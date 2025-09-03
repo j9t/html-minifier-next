@@ -127,26 +127,27 @@ For lint-like capabilities take a look at [HTMLLint](https://github.com/kangax/h
 
 ## Minification comparison
 
-How does HTML Minifier compare to other solutions, like [minimize](https://github.com/Swaagie/minimize) or [htmlcompressor.com](http://htmlcompressor.com/)?
+How does html-minifier-next compare to other solutions?
 
-| Site | Original size (KB) | HTMLMinifier | minimize | htmlcompressor.com |
-| --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 64 | **54** | 59 | 57 |
-| [Amazon](https://www.amazon.com/) | 707 | **635** | 693 | n/a |
-| [BBC](https://www.bbc.co.uk/) | 700 | **642** | 694 | n/a |
-| [CSS-Tricks](https://css-tricks.com/) | 167 | **124** | 153 | 149 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7205 | **6365** | 6585 | n/a |
-| [EFF](https://www.eff.org/) | 58 | **49** | 52 | 52 |
-| [Eloquent JavaScript](https://eloquentjavascript.net/) | 6 | **5** | 6 | 5 |
-| [FAZ](https://www.faz.net/aktuell/) | 1848 | **1727** | 1763 | n/a |
-| [Frontend Dogma](https://frontenddogma.com/) | 118 | **113** | 127 | 117 |
-| [Google](https://www.google.com/) | 50 | **46** | 50 | 50 |
-| [HTMLMinifier](https://github.com/kangax/html-minifier) | 371 | **249** | 347 | n/a |
-| [Mastodon](https://mastodon.social/explore) | 35 | **26** | 34 | 34 |
-| [NBC](https://www.nbc.com/) | 579 | **528** | 572 | n/a |
-| [New York Times](https://www.nytimes.com/) | 733 | **625** | 722 | n/a |
-| [United Nations](https://www.un.org/) | 9 | **7** | 8 | 8 |
-| [W3C](https://www.w3.org/) | 51 | **36** | 42 | 40 |
+[html-minifier-terser]: https://www.npmjs.com/package/html-minifier-terser/v/7.2.0
+[html-minifier-next]: https://www.npmjs.com/package/html-minifier-next/v/1.4.0
+[htmlnano]: https://www.npmjs.com/package/htmlnano/v/2.1.3
+[minify]: https://www.npmjs.com/package/@tdewolff/minify/v/2.24.2
+[minify-html]: https://www.npmjs.com/package/@minify-html/node/v/0.16.4
+
+| Website                                                     | Source (KB) | [html-minifier-terser] | [html-minifier-next] | [htmlnano] | [minify] | [minify-html] |
+| ----------------------------------------------------------- | ----------: | ---------------------: | -------------------: | ---------: | -------: | ------------: |
+| [stackoverflow.blog](https://stackoverflow.blog/)           |         166 |                   3.3% |                 3.3% |       8.3% |     4.6% |          4.0% |
+| [github.com](https://github.com/)                           |         541 |                   3.7% |                 3.7% |      18.1% |     7.9% |          6.2% |
+| [en.wikipedia.org](https://en.wikipedia.org/wiki/Main_Page) |         220 |                   4.6% |                 4.6% |       4.9% |     6.2% |          2.9% |
+| [npmjs.com](https://www.npmjs.com/package/eslint)           |         460 |                   0.5% |                 0.5% |       0.9% |     3.6% |          0.7% |
+| [tc39.es](https://tc39.es/ecma262/)                         |        7198 |                   8.5% |                 8.5% |       8.7% |     9.5% |          9.1% |
+| [apple.com](https://www.apple.com/)                         |         190 |                   7.6% |                 7.6% |      12.1% |    10.5% |          8.1% |
+| [w3.org](https://www.w3.org/)                               |          49 |                  18.9% |                18.9% |      23.0% |    24.1% |         19.9% |
+| [weather.com](https://weather.com)                          |        1770 |                   0.2% |                 0.2% |      12.1% |    11.9% |          0.6% |
+| **Avg. minify rate**                                        |             |               **5.9%** |             **5.9%** |  **11.0%** | **9.8%** |      **6.4%** |
+
+Latest benchmarks: https://github.com/maltsev/html-minifiers-benchmark (updated daily).
 
 ## Options quick reference
 
