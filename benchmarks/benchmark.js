@@ -222,6 +222,7 @@ async function processFile(fileName) {
       info.size = await readSize(info.filePath);
     }
 
+    // HTML Minifier Next
     async function testHTMLMinifier() {
       const info = infos.minifier;
       info.startTime = Date.now();
@@ -261,7 +262,7 @@ async function processFile(fileName) {
       });
     }
 
-    // Minimize (with defaults for best minification)
+    // Minimize, https://github.com/Swaagie/minimize
     async function testMinimize() {
       const data = await readBuffer(filePath);
       return new Promise((resolve, reject) => {
@@ -281,7 +282,7 @@ async function processFile(fileName) {
       });
     }
 
-    // htmlcompressor.com @@ https://htmlcompressor.com/api/#:~:text=HTMLCompressor%20API%20reference
+    // htmlcompressor.com, https://htmlcompressor.com/api/#:~:text=HTMLCompressor%20API%20reference
     async function testHTMLCompressor() {
       const data = await readText(filePath);
       const url = new URL('https://htmlcompressor.com/compress');
@@ -394,7 +395,7 @@ async function processFile(fileName) {
       });
     }
 
-    // htmlnano @@ https://htmlnano.netlify.app/presets
+    // htmlnano, https://htmlnano.netlify.app/presets
     async function testhtmlnano() {
       const data = await readText(filePath);
       const info = infos.htmlnano;
@@ -420,7 +421,7 @@ async function processFile(fileName) {
       }
     }
 
-    // minify-html @@ https://github.com/wilsonzlin/minify-html
+    // minify-html, https://github.com/wilsonzlin/minify-html
     async function testMinifyHTML() {
       const data = await readBuffer(filePath);
       const info = infos.minifyhtml;
