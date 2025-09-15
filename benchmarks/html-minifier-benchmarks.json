@@ -1,7 +1,7 @@
 {
   "caseSensitive": false,
   "collapseBooleanAttributes": true,
-  "collapseInlineTagWhitespace": false,
+  "collapseInlineTagWhitespace": true,
   "collapseWhitespace": true,
   "conservativeCollapse": false,
   "continueOnParseError": true,
@@ -19,11 +19,13 @@
   "maxLineLength": 0,
   "minifyCSS": true,
   "minifyJS": true,
+  "noNewlinesBeforeTagClose": true,
   "preserveLineBreaks": false,
   "preventAttributesEscaping": false,
   "processConditionalComments": true,
   "processScripts": [
-    "text/html"
+    "text/html",
+    "application/ld+json"
   ],
   "removeAttributeQuotes": true,
   "removeComments": true,

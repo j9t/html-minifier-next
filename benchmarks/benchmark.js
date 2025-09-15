@@ -381,6 +381,7 @@ async function processFile(fileName) {
         }).end(new URLSearchParams({
           code_type: 'html',
           html_level: 3,
+          html_single_line: 1,
           html_strip_quotes: 1,
           minimize_style: 1,
           minimize_events: 1,
@@ -401,15 +402,7 @@ async function processFile(fileName) {
       const info = infos.htmlnano;
 
       try {
-        const result = await htmlnano.process(data, {
-          minifyJs: true,
-          minifyCss: false, // Disable to avoid CSS parsing errors with modern syntax
-          removeEmptyAttributes: true,
-          removeRedundantAttributes: true,
-          collapseBooleanAttributes: true,
-          removeComments: true,
-          collapseWhitespace: true
-        });
+        const result = await htmlnano.process(data, {}, htmlnano.presets.max);
         await writeText(info.filePath, result.html);
         await readSizes(info);
       } catch (e) {
@@ -429,11 +422,21 @@ async function processFile(fileName) {
       try {
         const result = minifyHtml(data, {
           keep_closing_tags: false,
-          keep_html_and_head_opening_tags: false,
-          keep_spaces_between_attributes: false,
           keep_comments: false,
-          minify_js: false, // Disable JS minification to avoid Rust panics
-          minify_css: true
+          keep_html_and_head_opening_tags: false,
+          keep_input_type_text_attr: false,
+          keep_ssi_comments: false,
+          minify_css: true,
+          minify_js: true,
+          preserve_brace_template_syntax: false,
+          preserve_chevron_percent_template_syntax: false,
+          remove_bangs: true,
+          remove_processing_instructions: true,
+          // Excluded invalidating options as requested:
+          // allow_noncompliant_unquoted_attribute_values: false (default)
+          // allow_optimal_entities: false (default)
+          // allow_removing_spaces_between_attributes: false (default)
+          // minify_doctype: false (default)
         });
         await writeBuffer(info.filePath, result);
         await readSizes(info);
