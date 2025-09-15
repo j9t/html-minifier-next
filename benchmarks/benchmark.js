@@ -15,8 +15,8 @@ import Minimize from 'minimize';
 import Progress from 'progress';
 import Table from 'cli-table3';
 import htmlnano from 'htmlnano';
-import minifyHtmlPkg from '@minify-html/node';
-const { minify: minifyHtml } = minifyHtmlPkg;
+import minifyHTMLPkg from '@minify-html/node';
+const { minify: minifyHTML } = minifyHTMLPkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -320,7 +320,8 @@ async function processFile(fileName) {
         method: 'POST',
         headers: {
           'Accept-Encoding': 'gzip',
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'html-minifier-next-benchmark/1.0'
         }
       };
 
@@ -380,7 +381,7 @@ async function processFile(fileName) {
               const responseBytes = Buffer.byteLength(response, 'utf8');
               const originalBytes = Buffer.byteLength(data, 'utf8');
 
-              if (response && response.length > 0 && response.includes('<') && responseBytes < originalBytes) {
+              if (response && response.length > 0 && response.includes('<') && responseBytes <= originalBytes) {
                 compressedContent = response;
                 isSuccess = true;
               }
@@ -450,7 +451,7 @@ async function processFile(fileName) {
       const info = infos.minifyhtml;
 
       try {
-        const result = minifyHtml(data, {
+        const result = minifyHTML(data, {
           keep_closing_tags: false,
           keep_comments: false,
           keep_html_and_head_opening_tags: false,
