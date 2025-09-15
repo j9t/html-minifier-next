@@ -137,9 +137,39 @@ function generateMarkdownTable() {
     }
 
     const row = rows[fileName].report;
-    // Prevent double-bolding when regenerating README table
-    if (!row[2].startsWith('**')) {
-      row[2] = '**' + row[2] + '**';
+
+    // Find the best (smallest) size among all minifiers
+    // Minifier results start at index 2 (HTML Minifier Next)
+    const minifierResults = [];
+    for (let i = 2; i < row.length; i++) {
+      const value = row[i];
+      // Skip “n/a” results and parse numeric values
+      if (value !== 'n/a' && value !== '<1') {
+        const numericValue = parseFloat(value);
+        if (!isNaN(numericValue)) {
+          minifierResults.push({ index: i, value: numericValue, originalText: value });
+        }
+      }
+    }
+
+    if (minifierResults.length > 0) {
+      // Find the minimum value
+      const minValue = Math.min(...minifierResults.map(r => r.value));
+
+      // Bold all results that equal the minimum value
+      minifierResults.forEach(result => {
+        if (result.value === minValue) {
+          // Prevent double-bolding when regenerating README table
+          if (!result.originalText.startsWith('**')) {
+            row[result.index] = '**' + result.originalText + '**';
+          }
+        } else {
+          // Remove existing bold formatting if it’s not the best result
+          if (result.originalText.startsWith('**') && result.originalText.endsWith('**')) {
+            row[result.index] = result.originalText.slice(2, -2);
+          }
+        }
+      });
     }
   });
 
@@ -427,7 +457,7 @@ async function processFile(fileName) {
           keep_input_type_text_attr: false,
           keep_ssi_comments: false,
           minify_css: true,
-          minify_js: false, // Disable JS minification to avoid Rust panics
+          minify_js: true, // Disable if Rust panics get too frequent
           preserve_brace_template_syntax: false,
           preserve_chevron_percent_template_syntax: false,
           remove_bangs: true,
