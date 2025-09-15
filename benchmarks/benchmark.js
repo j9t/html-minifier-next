@@ -32,7 +32,7 @@ const progress = new Progress('[:bar] :etas :fileName', {
 });
 
 const table = new Table({
-  head: ['File', 'Before', 'HTML Minifier Next', 'Minimize', 'html&shy;compressor.com', 'htmlnano', 'minify-html', 'Savings', 'Time'],
+  head: ['File', 'Before', 'HTML Minifier Next', 'Minimize', 'htmlcompressor.com', 'htmlnano', 'minify-html', 'Savings', 'Time'],
   colWidths: [fileNames.reduce(function (length, fileName) {
     return Math.max(length, fileName.length);
   }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 20]
@@ -124,7 +124,7 @@ function generateMarkdownTable() {
     'Original size (KB)',
     'HTML Minifier Next',
     'minimize',
-    'htmlcompressor.com',
+    'html­compressor.com',
     'htmlnano',
     'minify-html'
   ];
@@ -427,16 +427,16 @@ async function processFile(fileName) {
           keep_input_type_text_attr: false,
           keep_ssi_comments: false,
           minify_css: true,
-          minify_js: true,
+          minify_js: false, // Disable JS minification to avoid Rust panics
           preserve_brace_template_syntax: false,
           preserve_chevron_percent_template_syntax: false,
           remove_bangs: true,
           remove_processing_instructions: true,
-          // Excluded invalidating options as requested:
-          // allow_noncompliant_unquoted_attribute_values: false (default)
-          // allow_optimal_entities: false (default)
-          // allow_removing_spaces_between_attributes: false (default)
-          // minify_doctype: false (default)
+          // Excluded invalidating options:
+          // allow_noncompliant_unquoted_attribute_values
+          // allow_optimal_entities
+          // allow_removing_spaces_between_attributes
+          // minify_doctype
         });
         await writeBuffer(info.filePath, result);
         await readSizes(info);
