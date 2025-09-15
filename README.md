@@ -127,27 +127,27 @@ For lint-like capabilities take a look at [HTMLLint](https://github.com/kangax/h
 
 ## Minification comparison
 
-How does HTML Minifier Next compare to other solutions, like [minimize](https://github.com/Swaagie/minimize), [htmlcompressor.com](http://htmlcompressor.com/), [htmlnano](https://github.com/posthtml/htmlnano), and [minify-html](https://github.com/wilsonzlin/minify-html)?
+How does HTML Minifier Next compare to other solutions, like [minimize](https://github.com/Swaagie/minimize), [htmlcompressor.com](http://htmlcompressor.com/), [htmlnano](https://github.com/posthtml/htmlnano), and [minify-html](https://github.com/wilsonzlin/minify-html)? (All with the most aggressive settings, but without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
 
-| Site | Original size (KB) | HTML Minifier Next | minimize | htmlcompressor.com | htmlnano | minify-html |
+| Site | Original size (KB) | HTML Minifier Next | minimize | html­compressor.com | htmlnano | minify-html |
 | --- | --- | --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 64 | **54** | 59 | 57 | 59 | 56 |
-| [Amazon](https://www.amazon.com/) | 718 | **645** | 704 | n/a | 667 | 683 |
-| [BBC](https://www.bbc.co.uk/) | 739 | **678** | 733 | n/a | 709 | 718 |
-| [CSS-Tricks](https://css-tricks.com/) | 165 | **123** | 151 | 148 | 136 | 148 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7205 | **6365** | 6585 | n/a | 6871 | 6538 |
-| [EFF](https://www.eff.org/) | 58 | **49** | 53 | 53 | 55 | 52 |
-| [Eloquent JavaScript](https://eloquentjavascript.net/) | 6 | **5** | 6 | 5 | 6 | 5 |
-| [FAZ](https://www.faz.net/aktuell/) | 1814 | **1696** | 1730 | n/a | 1623 | 1735 |
-| [Frontend Dogma](https://frontenddogma.com/) | 118 | **113** | 127 | 117 | 131 | 117 |
-| [Google](https://www.google.com/) | 50 | **46** | 50 | 50 | 48 | 49 |
-| [HTML Minifier Next](https://github.com/j9t/html-minifier-next) | 393 | **274** | 371 | n/a | 339 | 359 |
-| [Mastodon](https://mastodon.social/explore) | 35 | **26** | 34 | 34 | 31 | 33 |
-| [meiert.com](https://meiert.com/) | 25 | **24** | 26 | 25 | 26 | 25 |
-| [NBC](https://www.nbc.com/) | 584 | **533** | 576 | n/a | 559 | 571 |
-| [New York Times](https://www.nytimes.com/) | 864 | **738** | 852 | n/a | 801 | 848 |
-| [United Nations](https://www.un.org/) | 9 | **7** | 8 | 8 | 8 | 7 |
-| [W3C](https://www.w3.org/) | 50 | **36** | 41 | 39 | 40 | 41 |
+| [A List Apart](https://alistapart.com/) | 64 | **54** | 59 | 57 | 55 | 56 |
+| [Amazon](https://www.amazon.com/) | 700 | **628** | 687 | n/a | n/a | n/a |
+| [BBC](https://www.bbc.co.uk/) | 675 | **620** | 670 | n/a | 634 | 635 |
+| [CSS-Tricks](https://css-tricks.com/) | 165 | **122** | 151 | 147 | 129 | 146 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7205 | **6315** | 6585 | n/a | 6532 | 6538 |
+| [EFF](https://www.eff.org/) | 59 | **50** | 53 | 53 | 53 | 51 |
+| [FAZ](https://www.faz.net/aktuell/) | 1821 | 1702 | 1737 | n/a | **1605** | n/a |
+| [Frontend Dogma](https://frontenddogma.com/) | 117 | **112** | 126 | 117 | 124 | 117 |
+| [Google](https://www.google.com/) | 50 | **46** | 50 | 50 | 47 | n/a |
+| [Ground News](https://ground.news/) | 1753 | **1515** | 1740 | n/a | 1610 | n/a |
+| [HTML](https://html.spec.whatwg.org/multipage/) | 149 | **146** | 154 | 148 | 153 | 148 |
+| [Leanpub](https://leanpub.com/) | 1326 | **1128** | 1320 | n/a | 1135 | n/a |
+| [Mastodon](https://mastodon.social/explore) | 35 | **25** | 33 | 33 | 30 | 33 |
+| [MDN](https://developer.mozilla.org/en-US/) | 153 | 94 | 99 | 99 | **80** | n/a |
+| [Middle East Eye](https://www.middleeasteye.net/) | 221 | **194** | 201 | 202 | 201 | 199 |
+| [United Nations](https://www.un.org/en/) | 151 | **114** | 130 | 123 | 121 | 125 |
+| [W3C](https://www.w3.org/) | 50 | **36** | 41 | 40 | 39 | 39 |
 
 ## Options quick reference
 
