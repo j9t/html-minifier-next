@@ -22,15 +22,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const user_agent = 'html-minifier-next-benchmark/1.0';
-
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
-
 const minimize = new Minimize();
+const benchmarkErrors = [];
 
-const progress = new Progress('[:bar] :etas :fileName', {
-  width: 50,
-  total: fileNames.length
+const progress = new Progress(':current/:total [:bar] :percent :etas :fileName', {
+  width: 40,
+  total: fileNames.length,
+  complete: '=',
+  incomplete: '-',
+  clear: true,
+  stream: process.stderr
 });
 
 const table = new Table({
@@ -134,7 +137,7 @@ function generateMarkdownTable() {
   fileNames.forEach(function (fileName) {
     // Add a check for `rows[fileName]`
     if (!rows[fileName] || !rows[fileName].report) {
-      console.error(`Skipping ${fileName}: row or report is missing`);
+      benchmarkErrors.push(`Skipping ${fileName}: row or report is missing`);
       return;
     }
 
@@ -197,7 +200,7 @@ function displayTable() {
     if (rows[fileName]) { // Ensure the `fileName` exists in rows
       table.push(rows[fileName].display);
     } else {
-      console.warn(`Warning: No data available for ${fileName}. Skipping.`);
+      benchmarkErrors.push(`No data available for ${fileName}. Skipping.`);
     }
   });
   console.log();
@@ -300,6 +303,7 @@ async function processFile(fileName) {
       return new Promise((resolve, reject) => {
         minimize.parse(data, function (err, data) {
           if (err) {
+            benchmarkErrors.push(`Minimize failed for ${fileName}: ${err.message}`);
             return reject(new Error(`Minimize failed for ${fileName}: ${err.message}`));
           }
 
@@ -344,7 +348,7 @@ async function processFile(fileName) {
         const request = https.request(url, options, function (res) {
           // Check HTTP status code
           if (res.statusCode < 200 || res.statusCode >= 300) {
-            console.warn(`htmlcompressor.com failed for ${fileName}: HTTP ${res.statusCode}`);
+            benchmarkErrors.push(`htmlcompressor.com failed for ${fileName}: HTTP ${res.statusCode}`);
             failed();
             resolve();
             return;
@@ -406,14 +410,14 @@ async function processFile(fileName) {
 
         // Set request timeout (15 seconds)
         request.setTimeout(15000, function() {
-          console.warn(`htmlcompressor.com timed out for ${fileName}`);
+          benchmarkErrors.push(`htmlcompressor.com timed out for ${fileName}`);
           request.destroy();
           failed();
           resolve();
         });
 
         request.on('error', (err) => {
-          console.warn(`htmlcompressor.com error for ${fileName}: ${err.message}`);
+          benchmarkErrors.push(`htmlcompressor.com error for ${fileName}: ${err.message}`);
           failed();
           resolve();
         }).end(new URLSearchParams({
@@ -444,7 +448,7 @@ async function processFile(fileName) {
         await writeText(info.filePath, result.html);
         await readSizes(info);
       } catch (e) {
-        console.warn(`htmlnano failed for ${fileName}: ${e.message}`);
+        benchmarkErrors.push(`htmlnano failed for ${fileName}: ${e.message}`);
         info.size = 0;
         info.gzSize = 0;
         info.lzSize = 0;
@@ -479,7 +483,7 @@ async function processFile(fileName) {
         await writeBuffer(info.filePath, result);
         await readSizes(info);
       } catch (e) {
-        console.warn(`minify-html failed for ${fileName}:`, e.message);
+        benchmarkErrors.push(`minify-html failed for ${fileName}: ${e.message}`);
         info.size = 0;
         info.gzSize = 0;
         info.lzSize = 0;
@@ -534,7 +538,7 @@ async function processFile(fileName) {
       display: display,
       report: report
     };
-    progress.tick({ fileName: '' });
+    progress.tick({ fileName: `Completed ${fileName}` });
   }
 
   async function get(site) {
@@ -580,7 +584,7 @@ async function processFile(fileName) {
 
           if (decompressionStream) {
             decompressionStream.on('error', function (err) {
-              console.error(`Decompression error for ${site}: ${err.message}`);
+              benchmarkErrors.push(`Decompression error for ${site}: ${err.message}`);
               safeResolve(null);
             });
           }
@@ -589,12 +593,12 @@ async function processFile(fileName) {
 
           // Handle all possible stream errors
           res.on('error', function (err) {
-            console.error(`Response stream error for ${site}: ${err.message}`);
+            benchmarkErrors.push(`Response stream error for ${site}: ${err.message}`);
             safeResolve(null);
           });
 
           writeStream.on('error', function (err) {
-            console.error(`Write stream error for ${site}: ${err.message}`);
+            benchmarkErrors.push(`Write stream error for ${site}: ${err.message}`);
             safeResolve(null);
           });
 
@@ -615,7 +619,7 @@ async function processFile(fileName) {
           res.resume(); // Consume response to free memory
           get(new URL(res.headers.location, site)).then(safeResolve);
         } else {
-          console.warn(`Warning: HTTP error ${status} for ${site}`);
+          benchmarkErrors.push(`HTTP error ${status} for ${site}`);
           res.resume(); // Consume response to free memory
           safeResolve(null);
         }
@@ -623,22 +627,22 @@ async function processFile(fileName) {
 
       // Set request timeout (30 seconds)
       request.setTimeout(30000, function() {
-        console.warn(`Request timeout for ${site}`);
+        benchmarkErrors.push(`Request timeout for ${site}`);
         request.destroy();
         safeResolve(null);
       });
 
       request.on('error', function (err) {
-        console.error(`Error: Failed to fetch ${site} - ${err.message}`);
+        benchmarkErrors.push(`Failed to fetch ${site}: ${err.message}`);
         safeResolve(null);
       });
     });
   }
 
-  progress.tick(0, { fileName: fileName });
+  progress.tick(0, { fileName: `Starting ${fileName}` });
   const site = await get(urls[fileName]);
   if (!site) {
-    console.warn(`Skipping ${fileName} due to download failure.`);
+    benchmarkErrors.push(`Skipping ${fileName} due to download failure`);
     rows[fileName] = null; // Explicitly mark as skipped
     return;
   }
@@ -648,6 +652,17 @@ async function processFile(fileName) {
 await processFiles();
 
 displayTable();
+
+// Display issues that occurred during benchmarking
+if (benchmarkErrors.length > 0) {
+  console.log();
+  console.log(chalk.yellow('Benchmark warnings and errors:'));
+  benchmarkErrors.forEach(error => {
+    console.log(chalk.red(`• ${error}`));
+  });
+  console.log();
+}
+
 const content = generateMarkdownTable();
 const readme = '../README.md';
 const data = await readText(readme);
