@@ -656,7 +656,7 @@ displayTable();
 // Display issues that occurred during benchmarking
 if (benchmarkErrors.length > 0) {
   console.log();
-  console.log(chalk.yellow('Benchmark warnings and errors:'));
+  console.log('Benchmark warnings and errors:');
   benchmarkErrors.forEach(error => {
     console.log(chalk.red(`• ${error}`));
   });
