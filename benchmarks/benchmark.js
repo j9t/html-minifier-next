@@ -15,20 +15,25 @@ import Minimize from 'minimize';
 import Progress from 'progress';
 import Table from 'cli-table3';
 import htmlnano from 'htmlnano';
-import minifyHtmlPkg from '@minify-html/node';
-const { minify: minifyHtml } = minifyHtmlPkg;
+import minifyHTMLPkg from '@minify-html/node';
+const { minify: minifyHTML } = minifyHTMLPkg;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const user_agent = 'html-minifier-next-benchmarks/0.0';
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
-
 const minimize = new Minimize();
+const benchmarkErrors = [];
 
-const progress = new Progress('[:bar] :etas :fileName', {
-  width: 50,
-  total: fileNames.length
+const progress = new Progress(':current/:total [:bar] :percent :etas :fileName', {
+  width: 40,
+  total: fileNames.length,
+  complete: '=',
+  incomplete: '-',
+  clear: true,
+  stream: process.stderr
 });
 
 const table = new Table({
@@ -124,7 +129,7 @@ function generateMarkdownTable() {
     'Original size (KB)',
     'HTML Minifier Next',
     'minimize',
-    'htmlcompressor.com',
+    'html­compressor.com',
     'htmlnano',
     'minify-html'
   ];
@@ -132,14 +137,44 @@ function generateMarkdownTable() {
   fileNames.forEach(function (fileName) {
     // Add a check for `rows[fileName]`
     if (!rows[fileName] || !rows[fileName].report) {
-      console.error(`Skipping ${fileName}: row or report is missing`);
+      benchmarkErrors.push(`Skipping ${fileName}: row or report is missing`);
       return;
     }
 
     const row = rows[fileName].report;
-    // Prevent double-bolding when regenerating README table
-    if (!row[2].startsWith('**')) {
-      row[2] = '**' + row[2] + '**';
+
+    // Find the best (smallest) size among all minifiers
+    // Minifier results start at index 2 (HTML Minifier Next)
+    const minifierResults = [];
+    for (let i = 2; i < row.length; i++) {
+      const value = row[i];
+      // Skip “n/a” results and parse numeric values
+      if (value !== 'n/a' && value !== '<1') {
+        const numericValue = parseFloat(value);
+        if (!isNaN(numericValue)) {
+          minifierResults.push({ index: i, value: numericValue, originalText: value });
+        }
+      }
+    }
+
+    if (minifierResults.length > 0) {
+      // Find the minimum value
+      const minValue = Math.min(...minifierResults.map(r => r.value));
+
+      // Bold all results that equal the minimum value
+      minifierResults.forEach(result => {
+        if (result.value === minValue) {
+          // Prevent double-bolding when regenerating README table
+          if (!result.originalText.startsWith('**')) {
+            row[result.index] = '**' + result.originalText + '**';
+          }
+        } else {
+          // Remove existing bold formatting if it’s not the best result
+          if (result.originalText.startsWith('**') && result.originalText.endsWith('**')) {
+            row[result.index] = result.originalText.slice(2, -2);
+          }
+        }
+      });
     }
   });
 
@@ -165,7 +200,7 @@ function displayTable() {
     if (rows[fileName]) { // Ensure the `fileName` exists in rows
       table.push(rows[fileName].display);
     } else {
-      console.warn(`Warning: No data available for ${fileName}. Skipping.`);
+      benchmarkErrors.push(`No data available for ${fileName}. Skipping.`);
     }
   });
   console.log();
@@ -222,6 +257,7 @@ async function processFile(fileName) {
       info.size = await readSize(info.filePath);
     }
 
+    // HTML Minifier Next
     async function testHTMLMinifier() {
       const info = infos.minifier;
       info.startTime = Date.now();
@@ -261,11 +297,13 @@ async function processFile(fileName) {
       });
     }
 
+    // Minimize, https://github.com/Swaagie/minimize
     async function testMinimize() {
-      const data = await readBuffer(filePath);
+      const data = await readText(filePath);
       return new Promise((resolve, reject) => {
         minimize.parse(data, function (err, data) {
           if (err) {
+            benchmarkErrors.push(`Minimize failed for ${fileName}: ${err.message}`);
             return reject(new Error(`Minimize failed for ${fileName}: ${err.message}`));
           }
 
@@ -280,6 +318,7 @@ async function processFile(fileName) {
       });
     }
 
+    // htmlcompressor.com, https://htmlcompressor.com/api/#:~:text=HTMLCompressor%20API%20reference
     async function testHTMLCompressor() {
       const data = await readText(filePath);
       const url = new URL('https://htmlcompressor.com/compress');
@@ -287,7 +326,8 @@ async function processFile(fileName) {
         method: 'POST',
         headers: {
           'Accept-Encoding': 'gzip',
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': user_agent
         }
       };
 
@@ -308,7 +348,7 @@ async function processFile(fileName) {
         const request = https.request(url, options, function (res) {
           // Check HTTP status code
           if (res.statusCode < 200 || res.statusCode >= 300) {
-            console.warn(`htmlcompressor.com failed for ${fileName}: HTTP ${res.statusCode}`);
+            benchmarkErrors.push(`htmlcompressor.com failed for ${fileName}: HTTP ${res.statusCode}`);
             failed();
             resolve();
             return;
@@ -318,12 +358,17 @@ async function processFile(fileName) {
           const contentType = res.headers['content-type'] || '';
           const isJson = contentType.includes('application/json');
 
+          let stream = res;
           if (res.headers['content-encoding'] === 'gzip') {
-            res = res.pipe(zlib.createGunzip());
+            stream = stream.pipe(zlib.createGunzip());
+          } else if (res.headers['content-encoding'] === 'br') {
+            stream = stream.pipe(zlib.createBrotliDecompress());
+          } else if (res.headers['content-encoding'] === 'deflate') {
+            stream = stream.pipe(zlib.createInflate());
           }
-          res.setEncoding('utf8');
+          stream.setEncoding('utf8');
           let response = '';
-          res.on('data', function (chunk) {
+          stream.on('data', function (chunk) {
             response += chunk;
           }).on('end', async function () {
             let compressedContent = '';
@@ -347,7 +392,7 @@ async function processFile(fileName) {
               const responseBytes = Buffer.byteLength(response, 'utf8');
               const originalBytes = Buffer.byteLength(data, 'utf8');
 
-              if (response && response.length > 0 && response.includes('<') && responseBytes < originalBytes) {
+              if (response && response.length > 0 && response.includes('<') && responseBytes <= originalBytes) {
                 compressedContent = response;
                 isSuccess = true;
               }
@@ -365,19 +410,20 @@ async function processFile(fileName) {
 
         // Set request timeout (15 seconds)
         request.setTimeout(15000, function() {
-          console.warn(`htmlcompressor.com timed out for ${fileName}`);
+          benchmarkErrors.push(`htmlcompressor.com timed out for ${fileName}`);
           request.destroy();
           failed();
           resolve();
         });
 
         request.on('error', (err) => {
-          console.warn(`htmlcompressor.com error for ${fileName}: ${err.message}`);
+          benchmarkErrors.push(`htmlcompressor.com error for ${fileName}: ${err.message}`);
           failed();
           resolve();
         }).end(new URLSearchParams({
           code_type: 'html',
           html_level: 3,
+          html_single_line: 1,
           html_strip_quotes: 1,
           minimize_style: 1,
           minimize_events: 1,
@@ -392,25 +438,17 @@ async function processFile(fileName) {
       });
     }
 
+    // htmlnano, https://htmlnano.netlify.app/presets
     async function testhtmlnano() {
       const data = await readText(filePath);
       const info = infos.htmlnano;
 
       try {
-        // Use htmlnano with default preset
-        const result = await htmlnano.process(data, {
-          minifyJs: true,
-          minifyCss: false, // Disable to avoid CSS parsing errors with modern syntax
-          removeEmptyAttributes: true,
-          removeRedundantAttributes: true,
-          collapseBooleanAttributes: true,
-          removeComments: true,
-          collapseWhitespace: true
-        });
+        const result = await htmlnano.process(data, {}, htmlnano.presets.max);
         await writeText(info.filePath, result.html);
         await readSizes(info);
       } catch (e) {
-        console.warn(`htmlnano failed for ${fileName}: ${e.message}`);
+        benchmarkErrors.push(`htmlnano failed for ${fileName}: ${e.message}`);
         info.size = 0;
         info.gzSize = 0;
         info.lzSize = 0;
@@ -418,23 +456,34 @@ async function processFile(fileName) {
       }
     }
 
+    // minify-html, https://github.com/wilsonzlin/minify-html
     async function testMinifyHTML() {
       const data = await readBuffer(filePath);
       const info = infos.minifyhtml;
 
       try {
-        const result = minifyHtml(data, {
+        const result = minifyHTML(data, {
           keep_closing_tags: false,
-          keep_html_and_head_opening_tags: false,
-          keep_spaces_between_attributes: false,
           keep_comments: false,
-          minify_js: false, // Disable JS minification to avoid Rust panics
-          minify_css: true
+          keep_html_and_head_opening_tags: false,
+          keep_input_type_text_attr: false,
+          keep_ssi_comments: false,
+          minify_css: true,
+          minify_js: true, // Disable if Rust panics get too frequent
+          preserve_brace_template_syntax: false,
+          preserve_chevron_percent_template_syntax: false,
+          remove_bangs: true,
+          remove_processing_instructions: true,
+          // Excluded invalidating options:
+          // allow_noncompliant_unquoted_attribute_values
+          // allow_optimal_entities
+          // allow_removing_spaces_between_attributes
+          // minify_doctype
         });
         await writeBuffer(info.filePath, result);
         await readSizes(info);
       } catch (e) {
-        console.warn(`minify-html failed for ${fileName}:`, e.message);
+        benchmarkErrors.push(`minify-html failed for ${fileName}: ${e.message}`);
         info.size = 0;
         info.gzSize = 0;
         info.lzSize = 0;
@@ -489,7 +538,7 @@ async function processFile(fileName) {
       display: display,
       report: report
     };
-    progress.tick({ fileName: '' });
+    progress.tick({ fileName: `Completed ${fileName}` });
   }
 
   async function get(site) {
@@ -506,20 +555,36 @@ async function processFile(fileName) {
         }
       }
 
-      const request = https.get(url, function (res) {
+      const request = https.get({
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname + url.search,
+        headers: {
+          'Accept-Encoding': 'gzip, br, deflate',
+          'User-Agent': user_agent
+        }
+      }, function (res) {
         const status = res.statusCode;
 
         if (status === 200) {
           let stream = res;
-          let gunzipStream = null;
+          let decompressionStream = null;
 
-          // Handle gzip compression
+          // Handle compression
           if (res.headers['content-encoding'] === 'gzip') {
-            gunzipStream = zlib.createGunzip();
-            stream = res.pipe(gunzipStream);
+            decompressionStream = zlib.createGunzip();
+            stream = res.pipe(decompressionStream);
+          } else if (res.headers['content-encoding'] === 'br') {
+            decompressionStream = zlib.createBrotliDecompress();
+            stream = res.pipe(decompressionStream);
+          } else if (res.headers['content-encoding'] === 'deflate') {
+            decompressionStream = zlib.createInflate();
+            stream = res.pipe(decompressionStream);
+          }
 
-            gunzipStream.on('error', function (err) {
-              console.error(`Gunzip error for ${site}: ${err.message}`);
+          if (decompressionStream) {
+            decompressionStream.on('error', function (err) {
+              benchmarkErrors.push(`Decompression error for ${site}: ${err.message}`);
               safeResolve(null);
             });
           }
@@ -528,12 +593,12 @@ async function processFile(fileName) {
 
           // Handle all possible stream errors
           res.on('error', function (err) {
-            console.error(`Response stream error for ${site}: ${err.message}`);
+            benchmarkErrors.push(`Response stream error for ${site}: ${err.message}`);
             safeResolve(null);
           });
 
           writeStream.on('error', function (err) {
-            console.error(`Write stream error for ${site}: ${err.message}`);
+            benchmarkErrors.push(`Write stream error for ${site}: ${err.message}`);
             safeResolve(null);
           });
 
@@ -554,7 +619,7 @@ async function processFile(fileName) {
           res.resume(); // Consume response to free memory
           get(new URL(res.headers.location, site)).then(safeResolve);
         } else {
-          console.warn(`Warning: HTTP error ${status} for ${site}`);
+          benchmarkErrors.push(`HTTP error ${status} for ${site}`);
           res.resume(); // Consume response to free memory
           safeResolve(null);
         }
@@ -562,22 +627,22 @@ async function processFile(fileName) {
 
       // Set request timeout (30 seconds)
       request.setTimeout(30000, function() {
-        console.warn(`Request timeout for ${site}`);
+        benchmarkErrors.push(`Request timeout for ${site}`);
         request.destroy();
         safeResolve(null);
       });
 
       request.on('error', function (err) {
-        console.error(`Error: Failed to fetch ${site} - ${err.message}`);
+        benchmarkErrors.push(`Failed to fetch ${site}: ${err.message}`);
         safeResolve(null);
       });
     });
   }
 
-  progress.tick(0, { fileName: fileName });
+  progress.tick(0, { fileName: `Starting ${fileName}` });
   const site = await get(urls[fileName]);
   if (!site) {
-    console.warn(`Skipping ${fileName} due to download failure.`);
+    benchmarkErrors.push(`Skipping ${fileName} due to download failure`);
     rows[fileName] = null; // Explicitly mark as skipped
     return;
   }
@@ -587,6 +652,17 @@ async function processFile(fileName) {
 await processFiles();
 
 displayTable();
+
+// Display issues that occurred during benchmarking
+if (benchmarkErrors.length > 0) {
+  console.log();
+  console.log('Benchmark warnings and errors:');
+  benchmarkErrors.forEach(error => {
+    console.log(chalk.red(`• ${error}`));
+  });
+  console.log();
+}
+
 const content = generateMarkdownTable();
 const readme = '../README.md';
 const data = await readText(readme);
