@@ -21,6 +21,8 @@ const { minify: minifyHTML } = minifyHTMLPkg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const user_agent = 'html-minifier-next-benchmark/1.0';
+
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
 
@@ -294,7 +296,7 @@ async function processFile(fileName) {
 
     // Minimize, https://github.com/Swaagie/minimize
     async function testMinimize() {
-      const data = await readBuffer(filePath);
+      const data = await readText(filePath);
       return new Promise((resolve, reject) => {
         minimize.parse(data, function (err, data) {
           if (err) {
@@ -321,7 +323,7 @@ async function processFile(fileName) {
         headers: {
           'Accept-Encoding': 'gzip',
           'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'html-minifier-next-benchmark/1.0'
+          'User-Agent': user_agent
         }
       };
 
@@ -352,12 +354,17 @@ async function processFile(fileName) {
           const contentType = res.headers['content-type'] || '';
           const isJson = contentType.includes('application/json');
 
+          let stream = res;
           if (res.headers['content-encoding'] === 'gzip') {
-            res = res.pipe(zlib.createGunzip());
+            stream = stream.pipe(zlib.createGunzip());
+          } else if (res.headers['content-encoding'] === 'br') {
+            stream = stream.pipe(zlib.createBrotliDecompress());
+          } else if (res.headers['content-encoding'] === 'deflate') {
+            stream = stream.pipe(zlib.createInflate());
           }
-          res.setEncoding('utf8');
+          stream.setEncoding('utf8');
           let response = '';
-          res.on('data', function (chunk) {
+          stream.on('data', function (chunk) {
             response += chunk;
           }).on('end', async function () {
             let compressedContent = '';
@@ -544,20 +551,36 @@ async function processFile(fileName) {
         }
       }
 
-      const request = https.get(url, function (res) {
+      const request = https.get({
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname + url.search,
+        headers: {
+          'Accept-Encoding': 'gzip, br, deflate',
+          'User-Agent': user_agent
+        }
+      }, function (res) {
         const status = res.statusCode;
 
         if (status === 200) {
           let stream = res;
-          let gunzipStream = null;
+          let decompressionStream = null;
 
-          // Handle gzip compression
+          // Handle compression
           if (res.headers['content-encoding'] === 'gzip') {
-            gunzipStream = zlib.createGunzip();
-            stream = res.pipe(gunzipStream);
+            decompressionStream = zlib.createGunzip();
+            stream = res.pipe(decompressionStream);
+          } else if (res.headers['content-encoding'] === 'br') {
+            decompressionStream = zlib.createBrotliDecompress();
+            stream = res.pipe(decompressionStream);
+          } else if (res.headers['content-encoding'] === 'deflate') {
+            decompressionStream = zlib.createInflate();
+            stream = res.pipe(decompressionStream);
+          }
 
-            gunzipStream.on('error', function (err) {
-              console.error(`Gunzip error for ${site}: ${err.message}`);
+          if (decompressionStream) {
+            decompressionStream.on('error', function (err) {
+              console.error(`Decompression error for ${site}: ${err.message}`);
               safeResolve(null);
             });
           }
