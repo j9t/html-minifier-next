@@ -21,7 +21,7 @@ const { minify: minifyHTML } = minifyHTMLPkg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const user_agent = 'html-minifier-next-benchmark/1.0';
+const user_agent = 'html-minifier-next-benchmarks/0.0';
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
 const minimize = new Minimize();
