@@ -3,9 +3,9 @@
 [![npm version](https://img.shields.io/npm/v/html-minifier-next.svg)](https://www.npmjs.com/package/html-minifier-next)
 [![Build status](https://github.com/j9t/html-minifier-next/workflows/CI/badge.svg)](https://github.com/j9t/html-minifier-next/actions?workflow=CI)
 
-HTML Minifier Next is a highly **configurable, well-tested, JavaScript-based HTML minifier**.
+HTML Minifier Next (HMN) is a highly **configurable, well-tested, JavaScript-based HTML minifier**.
 
-The project has been based on [Terser’s html-minifier-terser](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy Zaytsev’s html-minifier](https://github.com/kangax/html-minifier). It was set up because as of 2025, both html-minifier-terser and html-minifier have been unmaintained for some time. As the project seems maintainable [to me, [Jens](https://meiert.com/)]—even more so with community support—, it will be updated and documented further in this place.
+The project has been based on [Terser’s html-minifier-terser](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy Zaytsev’s html-minifier](https://github.com/kangax/html-minifier) (HMN offers additional features, but is compatible with both). It was set up because as of 2025, both html-minifier-terser and html-minifier have been unmaintained for some time. As the project seems maintainable [to me, [Jens](https://meiert.com/)]—even more so with community support—, it’s being updated and documented further in this place.
 
 ## Installation
 
@@ -222,9 +222,9 @@ SVG elements are automatically recognized, and when they are minified, both case
 
 HTML Minifier Next **can’t work with invalid or partial chunks of markup**. This is because it parses markup into a tree structure, then modifies it (removing anything that was specified for removal, ignoring anything that was specified to be ignored, etc.), then it creates a markup out of that tree and returns it.
 
-Input markup (e.g., `<p id="">foo`) → Internal representation of markup in a form of tree (e.g., `{ tag: "p", attr: "id", children: ["foo"] }`) → Transformation of internal representation (e.g., removal of `id` attribute) → Output of resulting markup (e.g., `<p>foo</p>`)
+_Input markup (e.g., `<p id="">foo`) → Internal representation of markup in a form of tree (e.g., `{ tag: "p", attr: "id", children: ["foo"] }`) → Transformation of internal representation (e.g., removal of `id` attribute) → Output of resulting markup (e.g., `<p>foo</p>`)_
 
-HTML Minifier Next can’t know that the original markup represented only part of the tree. It parses a complete tree and, in doing so, loses information about the input being malformed or partial. As a result, it can’t emit a partial or malformed tree.
+HMN can’t know that the original markup represented only part of the tree. It parses a complete tree and, in doing so, loses information about the input being malformed or partial. As a result, it can’t emit a partial or malformed tree.
 
 To validate HTML markup, use [the W3C validator](https://validator.w3.org/) or one of [several validator packages](https://meiert.com/blog/html-validator-packages/).
 
