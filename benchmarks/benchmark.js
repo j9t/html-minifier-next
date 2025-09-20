@@ -9,13 +9,13 @@ import { fileURLToPath } from 'url';
 import { pipeline } from 'stream/promises';
 import { createReadStream, createWriteStream } from 'fs';
 import { styleText } from 'node:util';
-
 import lzma from 'lzma';
 import Minimize from 'minimize';
 import Progress from 'progress';
 import Table from 'cli-table3';
 import htmlnano from 'htmlnano';
 import minifyHTMLPkg from '@minify-html/node';
+
 const { minify: minifyHTML } = minifyHTMLPkg;
 
 const __filename = fileURLToPath(import.meta.url);

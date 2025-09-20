@@ -33,7 +33,6 @@ import { Command } from 'commander';
 import { minify } from './src/htmlminifier.js';
 
 const require = createRequire(import.meta.url);
-
 const pkg = require('./package.json');
 
 const program = new Command();
