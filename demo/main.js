@@ -252,57 +252,58 @@ const getOptions = (options) => {
   return minifierOptions;
 };
 
-window.Alpine.data('minifier', () => ({
-  options: sillyClone(defaultOptions),
-  input: '',
-  output: '',
-  stats: {
-    result: '',
-    text: ''
-  },
-
-  async minify() {
-    this.stats = {
+// Register Alpine data before Alpine starts
+document.addEventListener('alpine:init', () => {
+  window.Alpine.data('minifier', () => ({
+    options: sillyClone(defaultOptions),
+    input: '',
+    output: '',
+    stats: {
       result: '',
       text: ''
-    };
+    },
 
-    const options = getOptions(this.options);
-
-    try {
-      const data = await HTMLMinifier.minify(this.input, options);
-
-      const diff = this.input.length - data.length;
-      const savings = this.input.length ? (100 * diff / this.input.length).toFixed(2) : 0;
-
-      this.output = data;
-      this.stats.result = 'success';
-      this.stats.text = `Original Size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
-    } catch (err) {
-      this.stats.result = 'failure';
-      this.stats.text = err + '';
-      console.error(err);
-    }
-  },
-
-  selectAllOptions(yes = true) {
-    this.options = this.options.map((option) => {
-      if (option.type !== 'checkbox') {
-        return option;
-      }
-
-      return {
-        ...option,
-        checked: Boolean(yes)
+    async minify() {
+      this.stats = {
+        result: '',
+        text: ''
       };
-    });
-  },
 
-  resetOptions() {
-    this.options = sillyClone(defaultOptions);
-  }
-}));
+      const options = getOptions(this.options);
 
-window.Alpine.start();
+      try {
+        const data = await HTMLMinifier.minify(this.input, options);
+
+        const diff = this.input.length - data.length;
+        const savings = this.input.length ? (100 * diff / this.input.length).toFixed(2) : 0;
+
+        this.output = data;
+        this.stats.result = 'success';
+        this.stats.text = `Original Size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
+      } catch (err) {
+        this.stats.result = 'failure';
+        this.stats.text = err + '';
+        console.error(err);
+      }
+    },
+
+    selectAllOptions(yes = true) {
+      this.options = this.options.map((option) => {
+        if (option.type !== 'checkbox') {
+          return option;
+        }
+
+        return {
+          ...option,
+          checked: Boolean(yes)
+        };
+      });
+    },
+
+    resetOptions() {
+      this.options = sillyClone(defaultOptions);
+    }
+  }));
+});
 
 document.getElementById('minifier-version').innerText = `(v${pkg.version})`;
