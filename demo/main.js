@@ -1,4 +1,3 @@
-import Alpine from 'alpinejs';
 import HTMLMinifier from '../dist/htmlminifier.esm.bundle.js';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -253,7 +252,7 @@ const getOptions = (options) => {
   return minifierOptions;
 };
 
-Alpine.data('minifier', () => ({
+window.Alpine.data('minifier', () => ({
   options: sillyClone(defaultOptions),
   input: '',
   output: '',
@@ -304,6 +303,6 @@ Alpine.data('minifier', () => ({
   }
 }));
 
-Alpine.start();
+window.Alpine.start();
 
 document.getElementById('minifier-version').innerText = `(v${pkg.version})`;
