@@ -187,7 +187,6 @@ const defaultOptions = [
     type: 'checkbox',
     label: 'Remove tag whitespace',
     helpText: `Remove space between attributes whenever possible; <em>note that this will result in invalid HTML</em>`,
-    checked: false,
     unsafe: true
   },
   {
@@ -195,7 +194,6 @@ const defaultOptions = [
     type: 'checkbox',
     label: 'Sort attributes',
     helpText: 'Sort attributes by frequency',
-    checked: true,
     unsafe: true
   },
   {
@@ -203,7 +201,6 @@ const defaultOptions = [
     type: 'checkbox',
     label: 'Sort class name',
     helpText: 'Sort style classes by frequency',
-    checked: true,
     unsafe: true
   },
   {
@@ -252,58 +249,66 @@ const getOptions = (options) => {
   return minifierOptions;
 };
 
-// Register Alpine data before Alpine starts
-document.addEventListener('alpine:init', () => {
-  window.Alpine.data('minifier', () => ({
-    options: sillyClone(defaultOptions),
-    input: '',
-    output: '',
-    stats: {
+// Register Alpine data
+const minifierData = () => ({
+  options: sillyClone(defaultOptions),
+  input: '',
+  output: '',
+  stats: {
+    result: '',
+    text: ''
+  },
+
+  async minify() {
+    this.stats = {
       result: '',
       text: ''
-    },
+    };
 
-    async minify() {
-      this.stats = {
-        result: '',
-        text: ''
-      };
+    const options = getOptions(this.options);
 
-      const options = getOptions(this.options);
+    try {
+      const data = await HTMLMinifier.minify(this.input, options);
 
-      try {
-        const data = await HTMLMinifier.minify(this.input, options);
+      const diff = this.input.length - data.length;
+      const savings = this.input.length ? (100 * diff / this.input.length).toFixed(2) : 0;
 
-        const diff = this.input.length - data.length;
-        const savings = this.input.length ? (100 * diff / this.input.length).toFixed(2) : 0;
-
-        this.output = data;
-        this.stats.result = 'success';
-        this.stats.text = `Original Size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
-      } catch (err) {
-        this.stats.result = 'failure';
-        this.stats.text = err + '';
-        console.error(err);
-      }
-    },
-
-    selectAllOptions(yes = true) {
-      this.options = this.options.map((option) => {
-        if (option.type !== 'checkbox') {
-          return option;
-        }
-
-        return {
-          ...option,
-          checked: Boolean(yes)
-        };
-      });
-    },
-
-    resetOptions() {
-      this.options = sillyClone(defaultOptions);
+      this.output = data;
+      this.stats.result = 'success';
+      this.stats.text = `Original Size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
+    } catch (err) {
+      this.output = '';
+      this.stats.result = 'failure';
+      this.stats.text = err + '';
+      console.error(err);
     }
-  }));
+  },
+
+  selectAllOptions(yes = true) {
+    this.options = this.options.map((option) => {
+      if (option.type !== 'checkbox') {
+        return option;
+      }
+
+      return {
+        ...option,
+        checked: Boolean(yes)
+      };
+    });
+  },
+
+  resetOptions() {
+    this.options = sillyClone(defaultOptions);
+    this.output = '';
+    this.stats = { result: '', text: '' };
+  }
 });
+
+const registerMinifier = () => window.Alpine.data('minifier', minifierData);
+if (window.Alpine) {
+  registerMinifier();
+} else {
+  document.addEventListener('alpine:init', registerMinifier, { once: true });
+}
 
 document.getElementById('minifier-version').innerText = `(v${pkg.version})`;
