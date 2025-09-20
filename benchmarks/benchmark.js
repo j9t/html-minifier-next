@@ -8,8 +8,8 @@ import { fork } from 'child_process';
 import { fileURLToPath } from 'url';
 import { pipeline } from 'stream/promises';
 import { createReadStream, createWriteStream } from 'fs';
+import { styleText } from 'node:util';
 
-import chalk from 'chalk';
 import lzma from 'lzma';
 import Minimize from 'minimize';
 import Progress from 'progress';
@@ -48,17 +48,17 @@ function toKb(size, precision) {
 }
 
 function redSize(size) {
-  return chalk.red.bold(size) + chalk.white(' (' + toKb(size, 2) + ' KB)');
+  return styleText(['red', 'bold'], String(size)) + styleText(['white'], ' (' + toKb(size, 2) + ' KB)');
 }
 
 function greenSize(size) {
-  return chalk.green.bold(size) + chalk.white(' (' + toKb(size, 2) + ' KB)');
+  return styleText(['green', 'bold'], String(size)) + styleText(['white'], ' (' + toKb(size, 2) + ' KB)');
 }
 
 function blueSavings(oldSize, newSize) {
   // Handle invalid inputs
   if (!oldSize || oldSize <= 0 || typeof oldSize !== 'number') {
-    return chalk.white('N/A');
+    return styleText(['white'], 'N/A');
   }
   if (typeof newSize !== 'number' || newSize < 0) {
     newSize = 0; // Treat invalid newSize as 0
@@ -66,11 +66,11 @@ function blueSavings(oldSize, newSize) {
 
   const savingsPercent = (1 - newSize / oldSize) * 100;
   const savings = oldSize - newSize;
-  return chalk.cyan.bold(savingsPercent.toFixed(2)) + chalk.white('% (' + toKb(savings, 2) + ' KB)');
+  return styleText(['cyan', 'bold'], savingsPercent.toFixed(2)) + styleText(['white'], '% (' + toKb(savings, 2) + ' KB)');
 }
 
 function blueTime(time) {
-  return chalk.cyan.bold(time) + chalk.white(' ms');
+  return styleText(['cyan', 'bold'], String(time)) + styleText(['white'], ' ms');
 }
 
 async function readBuffer(filePath) {
@@ -658,7 +658,7 @@ if (benchmarkErrors.length > 0) {
   console.log();
   console.log('Benchmark warnings and errors:');
   benchmarkErrors.forEach(error => {
-    console.log(chalk.red(`• ${error}`));
+    console.log(styleText(['red'], `• ${error}`));
   });
   console.log();
 }
