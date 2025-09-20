@@ -187,7 +187,7 @@ const defaultOptions = [
     type: 'checkbox',
     label: 'Remove tag whitespace',
     helpText: `Remove space between attributes whenever possible; <em>note that this will result in invalid HTML</em>`,
-    checked: true,
+    checked: false,
     unsafe: true
   },
   {
