@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - Replaced Alpine.js npm dependency with CDN for demo page to reduce dev dependencies
-- Disabled “Remove tag whitespace” option by default in demo to prevent invalid HTML output
+- Improved demo safety by not marking unsafe options by default (to prevent invalid HTML output)
 
 ## [2.1.3] - 2025-09-14
 
