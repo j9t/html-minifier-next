@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
-
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { minify } from '../src/htmlminifier.js';
 

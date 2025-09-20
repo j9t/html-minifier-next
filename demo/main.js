@@ -1,4 +1,3 @@
-import Alpine from 'alpinejs';
 import HTMLMinifier from '../dist/htmlminifier.esm.bundle.js';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -188,7 +187,6 @@ const defaultOptions = [
     type: 'checkbox',
     label: 'Remove tag whitespace',
     helpText: `Remove space between attributes whenever possible; <em>note that this will result in invalid HTML</em>`,
-    checked: true,
     unsafe: true
   },
   {
@@ -196,7 +194,6 @@ const defaultOptions = [
     type: 'checkbox',
     label: 'Sort attributes',
     helpText: 'Sort attributes by frequency',
-    checked: true,
     unsafe: true
   },
   {
@@ -204,7 +201,6 @@ const defaultOptions = [
     type: 'checkbox',
     label: 'Sort class name',
     helpText: 'Sort style classes by frequency',
-    checked: true,
     unsafe: true
   },
   {
@@ -253,7 +249,8 @@ const getOptions = (options) => {
   return minifierOptions;
 };
 
-Alpine.data('minifier', () => ({
+// Register Alpine data
+const minifierData = () => ({
   options: sillyClone(defaultOptions),
   input: '',
   output: '',
@@ -280,6 +277,7 @@ Alpine.data('minifier', () => ({
       this.stats.result = 'success';
       this.stats.text = `Original Size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
     } catch (err) {
+      this.output = '';
       this.stats.result = 'failure';
       this.stats.text = err + '';
       console.error(err);
@@ -301,9 +299,16 @@ Alpine.data('minifier', () => ({
 
   resetOptions() {
     this.options = sillyClone(defaultOptions);
+    this.output = '';
+    this.stats = { result: '', text: '' };
   }
-}));
+});
 
-Alpine.start();
+const registerMinifier = () => window.Alpine.data('minifier', minifierData);
+if (window.Alpine) {
+  registerMinifier();
+} else {
+  document.addEventListener('alpine:init', registerMinifier, { once: true });
+}
 
 document.getElementById('minifier-version').innerText = `(v${pkg.version})`;

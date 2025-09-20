@@ -2,7 +2,6 @@ import CleanCSS from 'clean-css';
 import { decodeHTMLStrict, decodeHTML } from 'entities';
 import RelateURL from 'relateurl';
 import { minify as terser } from 'terser';
-
 import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { replaceAsync } from './utils.js';
