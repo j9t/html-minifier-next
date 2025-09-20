@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to this project are documented in this 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.4] - 2025-09-20
+
+### Changed
+
+- Replaced Alpine.js npm dependency with CDN for demo page to reduce dev dependencies
+
 ## [2.1.3] - 2025-09-14
 
 ### Changed
