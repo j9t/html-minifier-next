@@ -1,7 +1,7 @@
 # HTML Minifier Next
 
 [![npm version](https://img.shields.io/npm/v/html-minifier-next.svg)](https://www.npmjs.com/package/html-minifier-next)
-[![Build status](https://github.com/j9t/html-minifier-next/workflows/CI/badge.svg)](https://github.com/j9t/html-minifier-next/actions?workflow=CI)
+[![Build status](https://github.com/j9t/html-minifier-next/workflows/Tests/badge.svg)](https://github.com/j9t/html-minifier-next/actions)
 
 HTML Minifier Next (HMN) is a highly **configurable, well-tested, JavaScript-based HTML minifier**.
 
