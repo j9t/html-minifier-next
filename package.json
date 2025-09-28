@@ -12,7 +12,7 @@
     "relateurl": "^0.2.7",
     "terser": "^5.44.0"
   },
-  "description": "Highly configurable, well-tested, JavaScript-based HTML minifier.",
+  "description": "Highly configurable, well-tested, JavaScript-based HTML minifier",
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@eslint/js": "^9.35.0",
