@@ -279,10 +279,22 @@ export class HTMLParser {
       return -1;
     }
 
+    async function parseEndTagAt(pos) {
+      // Close all open elements up to pos (mirrors parseEndTag’s core branch)
+      for (let i = stack.length - 1; i >= pos; i--) {
+        if (handler.end) {
+          await handler.end(stack[i].tag, stack[i].attrs, i > pos);
+        }
+      }
+      stack.length = pos;
+      lastTag = pos && stack[pos - 1].tag;
+    }
+
     async function closeIfFoundInCurrentTable(tagName) {
       const pos = findTagInCurrentTable(tagName);
       if (pos >= 0) {
-        await parseEndTag('', tagName);
+        // Close at the specific index to avoid re-searching
+        await parseEndTagAt(pos);
         return true;
       }
       return false;
@@ -300,6 +312,11 @@ export class HTMLParser {
         } else if (tagName === 'tfoot') {
           if (!await closeIfFoundInCurrentTable('tbody')) {
             await closeIfFoundInCurrentTable('thead');
+          }
+        } else if (tagName === 'thead') {
+          // If a `tbody` or `tfoot` is open in the current table, close it
+          if (!await closeIfFoundInCurrentTable('tbody')) {
+            await closeIfFoundInCurrentTable('tfoot');
           }
         }
         if (tagName === 'col' && findTag('colgroup') < 0) {
