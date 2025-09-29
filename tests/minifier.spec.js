@@ -399,7 +399,7 @@ test('types of whitespace that should always be preserved', async () => {
   // Non-breaking space passed as HTML entity, in decodeEntities:true mode:
   expect(await minify(inputWithEntities, { collapseWhitespace: true, decodeEntities: true })).toBe(input);
 
-  // Do not remove hair space when preserving line breaks between tags:
+  // Do not remove hair space when preserving line breaks between tags
   input = '<p></p>\u200a\n<p></p>\n';
   expect(await minify(input, { collapseWhitespace: true, preserveLineBreaks: true })).toBe(input);
 
@@ -2065,7 +2065,7 @@ test('mixed html and svg', async () => {
     '<filter id="pictureFilter"><feGaussianBlur stdDeviation="15"/></filter>' +
     '</svg>' +
     '</body></html>';
-  // Should preserve case-sensitivity and closing slashes within svg tags
+  // Should preserve case-sensitivity and closing slashes within SVG tags
   expect(await minify(input, { collapseWhitespace: true })).toBe(output);
 });
 
@@ -3885,4 +3885,24 @@ test('srcdoc attribute minification', async () => {
   // After collapsing whitespace to empty, iframe with empty srcdoc is preserved
   input = '<iframe srcdoc="   \n\t   "></iframe>';
   expect(await minify(input, { collapseWhitespace: true, removeEmptyElements: true })).toBe('<iframe srcdoc=""></iframe>');
+});
+
+test('tfoot element in nested table', async () => {
+  // Minimal test case for tfoot element breaking HTML structure during minification
+  const input = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
+
+  // The output should preserve the correct table structure with tfoot properly nested
+  const expected = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
+
+  expect(await minify(input)).toBe(expected);
+});
+
+test('tbody element in nested table', async () => {
+  // Test case for tbody with thead in nested tables
+  const input = '<table><thead><tr><th>Outer Header</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner Header</th></tr></thead><tbody><tr><td>Test</td></tr></tbody></table></td></tr></tbody></table>';
+
+  // The output should preserve the correct table structure with thead/tbody properly nested
+  const expected = '<table><thead><tr><th>Outer Header</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner Header</th></tr></thead><tbody><tr><td>Test</td></tr></tbody></table></td></tr></tbody></table>';
+
+  expect(await minify(input)).toBe(expected);
 });
