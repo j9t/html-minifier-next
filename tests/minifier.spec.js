@@ -377,37 +377,37 @@ test('space normalization around text', async () => {
 });
 
 test('types of whitespace that should always be preserved', async () => {
-  // Hair space:
+  // Hair space
   let input = '<div>\u200afo\u200ao\u200a</div>';
   expect(await minify(input, { collapseWhitespace: true })).toBe(input);
 
-  // Hair space passed as HTML entity:
+  // Hair space passed as HTML entity
   let inputWithEntities = '<div>&#8202;fo&#8202;o&#8202;</div>';
   expect(await minify(inputWithEntities, { collapseWhitespace: true })).toBe(inputWithEntities);
 
-  // Hair space passed as HTML entity, in decodeEntities:true mode:
+  // Hair space passed as HTML entity, in decodeEntities:true mode
   expect(await minify(inputWithEntities, { collapseWhitespace: true, decodeEntities: true })).toBe(input);
 
-  // Non-breaking space:
+  // Non-breaking space
   input = '<div>\xa0fo\xa0o\xa0</div>';
   expect(await minify(input, { collapseWhitespace: true })).toBe(input);
 
-  // Non-breaking space passed as HTML entity:
+  // Non-breaking space passed as HTML entity
   inputWithEntities = '<div>&nbsp;fo&nbsp;o&nbsp;</div>';
   expect(await minify(inputWithEntities, { collapseWhitespace: true })).toBe(inputWithEntities);
 
-  // Non-breaking space passed as HTML entity, in decodeEntities:true mode:
+  // Non-breaking space passed as HTML entity, in decodeEntities:true mode
   expect(await minify(inputWithEntities, { collapseWhitespace: true, decodeEntities: true })).toBe(input);
 
-  // Do not remove hair space when preserving line breaks between tags:
+  // Do not remove hair space when preserving line breaks between tags
   input = '<p></p>\u200a\n<p></p>\n';
   expect(await minify(input, { collapseWhitespace: true, preserveLineBreaks: true })).toBe(input);
 
-  // Preserve hair space in attributes:
+  // Preserve hair space in attributes
   input = '<p class="foo\u200abar"></p>';
   expect(await minify(input, { collapseWhitespace: true })).toBe(input);
 
-  // Preserve hair space in class names when deduplicating and reordering:
+  // Preserve hair space in class names when deduplicating and reordering
   input = '<a class="0 1\u200a3 2 3"></a>';
   expect(await minify(input, { sortClassName: false })).toBe(input);
   expect(await minify(input, { sortClassName: true })).toBe(input);
@@ -2065,7 +2065,7 @@ test('mixed html and svg', async () => {
     '<filter id="pictureFilter"><feGaussianBlur stdDeviation="15"/></filter>' +
     '</svg>' +
     '</body></html>';
-  // Should preserve case-sensitivity and closing slashes within svg tags
+  // Should preserve case-sensitivity and closing slashes within SVG tags
   expect(await minify(input, { collapseWhitespace: true })).toBe(output);
 });
 
@@ -3654,8 +3654,7 @@ test('canCollapseWhitespace and canTrimWhitespace hooks', async () => {
     canCollapseWhitespace: canCollapseAndTrimWhitespace
   })).toBe(output);
 
-  // Make sure that the stack does get reset when leaving the element for which
-  // the hooks returned false:
+  // Make sure that the stack does get reset when leaving the element for which the hooks returned false
   input = '<div class="leaveAlone"></div><div> foo  bar </div>';
   output = '<div class="leaveAlone"></div><div>foo bar</div>';
 
@@ -3885,4 +3884,42 @@ test('srcdoc attribute minification', async () => {
   // After collapsing whitespace to empty, iframe with empty srcdoc is preserved
   input = '<iframe srcdoc="   \n\t   "></iframe>';
   expect(await minify(input, { collapseWhitespace: true, removeEmptyElements: true })).toBe('<iframe srcdoc=""></iframe>');
+});
+
+test('tfoot element in nested table', async () => {
+  // Minimal test case for tfoot element breaking HTML structure during minification
+  const input = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
+
+  // The output should preserve the correct table structure with tfoot properly nested
+  const expected = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
+
+  expect(await minify(input)).toBe(expected);
+});
+
+test('tbody element in nested table', async () => {
+  // Test case for tbody with thead in nested tables
+  const input = '<table><thead><tr><th>Outer Header</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner Header</th></tr></thead><tbody><tr><td>Test</td></tr></tbody></table></td></tr></tbody></table>';
+
+  // The output should preserve the correct table structure with thead/tbody properly nested
+  const expected = '<table><thead><tr><th>Outer Header</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner Header</th></tr></thead><tbody><tr><td>Test</td></tr></tbody></table></td></tr></tbody></table>';
+
+  expect(await minify(input)).toBe(expected);
+});
+
+test('tfoot in nested table with optional tags', async () => {
+  const input = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
+  const expected = '<table><tr><td><table><caption>Test<tr><td>Test<tfoot><tr><td>Footer</table></table>';
+  expect(await minify(input, { removeOptionalTags: true, collapseWhitespace: true })).toBe(expected);
+});
+
+test('nested table with complete table structure', async () => {
+  const input = '<table><thead><tr><th>Outer</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner</th></tr></thead><tbody><tr><td>Data</td></tr></tbody><tfoot><tr><td>Total</td></tr></tfoot></table></td></tr></tbody></table>';
+  const expected = '<table><thead><tr><th>Outer</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner</th></tr></thead><tbody><tr><td>Data</td></tr></tbody><tfoot><tr><td>Total</td></tr></tfoot></table></td></tr></tbody></table>';
+  expect(await minify(input)).toBe(expected);
+});
+
+test('multiple nested tables with different structures', async () => {
+  const input = '<table><tbody><tr><td><table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></td><td><table><tbody><tr><td>2</td></tr></tbody><tfoot><tr><td>Sum</td></tr></tfoot></table></td></tr></tbody></table>';
+  const expected = '<table><tbody><tr><td><table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></td><td><table><tbody><tr><td>2</td></tr></tbody><tfoot><tr><td>Sum</td></tr></tfoot></table></td></tr></tbody></table>';
+  expect(await minify(input)).toBe(expected);
 });

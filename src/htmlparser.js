@@ -122,7 +122,7 @@ export class HTMLParser {
       if (!lastTag || !special.has(lastTag)) {
         let textEnd = html.indexOf('<');
         if (textEnd === 0) {
-          // Comment:
+          // Comment
           if (/^<!--/.test(html)) {
             const commentEnd = html.indexOf('-->');
 
@@ -150,7 +150,7 @@ export class HTMLParser {
             }
           }
 
-          // Doctype:
+          // Doctype
           const doctypeMatch = html.match(doctype);
           if (doctypeMatch) {
             if (handler.doctype) {
@@ -161,7 +161,7 @@ export class HTMLParser {
             continue;
           }
 
-          // End tag:
+          // End tag
           const endTagMatch = html.match(endTag);
           if (endTagMatch) {
             html = html.substring(endTagMatch[0].length);
@@ -170,7 +170,7 @@ export class HTMLParser {
             continue;
           }
 
-          // Start tag:
+          // Start tag
           const startTagMatch = parseStartTag(html);
           if (startTagMatch) {
             html = startTagMatch.rest;
@@ -263,11 +263,41 @@ export class HTMLParser {
       }
     }
 
-    async function closeIfFound(tagName) {
-      if (findTag(tagName) >= 0) {
-        await parseEndTag('', tagName);
+    function findTagInCurrentTable(tagName) {
+      let pos;
+      const needle = tagName.toLowerCase();
+      for (pos = stack.length - 1; pos >= 0; pos--) {
+        const currentTag = stack[pos].tag.toLowerCase();
+        if (currentTag === needle) {
+          return pos;
+        }
+        // Stop searching if we hit a table boundary
+        if (currentTag === 'table') {
+          break;
+        }
+      }
+      return -1;
+    }
+
+    async function parseEndTagAt(pos) {
+      // Close all open elements up to pos (mirrors parseEndTag’s core branch)
+      for (let i = stack.length - 1; i >= pos; i--) {
+        if (handler.end) {
+          await handler.end(stack[i].tag, stack[i].attrs, true);
+        }
+      }
+      stack.length = pos;
+      lastTag = pos && stack[pos - 1].tag;
+    }
+
+    async function closeIfFoundInCurrentTable(tagName) {
+      const pos = findTagInCurrentTable(tagName);
+      if (pos >= 0) {
+        // Close at the specific index to avoid re-searching
+        await parseEndTagAt(pos);
         return true;
       }
+      return false;
     }
 
     async function handleStartTag(match) {
@@ -278,10 +308,15 @@ export class HTMLParser {
         if (lastTag === 'p' && nonPhrasing.has(tagName)) {
           await parseEndTag('', lastTag);
         } else if (tagName === 'tbody') {
-          await closeIfFound('thead');
+          await closeIfFoundInCurrentTable('thead');
         } else if (tagName === 'tfoot') {
-          if (!await closeIfFound('tbody')) {
-            await closeIfFound('thead');
+          if (!await closeIfFoundInCurrentTable('tbody')) {
+            await closeIfFoundInCurrentTable('thead');
+          }
+        } else if (tagName === 'thead') {
+          // If a `tbody` or `tfoot` is open in the current table, close it
+          if (!await closeIfFoundInCurrentTable('tbody')) {
+            await closeIfFoundInCurrentTable('tfoot');
           }
         }
         if (tagName === 'col' && findTag('colgroup') < 0) {

@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to this project are documented in this 
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.5] - 2025-09-29
+
+### Fixed
+
+- Fixed issue with `<tfoot>` and `<tbody>` elements breaking HTML structure in nested tables, by ensuring table element closing only occurs within the current table scope (addresses kangax/html-minifier#1163)
+
 ## [2.1.4] - 2025-09-20
 
 ### Changed
