@@ -3905,3 +3905,21 @@ test('tbody element in nested table', async () => {
 
   expect(await minify(input)).toBe(expected);
 });
+
+test('tfoot in nested table with optional tags', async () => {
+  const input = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
+  const expected = '<table><tr><td><table><caption>Test<tr><td>Test<tfoot><tr><td>Footer</table></table>';
+  expect(await minify(input, { removeOptionalTags: true, collapseWhitespace: true })).toBe(expected);
+});
+
+test('nested table with complete table structure', async () => {
+  const input = '<table><thead><tr><th>Outer</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner</th></tr></thead><tbody><tr><td>Data</td></tr></tbody><tfoot><tr><td>Total</td></tr></tfoot></table></td></tr></tbody></table>';
+  const expected = '<table><thead><tr><th>Outer</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner</th></tr></thead><tbody><tr><td>Data</td></tr></tbody><tfoot><tr><td>Total</td></tr></tfoot></table></td></tr></tbody></table>';
+  expect(await minify(input)).toBe(expected);
+});
+
+test('multiple nested tables with different structures', async () => {
+  const input = '<table><tbody><tr><td><table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></td><td><table><tbody><tr><td>2</td></tr></tbody><tfoot><tr><td>Sum</td></tr></tfoot></table></td></tr></tbody></table>';
+  const expected = '<table><tbody><tr><td><table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></td><td><table><tbody><tr><td>2</td></tr></tbody><tfoot><tr><td>Sum</td></tr></tfoot></table></td></tr></tbody></table>';
+  expect(await minify(input)).toBe(expected);
+});
