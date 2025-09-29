@@ -283,7 +283,7 @@ export class HTMLParser {
       // Close all open elements up to pos (mirrors parseEndTag’s core branch)
       for (let i = stack.length - 1; i >= pos; i--) {
         if (handler.end) {
-          await handler.end(stack[i].tag, stack[i].attrs, i > pos);
+          await handler.end(stack[i].tag, stack[i].attrs, true);
         }
       }
       stack.length = pos;
