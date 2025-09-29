@@ -263,11 +263,29 @@ export class HTMLParser {
       }
     }
 
-    async function closeIfFound(tagName) {
-      if (findTag(tagName) >= 0) {
+    function findTagInCurrentTable(tagName) {
+      let pos;
+      const needle = tagName.toLowerCase();
+      for (pos = stack.length - 1; pos >= 0; pos--) {
+        const currentTag = stack[pos].tag.toLowerCase();
+        if (currentTag === needle) {
+          return pos;
+        }
+        // Stop searching if we hit a table boundary
+        if (currentTag === 'table') {
+          break;
+        }
+      }
+      return -1;
+    }
+
+    async function closeIfFoundInCurrentTable(tagName) {
+      const pos = findTagInCurrentTable(tagName);
+      if (pos >= 0) {
         await parseEndTag('', tagName);
         return true;
       }
+      return false;
     }
 
     async function handleStartTag(match) {
@@ -278,10 +296,10 @@ export class HTMLParser {
         if (lastTag === 'p' && nonPhrasing.has(tagName)) {
           await parseEndTag('', lastTag);
         } else if (tagName === 'tbody') {
-          await closeIfFound('thead');
+          await closeIfFoundInCurrentTable('thead');
         } else if (tagName === 'tfoot') {
-          if (!await closeIfFound('tbody')) {
-            await closeIfFound('thead');
+          if (!await closeIfFoundInCurrentTable('tbody')) {
+            await closeIfFoundInCurrentTable('thead');
           }
         }
         if (tagName === 'col' && findTag('colgroup') < 0) {
