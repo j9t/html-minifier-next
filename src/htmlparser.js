@@ -122,7 +122,7 @@ export class HTMLParser {
       if (!lastTag || !special.has(lastTag)) {
         let textEnd = html.indexOf('<');
         if (textEnd === 0) {
-          // Comment:
+          // Comment
           if (/^<!--/.test(html)) {
             const commentEnd = html.indexOf('-->');
 
@@ -150,7 +150,7 @@ export class HTMLParser {
             }
           }
 
-          // Doctype:
+          // Doctype
           const doctypeMatch = html.match(doctype);
           if (doctypeMatch) {
             if (handler.doctype) {
@@ -161,7 +161,7 @@ export class HTMLParser {
             continue;
           }
 
-          // End tag:
+          // End tag
           const endTagMatch = html.match(endTag);
           if (endTagMatch) {
             html = html.substring(endTagMatch[0].length);
@@ -170,7 +170,7 @@ export class HTMLParser {
             continue;
           }
 
-          // Start tag:
+          // Start tag
           const startTagMatch = parseStartTag(html);
           if (startTagMatch) {
             html = startTagMatch.rest;
