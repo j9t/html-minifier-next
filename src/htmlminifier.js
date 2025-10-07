@@ -1093,7 +1093,7 @@ async function minifyHTML(value, options, partialMarkup) {
       let optional = options.removeOptionalTags;
       if (optional) {
         const htmlTag = htmlTags.has(tag);
-        // <html> may be omitted if first thing inside is not comment
+        // <html> may be omitted if first thing inside is not a comment
         // <head> may be omitted if first thing inside is an element
         // <body> may be omitted if first thing inside is not space, comment, <meta>, <link>, <script>, <style> or <template>
         // <colgroup> may be omitted if first thing inside is <col>
@@ -1112,7 +1112,7 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalEndTag = '';
       }
 
-      // Set whitespace flags for nested tags (eg. <code> within a <pre>)
+      // Set whitespace flags for nested tags (e.g., <code> within a <pre>)
       if (options.collapseWhitespace) {
         if (!stackNoTrimWhitespace.length) {
           squashTrailingWhitespace(tag);
@@ -1280,7 +1280,7 @@ async function minifyHTML(value, options, partialMarkup) {
         text = await options.minifyCSS(text);
       }
       if (options.removeOptionalTags && text) {
-        // <html> may be omitted if first thing inside is not comment
+        // <html> may be omitted if first thing inside is not a comment
         // <body> may be omitted if first thing inside is not space, comment, <meta>, <link>, <script>, <style> or <template>
         if (optionalStartTag === 'html' || (optionalStartTag === 'body' && !/^\s/.test(text))) {
           removeStartTag();
@@ -1348,7 +1348,7 @@ async function minifyHTML(value, options, partialMarkup) {
   await parser.parse();
 
   if (options.removeOptionalTags) {
-    // <html> may be omitted if first thing inside is not comment
+    // <html> may be omitted if first thing inside is not a comment
     // <head> or <body> may be omitted if empty
     if (topLevelTags.has(optionalStartTag)) {
       removeStartTag();
