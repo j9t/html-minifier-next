@@ -85,5 +85,5 @@
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules --no-warnings' jest --watch"
   },
   "type": "module",
-  "version": "2.1.5"
+  "version": "2.1.6"
 }
