@@ -59,9 +59,9 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
 }
 
 // Non-empty elements that will maintain whitespace around them
-const inlineElementsToKeepWhitespaceAround = ['a', 'abbr', 'acronym', 'b', 'bdi', 'bdo', 'big', 'button', 'cite', 'code', 'del', 'dfn', 'em', 'font', 'i', 'img', 'input', 'ins', 'kbd', 'label', 'mark', 'math', 'meter', 'nobr', 'object', 'output', 'progress', 'q', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'select', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'svg', 'textarea', 'time', 'tt', 'u', 'var', 'wbr'];
+const inlineElementsToKeepWhitespaceAround = ['a', 'abbr', 'acronym', 'b', 'bdi', 'bdo', 'big', 'button', 'cite', 'code', 'del', 'dfn', 'em', 'font', 'i', 'img', 'input', 'ins', 'kbd', 'label', 'mark', 'math', 'meter', 'nobr', 'object', 'output', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'select', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'svg', 'textarea', 'time', 'tt', 'u', 'var', 'wbr'];
 // Non-empty elements that will maintain whitespace within them
-const inlineElementsToKeepWhitespaceWithin = new Set(['a', 'abbr', 'acronym', 'b', 'big', 'del', 'em', 'font', 'i', 'ins', 'kbd', 'mark', 'nobr', 'rp', 's', 'samp', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'time', 'tt', 'u', 'var']);
+const inlineElementsToKeepWhitespaceWithin = new Set(['a', 'abbr', 'acronym', 'b', 'big', 'del', 'em', 'font', 'i', 'ins', 'kbd', 'mark', 'nobr', 's', 'samp', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'time', 'tt', 'u', 'var']);
 // Elements that will always maintain whitespace around them
 const inlineElementsToKeepWhitespace = new Set(['comment', 'img', 'input', 'wbr']);
 
@@ -414,19 +414,18 @@ async function processScript(text, options, currentAttrs) {
   return text;
 }
 
-// Tag omission rules from https://html.spec.whatwg.org/multipage/syntax.html#optional-tags
-// with the following deviations:
+// Tag omission rules from https://html.spec.whatwg.org/multipage/syntax.html#optional-tags with the following extensions:
 // - retain <body> if followed by <noscript>
-// - </rb>, </rt>, </rtc>, </rp>, and </tfoot> follow https://www.w3.org/TR/html5/syntax.html#optional-tags
+// - <rb>, <rt>, <rtc>, <rp> follow W3C Ruby Markup Extensions draft (https://www.w3.org/TR/html-ruby-extensions/)
 // - retain all tags which are adjacent to non-standard HTML tags
 const optionalStartTags = new Set(['html', 'head', 'body', 'colgroup', 'tbody']);
 const optionalEndTags = new Set(['html', 'head', 'body', 'li', 'dt', 'dd', 'p', 'rb', 'rt', 'rtc', 'rp', 'optgroup', 'option', 'colgroup', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th']);
 const headerTags = new Set(['meta', 'link', 'script', 'style', 'template', 'noscript']);
 const descriptionTags = new Set(['dt', 'dd']);
-const pBlockTags = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'div', 'dl', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'main', 'menu', 'nav', 'ol', 'p', 'pre', 'section', 'table', 'ul']);
+const pBlockTags = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'dialog', 'div', 'dl', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'main', 'menu', 'nav', 'ol', 'p', 'pre', 'search', 'section', 'table', 'ul']);
 const pInlineTags = new Set(['a', 'audio', 'del', 'ins', 'map', 'noscript', 'video']);
-const rubyTags = new Set(['rb', 'rt', 'rtc', 'rp']);
-const rtcTag = new Set(['rb', 'rtc', 'rp']);
+const rubyEndTagOmission = new Set(['rb', 'rt', 'rtc', 'rp']); // </rb>, </rt>, </rp> can be omitted if followed by <rb>, <rt>, <rtc>, or <rp>
+const rubyRtcEndTagOmission = new Set(['rb', 'rtc']); // </rtc> can be omitted if followed by <rb> or <rtc> (not <rt> or <rp>)
 const optionTag = new Set(['option', 'optgroup']);
 const tableContentTags = new Set(['tbody', 'tfoot']);
 const tableSectionTags = new Set(['thead', 'tbody', 'tfoot']);
@@ -482,9 +481,9 @@ function canRemovePrecedingTag(optionalEndTag, tag) {
     case 'rb':
     case 'rt':
     case 'rp':
-      return rubyTags.has(tag);
+      return rubyEndTagOmission.has(tag);
     case 'rtc':
-      return rtcTag.has(tag);
+      return rubyRtcEndTagOmission.has(tag);
     case 'option':
       return optionTag.has(tag);
     case 'thead':
@@ -1292,7 +1291,10 @@ async function minifyHTML(value, options, partialMarkup) {
         if (compactTags.has(optionalEndTag) || (looseTags.has(optionalEndTag) && !/^\s/.test(text))) {
           removeEndTag();
         }
-        optionalEndTag = '';
+        // Don’t reset optionalEndTag if text is only whitespace and will be collapsed (not conservatively)
+        if (!/^\s+$/.test(text) || !options.collapseWhitespace || options.conservativeCollapse) {
+          optionalEndTag = '';
+        }
       }
       charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
       if (options.decodeEntities && text && !specialContentTags.has(currentTag)) {
