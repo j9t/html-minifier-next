@@ -219,7 +219,7 @@ test('space normalization around text', async () => {
     expect(await minify('<div>foo <' + el + '> baz </' + el + '>bar</div>', { collapseWhitespace: true })).toBe('<div>foo <' + el + '>baz </' + el + '>bar</div>');
     expect(await minify('<div>foo<' + el + '> baz </' + el + '> bar</div>', { collapseWhitespace: true })).toBe('<div>foo<' + el + '> baz </' + el + '>bar</div>');
   }));
-  // Don’t trim whitespace around element, but do trim within
+  // Don't trim whitespace around element, but do trim within
   await Promise.all([
     'bdi', 'bdo', 'button', 'cite', 'code', 'dfn', 'math', 'q', 'rt', 'rtc', 'ruby', 'svg'
   ].map(async function (el) {
@@ -3922,4 +3922,113 @@ test('multiple nested tables with different structures', async () => {
   const input = '<table><tbody><tr><td><table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></td><td><table><tbody><tr><td>2</td></tr></tbody><tfoot><tr><td>Sum</td></tr></tfoot></table></td></tr></tbody></table>';
   const expected = '<table><tbody><tr><td><table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table></td><td><table><tbody><tr><td>2</td></tr></tbody><tfoot><tr><td>Sum</td></tr></tfoot></table></td></tr></tbody></table>';
   expect(await minify(input)).toBe(expected);
+});
+
+test('all optional tags', async () => {
+  const input = '<!DOCTYPE html>\n' +
+    '<html>\n' +
+    '\t<head>\n' +
+    '\t\t<title>Optional Tags</title>\n' +
+    '\t</head>\n' +
+    '\t<body>\n' +
+    '\t\t<table>\n' +
+    '\t\t\t<caption></caption>\n' +
+    '\t\t\t<colgroup>\n' +
+    '\t\t\t\t<col>\n' +
+    '\t\t\t</colgroup>\n' +
+    '\t\t\t<thead>\n' +
+    '\t\t\t\t<tr>\n' +
+    '\t\t\t\t\t<th></th>\n' +
+    '\t\t\t\t</tr>\n' +
+    '\t\t\t</thead>\n' +
+    '\t\t\t<tbody>\n' +
+    '\t\t\t\t<tr>\n' +
+    '\t\t\t\t\t<td></td>\n' +
+    '\t\t\t\t</tr>\n' +
+    '\t\t\t</tbody>\n' +
+    '\t\t\t<tfoot>\n' +
+    '\t\t\t\t<tr>\n' +
+    '\t\t\t\t\t<td></td>\n' +
+    '\t\t\t\t</tr>\n' +
+    '\t\t\t</tfoot>\n' +
+    '\t\t</table>\n' +
+    '\t\t<table>\n' +
+    '\t\t\t<tbody>\n' +
+    '\t\t\t\t<tr>\n' +
+    '\t\t\t\t\t<td></td>\n' +
+    '\t\t\t\t</tr>\n' +
+    '\t\t\t</tbody>\n' +
+    '\t\t</table>\n' +
+    '\t\t<dl>\n' +
+    '\t\t\t<dt></dt>\n' +
+    '\t\t\t<dd></dd>\n' +
+    '\t\t</dl>\n' +
+    '\t\t<ul>\n' +
+    '\t\t\t<li></li>\n' +
+    '\t\t</ul>\n' +
+    '\t\t<select>\n' +
+    '\t\t\t<optgroup label=Example>\n' +
+    '\t\t\t\t<option>Example</option>\n' +
+    '\t\t\t</optgroup>\n' +
+    '\t\t</select>\n' +
+    '\t\t<p></p>\n' +
+    '\t\t<ruby>\n' +
+    '\t\t\t<rp>(</rp>\n' +
+    '\t\t\t<rt></rt>\n' +
+    '\t\t\t<rp>)</rp>\n' +
+    '\t\t</ruby>\n' +
+    '\t\t<p></p>\n' +
+    '\t</body>\n' +
+    '</html>';
+  const expected = '<!DOCTYPE html><title>Optional Tags</title><table><caption><col><thead><tr><th><tbody><tr><td><tfoot><tr><td></table><table><tr><td></table><dl><dt><dd></dl><ul><li></ul><select><optgroup label=Example><option>Example</select><p></p><ruby><rp>(<rt><rp>)</ruby><p>';
+  expect(await minify(input, { removeAttributeQuotes: true, removeOptionalTags: true, collapseWhitespace: true })).toBe(expected);
+});
+
+test('extended ruby markup with optional tags (HTML Ruby Markup Extensions)', async () => {
+  let input, output;
+
+  // Simple ruby with rb elements
+  input = '<ruby><rb>漢</rb><rt>kan</rt></ruby>';
+  output = '<ruby><rb>漢<rt>kan</ruby>';
+  expect(await minify(input, { removeOptionalTags: true })).toBe(output);
+
+  // Ruby with multiple rb/rt pairs
+  input = '<ruby><rb>東</rb><rt>tō</rt><rb>京</rb><rt>kyō</rt></ruby>';
+  output = '<ruby><rb>東<rt>tō<rb>京<rt>kyō</ruby>';
+  expect(await minify(input, { removeOptionalTags: true })).toBe(output);
+
+  // Ruby with rtc (ruby text container)
+  input = '<ruby><rb>字</rb><rtc><rt>ji</rt></rtc></ruby>';
+  output = '<ruby><rb>字<rtc><rt>ji</ruby>';
+  expect(await minify(input, { removeOptionalTags: true })).toBe(output);
+
+  // Ruby with rp fallback and rb elements
+  input = '<ruby><rb>漢</rb><rp> (</rp><rt>kan</rt><rp>) </rp></ruby>';
+  output = '<ruby><rb>漢<rp> (<rt>kan<rp>) </ruby>';
+  expect(await minify(input, { removeOptionalTags: true })).toBe(output);
+
+  // Double-sided ruby (rtc followed by another rtc)
+  input = '<ruby><rb>字</rb><rtc><rt>reading1</rt></rtc><rtc><rt>reading2</rt></rtc></ruby>';
+  output = '<ruby><rb>字<rtc><rt>reading1<rtc><rt>reading2</ruby>';
+  expect(await minify(input, { removeOptionalTags: true })).toBe(output);
+
+  // Complex example with whitespace collapsing
+  input = '<ruby>\n' +
+    '  <rb>東</rb>\n' +
+    '  <rt>tō</rt>\n' +
+    '  <rb>京</rb>\n' +
+    '  <rt>kyō</rt>\n' +
+    '</ruby>';
+  output = '<ruby><rb>東<rt>tō<rb>京<rt>kyō</ruby>';
+  expect(await minify(input, { removeOptionalTags: true, collapseWhitespace: true })).toBe(output);
+
+  // rtc end tag omission rules—rtc can only be followed by rb or rtc
+  input = '<ruby><rb>a</rb><rtc><rt>x</rt></rtc><rb>b</rb></ruby>';
+  output = '<ruby><rb>a<rtc><rt>x<rb>b</ruby>';
+  expect(await minify(input, { removeOptionalTags: true })).toBe(output);
+
+  // Ensuring rtc end tag is not omitted before rt (spec says rtc can only be followed by rb or rtc)
+  input = '<ruby><rtc><rt>annotation</rt></rtc><rt>more</rt></ruby>';
+  output = '<ruby><rtc><rt>annotation</rtc><rt>more</ruby>';
+  expect(await minify(input, { removeOptionalTags: true })).toBe(output);
 });
