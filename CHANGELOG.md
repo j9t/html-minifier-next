@@ -1,6 +1,6 @@
 # Changelog
 
-As of version 2.0.0, all notable changes to this project are documented in this file, which is (mostly) AI-generated and (always) human-edited. Dependency updates may or may not be called out specifically.
+As of version 2.0.0, all notable changes to HTML Minifier Next are documented in this file, which is (mostly) AI-generated and (always) human-edited. Dependency updates may or may not be called out specifically.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -8,19 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- Added support for HTML Ruby Markup Extensions ([June 2024 Working Draft](https://www.w3.org/TR/2024/WD-html-ruby-extensions-20240627/)) to handle extended ruby annotation markup
+- Added support for HTML Ruby Markup Extensions ([June 2024 draft](https://www.w3.org/TR/2024/WD-html-ruby-extensions-20240627/)) to handle extended ruby annotation markup
 - Added `dialog` and `search` elements to `<p>` end tag omission rules per current HTML specification
 
-### Changed
+### Changed/fixed
 
 - Updated ruby element tag omission logic to correctly handle all conforming elements: `<ruby>`, `<rp>`, `<rt>`, `<rb>`, `<rtc>`
 - Improved optional tag removal for ruby elements when `removeOptionalTags` and `collapseWhitespace` options are enabled
 - Enhanced whitespace handling to preserve `optionalEndTag` tracking through collapsible whitespace (unless `conservativeCollapse` is enabled)
-
-### Fixed
-
-- Fixed `<rtc>` end tag omission to correctly preserve `</rtc>` before `<rt>` or `<rp>` elements (per spec: rtc end tag can only be omitted before `<rb>` or `<rtc>`)
-- Fixed ruby element optional tag removal to work correctly with whitespace between tags
 
 ## [2.1.5] - 2025-09-29
 
