@@ -416,7 +416,7 @@ async function processScript(text, options, currentAttrs) {
 
 // Tag omission rules from https://html.spec.whatwg.org/multipage/syntax.html#optional-tags with the following extensions:
 // - retain <body> if followed by <noscript>
-// - <rb>, <rt>, <rtc>, <rp> follow W3C Ruby Markup Extensions draft (https://www.w3.org/TR/html-ruby-extensions/)
+// - <rb>, <rt>, <rtc>, <rp> follow HTML Ruby Markup Extensions draft (https://www.w3.org/TR/html-ruby-extensions/)
 // - retain all tags which are adjacent to non-standard HTML tags
 const optionalStartTags = new Set(['html', 'head', 'body', 'colgroup', 'tbody']);
 const optionalEndTags = new Set(['html', 'head', 'body', 'li', 'dt', 'dd', 'p', 'rb', 'rt', 'rtc', 'rp', 'optgroup', 'option', 'colgroup', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th']);
