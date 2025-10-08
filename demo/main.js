@@ -275,7 +275,7 @@ const minifierData = () => ({
 
       this.output = data;
       this.stats.result = 'success';
-      this.stats.text = `Original Size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
+      this.stats.text = `Original size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
     } catch (err) {
       this.output = '';
       this.stats.result = 'failure';

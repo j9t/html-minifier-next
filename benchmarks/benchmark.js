@@ -126,7 +126,7 @@ const rows = {};
 function generateMarkdownTable() {
   const headers = [
     'Site',
-    'Original size (KB)',
+    'Original Size (KB)',
     'HTML Minifier Next',
     'minimize',
     'html­compressor.com',

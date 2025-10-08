@@ -129,7 +129,7 @@ For lint-like capabilities take a look at [HTMLLint](https://github.com/kangax/h
 
 How does HTML Minifier Next compare to other solutions, like [minimize](https://github.com/Swaagie/minimize), [htmlcompressor.com](http://htmlcompressor.com/), [htmlnano](https://github.com/posthtml/htmlnano), and [minify-html](https://github.com/wilsonzlin/minify-html)? (All with the most aggressive settings, but without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
 
-| Site | Original size (KB) | HTML Minifier Next | minimize | html­compressor.com | htmlnano | minify-html |
+| Site | Original Size (KB) | HTML Minifier Next | minimize | html­compressor.com | htmlnano | minify-html |
 | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 63 | **54** | 58 | 57 | 55 | 56 |
 | [Amazon](https://www.amazon.com/) | 5 | **3** | **3** | **3** | **3** | n/a |
