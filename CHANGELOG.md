@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.7] - 2025-10-10
+
+### Changed
+
+- Migrated test suite from Jest to native Node.js `node:test` runner
+- Removed glob dependency overrides (no longer needed without Jest)
+
 ## [2.1.6] - 2025-10-07
 
 ### Added
