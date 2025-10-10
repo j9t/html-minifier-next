@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
-import { describe, test, expect, beforeEach } from '@jest/globals';
+import { describe, test, beforeEach } from 'node:test';
+import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -61,10 +62,10 @@ describe('cli', () => {
     let cliMinifiedHTML = execCli(cliArguments);
     const minifiedHTML = await minify(input, minifyOptions);
 
-    expect(cliMinifiedHTML).toBe(minifiedHTML);
+    assert.strictEqual(cliMinifiedHTML, minifiedHTML);
 
     cliMinifiedHTML = execCli(['default.html']);
-    expect(cliMinifiedHTML).not.toBe(minifiedHTML);
+    assert.notStrictEqual(cliMinifiedHTML, minifiedHTML);
   });
 
   test('should throw error if input file not found', () => {
@@ -72,7 +73,7 @@ describe('cli', () => {
       'no-file.html'
     ];
 
-    expect(() => execCli(cliArguments)).toThrow('no such file');
+    assert.throws(() => execCli(cliArguments), /no such file/);
   });
 
   test('should throw if output directory not specified', () => {
@@ -80,7 +81,7 @@ describe('cli', () => {
       '--input-dir=./'
     ];
 
-    expect(() => execCli(cliArguments)).toThrow('You need to specify where to write the output files with the option --output-dir');
+    assert.throws(() => execCli(cliArguments), /You need to specify where to write the output files with the option --output-dir/);
   });
 
   test('should throw if input directory not specified', () => {
@@ -88,7 +89,7 @@ describe('cli', () => {
       '--output-dir=./'
     ];
 
-    expect(() => execCli(cliArguments)).toThrow('The option output-dir needs to be used with the option input-dir. If you are working with a single file, use -o');
+    assert.throws(() => execCli(cliArguments), /The option output-dir needs to be used with the option input-dir. If you are working with a single file, use -o/);
   });
 
   test('should write files to output directory', () => {
@@ -98,7 +99,7 @@ describe('cli', () => {
     ];
 
     execCli(cliArguments);
-    expect(existsFixture('tmp/default.html')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/default.html'), true);
   });
 
   test('should write files to output nested directory', () => {
@@ -108,7 +109,7 @@ describe('cli', () => {
     ];
 
     execCli(cliArguments);
-    expect(existsFixture('tmp/nested/default.html')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/nested/default.html'), true);
   });
 
   // Parsing JSON
@@ -130,7 +131,7 @@ describe('cli', () => {
 
     const cliMinifiedHTML = execCli(cliArguments);
     const minifiedHTML = await minify(input, minifyOptions);
-    expect(cliMinifiedHTML).toBe(minifiedHTML);
+    assert.strictEqual(cliMinifiedHTML, minifiedHTML);
   });
 
   // Parsing string inputs
@@ -150,7 +151,7 @@ describe('cli', () => {
 
     const cliMinifiedHTML = execCli(cliArguments);
     const minifiedHTML = await minify(input, minifyOptions);
-    expect(cliMinifiedHTML).toBe(minifiedHTML);
+    assert.strictEqual(cliMinifiedHTML, minifiedHTML);
   });
 
   // Parsing array inputs
@@ -170,13 +171,13 @@ describe('cli', () => {
 
     const cliMinifiedHTML = execCli(cliArguments);
     const minifiedHTML = await minify(input, minifyOptions);
-    expect(cliMinifiedHTML).toBe(minifiedHTML);
+    assert.strictEqual(cliMinifiedHTML, minifiedHTML);
 
     // Verify spacing is preserved for specified custom elements
-    expect(cliMinifiedHTML).toContain('<custom-element>A</custom-element> <custom-element>B</custom-element>');
-    expect(cliMinifiedHTML).toContain('<span>Standard</span> <custom-inline>Custom</custom-inline>');
+    assert.ok(cliMinifiedHTML.includes('<custom-element>A</custom-element> <custom-element>B</custom-element>'));
+    assert.ok(cliMinifiedHTML.includes('<span>Standard</span> <custom-inline>Custom</custom-inline>'));
     // but not for unspecified custom elements
-    expect(cliMinifiedHTML).toContain('<web-component>X</web-component><web-component>Y</web-component>');
+    assert.ok(cliMinifiedHTML.includes('<web-component>X</web-component><web-component>Y</web-component>'));
   });
 
   test('should process files with single extension', () => {
@@ -190,12 +191,12 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should process .html files
-    expect(existsFixture('tmp/single-ext/extension.html')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/single-ext/extension.html'), true);
 
     // Should not process other extensions
-    expect(existsFixture('tmp/single-ext/extension.htm')).toBe(false);
-    expect(existsFixture('tmp/single-ext/extension.php')).toBe(false);
-    expect(existsFixture('tmp/single-ext/extension.txt')).toBe(false);
+    assert.strictEqual(existsFixture('tmp/single-ext/extension.htm'), false);
+    assert.strictEqual(existsFixture('tmp/single-ext/extension.php'), false);
+    assert.strictEqual(existsFixture('tmp/single-ext/extension.txt'), false);
   });
 
   test('should process files with multiple extensions', () => {
@@ -209,12 +210,12 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should process specified extensions
-    expect(existsFixture('tmp/multi-ext/extension.html')).toBe(true);
-    expect(existsFixture('tmp/multi-ext/extension.htm')).toBe(true);
-    expect(existsFixture('tmp/multi-ext/extension.php')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/multi-ext/extension.html'), true);
+    assert.strictEqual(existsFixture('tmp/multi-ext/extension.htm'), true);
+    assert.strictEqual(existsFixture('tmp/multi-ext/extension.php'), true);
 
     // Should not process unspecified extensions
-    expect(existsFixture('tmp/multi-ext/extension.txt')).toBe(false);
+    assert.strictEqual(existsFixture('tmp/multi-ext/extension.txt'), false);
   });
 
   test('should process files with mixed-case and dot-prefixed extension tokens', () => {
@@ -227,10 +228,10 @@ describe('cli', () => {
 
     execCli(cliArguments);
 
-    expect(existsFixture('tmp/mixed-case/extension.html')).toBe(true);
-    expect(existsFixture('tmp/mixed-case/extension.htm')).toBe(true);
-    expect(existsFixture('tmp/mixed-case/extension.php')).toBe(true);
-    expect(existsFixture('tmp/mixed-case/extension.txt')).toBe(false);
+    assert.strictEqual(existsFixture('tmp/mixed-case/extension.html'), true);
+    assert.strictEqual(existsFixture('tmp/mixed-case/extension.htm'), true);
+    assert.strictEqual(existsFixture('tmp/mixed-case/extension.php'), true);
+    assert.strictEqual(existsFixture('tmp/mixed-case/extension.txt'), false);
   });
 
   test('should process files with comma-separated extensions with spaces', () => {
@@ -244,10 +245,10 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should handle spaces around commas correctly
-    expect(existsFixture('tmp/spaced-ext/extension.html')).toBe(true);
-    expect(existsFixture('tmp/spaced-ext/extension.htm')).toBe(true);
-    expect(existsFixture('tmp/spaced-ext/extension.php')).toBe(true);
-    expect(existsFixture('tmp/spaced-ext/extension.txt')).toBe(false);
+    assert.strictEqual(existsFixture('tmp/spaced-ext/extension.html'), true);
+    assert.strictEqual(existsFixture('tmp/spaced-ext/extension.htm'), true);
+    assert.strictEqual(existsFixture('tmp/spaced-ext/extension.php'), true);
+    assert.strictEqual(existsFixture('tmp/spaced-ext/extension.txt'), false);
   });
 
   test('should process all files when no extension specified', () => {
@@ -260,10 +261,10 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should process all files when no --file-ext is specified
-    expect(existsFixture('tmp/all-files/extension.html')).toBe(true);
-    expect(existsFixture('tmp/all-files/extension.htm')).toBe(true);
-    expect(existsFixture('tmp/all-files/extension.php')).toBe(true);
-    expect(existsFixture('tmp/all-files/extension.txt')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/all-files/extension.html'), true);
+    assert.strictEqual(existsFixture('tmp/all-files/extension.htm'), true);
+    assert.strictEqual(existsFixture('tmp/all-files/extension.php'), true);
+    assert.strictEqual(existsFixture('tmp/all-files/extension.txt'), true);
   });
 
   test('should verify minified output for multiple extensions', async () => {
@@ -282,17 +283,17 @@ describe('cli', () => {
       path.resolve(fixturesDir, 'tmp/verify-output/extension.html'),
       'utf-8'
     );
-    expect(minifiedHtml).toBe('<!DOCTYPE html><html><head><title>.html extension test page</title></head><body><p>Test content</p></body></html>');
+    assert.strictEqual(minifiedHtml, '<!DOCTYPE html><html><head><title>.html extension test page</title></head><body><p>Test content</p></body></html>');
 
     // Verify HTM file is minified correctly
     const minifiedHtm = await fs.promises.readFile(
       path.resolve(fixturesDir, 'tmp/verify-output/extension.htm'),
       'utf-8'
     );
-    expect(minifiedHtm).toBe('<!DOCTYPE html><html><head><title>.htm extension test page</title></head><body><p>Test content</p></body></html>');
+    assert.strictEqual(minifiedHtm, '<!DOCTYPE html><html><head><title>.htm extension test page</title></head><body><p>Test content</p></body></html>');
 
     // PHP file should not be processed (not in the extension list)
-    expect(existsFixture('tmp/verify-output/extension.php')).toBe(false);
+    assert.strictEqual(existsFixture('tmp/verify-output/extension.php'), false);
   });
 
   test('should handle empty extension list gracefully', () => {
@@ -306,10 +307,10 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should process all files when empty string is provided
-    expect(existsFixture('tmp/empty-ext/extension.html')).toBe(true);
-    expect(existsFixture('tmp/empty-ext/extension.htm')).toBe(true);
-    expect(existsFixture('tmp/empty-ext/extension.php')).toBe(true);
-    expect(existsFixture('tmp/empty-ext/extension.txt')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/empty-ext/extension.html'), true);
+    assert.strictEqual(existsFixture('tmp/empty-ext/extension.htm'), true);
+    assert.strictEqual(existsFixture('tmp/empty-ext/extension.php'), true);
+    assert.strictEqual(existsFixture('tmp/empty-ext/extension.txt'), true);
   });
 
   test('should process files with extensions from config file (string format)', () => {
@@ -329,12 +330,12 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should process extensions specified in config
-    expect(existsFixture('tmp/config-string/extension.html')).toBe(true);
-    expect(existsFixture('tmp/config-string/extension.htm')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/config-string/extension.html'), true);
+    assert.strictEqual(existsFixture('tmp/config-string/extension.htm'), true);
 
     // Should not process unspecified extensions
-    expect(existsFixture('tmp/config-string/extension.php')).toBe(false);
-    expect(existsFixture('tmp/config-string/extension.txt')).toBe(false);
+    assert.strictEqual(existsFixture('tmp/config-string/extension.php'), false);
+    assert.strictEqual(existsFixture('tmp/config-string/extension.txt'), false);
 
     // Clean up
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config.json'));
@@ -357,12 +358,12 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should process extensions specified in config array
-    expect(existsFixture('tmp/config-array/extension.html')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/config-array/extension.html'), true);
 
     // Should not process other extensions
-    expect(existsFixture('tmp/config-array/extension.htm')).toBe(false);
-    expect(existsFixture('tmp/config-array/extension.php')).toBe(false);
-    expect(existsFixture('tmp/config-array/extension.txt')).toBe(false);
+    assert.strictEqual(existsFixture('tmp/config-array/extension.htm'), false);
+    assert.strictEqual(existsFixture('tmp/config-array/extension.php'), false);
+    assert.strictEqual(existsFixture('tmp/config-array/extension.txt'), false);
 
     // Clean up
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-array.json'));
@@ -386,12 +387,12 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should process CLI-specified extensions, not config extensions
-    expect(existsFixture('tmp/config-override/extension.htm')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/config-override/extension.htm'), true);
 
     // Should not process config-specified extensions
-    expect(existsFixture('tmp/config-override/extension.html')).toBe(false);
-    expect(existsFixture('tmp/config-override/extension.php')).toBe(false);
-    expect(existsFixture('tmp/config-override/extension.txt')).toBe(false);
+    assert.strictEqual(existsFixture('tmp/config-override/extension.html'), false);
+    assert.strictEqual(existsFixture('tmp/config-override/extension.php'), false);
+    assert.strictEqual(existsFixture('tmp/config-override/extension.txt'), false);
 
     // Clean up
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-override.json'));
@@ -415,10 +416,10 @@ describe('cli', () => {
     execCli(cliArguments);
 
     // Should process ALL files when CLI provides empty string (overriding config restriction)
-    expect(existsFixture('tmp/config-empty-override/extension.html')).toBe(true);
-    expect(existsFixture('tmp/config-empty-override/extension.htm')).toBe(true);
-    expect(existsFixture('tmp/config-empty-override/extension.php')).toBe(true);
-    expect(existsFixture('tmp/config-empty-override/extension.txt')).toBe(true);
+    assert.strictEqual(existsFixture('tmp/config-empty-override/extension.html'), true);
+    assert.strictEqual(existsFixture('tmp/config-empty-override/extension.htm'), true);
+    assert.strictEqual(existsFixture('tmp/config-empty-override/extension.php'), true);
+    assert.strictEqual(existsFixture('tmp/config-empty-override/extension.txt'), true);
 
     // Clean up
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-empty-override.json'));
