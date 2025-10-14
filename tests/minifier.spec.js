@@ -35,13 +35,13 @@ test('parsing non-trivial markup', async () => {
   assert.strictEqual(await minify('<p x="x\'"">x</p>'), '<p x="x\'">x</p>', 'trailing quote should be ignored');
   assert.strictEqual(await minify('<a href="#"><p>Click me</p></a>'), '<a href="#"><p>Click me</p></a>');
   assert.strictEqual(await minify('<span><button>Hit me</button></span>'), '<span><button>Hit me</button></span>');
-  assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>'), 
+  assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>'),
     '<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>'
   );
 
   assert.strictEqual(await minify('<ng-include src="x"></ng-include>'), '<ng-include src="x"></ng-include>');
   assert.strictEqual(await minify('<ng:include src="x"></ng:include>'), '<ng:include src="x"></ng:include>');
-  assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>'), 
+  assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>'),
     '<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>'
   );
 
@@ -67,7 +67,7 @@ test('parsing non-trivial markup', async () => {
   assert.strictEqual(await minify(input), input);
 
   // https://github.com/kangax/html-minifier/issues/41
-  assert.strictEqual(await minify('<some-tag-1></some-tag-1><some-tag-2></some-tag-2>'), 
+  assert.strictEqual(await minify('<some-tag-1></some-tag-1><some-tag-2></some-tag-2>'),
     '<some-tag-1></some-tag-1><some-tag-2></some-tag-2>'
   );
 
@@ -1666,6 +1666,32 @@ test('removing optional tags in tables', async () => {
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 });
 
+test('removing optional tags in definition lists', async () => {
+  let input, output;
+
+  // dt and dd with closing tags
+  input = '<dl><dt>Term 1</dt><dd>Definition 1</dd><dt>Term 2</dt><dd>Definition 2</dd><dt>Term 3</dt><dd>Definition 3</dd></dl>';
+  output = '<dl><dt>Term 1<dd>Definition 1<dt>Term 2<dd>Definition 2<dt>Term 3<dd>Definition 3</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // dt and dd with already-omitted closing tags (should not accumulate closing tags)
+  input = '<dl><dt>Term 1<dd>Definition 1<dt>Term 2<dd>Definition 2<dt>Term 3<dd>Definition 3</dl>';
+  output = '<dl><dt>Term 1<dd>Definition 1<dt>Term 2<dd>Definition 2<dt>Term 3<dd>Definition 3</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Mixed dt and dd with whitespace (closing tags remain due to whitespace)
+  input = '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n</dl>';
+  output = '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+  output = '<dl><dt>Term<dd>Definition</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
+
+  // Already-omitted tags with whitespace collapsed
+  input = '<dl>\n  <dt>Term\n  <dd>Definition\n</dl>';
+  output = '<dl><dt>Term<dd>Definition</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
+});
+
 test('removing optional tags in options', async () => {
   let input, output;
 
@@ -1901,8 +1927,7 @@ test('ignoring custom fragments', async () => {
       /\{%[^%]*?%\}/g
     ]
   }), input);
-  // `trimCustomFragments` withOUT `collapseWhitespace`,
-  // does not break the “{% foo %} {% bar %}” test
+  // `trimCustomFragments` withOUT `collapseWhitespace`, does not break the “{% foo %} {% bar %}” test
   assert.strictEqual(await minify(input, {
     ignoreCustomFragments: [
       /\{%[^%]*?%\}/g
@@ -3003,7 +3028,7 @@ test('noscript', async () => {
 
   input = '<noscript>\n<!-- anchor linking to external file -->\n' +
     '<a href="#" onclick="javascript:">External Link</a>\n</noscript>';
-  assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, removeEmptyAttributes: true }), 
+  assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, removeEmptyAttributes: true }),
     '<noscript><a href="#">External Link</a></noscript>');
 });
 
@@ -3071,13 +3096,13 @@ test('max line length', async () => {
   input = '<span><button>Hit me\n</button></span>';
   assert.strictEqual(await minify('<span><button>Hit me</button></span>', options), input);
   assert.strictEqual(await minify(input, options), input);
-  assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>', options), 
+  assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>', options),
     '<object \ntype="image/svg+xml" \ndata="image.svg"><div>\n[fallback image]</div>\n</object>'
   );
 
   assert.strictEqual(await minify('<ng-include src="x"></ng-include>', options), '<ng-include src="x">\n</ng-include>');
   assert.strictEqual(await minify('<ng:include src="x"></ng:include>', options), '<ng:include src="x">\n</ng:include>');
-  assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>', options), 
+  assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>', options),
     '<ng-include \nsrc="\'views/partial-notification.html\'">\n</ng-include><div \nng-view=""></div>'
   );
 
