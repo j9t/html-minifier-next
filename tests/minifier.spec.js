@@ -35,13 +35,13 @@ test('parsing non-trivial markup', async () => {
   assert.strictEqual(await minify('<p x="x\'"">x</p>'), '<p x="x\'">x</p>', 'trailing quote should be ignored');
   assert.strictEqual(await minify('<a href="#"><p>Click me</p></a>'), '<a href="#"><p>Click me</p></a>');
   assert.strictEqual(await minify('<span><button>Hit me</button></span>'), '<span><button>Hit me</button></span>');
-  assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>'), 
+  assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>'),
     '<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>'
   );
 
   assert.strictEqual(await minify('<ng-include src="x"></ng-include>'), '<ng-include src="x"></ng-include>');
   assert.strictEqual(await minify('<ng:include src="x"></ng:include>'), '<ng:include src="x"></ng:include>');
-  assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>'), 
+  assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>'),
     '<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>'
   );
 
@@ -67,7 +67,7 @@ test('parsing non-trivial markup', async () => {
   assert.strictEqual(await minify(input), input);
 
   // https://github.com/kangax/html-minifier/issues/41
-  assert.strictEqual(await minify('<some-tag-1></some-tag-1><some-tag-2></some-tag-2>'), 
+  assert.strictEqual(await minify('<some-tag-1></some-tag-1><some-tag-2></some-tag-2>'),
     '<some-tag-1></some-tag-1><some-tag-2></some-tag-2>'
   );
 
@@ -220,7 +220,7 @@ test('space normalization around text', async () => {
     assert.strictEqual(await minify('<div>foo <' + el + '> baz </' + el + '>bar</div>', { collapseWhitespace: true }), '<div>foo <' + el + '>baz </' + el + '>bar</div>');
     assert.strictEqual(await minify('<div>foo<' + el + '> baz </' + el + '> bar</div>', { collapseWhitespace: true }), '<div>foo<' + el + '> baz </' + el + '>bar</div>');
   }));
-  // Don't trim whitespace around element, but do trim within
+  // Don’t trim whitespace around element, but do trim within
   await Promise.all([
     'bdi', 'bdo', 'button', 'cite', 'code', 'dfn', 'math', 'q', 'rt', 'rtc', 'ruby', 'svg'
   ].map(async function (el) {
@@ -895,8 +895,7 @@ test('empty attributes', async () => {
   input = '<img src="" alt="">';
   assert.strictEqual(await minify(input, { removeEmptyAttributes: true }), '<img src="" alt="">');
 
-  // Preserve unrecognized attribute,
-  // remove recognized attrs with unspecified values
+  // Preserve unrecognized attribute, remove recognized attrs with unspecified values
   input = '<div data-foo class id style title lang dir onfocus onblur onchange onclick ondblclick onmousedown onmouseup onmouseover onmousemove onmouseout onkeypress onkeydown onkeyup></div>';
   assert.strictEqual(await minify(input, { removeEmptyAttributes: true }), '<div data-foo></div>');
 
@@ -1666,6 +1665,32 @@ test('removing optional tags in tables', async () => {
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 });
 
+test('removing optional tags in definition lists', async () => {
+  let input, output;
+
+  // `dt` and `dd` with closing tags
+  input = '<dl><dt>Term 1</dt><dd>Definition 1</dd><dt>Term 2</dt><dd>Definition 2</dd><dt>Term 3</dt><dd>Definition 3</dd></dl>';
+  output = '<dl><dt>Term 1<dd>Definition 1<dt>Term 2<dd>Definition 2<dt>Term 3<dd>Definition 3</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // `dt` and `dd` with already-omitted closing tags (should not accumulate closing tags)
+  input = '<dl><dt>Term 1<dd>Definition 1<dt>Term 2<dd>Definition 2<dt>Term 3<dd>Definition 3</dl>';
+  output = '<dl><dt>Term 1<dd>Definition 1<dt>Term 2<dd>Definition 2<dt>Term 3<dd>Definition 3</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Mixed `dt` and `dd` with whitespace (closing tags remain due to whitespace)
+  input = '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n</dl>';
+  output = '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+  output = '<dl><dt>Term<dd>Definition</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
+
+  // Already-omitted tags with whitespace collapsed
+  input = '<dl>\n  <dt>Term\n  <dd>Definition\n</dl>';
+  output = '<dl><dt>Term<dd>Definition</dl>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
+});
+
 test('removing optional tags in options', async () => {
   let input, output;
 
@@ -1901,8 +1926,7 @@ test('ignoring custom fragments', async () => {
       /\{%[^%]*?%\}/g
     ]
   }), input);
-  // `trimCustomFragments` withOUT `collapseWhitespace`,
-  // does not break the “{% foo %} {% bar %}” test
+  // `trimCustomFragments` withOUT `collapseWhitespace`, does not break the “{% foo %} {% bar %}” test
   assert.strictEqual(await minify(input, {
     ignoreCustomFragments: [
       /\{%[^%]*?%\}/g
@@ -2537,7 +2561,7 @@ test('srcset attribute minification', async () => {
 test('async minifyURLs support', async () => {
   let input, output;
 
-  // Test async function for href attributes
+  // Test async function for `href` attributes
   const asyncUrlMinifier = async (url) => {
     await Promise.resolve(); // Simulate async boundary
     return url.replace('https://example.com/', '');
@@ -2547,12 +2571,12 @@ test('async minifyURLs support', async () => {
   output = '<a href="page.html">link</a>';
   assert.strictEqual(await minify(input, { minifyURLs: asyncUrlMinifier }), output);
 
-  // Test async function with srcset
+  // Test async function with `srcset`
   input = '<img srcset="https://example.com/img1.jpg, https://example.com/img2.jpg 2x">';
   output = '<img srcset="img1.jpg, img2.jpg 2x">';
   assert.strictEqual(await minify(input, { minifyURLs: asyncUrlMinifier }), output);
 
-  // Test async function with CSS url()
+  // Test async function with CSS `url()`
   input = '<style>body { background: url("https://example.com/bg.png") }</style>';
   output = '<style>body{background:url("bg.png")}</style>';
   assert.strictEqual(await minify(input, { minifyCSS: true, minifyURLs: asyncUrlMinifier }), output);
@@ -2603,17 +2627,17 @@ test('async minifyURLs error handling', async () => {
   output = '<a href="good.html">good</a><a href="https://example.com/reject.html">bad</a>';
   assert.strictEqual(await minify(input, { minifyURLs: rejectingMinifier }), output);
 
-  // Test error in srcset processing
+  // Test error in `srcset` processing
   input = '<img srcset="https://example.com/good.jpg, https://example.com/error.jpg 2x">';
   output = '<img srcset="good.jpg, https://example.com/error.jpg 2x">';
   assert.strictEqual(await minify(input, { minifyURLs: faultyAsyncMinifier }), output);
 
-  // Test error in CSS url() processing
+  // Test error in CSS `url()` processing
   input = '<style>body { background: url("https://example.com/error.png") }</style>';
   output = '<style>body{background:url("https://example.com/error.png")}</style>';
   assert.strictEqual(await minify(input, { minifyCSS: true, minifyURLs: faultyAsyncMinifier }), output);
 
-  // Test CSS URLs with parentheses in filename (regression test for CSS URL regex bug)
+  // Test CSS URLs with parentheses in file name (regression test for CSS URL regex bug)
   const urlWithParens = async (url) => url.replace('https://example.com/', '');
   input = '<style>body { background: url("https://example.com/foo(bar).png") }</style>';
   output = '<style>body{background:url("foo(bar).png")}</style>';
@@ -3003,7 +3027,7 @@ test('noscript', async () => {
 
   input = '<noscript>\n<!-- anchor linking to external file -->\n' +
     '<a href="#" onclick="javascript:">External Link</a>\n</noscript>';
-  assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, removeEmptyAttributes: true }), 
+  assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, removeEmptyAttributes: true }),
     '<noscript><a href="#">External Link</a></noscript>');
 });
 
@@ -3071,13 +3095,13 @@ test('max line length', async () => {
   input = '<span><button>Hit me\n</button></span>';
   assert.strictEqual(await minify('<span><button>Hit me</button></span>', options), input);
   assert.strictEqual(await minify(input, options), input);
-  assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>', options), 
+  assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>', options),
     '<object \ntype="image/svg+xml" \ndata="image.svg"><div>\n[fallback image]</div>\n</object>'
   );
 
   assert.strictEqual(await minify('<ng-include src="x"></ng-include>', options), '<ng-include src="x">\n</ng-include>');
   assert.strictEqual(await minify('<ng:include src="x"></ng:include>', options), '<ng:include src="x">\n</ng:include>');
-  assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>', options), 
+  assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>', options),
     '<ng-include \nsrc="\'views/partial-notification.html\'">\n</ng-include><div \nng-view=""></div>'
   );
 
@@ -3596,7 +3620,7 @@ test('tests from PHPTAL', async () => {
       '<script type=\'text/javascript ;charset=utf-8\'\n' +
       'language=\'javascript\'></script><style type=\'text/css\'></style>'
     ], */
-    // Minifier removes more javascript type attributes than PHPTAL
+    // Minifier removes more JavaScript `type` attributes than PHPTAL
     ['<script></script><script type=text/hack></script>', '<script type="text/javascript;e4x=1"></script><script type="text/hack"></script>']
     /* trim "title" attribute value in <a>
     [
@@ -3716,14 +3740,14 @@ test('ReDoS prevention in custom fragments processing', async () => {
 test('inline custom elements', async () => {
   let input, output;
 
-  // Test with inlineCustomElements option
+  // Test with `inlineCustomElements` option
   input = '<custom-element>A</custom-element> <custom-element>B</custom-element>';
   assert.strictEqual(await minify(input, {
     collapseWhitespace: true,
     inlineCustomElements: ['custom-element']
   }), input);
 
-  // Test without inlineCustomElements—spacing should collapse for custom elements
+  // Test without `inlineCustomElements`—spacing should collapse for custom elements
   output = '<custom-element>A</custom-element><custom-element>B</custom-element>';
   assert.strictEqual(await minify(input, {
     collapseWhitespace: true
@@ -3772,7 +3796,7 @@ test('inline custom elements', async () => {
 test('srcdoc attribute minification', async () => {
   let input, output;
 
-  // Basic srcdoc minification (from GitHub issue #762)
+  // Basic `srcdoc` minification, https://github.com/kangax/html-minifier/issues/762
   input = '<iframe srcdoc="<p>hello<!-- comment -->         </p>"></iframe>';
   output = '<iframe srcdoc="<p>hello</p>"></iframe>';
   assert.strictEqual(await minify(input, {
@@ -3780,7 +3804,7 @@ test('srcdoc attribute minification', async () => {
     collapseWhitespace: true
   }), output);
 
-  // Complex HTML document in srcdoc
+  // Complex HTML document in `srcdoc`
   input = '<iframe srcdoc="<!DOCTYPE html><html><head><style>  body { margin: 0; }  </style></head><body><h1>  Title  </h1><!-- Test comment --><script>  console.log(\'test\');  </script></body></html>"></iframe>';
   output = '<iframe srcdoc=\'<!DOCTYPE html><html><head><style>body{margin:0}</style></head><body><h1>Title</h1><script>console.log("test")</script></body></html>\'></iframe>';
   assert.strictEqual(await minify(input, {
@@ -3790,7 +3814,7 @@ test('srcdoc attribute minification', async () => {
     minifyJS: true
   }), output);
 
-  // srcdoc with nested quotes and escaping
+  // `srcdoc` with nested quotes and escaping
   input = '<iframe srcdoc="<p title=\'quoted text\'>Content<!-- comment --></p>"></iframe>';
   output = '<iframe srcdoc=\'<p title="quoted text">Content</p>\'></iframe>';
   assert.strictEqual(await minify(input, {
@@ -3798,7 +3822,7 @@ test('srcdoc attribute minification', async () => {
     collapseWhitespace: true
   }), output);
 
-  // srcdoc with both src and srcdoc attributes (srcdoc takes precedence)
+  // `srcdoc` with both `src` and `srcdoc` attributes (`srcdoc` takes precedence)
   input = '<iframe src="page.html" srcdoc="<p>  Content with spaces  <!-- comment --></p>"></iframe>';
   output = '<iframe src="page.html" srcdoc="<p>Content with spaces</p>"></iframe>';
   assert.strictEqual(await minify(input, {
@@ -3806,23 +3830,23 @@ test('srcdoc attribute minification', async () => {
     collapseWhitespace: true
   }), output);
 
-  // Empty srcdoc should remain empty
+  // Empty `srcdoc` should remain empty
   input = '<iframe srcdoc=""></iframe>';
   output = '<iframe srcdoc=""></iframe>';
   assert.strictEqual(await minify(input), output);
 
-  // srcdoc with only whitespace
+  // `srcdoc` with only whitespace
   input = '<iframe srcdoc="   \n\t   "></iframe>';
   output = '<iframe srcdoc=""></iframe>';
   assert.strictEqual(await minify(input, {
     collapseWhitespace: true
   }), output);
 
-  // srcdoc should not be removed even with removeEmptyElements
+  // `srcdoc` should not be removed even with `removeEmptyElements`
   input = '<iframe srcdoc="<h1>Foo</h1>"></iframe>';
   assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
 
-  // Multiple iframes with srcdoc
+  // Multiple iframes with `srcdoc`
   input = '<iframe srcdoc="<h1>  First  </h1>"></iframe><iframe srcdoc="<h2><!-- comment -->Second</h2>"></iframe>';
   output = '<iframe srcdoc="<h1>First</h1>"></iframe><iframe srcdoc="<h2>Second</h2>"></iframe>';
   assert.strictEqual(await minify(input, {
@@ -3830,7 +3854,7 @@ test('srcdoc attribute minification', async () => {
     collapseWhitespace: true
   }), output);
 
-  // srcdoc with inline styles and scripts
+  // `srcdoc` with inline styles and scripts
   input = '<iframe srcdoc="<div style=\'  color: red;  \' onclick=\'  alert(&quot;Hello&quot;);  \'>Test</div>"></iframe>';
   output = '<iframe srcdoc=\'<div style="color:red" onclick="alert(&quot;Hello&quot;);">Test</div>\'></iframe>';
   assert.strictEqual(await minify(input, {
@@ -3839,50 +3863,50 @@ test('srcdoc attribute minification', async () => {
     collapseWhitespace: true
   }), output);
 
-  // Nested iframe srcdoc should recurse
+  // Nested iframe `srcdoc` should recurse
   input = '<iframe srcdoc="<iframe srcdoc=\'<p>  Hi  </p>\'></iframe>"></iframe>';
   output = '<iframe srcdoc=\'<iframe srcdoc="<p>Hi</p>"></iframe>\'></iframe>';
   assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
-  // decodeEntities true should decode inner markup
+  // `decodeEntities` should decode inner markup
   input = '<iframe srcdoc="&lt;p&gt;a&amp;b&lt;/p&gt;"></iframe>';
   output = '<iframe srcdoc="<p>a&b</p>"></iframe>';
   assert.strictEqual(await minify(input, { collapseWhitespace: true, decodeEntities: true }), output);
 
-  // Fast-path: no minification options should leave srcdoc unchanged
+  // Fast-path: no minification options should leave `srcdoc` unchanged
   input = '<iframe srcdoc="<p>hello<!-- comment -->         </p>"></iframe>';
   output = '<iframe srcdoc="<p>hello<!-- comment -->         </p>"></iframe>';
   assert.strictEqual(await minify(input, {}), output);
 
-  // Quotes around srcdoc must be preserved even when allowing quote removal
+  // Quotes around `srcdoc` must be preserved even when allowing quote removal
   input = '<iframe srcdoc="<p>hello world</p>"></iframe>';
   assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), input);
 
-  // minifyURLs should apply inside srcdoc content
+  // `minifyURLs` should apply inside `srcdoc` content
   input = '<iframe srcdoc="<a href=\'https://example.com/foo\'>x</a>"></iframe>';
   output = '<iframe srcdoc=\'<a href="foo">x</a>\'></iframe>';
   assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), output);
 
-  // After collapsing whitespace to empty, iframe with empty srcdoc is preserved
+  // After collapsing whitespace to empty, iframe with empty `srcdoc` is preserved
   input = '<iframe srcdoc="   \n\t   "></iframe>';
   assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), '<iframe srcdoc=""></iframe>');
 });
 
 test('tfoot element in nested table', async () => {
-  // Minimal test case for tfoot element breaking HTML structure during minification
+  // Minimal test case for `tfoot` element breaking HTML structure during minification
   const input = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
 
-  // The output should preserve the correct table structure with tfoot properly nested
+  // The output should preserve the correct table structure with `tfoot` properly nested
   const expected = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
 
   assert.strictEqual(await minify(input), expected);
 });
 
 test('tbody element in nested table', async () => {
-  // Test case for tbody with thead in nested tables
+  // Test case for `tbody` with `thead` in nested tables
   const input = '<table><thead><tr><th>Outer Header</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner Header</th></tr></thead><tbody><tr><td>Test</td></tr></tbody></table></td></tr></tbody></table>';
 
-  // The output should preserve the correct table structure with thead/tbody properly nested
+  // The output should preserve the correct table structure with `thead`/`tbody` properly nested
   const expected = '<table><thead><tr><th>Outer Header</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner Header</th></tr></thead><tbody><tr><td>Test</td></tr></tbody></table></td></tr></tbody></table>';
 
   assert.strictEqual(await minify(input), expected);
@@ -3969,27 +3993,27 @@ test('all optional tags', async () => {
 test('extended ruby markup with optional tags (HTML Ruby Markup Extensions)', async () => {
   let input, output;
 
-  // Simple ruby with rb elements
+  // Simple ruby with `rb` elements
   input = '<ruby><rb>漢</rb><rt>kan</rt></ruby>';
   output = '<ruby><rb>漢<rt>kan</ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-  // Ruby with multiple rb/rt pairs
+  // Ruby with multiple `rb`/`rt` pairs
   input = '<ruby><rb>東</rb><rt>tō</rt><rb>京</rb><rt>kyō</rt></ruby>';
   output = '<ruby><rb>東<rt>tō<rb>京<rt>kyō</ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-  // Ruby with rtc (ruby text container)
+  // Ruby with `rtc` (ruby text container)
   input = '<ruby><rb>字</rb><rtc><rt>ji</rt></rtc></ruby>';
   output = '<ruby><rb>字<rtc><rt>ji</ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-  // Ruby with rp fallback and rb elements
+  // Ruby with `rp` fallback and `rb` elements
   input = '<ruby><rb>漢</rb><rp> (</rp><rt>kan</rt><rp>) </rp></ruby>';
   output = '<ruby><rb>漢<rp> (<rt>kan<rp>) </ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-  // Double-sided ruby (rtc followed by another rtc)
+  // Double-sided ruby (`rtc` followed by another `rtc`)
   input = '<ruby><rb>字</rb><rtc><rt>reading1</rt></rtc><rtc><rt>reading2</rt></rtc></ruby>';
   output = '<ruby><rb>字<rtc><rt>reading1<rtc><rt>reading2</ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
@@ -4004,12 +4028,12 @@ test('extended ruby markup with optional tags (HTML Ruby Markup Extensions)', as
   output = '<ruby><rb>東<rt>tō<rb>京<rt>kyō</ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
 
-  // rtc end tag omission rules—rtc can only be followed by rb or rtc
+  // `rtc` end tag omission rules—`rtc` can only be followed by `rb` or `rtc`
   input = '<ruby><rb>a</rb><rtc><rt>x</rt></rtc><rb>b</rb></ruby>';
   output = '<ruby><rb>a<rtc><rt>x<rb>b</ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-  // Ensuring rtc end tag is not omitted before rt (spec says rtc can only be followed by rb or rtc)
+  // Ensuring `rtc` end tag is not omitted before `rt` (spec says `rtc` can only be followed by `rb` or `rtc`)
   input = '<ruby><rtc><rt>annotation</rt></rtc><rt>more</rt></ruby>';
   output = '<ruby><rtc><rt>annotation</rtc><rt>more</ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);

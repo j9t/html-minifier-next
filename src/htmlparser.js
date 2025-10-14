@@ -338,6 +338,11 @@ export class HTMLParser {
         await parseEndTag('', tagName);
       }
 
+      // Handle `dt`/`dd` cross-closing: `dt` followed by `dd`, or `dd` followed by `dt`
+      if ((tagName === 'dt' || tagName === 'dd') && (lastTag === 'dt' || lastTag === 'dd')) {
+        await parseEndTag('', lastTag);
+      }
+
       const unary = empty.has(tagName) || (tagName === 'html' && lastTag === 'head') || !!unarySlash;
 
       const attrs = match.attrs.map(function (args) {
