@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.8] - 2025-10-14
+
+### Fixed
+
+- Fixed HTML parser incorrectly handling `<dt>` and `<dd>` elements when optional closing tags are already omitted in source markup, preventing accumulation of remnant closing tags in output
+
 ## [2.1.7] - 2025-10-10
 
 ### Changed
