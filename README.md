@@ -191,7 +191,7 @@ Most of the options are disabled by default.
 | `removeEmptyAttributes` | [Remove all attributes with whitespace-only values](http://perfectionkills.com/experimenting-with-html-minifier#remove_empty_or_blank_attributes) | `false` (could be `true`, `Function(attrName, tag)`) |
 | `removeEmptyElements` | [Remove all elements with empty contents](http://perfectionkills.com/experimenting-with-html-minifier#remove_empty_elements) | `false` |
 | `removeOptionalTags` | [Remove optional tags](http://perfectionkills.com/experimenting-with-html-minifier#remove_optional_tags) | `false` |
-| `removeRedundantAttributes` | [Remove attributes when value matches default.](http://perfectionkills.com/experimenting-with-html-minifier#remove_redundant_attributes) | `false` |
+| `removeRedundantAttributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeScriptTypeAttributes` | Remove `type="text/javascript"` from `script` elements; other `type` attribute values are left intact | `false` |
 | `removeStyleLinkTypeAttributes`| Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact | `false` |
 | `removeTagWhitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
