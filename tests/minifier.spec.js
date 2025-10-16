@@ -1129,6 +1129,12 @@ test('attribute value defaults', async () => {
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true, removeAttributeQuotes: true }), expected);
 });
 
+test('removing optional tags with attribute value defaults', async () => {
+  const input = '<html dir=ltr>';
+  const output = '';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true, removeRedundantAttributes: true }), output);
+});
+
 test('removing redundant attributes (&lt;... = "javascript: ..." ...>)', async () => {
   let input;
 
