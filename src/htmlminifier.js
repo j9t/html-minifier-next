@@ -121,17 +121,10 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   attrValue = attrValue ? trimWhitespace(attrValue.toLowerCase()) : '';
 
   return (
+    // Legacy attributes
     (tag === 'script' &&
       attrName === 'language' &&
       attrValue === 'javascript') ||
-
-    (tag === 'form' &&
-      attrName === 'method' &&
-      attrValue === 'get') ||
-
-    (tag === 'input' &&
-      attrName === 'type' &&
-      attrValue === 'text') ||
 
     (tag === 'script' &&
       attrName === 'charset' &&
@@ -141,9 +134,74 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
       attrName === 'name' &&
       attributesInclude(attrs, 'id')) ||
 
+    // HTML spec default values
+    (attrName === 'autocorrect' &&
+      attrValue === 'on') ||
+
+    (attrName === 'fetchpriority' &&
+      attrValue === 'auto') ||
+
+    (attrName === 'loading' &&
+      attrValue === 'eager') ||
+
+    (attrName === 'popovertargetaction' &&
+      attrValue === 'toggle') ||
+
     (tag === 'area' &&
       attrName === 'shape' &&
-      attrValue === 'rect')
+      attrValue === 'rect') ||
+
+    (tag === 'button' &&
+      attrName === 'type' &&
+      attrValue === 'submit') ||
+
+    (tag === 'dialog' &&
+      attrName === 'closedby' &&
+      attrValue === 'none') ||
+
+    (tag === 'form' &&
+      attrName === 'enctype' &&
+      attrValue === 'application/x-www-form-urlencoded') ||
+
+    (tag === 'form' &&
+      attrName === 'method' &&
+      attrValue === 'get') ||
+
+    (tag === 'html' &&
+      attrName === 'dir' &&
+      attrValue === 'ltr') ||
+
+    (tag === 'img' &&
+      attrName === 'decoding' &&
+      attrValue === 'auto') ||
+
+    (tag === 'input' &&
+      attrName === 'colorspace' &&
+      attrValue === 'limited-srgb') ||
+
+    (tag === 'input' &&
+      attrName === 'type' &&
+      attrValue === 'text') ||
+
+    (tag === 'marquee' &&
+      attrName === 'behavior' &&
+      attrValue === 'scroll') ||
+
+    (tag === 'marquee' &&
+      attrName === 'direction' &&
+      attrValue === 'left') ||
+
+    (tag === 'style' &&
+      attrName === 'media' &&
+      attrValue === 'all') ||
+
+    (tag === 'textarea' &&
+      attrName === 'wrap' &&
+      attrValue === 'soft') ||
+
+    (tag === 'track' &&
+      attrName === 'kind' &&
+      attrValue === 'subtitles')
   );
 }
 
