@@ -1083,6 +1083,52 @@ test('removing redundant attributes (&lt;area shape="rect" ...>)', async () => {
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), output);
 });
 
+test('attribute value defaults', async () => {
+  const input = '<!DOCTYPE html>\n' +
+    '<html dir=ltr>\n' +
+    '\t<title>Attribute Value Defaults</title>\n' +
+    '\t<style media=all></style>\n' +
+    '\t<form autocorrect=on>\n' +
+    '\t\t<button type=submit>Example</button>\n' +
+    '\t\t<button popovertargetaction=toggle>Example</button>\n' +
+    '\t</form>\n' +
+    '\t<img src=example alt=Example fetchpriority=auto loading=eager decoding=auto>\n' +
+    '\t<map name=example>\n' +
+    '\t\t<area coords="0,1,2,3" shape=rect>\n' +
+    '\t</map>\n' +
+    '\t<dialog closedby=none></dialog>\n' +
+    '\t<form enctype=application/x-www-form-urlencoded method=get></form>\n' +
+    '\t<input type=color colorspace=limited-srgb>\n' +
+    '\t<input type=text>\n' +
+    '\t<marquee behavior=scroll direction=left></marquee>\n' +
+    '\t<textarea wrap=soft></textarea>\n' +
+    '\t<video>\n' +
+    '\t\t<track src=example kind=subtitles>\n' +
+    '\t</video>';
+  const expected = '<!DOCTYPE html>\n' +
+    '<html>\n' +
+    '\t<title>Attribute Value Defaults</title>\n' +
+    '\t<style></style>\n' +
+    '\t<form>\n' +
+    '\t\t<button>Example</button>\n' +
+    '\t\t<button>Example</button>\n' +
+    '\t</form>\n' +
+    '\t<img src=example alt=Example>\n' +
+    '\t<map name=example>\n' +
+    '\t\t<area coords=0,1,2,3>\n' +
+    '\t</map>\n' +
+    '\t<dialog></dialog>\n' +
+    '\t<form></form>\n' +
+    '\t<input type=color>\n' +
+    '\t<input>\n' +
+    '\t<marquee></marquee>\n' +
+    '\t<textarea></textarea>\n' +
+    '\t<video>\n' +
+    '\t\t<track src=example>\n' +
+    '\t</video></html>';
+  assert.strictEqual(await minify(input, { removeRedundantAttributes: true, removeAttributeQuotes: true }), expected);
+});
+
 test('removing redundant attributes (&lt;... = "javascript: ..." ...>)', async () => {
   let input;
 
@@ -3269,7 +3315,7 @@ test('markups from Angular 2', async () => {
     '<label for=name>Name</label>' +
     ' <input class=form-control required ngControl=firstName [(ngModel)]=currentHero.firstName>' +
     '</div>' +
-    '<button type=submit [disabled]=!theForm.form.valid>Submit</button>' +
+    '<button [disabled]=!theForm.form.valid>Submit</button>' +
     '</form>';
   assert.strictEqual(await minify(input, {
     caseSensitive: true,
