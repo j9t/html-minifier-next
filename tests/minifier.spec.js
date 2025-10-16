@@ -1096,7 +1096,6 @@ test('attribute value defaults', async () => {
     '\t<map name=example>\n' +
     '\t\t<area coords="0,1,2,3" shape=rect>\n' +
     '\t</map>\n' +
-    '\t<dialog closedby=none></dialog>\n' +
     '\t<form enctype=application/x-www-form-urlencoded method=get></form>\n' +
     '\t<input type=color colorspace=limited-srgb>\n' +
     '\t<input type=text>\n' +
@@ -1117,7 +1116,6 @@ test('attribute value defaults', async () => {
     '\t<map name=example>\n' +
     '\t\t<area coords=0,1,2,3>\n' +
     '\t</map>\n' +
-    '\t<dialog></dialog>\n' +
     '\t<form></form>\n' +
     '\t<input type=color>\n' +
     '\t<input>\n' +

@@ -155,10 +155,6 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
       attrName === 'type' &&
       attrValue === 'submit') ||
 
-    (tag === 'dialog' &&
-      attrName === 'closedby' &&
-      attrValue === 'none') ||
-
     (tag === 'form' &&
       attrName === 'enctype' &&
       attrValue === 'application/x-www-form-urlencoded') ||
