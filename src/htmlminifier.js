@@ -129,7 +129,6 @@ const generalDefaults = {
 const tagDefaults = {
   area: { shape: 'rect' },
   button: { type: 'submit' },
-  dialog: { closedby: 'auto' },
   form: {
     enctype: 'application/x-www-form-urlencoded',
     method: 'get'
@@ -137,8 +136,8 @@ const tagDefaults = {
   html: { dir: 'ltr' },
   img: { decoding: 'auto' },
   input: {
-    type: 'text',
-    colorspace: 'limited-srgb'
+    colorspace: 'limited-srgb',
+    type: 'text'
   },
   marquee: {
     behavior: 'scroll',
