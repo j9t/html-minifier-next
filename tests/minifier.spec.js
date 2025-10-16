@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 
-test('`minifiy` exists', () => {
+test('`minify` exists', () => {
   assert.ok(minify);
 });
 
