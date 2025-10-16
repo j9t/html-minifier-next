@@ -1013,7 +1013,7 @@ test('cleaning other attributes', async () => {
   assert.strictEqual(await minify(input), output);
 });
 
-test('removing redundant attributes (&lt;form method="get" ...>)', async () => {
+test('removing redundant attributes (&lt;form method="get" …>)', async () => {
   let input;
 
   input = '<form method="get">hello world</form>';
@@ -1023,7 +1023,7 @@ test('removing redundant attributes (&lt;form method="get" ...>)', async () => {
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<form method="post">hello world</form>');
 });
 
-test('removing redundant attributes (&lt;input type="text" ...>)', async () => {
+test('removing redundant attributes (&lt;input type="text" …>)', async () => {
   let input;
 
   input = '<input type="text">';
@@ -1036,7 +1036,7 @@ test('removing redundant attributes (&lt;input type="text" ...>)', async () => {
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<input type="checkbox">');
 });
 
-test('removing redundant attributes (&lt;a name="..." id="..." ...>)', async () => {
+test('removing redundant attributes (&lt;a name="…" id="…" …>)', async () => {
   let input;
 
   input = '<a id="foo" name="foo">blah</a>';
@@ -1048,11 +1048,11 @@ test('removing redundant attributes (&lt;a name="..." id="..." ...>)', async () 
   input = '<a name="foo">blah</a>';
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), input);
 
-  input = '<a href="..." name="  bar  " id="bar" >blah</a>';
-  assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<a href="..." id="bar">blah</a>');
+  input = '<a href="…" name="  bar  " id="bar" >blah</a>';
+  assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<a href="…" id="bar">blah</a>');
 });
 
-test('removing redundant attributes (&lt;script src="..." charset="...">)', async () => {
+test('removing redundant attributes (&lt;script src="…" charset="…">)', async () => {
   let input, output;
 
   input = '<script type="text/javascript" charset="UTF-8">alert(222);</script>';
@@ -1062,12 +1062,12 @@ test('removing redundant attributes (&lt;script src="..." charset="...">)', asyn
   input = '<script type="text/javascript" src="https://example.com" charset="UTF-8">alert(222);</script>';
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), input);
 
-  input = '<script CHARSET=" ... ">alert(222);</script>';
+  input = '<script CHARSET=" … ">alert(222);</script>';
   output = '<script>alert(222);</script>';
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), output);
 });
 
-test('removing redundant attributes (&lt;... language="javascript" ...>)', async () => {
+test('removing redundant attributes (&lt;… language="javascript" …>)', async () => {
   let input;
 
   input = '<script language="Javascript">x=2,y=4</script>';
@@ -1077,7 +1077,7 @@ test('removing redundant attributes (&lt;... language="javascript" ...>)', async
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<script>x=2,y=4</script>');
 });
 
-test('removing redundant attributes (&lt;area shape="rect" ...>)', async () => {
+test('removing redundant attributes (&lt;area shape="rect" …>)', async () => {
   const input = '<area shape="rect" coords="696,25,958,47" href="#" title="foo">';
   const output = '<area coords="696,25,958,47" href="#" title="foo">';
   assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), output);
@@ -1135,7 +1135,7 @@ test('removing optional tags with attribute value defaults', async () => {
   assert.strictEqual(await minify(input, { removeOptionalTags: true, removeRedundantAttributes: true }), output);
 });
 
-test('removing redundant attributes (&lt;... = "javascript: ..." ...>)', async () => {
+test('removing redundant attributes (&lt;… = "javascript: …" …>)', async () => {
   let input;
 
   input = '<p onclick="javascript:alert(1)">x</p>';
@@ -1376,12 +1376,12 @@ test('collapsing whitespace', async () => {
     '<input type="text"> <textarea></textarea><pre></pre>';
   assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
-  input = '<pre title="some title...">   hello     world </pre>';
-  output = '<pre title="some title...">   hello     world </pre>';
+  input = '<pre title="some title…">   hello     world </pre>';
+  output = '<pre title="some title…">   hello     world </pre>';
   assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
-  input = '<pre title="some title..."><code>   hello     world </code></pre>';
-  output = '<pre title="some title..."><code>   hello     world </code></pre>';
+  input = '<pre title="some title…"><code>   hello     world </code></pre>';
+  output = '<pre title="some title…"><code>   hello     world </code></pre>';
   assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
   input = '<script>alert("foo     bar")    </script>';
@@ -1862,8 +1862,8 @@ test('ignoring custom fragments', async () => {
   let input, output;
   const reFragments = [/<\?[^?]+\?>/, /<%[^%]+%>/, /\{\{[^}]*\}\}/];
 
-  input = 'This is the start. <% ... %>\r\n<%= ... %>\r\n<? ... ?>\r\n<!-- This is the middle, and a comment. -->\r\nNo comment, but middle.\r\n{{ ... }}\r\n<?php ... ?>\r\n<?xml ... ?>\r\nHello, this is the end!';
-  output = 'This is the start. <% ... %> <%= ... %> <? ... ?> No comment, but middle. {{ ... }} <?php ... ?> <?xml ... ?> Hello, this is the end!';
+  input = 'This is the start. <% … %>\r\n<%= … %>\r\n<? … ?>\r\n<!-- This is the middle, and a comment. -->\r\nNo comment, but middle.\r\n{{ … }}\r\n<?php … ?>\r\n<?xml … ?>\r\nHello, this is the end!';
+  output = 'This is the start. <% … %> <%= … %> <? … ?> No comment, but middle. {{ … }} <?php … ?> <?xml … ?> Hello, this is the end!';
   assert.strictEqual(await minify(input, {}), input);
   assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true }), output);
   assert.strictEqual(await minify(input, {
@@ -1872,14 +1872,14 @@ test('ignoring custom fragments', async () => {
     ignoreCustomFragments: reFragments
   }), output);
 
-  output = 'This is the start. <% ... %>\n<%= ... %>\n<? ... ?>\nNo comment, but middle. {{ ... }}\n<?php ... ?>\n<?xml ... ?>\nHello, this is the end!';
+  output = 'This is the start. <% … %>\n<%= … %>\n<? … ?>\nNo comment, but middle. {{ … }}\n<?php … ?>\n<?xml … ?>\nHello, this is the end!';
   assert.strictEqual(await minify(input, {
     removeComments: true,
     collapseWhitespace: true,
     preserveLineBreaks: true
   }), output);
 
-  output = 'This is the start. <% ... %>\n<%= ... %>\n<? ... ?>\nNo comment, but middle.\n{{ ... }}\n<?php ... ?>\n<?xml ... ?>\nHello, this is the end!';
+  output = 'This is the start. <% … %>\n<%= … %>\n<? … ?>\nNo comment, but middle.\n{{ … }}\n<?php … ?>\n<?xml … ?>\nHello, this is the end!';
   assert.strictEqual(await minify(input, {
     removeComments: true,
     collapseWhitespace: true,
@@ -1887,23 +1887,23 @@ test('ignoring custom fragments', async () => {
     ignoreCustomFragments: reFragments
   }), output);
 
-  input = '{{ if foo? }}\r\n  <div class="bar">\r\n    ...\r\n  </div>\r\n{{ end \n}}';
-  output = '{{ if foo? }}<div class="bar">...</div>{{ end }}';
+  input = '{{ if foo? }}\r\n  <div class="bar">\r\n    …\r\n  </div>\r\n{{ end \n}}';
+  output = '{{ if foo? }}<div class="bar">…</div>{{ end }}';
   assert.strictEqual(await minify(input, {}), input);
   assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [] }), output);
 
-  output = '{{ if foo? }} <div class="bar">...</div> {{ end \n}}';
+  output = '{{ if foo? }} <div class="bar">…</div> {{ end \n}}';
   assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: reFragments }), output);
 
-  output = '{{ if foo? }}\n<div class="bar">\n...\n</div>\n{{ end \n}}';
+  output = '{{ if foo? }}\n<div class="bar">\n…\n</div>\n{{ end \n}}';
   assert.strictEqual(await minify(input, {
     collapseWhitespace: true,
     preserveLineBreaks: true,
     ignoreCustomFragments: reFragments
   }), output);
 
-  input = '<a class="<% if foo? %>bar<% end %> {{ ... }}"></a>';
+  input = '<a class="<% if foo? %>bar<% end %> {{ … }}"></a>';
   assert.strictEqual(await minify(input, {}), input);
   assert.strictEqual(await minify(input, { ignoreCustomFragments: reFragments }), input);
 
@@ -2273,7 +2273,7 @@ test('minification of scripts with custom fragments', async () => {
     preserveLineBreaks: true
   }), input);
 
-  input = '<script>// <% ... %></script>';
+  input = '<script>// <% … %></script>';
   output = '<script></script>';
   assert.strictEqual(await minify(input, { minifyJS: true }), output);
   assert.strictEqual(await minify(input, { collapseWhitespace: true, minifyJS: true }), output);
@@ -2283,19 +2283,19 @@ test('minification of scripts with custom fragments', async () => {
     preserveLineBreaks: true
   }), output);
 
-  input = '<script>// \n<% ... %></script>';
-  output = '<script> \n<% ... %></script>';
+  input = '<script>// \n<% … %></script>';
+  output = '<script> \n<% … %></script>';
   assert.strictEqual(await minify(input, { minifyJS: true }), output);
-  output = '<script> <% ... %></script>';
+  output = '<script> <% … %></script>';
   assert.strictEqual(await minify(input, { collapseWhitespace: true, minifyJS: true }), output);
-  output = '<script>\n<% ... %></script>';
+  output = '<script>\n<% … %></script>';
   assert.strictEqual(await minify(input, {
     collapseWhitespace: true,
     minifyJS: true,
     preserveLineBreaks: true
   }), output);
 
-  input = '<script>// <% ... %>\n</script>';
+  input = '<script>// <% … %>\n</script>';
   output = '<script></script>';
   assert.strictEqual(await minify(input, { minifyJS: true }), output);
   assert.strictEqual(await minify(input, { collapseWhitespace: true, minifyJS: true }), output);
@@ -2305,12 +2305,12 @@ test('minification of scripts with custom fragments', async () => {
     preserveLineBreaks: true
   }), output);
 
-  input = '<script>// \n<% ... %>\n</script>';
-  output = '<script> \n<% ... %>\n</script>';
+  input = '<script>// \n<% … %>\n</script>';
+  output = '<script> \n<% … %>\n</script>';
   assert.strictEqual(await minify(input, { minifyJS: true }), output);
-  output = '<script> <% ... %> </script>';
+  output = '<script> <% … %> </script>';
   assert.strictEqual(await minify(input, { collapseWhitespace: true, minifyJS: true }), output);
-  output = '<script>\n<% ... %>\n</script>';
+  output = '<script>\n<% … %>\n</script>';
   assert.strictEqual(await minify(input, {
     collapseWhitespace: true,
     minifyJS: true,
@@ -2908,8 +2908,8 @@ test('collapse preserving a line break', async () => {
     preserveLineBreaks: true
   }), output);
 
-  input = 'This is the start. <% ... %>\r\n<%= ... %>\r\n<? ... ?>\r\n<!-- This is the middle, and a comment. -->\r\nNo comment, but middle.\r\n<?= ... ?>\r\n<?php ... ?>\r\n<?xml ... ?>\r\nHello, this is the end!';
-  output = 'This is the start. <% ... %>\n<%= ... %>\n<? ... ?>\nNo comment, but middle.\n<?= ... ?>\n<?php ... ?>\n<?xml ... ?>\nHello, this is the end!';
+  input = 'This is the start. <% … %>\r\n<%= … %>\r\n<? … ?>\r\n<!-- This is the middle, and a comment. -->\r\nNo comment, but middle.\r\n<?= … ?>\r\n<?php … ?>\r\n<?xml … ?>\r\nHello, this is the end!';
+  output = 'This is the start. <% … %>\n<%= … %>\n<? … ?>\nNo comment, but middle.\n<?= … ?>\n<?php … ?>\n<?xml … ?>\nHello, this is the end!';
   assert.strictEqual(await minify(input, {
     removeComments: true,
     collapseWhitespace: true,
@@ -3013,16 +3013,16 @@ test('ignore', async () => {
   input = '<!-- htmlmin:ignore --><!-- htmlmin:ignore -->';
   assert.strictEqual(await minify(input), '');
 
-  input = '<p>.....</p><!-- htmlmin:ignore -->' +
+  input = '<p>…..</p><!-- htmlmin:ignore -->' +
     '@for( $i = 0 ; $i < $criterions->count() ; $i++ )' +
     '<h1>{{ $criterions[$i]->value }}</h1>' +
     '@endfor' +
-    '<!-- htmlmin:ignore --><p>....</p>';
-  output = '<p>.....</p>' +
+    '<!-- htmlmin:ignore --><p>….</p>';
+  output = '<p>…..</p>' +
     '@for( $i = 0 ; $i < $criterions->count() ; $i++ )' +
     '<h1>{{ $criterions[$i]->value }}</h1>' +
     '@endfor' +
-    '<p>....</p>';
+    '<p>….</p>';
   assert.strictEqual(await minify(input, { removeComments: true }), output);
 
   input = '<!-- htmlmin:ignore --> <p class="logged"|cond="$is_logged === true" id="foo"> bar</p> <!-- htmlmin:ignore -->';
