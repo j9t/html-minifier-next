@@ -45,7 +45,7 @@ describe('cli', () => {
     await removeFixture('tmp');
   });
 
-  test('minify the html', async () => {
+  test('minify the HTML', async () => {
     const input = await readFixture('default.html');
 
     const minifyOptions = {
@@ -113,7 +113,7 @@ describe('cli', () => {
   });
 
   // Parsing JSON
-  test('should minify urls correctly', async () => {
+  test('should minify URLs correctly', async () => {
     const input = await readFixture('url.html');
 
     const minifyOptions = {

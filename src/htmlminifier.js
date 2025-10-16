@@ -117,34 +117,58 @@ function attributesInclude(attributes, attribute) {
   return false;
 }
 
+// Default attribute values (could apply to any element)
+const generalDefaults = {
+  autocorrect: 'on',
+  fetchpriority: 'auto',
+  loading: 'eager',
+  popovertargetaction: 'toggle'
+};
+
+// Tag-specific default attribute values
+const tagDefaults = {
+  area: { shape: 'rect' },
+  button: { type: 'submit' },
+  form: {
+    enctype: 'application/x-www-form-urlencoded',
+    method: 'get'
+  },
+  html: { dir: 'ltr' },
+  img: { decoding: 'auto' },
+  input: {
+    colorspace: 'limited-srgb',
+    type: 'text'
+  },
+  marquee: {
+    behavior: 'scroll',
+    direction: 'left'
+  },
+  style: { media: 'all' },
+  textarea: { wrap: 'soft' },
+  track: { kind: 'subtitles' }
+};
+
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   attrValue = attrValue ? trimWhitespace(attrValue.toLowerCase()) : '';
 
-  return (
-    (tag === 'script' &&
-      attrName === 'language' &&
-      attrValue === 'javascript') ||
+  // Legacy attributes
+  if (tag === 'script' && attrName === 'language' && attrValue === 'javascript') {
+    return true;
+  }
+  if (tag === 'script' && attrName === 'charset' && !attributesInclude(attrs, 'src')) {
+    return true;
+  }
+  if (tag === 'a' && attrName === 'name' && attributesInclude(attrs, 'id')) {
+    return true;
+  }
 
-    (tag === 'form' &&
-      attrName === 'method' &&
-      attrValue === 'get') ||
+  // Check general defaults
+  if (generalDefaults[attrName] === attrValue) {
+    return true;
+  }
 
-    (tag === 'input' &&
-      attrName === 'type' &&
-      attrValue === 'text') ||
-
-    (tag === 'script' &&
-      attrName === 'charset' &&
-      !attributesInclude(attrs, 'src')) ||
-
-    (tag === 'a' &&
-      attrName === 'name' &&
-      attributesInclude(attrs, 'id')) ||
-
-    (tag === 'area' &&
-      attrName === 'shape' &&
-      attrValue === 'rect')
-  );
+  // Check tag-specific defaults
+  return tagDefaults[tag]?.[attrName] === attrValue;
 }
 
 // https://mathiasbynens.be/demo/javascript-mime-type

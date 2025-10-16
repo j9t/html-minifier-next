@@ -131,25 +131,25 @@ How does HTML Minifier Next compare to other solutions, like [minimize](https://
 
 | Site | Original Size (KB) | HTML Minifier Next | minimize | html­compressor.com | htmlnano | minify-html |
 | --- | --- | --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 63 | **54** | 58 | 57 | 55 | 56 |
-| [Amazon](https://www.amazon.com/) | 5 | **3** | **3** | **3** | **3** | n/a |
-| [Apple](https://www.apple.com/) | 212 | **171** | 198 | 195 | 189 | 194 |
-| [BBC](https://www.bbc.co.uk/) | 742 | **683** | 736 | n/a | 698 | 699 |
-| [CSS-Tricks](https://css-tricks.com/) | 11 | **6** | 11 | 10 | 7 | n/a |
-| [ECMAScript](https://tc39.es/ecma262/) | 7205 | **6315** | 6585 | n/a | 6532 | 6538 |
-| [EFF](https://www.eff.org/) | 60 | **51** | 55 | 55 | 54 | 53 |
-| [FAZ](https://www.faz.net/aktuell/) | 1847 | 1728 | 1764 | n/a | **1630** | n/a |
-| [Frontend Dogma](https://frontenddogma.com/) | 117 | **112** | 126 | 117 | 124 | 117 |
-| [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | **16** | n/a |
-| [Ground News](https://ground.news/) | 1509 | **1287** | 1495 | n/a | 1386 | n/a |
-| [HTML](https://html.spec.whatwg.org/multipage/) | 149 | **146** | 155 | 148 | 153 | 148 |
-| [Leanpub](https://leanpub.com/) | 1361 | **1143** | 1355 | n/a | 1150 | n/a |
-| [Mastodon](https://mastodon.social/explore) | 35 | **25** | 33 | 33 | 30 | 33 |
+| [A List Apart](https://alistapart.com/) | 62 | **53** | 58 | 56 | 54 | 55 |
+| [Amazon](https://www.amazon.com/) | 715 | **642** | 701 | n/a | n/a | n/a |
+| [Apple](https://www.apple.com/) | 184 | **143** | 170 | 167 | 161 | 166 |
+| [BBC](https://www.bbc.co.uk/) | 618 | **568** | 613 | n/a | 580 | 582 |
+| [CSS-Tricks](https://css-tricks.com/) | 161 | **121** | 148 | 145 | 126 | 144 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7233 | **6338** | 6610 | n/a | 6557 | 6563 |
+| [EFF](https://www.eff.org/) | 57 | **48** | 51 | 51 | 51 | 49 |
+| [FAZ](https://www.faz.net/aktuell/) | 1876 | 1753 | 1790 | n/a | **1652** | n/a |
+| [Frontend Dogma](https://frontenddogma.com/) | 119 | **114** | 128 | 118 | 125 | 119 |
+| [Google](https://www.google.com/) | 18 | **17** | 18 | 18 | **17** | n/a |
+| [Ground News](https://ground.news/) | 1840 | **1591** | 1827 | n/a | 1689 | n/a |
+| [HTML](https://html.spec.whatwg.org/multipage/) | 149 | **147** | 155 | 148 | 153 | 149 |
+| [Leanpub](https://leanpub.com/) | 1567 | **1292** | 1561 | n/a | 1299 | n/a |
+| [Mastodon](https://mastodon.social/explore) | 35 | **26** | 34 | 34 | 30 | 33 |
 | [MDN](https://developer.mozilla.org/en-US/) | 104 | **62** | 67 | 68 | 64 | n/a |
-| [Middle East Eye](https://www.middleeasteye.net/) | 221 | **194** | 201 | 202 | 201 | 199 |
-| [SitePoint](https://www.sitepoint.com/) | 469 | **338** | 466 | n/a | 408 | 449 |
-| [United Nations](https://www.un.org/en/) | 153 | **116** | 132 | 125 | 123 | 127 |
-| [W3C](https://www.w3.org/) | 49 | **35** | 40 | 38 | 37 | 38 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 224 | **197** | 204 | 204 | 204 | 201 |
+| [SitePoint](https://www.sitepoint.com/) | 476 | **345** | 473 | n/a | 415 | 456 |
+| [United Nations](https://www.un.org/en/) | 151 | **114** | 130 | 123 | 121 | 124 |
+| [W3C](https://www.w3.org/) | 50 | **36** | 41 | 39 | 39 | 39 |
 
 ## Options quick reference
 
@@ -191,7 +191,7 @@ Most of the options are disabled by default.
 | `removeEmptyAttributes` | [Remove all attributes with whitespace-only values](http://perfectionkills.com/experimenting-with-html-minifier#remove_empty_or_blank_attributes) | `false` (could be `true`, `Function(attrName, tag)`) |
 | `removeEmptyElements` | [Remove all elements with empty contents](http://perfectionkills.com/experimenting-with-html-minifier#remove_empty_elements) | `false` |
 | `removeOptionalTags` | [Remove optional tags](http://perfectionkills.com/experimenting-with-html-minifier#remove_optional_tags) | `false` |
-| `removeRedundantAttributes` | [Remove attributes when value matches default.](http://perfectionkills.com/experimenting-with-html-minifier#remove_redundant_attributes) | `false` |
+| `removeRedundantAttributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeScriptTypeAttributes` | Remove `type="text/javascript"` from `script` elements; other `type` attribute values are left intact | `false` |
 | `removeStyleLinkTypeAttributes`| Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact | `false` |
 | `removeTagWhitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
