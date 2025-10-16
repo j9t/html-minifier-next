@@ -117,88 +117,59 @@ function attributesInclude(attributes, attribute) {
   return false;
 }
 
+// Default attribute values (could apply to any element)
+const generalDefaults = {
+  autocorrect: 'on',
+  fetchpriority: 'auto',
+  loading: 'eager',
+  popovertargetaction: 'toggle'
+};
+
+// Tag-specific default attribute values
+const tagDefaults = {
+  area: { shape: 'rect' },
+  button: { type: 'submit' },
+  dialog: { closedby: 'auto' },
+  form: {
+    enctype: 'application/x-www-form-urlencoded',
+    method: 'get'
+  },
+  html: { dir: 'ltr' },
+  img: { decoding: 'auto' },
+  input: {
+    type: 'text',
+    colorspace: 'limited-srgb'
+  },
+  marquee: {
+    behavior: 'scroll',
+    direction: 'left'
+  },
+  style: { media: 'all' },
+  textarea: { wrap: 'soft' },
+  track: { kind: 'subtitles' }
+};
+
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   attrValue = attrValue ? trimWhitespace(attrValue.toLowerCase()) : '';
 
-  return (
-    // Legacy attributes
-    (tag === 'script' &&
-      attrName === 'language' &&
-      attrValue === 'javascript') ||
+  // Legacy attributes
+  if (tag === 'script' && attrName === 'language' && attrValue === 'javascript') {
+    return true;
+  }
+  if (tag === 'script' && attrName === 'charset' && !attributesInclude(attrs, 'src')) {
+    return true;
+  }
+  if (tag === 'a' && attrName === 'name' && attributesInclude(attrs, 'id')) {
+    return true;
+  }
 
-    (tag === 'script' &&
-      attrName === 'charset' &&
-      !attributesInclude(attrs, 'src')) ||
+  // Check general defaults
+  if (generalDefaults[attrName] === attrValue) {
+    return true;
+  }
 
-    (tag === 'a' &&
-      attrName === 'name' &&
-      attributesInclude(attrs, 'id')) ||
-
-    // HTML spec default values
-    (attrName === 'autocorrect' &&
-      attrValue === 'on') ||
-
-    (attrName === 'fetchpriority' &&
-      attrValue === 'auto') ||
-
-    (attrName === 'loading' &&
-      attrValue === 'eager') ||
-
-    (attrName === 'popovertargetaction' &&
-      attrValue === 'toggle') ||
-
-    (tag === 'area' &&
-      attrName === 'shape' &&
-      attrValue === 'rect') ||
-
-    (tag === 'button' &&
-      attrName === 'type' &&
-      attrValue === 'submit') ||
-
-    (tag === 'form' &&
-      attrName === 'enctype' &&
-      attrValue === 'application/x-www-form-urlencoded') ||
-
-    (tag === 'form' &&
-      attrName === 'method' &&
-      attrValue === 'get') ||
-
-    (tag === 'html' &&
-      attrName === 'dir' &&
-      attrValue === 'ltr') ||
-
-    (tag === 'img' &&
-      attrName === 'decoding' &&
-      attrValue === 'auto') ||
-
-    (tag === 'input' &&
-      attrName === 'colorspace' &&
-      attrValue === 'limited-srgb') ||
-
-    (tag === 'input' &&
-      attrName === 'type' &&
-      attrValue === 'text') ||
-
-    (tag === 'marquee' &&
-      attrName === 'behavior' &&
-      attrValue === 'scroll') ||
-
-    (tag === 'marquee' &&
-      attrName === 'direction' &&
-      attrValue === 'left') ||
-
-    (tag === 'style' &&
-      attrName === 'media' &&
-      attrValue === 'all') ||
-
-    (tag === 'textarea' &&
-      attrName === 'wrap' &&
-      attrValue === 'soft') ||
-
-    (tag === 'track' &&
-      attrName === 'kind' &&
-      attrValue === 'subtitles')
-  );
+  // Check tag-specific defaults
+  return tagDefaults[tag]?.[attrName] === attrValue;
 }
 
 // https://mathiasbynens.be/demo/javascript-mime-type
