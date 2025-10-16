@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2025-10-16
+
+### Breaking Changes
+
+- **BREAKING:** The `removeRedundantAttributes` option now removes significantly more HTML default attribute values. This will result in more aggressive minification when this option is enabled, which may change existing output—keep an eye on CSS selectors, JavaScript queries, and tooling requirements. Newly removed default values include:
+  - `autocorrect="on"`, `fetchpriority="auto"`, `loading="eager"`, `popovertargetaction="toggle"`
+  - Specific element/attribute combinations: `<button type="submit">`, `<dialog closedby="none">`, `<form enctype="application/x-www-form-urlencoded">`, `<form method="get">` (both previously supported, now reorganized), `<html dir="ltr">`, `<img decoding="auto">`, `<input colorspace="limited-srgb">`, `<input type="text">` (previously supported, now reorganized), `<marquee behavior="scroll">`, `<marquee direction="left">`, `<style media="all">`, `<textarea wrap="soft">`, `<track kind="subtitles">`
+
 ## [2.1.8] - 2025-10-14
 
 ### Fixed
