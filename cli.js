@@ -362,11 +362,14 @@ const writeMinify = async () => {
     await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true }).catch((e) => {
       fatal('Cannot create directory ' + path.dirname(programOptions.output) + '\n' + e.message);
     });
-    const fileStream = fs.createWriteStream(programOptions.output)
-      .on('error', (e) => {
-        fatal('Cannot write ' + programOptions.output + '\n' + e.message);
-      });
-    fileStream.end(minified);
+    await new Promise((resolve, reject) => {
+      const fileStream = fs.createWriteStream(programOptions.output)
+        .on('error', reject)
+        .on('finish', resolve);
+      fileStream.end(minified);
+      }).catch((e) => {
+      fatal('Cannot write ' + programOptions.output + '\n' + e.message);
+    });
     return;
   }
 
