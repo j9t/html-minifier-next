@@ -34,10 +34,10 @@ html-minifier-next --collapse-whitespace --remove-comments --minify-js true --in
 **Process specific file extensions:**
 
 ```bash
-# Process only HTML files (CLI method)
+# Process only HTML files
 html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html
 
-# Process multiple file extensions (CLI method)
+# Process multiple file extensions
 html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,htm,php
 
 # Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,htm"`)
@@ -47,6 +47,21 @@ html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir
 html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 # Note: When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier.
 # Consider restricting with “--file-ext” to avoid touching binaries (e.g., images, archives).
+```
+
+**Dry run mode (preview outcome without writing files):**
+
+```bash
+# Preview with output file
+html-minifier-next input.html -o output.html --dry --collapse-whitespace
+
+# Preview directory processing with statistics per file and total
+html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
+# Output: [DRY RUN] Would process directory: src → dist
+#   index.html: 1,234 → 892 bytes (-342, 27.7%)
+#   about.html: 2,100 → 1,654 bytes (-446, 21.2%)
+# ---
+# Total: 3,334 → 2,546 bytes (-788, 23.6%)
 ```
 
 ### CLI options
@@ -60,6 +75,7 @@ Use `html-minifier-next --help` to check all available options:
 | `--file-ext <extensions>` | Specify file extension(s) to process (overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
 | `-o --output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
 | `-c --config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
+| `-d --dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
 
 ### Configuration file
 
