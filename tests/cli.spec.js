@@ -40,6 +40,20 @@ const execCli = (args = []) => {
   }
 };
 
+const execCliWithStderr = (args = []) => {
+  const spawnOptions = {
+    cwd: fixturesDir
+  };
+
+  const { stdout, stderr, status } = spawnSync('node', [cliPath, ...args], spawnOptions);
+
+  return {
+    stdout: stdout.toString().trim(),
+    stderr: stderr.toString().trim(),
+    exitCode: status
+  };
+};
+
 describe('cli', () => {
   beforeEach(async () => {
     await removeFixture('tmp');
@@ -423,5 +437,217 @@ describe('cli', () => {
 
     // Clean up
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-empty-override.json'));
+  });
+
+  // Dry run mode tests
+  test('should show statistics in dry run mode for single file', () => {
+    const cliArguments = [
+      'default.html',
+      '--dry',
+      '--collapse-whitespace'
+    ];
+
+    const result = execCliWithStderr(cliArguments);
+
+    // Should output to stderr
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Would minify:'));
+    assert.ok(result.stderr.includes('Original:'));
+    assert.ok(result.stderr.includes('Minified:'));
+    assert.ok(result.stderr.includes('Saved:'));
+    assert.ok(result.stderr.includes('bytes'));
+
+    // Should not output to stdout
+    assert.strictEqual(result.stdout, '');
+
+    // Should exit successfully
+    assert.strictEqual(result.exitCode, 0);
+  });
+
+  test('should show statistics in dry run mode for directory', () => {
+    const cliArguments = [
+      '--input-dir=./',
+      '--output-dir=./tmp/dry-test',
+      '--dry',
+      '--collapse-whitespace'
+    ];
+
+    const result = execCliWithStderr(cliArguments);
+
+    // Should output to stderr
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Would process directory:'));
+    assert.ok(result.stderr.includes('Total:'));
+    assert.ok(result.stderr.includes('bytes'));
+
+    // Should not output to stdout
+    assert.strictEqual(result.stdout, '');
+
+    // Should exit successfully
+    assert.strictEqual(result.exitCode, 0);
+  });
+
+  test('should not write files in dry run mode', () => {
+    const cliArguments = [
+      '--input-dir=./',
+      '--output-dir=./tmp/dry-no-write',
+      '--dry',
+      '--collapse-whitespace'
+    ];
+
+    execCliWithStderr(cliArguments);
+
+    // Should not create output directory or files
+    assert.strictEqual(existsFixture('tmp/dry-no-write'), false);
+    assert.strictEqual(existsFixture('tmp/dry-no-write/default.html'), false);
+  });
+
+  // STDIN/STDOUT pipe tests
+  test('should handle STDIN to STDOUT pipe in dry run', () => {
+    const input = '<p>  test  </p>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--dry', '--collapse-whitespace'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    const stderrStr = stderr.toString();
+
+    assert.strictEqual(status, 0);
+    assert.ok(stderrStr.includes('[DRY RUN]'));
+    assert.ok(stderrStr.includes('STDIN → STDOUT'));
+    assert.ok(stderrStr.includes('Original:'));
+    assert.ok(stderrStr.includes('Minified:'));
+    assert.ok(stderrStr.includes('Saved:'));
+    // Should not output minified HTML to stdout in dry run
+    assert.strictEqual(stdout.toString().trim(), '');
+  });
+
+  test('should handle STDIN to file with -o flag in dry run', () => {
+    const input = '<p>  test  </p>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-o', 'tmp/stdin-output.html', '--dry', '--collapse-whitespace'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    const stderrStr = stderr.toString();
+
+    assert.strictEqual(status, 0);
+    assert.ok(stderrStr.includes('[DRY RUN]'));
+    assert.ok(stderrStr.includes('STDIN → tmp/stdin-output.html'));
+    assert.ok(stderrStr.includes('Original:'));
+    assert.ok(stderrStr.includes('Minified:'));
+    assert.strictEqual(stdout.toString().trim(), '');
+    // Should not create output file
+    assert.strictEqual(existsFixture('tmp/stdin-output.html'), false);
+  });
+
+  test('should handle STDIN to STDOUT pipe without dry run', () => {
+    const input = '<p>  test  </p>';
+    const { stdout, status } = spawnSync('node', [cliPath, '--collapse-whitespace'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    assert.strictEqual(status, 0);
+    assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
+  });
+
+  // -o flag combination tests
+  test('should handle file to file with -o flag in dry run', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '-o', 'tmp/output-flag.html',
+      '--dry',
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('default.html → tmp/output-flag.html'));
+    assert.ok(result.stderr.includes('Original:'));
+    assert.ok(result.stderr.includes('Minified:'));
+    assert.strictEqual(result.stdout, '');
+    // Should not create output file
+    assert.strictEqual(existsFixture('tmp/output-flag.html'), false);
+  });
+
+  test('should handle file to file with -o flag without dry run', async () => {
+    // Ensure tmp directory exists
+    fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+
+    execCli([
+      'default.html',
+      '-o', 'tmp/output-normal.html',
+      '--collapse-whitespace'
+    ]);
+
+    // Should create output file
+    assert.strictEqual(existsFixture('tmp/output-normal.html'), true);
+
+    const output = await readFixture('tmp/output-normal.html');
+    assert.ok(output.length > 0);
+    assert.ok(output.includes('<!DOCTYPE html>'));
+  });
+
+  test('should handle file to STDOUT without -o flag', () => {
+    const result = execCli([
+      'default.html',
+      '--collapse-whitespace'
+    ]);
+
+    // Should output to stdout
+    assert.ok(result.length > 0);
+    assert.ok(result.includes('<!DOCTYPE html>'));
+  });
+
+  // Error handling tests for dry run
+  test('should show error in dry run for non-existent file', () => {
+    const result = execCliWithStderr([
+      'non-existent.html',
+      '--dry',
+      '--collapse-whitespace'
+    ]);
+
+    // Should exit with error
+    assert.notStrictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('Cannot read') || result.stderr.includes('no such file'));
+  });
+
+  test('should show error in dry run for invalid directory', () => {
+    const result = execCliWithStderr([
+      '--input-dir=./non-existent-dir',
+      '--output-dir=./tmp/output',
+      '--dry',
+      '--collapse-whitespace'
+    ]);
+
+    // Should exit with error
+    assert.notStrictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('Cannot read') || result.stderr.includes('no such file'));
+  });
+
+  test('should handle dry run with config file', () => {
+    fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    const configContent = JSON.stringify({
+      collapseWhitespace: true,
+      removeComments: true
+    });
+    fs.writeFileSync(path.resolve(fixturesDir, 'tmp/dry-config.json'), configContent);
+
+    const result = execCliWithStderr([
+      '--config-file=./tmp/dry-config.json',
+      'default.html',
+      '--dry'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Would minify:'));
+    assert.ok(result.stderr.includes('Original:'));
+    assert.ok(result.stderr.includes('Minified:'));
+    assert.strictEqual(result.stdout, '');
+
+    // Clean up
+    fs.unlinkSync(path.resolve(fixturesDir, 'tmp/dry-config.json'));
   });
 });
