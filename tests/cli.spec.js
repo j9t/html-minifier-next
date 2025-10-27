@@ -505,9 +505,10 @@ describe('cli', () => {
   // STDIN/STDOUT pipe tests
   test('should handle STDIN to STDOUT pipe in dry run', () => {
     const input = '<p>  test  </p>';
-    const { stdout, stderr, status } = spawnSync('sh', ['-c',
-      `echo '${input}' | node ${cliPath} --dry --collapse-whitespace`
-    ], { cwd: fixturesDir });
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--dry', '--collapse-whitespace'], {
+      cwd: fixturesDir,
+      input: input
+    });
 
     const stderrStr = stderr.toString();
 
@@ -523,9 +524,10 @@ describe('cli', () => {
 
   test('should handle STDIN to file with -o flag in dry run', () => {
     const input = '<p>  test  </p>';
-    const { stdout, stderr, status } = spawnSync('sh', ['-c',
-      `echo '${input}' | node ${cliPath} -o tmp/stdin-output.html --dry --collapse-whitespace`
-    ], { cwd: fixturesDir });
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-o', 'tmp/stdin-output.html', '--dry', '--collapse-whitespace'], {
+      cwd: fixturesDir,
+      input: input
+    });
 
     const stderrStr = stderr.toString();
 
@@ -541,9 +543,10 @@ describe('cli', () => {
 
   test('should handle STDIN to STDOUT pipe without dry run', () => {
     const input = '<p>  test  </p>';
-    const { stdout, status } = spawnSync('sh', ['-c',
-      `echo '${input}' | node ${cliPath} --collapse-whitespace`
-    ], { cwd: fixturesDir });
+    const { stdout, status } = spawnSync('node', [cliPath, '--collapse-whitespace'], {
+      cwd: fixturesDir,
+      input: input
+    });
 
     assert.strictEqual(status, 0);
     assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
