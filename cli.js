@@ -333,7 +333,7 @@ const writeMinify = async () => {
     const originalSize = Buffer.byteLength(content, 'utf8');
     const minifiedSize = Buffer.byteLength(minified, 'utf8');
     const saved = originalSize - minifiedSize;
-    const percentage = ((saved / originalSize) * 100).toFixed(1);
+    const percentage = originalSize ? ((saved / originalSize) * 100).toFixed(1) : '0.0';
 
     const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
     const outputDest = programOptions.output || 'STDOUT';
@@ -348,6 +348,9 @@ const writeMinify = async () => {
   let stream = process.stdout;
 
   if (programOptions.output) {
+    await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true }).catch((e) => {
+      fatal('Cannot create directory ' + path.dirname(programOptions.output) + '\n' + e.message);
+    });
     stream = fs.createWriteStream(programOptions.output)
       .on('error', (e) => {
         fatal('Cannot write ' + programOptions.output + '\n' + e.message);
@@ -377,11 +380,11 @@ if (inputDir || outputDir) {
 
     const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry);
 
-    if (programOptions.dry && stats && stats.length > 0) {
+    if (programOptions.dry) {
       const totalOriginal = stats.reduce((sum, s) => sum + s.originalSize, 0);
       const totalMinified = stats.reduce((sum, s) => sum + s.minifiedSize, 0);
       const totalSaved = totalOriginal - totalMinified;
-      const totalPercentage = ((totalSaved / totalOriginal) * 100).toFixed(1);
+      const totalPercentage = totalOriginal ? ((totalSaved / totalOriginal) * 100).toFixed(1) : '0.0';
 
       console.error('---');
       console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (-${totalSaved.toLocaleString()}, ${totalPercentage}%)`);
