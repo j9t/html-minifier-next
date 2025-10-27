@@ -248,7 +248,7 @@ async function processFile(inputFile, outputFile, isDryRun = false) {
     const sign = saved >= 0 ? '-' : '+';
     const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
 
-    console.error(`  ${path.basename(inputFile)}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (${sign}${Math.abs(saved).toLocaleString()}, ${percentage}%)`);
+    console.error(`  ${path.relative(process.cwd(), inputFile)}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (${sign}${Math.abs(saved).toLocaleString()}, ${percentage}%)`);
 
     return { originalSize, minifiedSize, saved };
   }
