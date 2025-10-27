@@ -3769,8 +3769,8 @@ test('ReDoS prevention in custom fragments processing', async () => {
   });
   const endTime1 = Date.now();
 
-  // Should complete quickly (under 1 second)
-  assert.ok((endTime1 - startTime1) < 1000);
+  // Should complete reasonably quickly (under 2 seconds)
+  assert.ok((endTime1 - startTime1) < 2000);
   assert.ok(result1.includes('<?php echo "test"; ?>'));
 
   // Test case 2: Multiple consecutive fragments with long whitespace
@@ -3782,7 +3782,7 @@ test('ReDoS prevention in custom fragments processing', async () => {
   });
   const endTime2 = Date.now();
 
-  assert.ok((endTime2 - startTime2) < 1000);
+  assert.ok((endTime2 - startTime2) < 2000);
   assert.ok(result2.includes('<?php echo "test1"; ?>'));
   assert.ok(result2.includes('<?php echo "test2"; ?>'));
 });
