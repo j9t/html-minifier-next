@@ -4,12 +4,15 @@ As of version 2.0.0, all notable changes to HTML Minifier Next are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.0.1] - 2025-10-27
+## [3.1.0] - 2025-10-27
+
+### Added
+
+- Added `--dry` / `-d` flag for dry run mode: process and report statistics without writing output files
 
 ### Changed
 
-- Improved CLI help text for `-o, --output` flag to clarify that it accepts input from file arguments or STDIN
-- Enhanced README documentation with examples showing file-to-file, pipe-to-file, and file-to-STDOUT usage patterns
+- Improved CLI help text and enhanced README documentation for `-o, --output` flag, to clarify what it does and how it works
 
 ## [3.0.0] - 2025-10-16
 
