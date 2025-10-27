@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - Added `--dry` / `-d` flag for dry run mode: process and report statistics without writing output files
+- Expanded test coverage with CLI tests (STDIN/STDOUT pipe tests, `-o` flag combination tests, dry run error handling), minifier tests (`maxInputLength` security option, CSS/JS minification error handling, `<dialog>` and `<search>` element validation), and cross-platform CI testing (Ubuntu, macOS, Windows)
 
 ### Changed
 
