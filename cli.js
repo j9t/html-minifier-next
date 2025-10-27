@@ -154,7 +154,7 @@ mainOptionKeys.forEach(function (key) {
     program.option('--' + paramCase(key), option);
   }
 });
-program.option('-o --output <file>', 'Specify output file (if not specified STDOUT will be used for output)');
+program.option('-o --output <file>', 'Specify output file (reads from file arguments or STDIN; outputs to STDOUT if not specified)');
 
 function readFile(file) {
   try {

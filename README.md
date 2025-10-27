@@ -58,7 +58,7 @@ Use `html-minifier-next --help` to check all available options:
 | `--input-dir <dir>` | Specify an input directory | `--input-dir=src` |
 | `--output-dir <dir>` | Specify an output directory | `--output-dir=dist` |
 | `--file-ext <extensions>` | Specify file extension(s) to process (overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
-| `-o --output <file>` | Specify output file (single file mode) | `-o minified.html` |
+| `-o --output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
 | `-c --config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
 
 ### Configuration file
