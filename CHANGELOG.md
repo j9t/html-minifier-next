@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 - Improved CLI help text and enhanced README documentation for `-o, --output` flag, to clarify what it does and how it works
+- Refactored CLI functionality by closing `-o` file streams, skipping symlinks and the output subtree in directory mode, and handling `EPIPE`
 
 ## [3.0.0] - 2025-10-16
 
