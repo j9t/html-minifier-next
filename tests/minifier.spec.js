@@ -2090,7 +2090,7 @@ test('ignoring custom fragments', async () => {
   assert.strictEqual(await minify(input, { minifyCSS: true }), input);
 });
 
-test('bootstrap\'s span > button > span', async () => {
+test('Bootstrap’s span > button > span', async () => {
   const input = '<span class="input-group-btn">' +
     '\n  <button class="btn btn-default" type="button">' +
     '\n    <span class="glyphicon glyphicon-search"></span>' +

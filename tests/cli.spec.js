@@ -601,9 +601,9 @@ describe('cli', () => {
   });
 
   // Error handling tests for dry run
-  test('should show error in dry run for nonexistent file', () => {
+  test('should show error in dry run for non-existent file', () => {
     const result = execCliWithStderr([
-      'nonexistent.html',
+      'non-existent.html',
       '--dry',
       '--collapse-whitespace'
     ]);
@@ -615,7 +615,7 @@ describe('cli', () => {
 
   test('should show error in dry run for invalid directory', () => {
     const result = execCliWithStderr([
-      '--input-dir=./nonexistent-dir',
+      '--input-dir=./non-existent-dir',
       '--output-dir=./tmp/output',
       '--dry',
       '--collapse-whitespace'
