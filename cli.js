@@ -44,6 +44,14 @@ function fatal(message) {
   process.exit(1);
 }
 
+// Handle broken pipe (e.g., when piping to `head`)
+process.stdout.on('error', (err) => {
+  if (err && err.code === 'EPIPE') {
+    process.exit(0);
+  }
+  fatal('STDOUT error\n' + (err && err.message ? err.message : String(err)));
+});
+
 /**
  * JSON does not support regexes, so, e.g., JSON.parse() will not create
  * a RegExp from the JSON value `[ "/matchString/" ]`, which is
@@ -60,7 +68,7 @@ function fatal(message) {
  * search string, the user would need to enclose the expression in a
  * second set of slashes:
  *
- *    --customAttrSrround "[\"//matchString//\"]"
+ *    --customAttrSurround "[\"//matchString//\"]"
  */
 function parseRegExp(value) {
   if (value) {
@@ -237,9 +245,10 @@ async function processFile(inputFile, outputFile, isDryRun = false) {
     const originalSize = Buffer.byteLength(data, 'utf8');
     const minifiedSize = Buffer.byteLength(minified, 'utf8');
     const saved = originalSize - minifiedSize;
-    const percentage = originalSize ? ((saved / originalSize) * 100).toFixed(1) : '0.0';
+    const sign = saved >= 0 ? '-' : '+';
+    const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
 
-    console.error(`  ${path.basename(inputFile)}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (-${saved.toLocaleString()}, ${percentage}%)`);
+    console.error(`  ${path.basename(inputFile)}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (${sign}${Math.abs(saved).toLocaleString()}, ${percentage}%)`);
 
     return { originalSize, minifiedSize, saved };
   }
@@ -269,7 +278,7 @@ function shouldProcessFile(filename, fileExtensions) {
   return fileExtensions.includes(fileExt);
 }
 
-async function processDirectory(inputDir, outputDir, extensions, isDryRun = false) {
+async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, skipRootAbs) {
   // If first call provided a string, normalize once; otherwise assume pre-parsed array
   if (typeof extensions === 'string') {
     extensions = parseFileExtensions(extensions);
@@ -284,6 +293,14 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
   for (const file of files) {
     const inputFile = path.join(inputDir, file);
     const outputFile = path.join(outputDir, file);
+
+    // Skip anything inside the output root to avoid reprocessing
+    if (skipRootAbs) {
+      const real = await fs.promises.realpath(inputFile).catch(() => undefined);
+      if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) {
+        continue;
+      }
+    }
 
     const lst = await fs.promises.lstat(inputFile).catch(err => {
       fatal('Cannot read ' + inputFile + '\n' + err.message);
@@ -328,7 +345,8 @@ const writeMinify = async () => {
     const originalSize = Buffer.byteLength(content, 'utf8');
     const minifiedSize = Buffer.byteLength(minified, 'utf8');
     const saved = originalSize - minifiedSize;
-    const percentage = originalSize ? ((saved / originalSize) * 100).toFixed(1) : '0.0';
+    const sign = saved >= 0 ? '-' : '+';
+    const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
 
     const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
     const outputDest = programOptions.output || 'STDOUT';
@@ -336,7 +354,7 @@ const writeMinify = async () => {
     console.error(`[DRY RUN] Would minify: ${inputSource} → ${outputDest}`);
     console.error(`  Original: ${originalSize.toLocaleString()} bytes`);
     console.error(`  Minified: ${minifiedSize.toLocaleString()} bytes`);
-    console.error(`  Saved: ${saved.toLocaleString()} bytes (${percentage}%)`);
+    console.error(`  Saved: ${sign}${Math.abs(saved).toLocaleString()} bytes (${percentage}%)`);
     return;
   }
 
@@ -369,20 +387,36 @@ if (inputDir || outputDir) {
   }
 
   (async () => {
+    // Prevent traversing into the output directory when it is inside the input directory
+    let inputReal;
+    let outputReal;
+    inputReal = await fs.promises.realpath(inputDir).catch(() => undefined);
+    try {
+      outputReal = await fs.promises.realpath(outputDir);
+    } catch {
+      outputReal = path.resolve(outputDir);
+    }
+    let skipRootAbs;
+    if (inputReal && outputReal && (outputReal === inputReal || outputReal.startsWith(inputReal + path.sep))) {
+      // Instead of aborting, skip traversing into the output directory
+      skipRootAbs = outputReal;
+    }
+
     if (programOptions.dry) {
       console.error(`[DRY RUN] Would process directory: ${inputDir} → ${outputDir}`);
     }
 
-    const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry);
+    const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, skipRootAbs);
 
     if (programOptions.dry) {
       const totalOriginal = stats.reduce((sum, s) => sum + s.originalSize, 0);
       const totalMinified = stats.reduce((sum, s) => sum + s.minifiedSize, 0);
       const totalSaved = totalOriginal - totalMinified;
-      const totalPercentage = totalOriginal ? ((totalSaved / totalOriginal) * 100).toFixed(1) : '0.0';
+      const sign = totalSaved >= 0 ? '-' : '+';
+      const totalPercentage = totalOriginal ? ((Math.abs(totalSaved) / totalOriginal) * 100).toFixed(1) : '0.0';
 
       console.error('---');
-      console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (-${totalSaved.toLocaleString()}, ${totalPercentage}%)`);
+      console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (${sign}${Math.abs(totalSaved).toLocaleString()}, ${totalPercentage}%)`);
     }
   })();
 } else if (content) { // Minifying one or more files specified on the CMD line
