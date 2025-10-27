@@ -221,15 +221,6 @@ function createOptions() {
   return options;
 }
 
-function mkdir(outputDir, callback) {
-  fs.mkdir(outputDir, { recursive: true }, function (err) {
-    if (err) {
-      fatal('Cannot create directory ' + outputDir + '\n' + err.message);
-    }
-    callback();
-  });
-}
-
 async function processFile(inputFile, outputFile, isDryRun = false) {
   const data = await fs.promises.readFile(inputFile, { encoding: 'utf8' }).catch(err => {
     fatal('Cannot read ' + inputFile + '\n' + err.message);
@@ -305,8 +296,8 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
       }
     } else if (shouldProcessFile(file, extensions)) {
       if (!isDryRun) {
-        await new Promise((resolve) => {
-          mkdir(outputDir, resolve);
+        await fs.promises.mkdir(outputDir, { recursive: true }).catch(err => {
+          fatal('Cannot create directory ' + outputDir + '\n' + err.message);
         });
       }
       const fileStats = await processFile(inputFile, outputFile, isDryRun);
