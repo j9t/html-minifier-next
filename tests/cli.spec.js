@@ -40,6 +40,20 @@ const execCli = (args = []) => {
   }
 };
 
+const execCliWithStderr = (args = []) => {
+  const spawnOptions = {
+    cwd: fixturesDir
+  };
+
+  const { stdout, stderr, status } = spawnSync('node', [cliPath, ...args], spawnOptions);
+
+  return {
+    stdout: stdout.toString().trim(),
+    stderr: stderr.toString().trim(),
+    exitCode: status
+  };
+};
+
 describe('cli', () => {
   beforeEach(async () => {
     await removeFixture('tmp');
@@ -423,5 +437,68 @@ describe('cli', () => {
 
     // Clean up
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-empty-override.json'));
+  });
+
+  // Dry run mode tests
+  test('should show statistics in dry run mode for single file', () => {
+    const cliArguments = [
+      'default.html',
+      '--dry',
+      '--collapse-whitespace'
+    ];
+
+    const result = execCliWithStderr(cliArguments);
+
+    // Should output to stderr
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Would minify:'));
+    assert.ok(result.stderr.includes('Original:'));
+    assert.ok(result.stderr.includes('Minified:'));
+    assert.ok(result.stderr.includes('Saved:'));
+    assert.ok(result.stderr.includes('bytes'));
+
+    // Should not output to stdout
+    assert.strictEqual(result.stdout, '');
+
+    // Should exit successfully
+    assert.strictEqual(result.exitCode, 0);
+  });
+
+  test('should show statistics in dry run mode for directory', () => {
+    const cliArguments = [
+      '--input-dir=./',
+      '--output-dir=./tmp/dry-test',
+      '--dry',
+      '--collapse-whitespace'
+    ];
+
+    const result = execCliWithStderr(cliArguments);
+
+    // Should output to stderr
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Would process directory:'));
+    assert.ok(result.stderr.includes('Total:'));
+    assert.ok(result.stderr.includes('bytes'));
+
+    // Should not output to stdout
+    assert.strictEqual(result.stdout, '');
+
+    // Should exit successfully
+    assert.strictEqual(result.exitCode, 0);
+  });
+
+  test('should not write files in dry run mode', () => {
+    const cliArguments = [
+      '--input-dir=./',
+      '--output-dir=./tmp/dry-no-write',
+      '--dry',
+      '--collapse-whitespace'
+    ];
+
+    execCliWithStderr(cliArguments);
+
+    // Should not create output directory or files
+    assert.strictEqual(existsFixture('tmp/dry-no-write'), false);
+    assert.strictEqual(existsFixture('tmp/dry-no-write/default.html'), false);
   });
 });

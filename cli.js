@@ -155,6 +155,7 @@ mainOptionKeys.forEach(function (key) {
   }
 });
 program.option('-o --output <file>', 'Specify output file (reads from file arguments or STDIN; outputs to STDOUT if not specified)');
+program.option('-d --dry', 'Dry run: process and report statistics without writing output');
 
 function readFile(file) {
   try {
@@ -229,23 +230,34 @@ function mkdir(outputDir, callback) {
   });
 }
 
-function processFile(inputFile, outputFile) {
-  fs.readFile(inputFile, { encoding: 'utf8' }, async function (err, data) {
-    if (err) {
-      fatal('Cannot read ' + inputFile + '\n' + err.message);
-    }
-    let minified;
-    try {
-      minified = await minify(data, createOptions());
-    } catch (e) {
-      fatal('Minification error on ' + inputFile + '\n' + e.message);
-    }
-    fs.writeFile(outputFile, minified, { encoding: 'utf8' }, function (err) {
-      if (err) {
-        fatal('Cannot write ' + outputFile + '\n' + err.message);
-      }
-    });
+async function processFile(inputFile, outputFile, isDryRun = false) {
+  const data = await fs.promises.readFile(inputFile, { encoding: 'utf8' }).catch(err => {
+    fatal('Cannot read ' + inputFile + '\n' + err.message);
   });
+
+  let minified;
+  try {
+    minified = await minify(data, createOptions());
+  } catch (e) {
+    fatal('Minification error on ' + inputFile + '\n' + e.message);
+  }
+
+  if (isDryRun) {
+    const originalSize = Buffer.byteLength(data, 'utf8');
+    const minifiedSize = Buffer.byteLength(minified, 'utf8');
+    const saved = originalSize - minifiedSize;
+    const percentage = ((saved / originalSize) * 100).toFixed(1);
+
+    console.error(`  ${path.basename(inputFile)}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (-${saved.toLocaleString()}, ${percentage}%)`);
+
+    return { originalSize, minifiedSize, saved };
+  }
+
+  await fs.promises.writeFile(outputFile, minified, { encoding: 'utf8' }).catch(err => {
+    fatal('Cannot write ' + outputFile + '\n' + err.message);
+  });
+
+  return null;
 }
 
 function parseFileExtensions(fileExt) {
@@ -266,34 +278,45 @@ function shouldProcessFile(filename, fileExtensions) {
   return fileExtensions.includes(fileExt);
 }
 
-function processDirectory(inputDir, outputDir, extensions) {
+async function processDirectory(inputDir, outputDir, extensions, isDryRun = false) {
   // If first call provided a string, normalize once; otherwise assume pre-parsed array
   if (typeof extensions === 'string') {
     extensions = parseFileExtensions(extensions);
   }
 
-  fs.readdir(inputDir, function (err, files) {
-    if (err) {
-      fatal('Cannot read directory ' + inputDir + '\n' + err.message);
-    }
-
-    files.forEach(function (file) {
-      const inputFile = path.join(inputDir, file);
-      const outputFile = path.join(outputDir, file);
-
-      fs.stat(inputFile, function (err, stat) {
-        if (err) {
-          fatal('Cannot read ' + inputFile + '\n' + err.message);
-        } else if (stat.isDirectory()) {
-          processDirectory(inputFile, outputFile, extensions);
-        } else if (shouldProcessFile(file, extensions)) {
-          mkdir(outputDir, function () {
-            processFile(inputFile, outputFile);
-          });
-        }
-      });
-    });
+  const files = await fs.promises.readdir(inputDir).catch(err => {
+    fatal('Cannot read directory ' + inputDir + '\n' + err.message);
   });
+
+  const allStats = [];
+
+  for (const file of files) {
+    const inputFile = path.join(inputDir, file);
+    const outputFile = path.join(outputDir, file);
+
+    const stat = await fs.promises.stat(inputFile).catch(err => {
+      fatal('Cannot read ' + inputFile + '\n' + err.message);
+    });
+
+    if (stat.isDirectory()) {
+      const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun);
+      if (dirStats) {
+        allStats.push(...dirStats);
+      }
+    } else if (shouldProcessFile(file, extensions)) {
+      if (!isDryRun) {
+        await new Promise((resolve) => {
+          mkdir(outputDir, resolve);
+        });
+      }
+      const fileStats = await processFile(inputFile, outputFile, isDryRun);
+      if (fileStats) {
+        allStats.push(fileStats);
+      }
+    }
+  }
+
+  return allStats;
 }
 
 const writeMinify = async () => {
@@ -304,6 +327,22 @@ const writeMinify = async () => {
     minified = await minify(content, minifierOptions);
   } catch (e) {
     fatal('Minification error:\n' + e.message);
+  }
+
+  if (programOptions.dry) {
+    const originalSize = Buffer.byteLength(content, 'utf8');
+    const minifiedSize = Buffer.byteLength(minified, 'utf8');
+    const saved = originalSize - minifiedSize;
+    const percentage = ((saved / originalSize) * 100).toFixed(1);
+
+    const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
+    const outputDest = programOptions.output || 'STDOUT';
+
+    console.error(`[DRY RUN] Would minify: ${inputSource} → ${outputDest}`);
+    console.error(`  Original: ${originalSize.toLocaleString()} bytes`);
+    console.error(`  Minified: ${minifiedSize.toLocaleString()} bytes`);
+    console.error(`  Saved: ${saved.toLocaleString()} bytes (${percentage}%)`);
+    return;
   }
 
   let stream = process.stdout;
@@ -330,7 +369,24 @@ if (inputDir || outputDir) {
   } else if (!outputDir) {
     fatal('You need to specify where to write the output files with the option --output-dir');
   }
-  processDirectory(inputDir, outputDir, resolvedFileExt);
+
+  (async () => {
+    if (programOptions.dry) {
+      console.error(`[DRY RUN] Would process directory: ${inputDir} → ${outputDir}`);
+    }
+
+    const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry);
+
+    if (programOptions.dry && stats && stats.length > 0) {
+      const totalOriginal = stats.reduce((sum, s) => sum + s.originalSize, 0);
+      const totalMinified = stats.reduce((sum, s) => sum + s.minifiedSize, 0);
+      const totalSaved = totalOriginal - totalMinified;
+      const totalPercentage = ((totalSaved / totalOriginal) * 100).toFixed(1);
+
+      console.error('---');
+      console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (-${totalSaved.toLocaleString()}, ${totalPercentage}%)`);
+    }
+  })();
 } else if (content) { // Minifying one or more files specified on the CMD line
   writeMinify();
 } else { // Minifying input coming from STDIN
