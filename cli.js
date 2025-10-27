@@ -237,7 +237,7 @@ async function processFile(inputFile, outputFile, isDryRun = false) {
     const originalSize = Buffer.byteLength(data, 'utf8');
     const minifiedSize = Buffer.byteLength(minified, 'utf8');
     const saved = originalSize - minifiedSize;
-    const percentage = ((saved / originalSize) * 100).toFixed(1);
+    const percentage = originalSize ? ((saved / originalSize) * 100).toFixed(1) : '0.0';
 
     console.error(`  ${path.basename(inputFile)}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (-${saved.toLocaleString()}, ${percentage}%)`);
 
