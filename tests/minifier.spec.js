@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 
-test('`minify` exists', () => {
+test('minify exists', () => {
   assert.ok(minify);
 });
 
@@ -4087,4 +4087,167 @@ test('extended ruby markup with optional tags (HTML Ruby Markup Extensions)', as
   input = '<ruby><rtc><rt>annotation</rt></rtc><rt>more</rt></ruby>';
   output = '<ruby><rtc><rt>annotation</rtc><rt>more</ruby>';
   assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+});
+
+test('maxInputLength security option', async () => {
+  // Test that large inputs are rejected when `maxInputLength` is set
+  const largeInput = '<p>' + 'x'.repeat(100000) + '</p>';
+
+  await assert.rejects(
+    minify(largeInput, { maxInputLength: 50000 }),
+    { message: /Input length .* exceeds maximum allowed length/ }
+  );
+
+  // Test that inputs under the limit are processed normally
+  const smallInput = '<p>  Normal content  </p>';
+  const result = await minify(smallInput, { maxInputLength: 1000, collapseWhitespace: true });
+  assert.strictEqual(result, '<p>Normal content</p>');
+
+  // Test exact boundary (at the limit)
+  const boundaryInput = '<p>' + 'x'.repeat(93) + '</p>'; // Total 100 chars: 3 + 93 + 4 = 100
+  const boundaryResult = await minify(boundaryInput, { maxInputLength: 100 });
+  assert.strictEqual(boundaryResult, boundaryInput);
+
+  // Test one over the boundary
+  const overBoundaryInput = '<p>' + 'x'.repeat(94) + '</p>'; // Total 101 chars: 3 + 94 + 4 = 101
+  await assert.rejects(
+    minify(overBoundaryInput, { maxInputLength: 100 }),
+    { message: /Input length .* exceeds maximum allowed length/ }
+  );
+
+  // Test that without maxInputLength, large inputs are processed
+  const result2 = await minify('<p>' + 'x'.repeat(1000) + '</p>', { collapseWhitespace: true });
+  assert.ok(result2.length > 0);
+  assert.ok(result2.includes('xxx'));
+});
+
+test('CSS minification error handling', async () => {
+  // Test invalid CSS syntax - should attempt to minify or preserve original
+  let input = '<style>body { color: #invalid!!! }</style>';
+  let result = await minify(input, { minifyCSS: true });
+  // Should not crash and should contain style element
+  assert.ok(result.includes('<style>'));
+  assert.ok(result.includes('</style>'));
+
+  // Test completely malformed CSS
+  input = '<style>this is not valid css at all { { { </style>';
+  result = await minify(input, { minifyCSS: true });
+  assert.ok(result.includes('<style>'));
+  assert.ok(result.includes('</style>'));
+
+  // Test CSS with unclosed braces
+  input = '<style>body { color: red;</style>';
+  result = await minify(input, { minifyCSS: true });
+  assert.ok(result.includes('style'));
+
+  // Test empty `style` element
+  input = '<style></style>';
+  result = await minify(input, { minifyCSS: true, removeEmptyElements: false });
+  assert.strictEqual(result, '<style></style>');
+
+  // Test `style` attribute with invalid CSS
+  input = '<div style="color: #invalid!!!">Test</div>';
+  result = await minify(input, { minifyCSS: true });
+  assert.ok(result.includes('div'));
+  assert.ok(result.includes('Test'));
+
+  // Test valid CSS still works
+  input = '<style>  body { color: red; }  </style>';
+  result = await minify(input, { minifyCSS: true });
+  assert.strictEqual(result, '<style>body{color:red}</style>');
+});
+
+test('JavaScript minification error handling', async () => {
+  // Test invalid JavaScript syntax
+  let input = '<script>function foo( { syntax error</script>';
+  let result = await minify(input, { minifyJS: true });
+  // Should not crash and should contain script element
+  assert.ok(result.includes('<script>'));
+  assert.ok(result.includes('</script>'));
+  // Invalid JS should be preserved or partially processed
+  assert.ok(result.includes('foo'));
+
+  // Test completely malformed JavaScript
+  input = '<script>{{ this is not valid javascript }} [[</script>';
+  result = await minify(input, { minifyJS: true });
+  assert.ok(result.includes('<script>'));
+  assert.ok(result.includes('</script>'));
+
+  // Test JS with unclosed brackets
+  input = '<script>function test() { console.log("hi");</script>';
+  result = await minify(input, { minifyJS: true });
+  assert.ok(result.includes('script'));
+
+  // Test empty `script` element
+  input = '<script></script>';
+  result = await minify(input, { minifyJS: true, removeEmptyElements: false });
+  assert.strictEqual(result, '<script></script>');
+
+  // Test event attribute with invalid JS
+  input = '<button onclick="function( { syntax">Click</button>';
+  result = await minify(input, { minifyJS: true });
+  assert.ok(result.includes('button'));
+  assert.ok(result.includes('Click'));
+
+  // Test valid JS still works
+  input = '<script>  console.log( "test" );  </script>';
+  result = await minify(input, { minifyJS: true });
+  assert.strictEqual(result, '<script>console.log("test")</script>');
+
+  // Test event attribute with valid JS (note: quote style may change during minification)
+  input = '<button onclick="  alert( \'test\' )  ">Click</button>';
+  result = await minify(input, { minifyJS: true });
+  // Minifier may normalize quote styles
+  assert.ok(result.includes('onclick='));
+  assert.ok(result.includes('alert'));
+  assert.ok(result.includes('test'));
+});
+
+test('dialog and search elements with optional p tag omission', async () => {
+  // Test dialog closes preceding `p` tag
+  let input = '<p>Paragraph text<dialog>Modal content</dialog>';
+  let output = '<p>Paragraph text<dialog>Modal content</dialog>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Test `search` closes preceding `p` tag
+  input = '<p>Paragraph text<search>Search form</search>';
+  output = '<p>Paragraph text<search>Search form</search>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Test with whitespace collapsing
+  input = '<p>Text  \n  <dialog>  Modal  </dialog>';
+  output = '<p>Text<dialog>Modal</dialog>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
+
+  // Test `search` with `form` content
+  input = '<div><p>Before<search><form><input type="search"></form></search><p>After</div>';
+  output = '<div><p>Before<search><form><input type="search"></form></search><p>After</div>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Test `dialog` with attributes
+  input = '<p>Text<dialog open id="modal">Content</dialog>';
+  output = '<p>Text<dialog open id="modal">Content</dialog>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Test `search` with attributes
+  input = '<p>Text<search role="search" class="main">Form</search>';
+  output = '<p>Text<search role="search" class="main">Form</search>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Test nested structure
+  input = '<div><p>Paragraph<dialog><p>Dialog paragraph</p></dialog></div>';
+  output = '<div><p>Paragraph<dialog><p>Dialog paragraph</dialog></div>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Test multiple `dialog` elements
+  input = '<p>Text1<dialog>Modal1</dialog><p>Text2<dialog>Modal2</dialog>';
+  output = '<p>Text1<dialog>Modal1</dialog><p>Text2<dialog>Modal2</dialog>';
+  assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+  // Test `dialog` and `search` without `removeOptionalTags` (should keep closing `p` tags)
+  input = '<p>Text</p><dialog>Modal</dialog>';
+  assert.strictEqual(await minify(input), input);
+
+  input = '<p>Text</p><search>Form</search>';
+  assert.strictEqual(await minify(input), input);
 });
