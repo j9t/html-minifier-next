@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2025-10-27
+
+### Changed
+
+- Improved CLI help text for `-o, --output` flag to clarify that it accepts input from file arguments or STDIN
+- Enhanced README documentation with examples showing file-to-file, pipe-to-file, and file-to-STDOUT usage patterns
+
 ## [3.0.0] - 2025-10-16
 
 ### Breaking Changes
