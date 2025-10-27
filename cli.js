@@ -285,11 +285,15 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
     const inputFile = path.join(inputDir, file);
     const outputFile = path.join(outputDir, file);
 
-    const stat = await fs.promises.stat(inputFile).catch(err => {
+    const lst = await fs.promises.lstat(inputFile).catch(err => {
       fatal('Cannot read ' + inputFile + '\n' + err.message);
     });
 
-    if (stat.isDirectory()) {
+    if (lst.isSymbolicLink()) {
+      continue;
+    }
+
+    if (lst.isDirectory()) {
       const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun);
       if (dirStats) {
         allStats.push(...dirStats);
@@ -336,19 +340,19 @@ const writeMinify = async () => {
     return;
   }
 
-  let stream = process.stdout;
-
   if (programOptions.output) {
     await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true }).catch((e) => {
       fatal('Cannot create directory ' + path.dirname(programOptions.output) + '\n' + e.message);
     });
-    stream = fs.createWriteStream(programOptions.output)
+    const fileStream = fs.createWriteStream(programOptions.output)
       .on('error', (e) => {
         fatal('Cannot write ' + programOptions.output + '\n' + e.message);
       });
+    fileStream.end(minified);
+    return;
   }
 
-  stream.write(minified);
+  process.stdout.write(minified);
 };
 
 const { inputDir, outputDir, fileExt } = programOptions;
