@@ -78,5 +78,5 @@
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "version": "3.0.0"
+  "version": "3.0.1"
 }
