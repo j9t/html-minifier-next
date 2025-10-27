@@ -311,7 +311,7 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
     }
 
     if (lst.isDirectory()) {
-      const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun);
+      const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, skipRootAbs);
       if (dirStats) {
         allStats.push(...dirStats);
       }
