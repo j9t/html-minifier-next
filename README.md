@@ -22,7 +22,7 @@ npm i html-minifier-next
 
 ## General usage
 
-### CLI options
+### CLI
 
 Use `html-minifier-next --help` to check all available options:
 
