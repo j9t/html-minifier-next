@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - Added `--verbose`/`-v` flag to show detailed processing information (active options and file statistics; `--dry` mode automatically enables verbose output)
+- Documented and added tests for `--version`/`-V` flag
 
 ### Changed
 
