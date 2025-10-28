@@ -25,45 +25,6 @@ npm i html-minifier-next
 
 **Note** that almost all options are disabled by default. Experiment and find what works best for you and your project.
 
-**Sample command line:**
-
-```bash
-html-minifier-next --collapse-whitespace --remove-comments --minify-js true --input-dir=. --output-dir=example
-```
-
-**Process specific file extensions:**
-
-```bash
-# Process only HTML files
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html
-
-# Process multiple file extensions
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,htm,php
-
-# Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,htm"`)
-html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir=dist
-
-# Process all files (default behavior)
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
-# Note: When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier.
-# Consider restricting with “--file-ext” to avoid touching binaries (e.g., images, archives).
-```
-
-**Dry run mode (preview outcome without writing files):**
-
-```bash
-# Preview with output file
-html-minifier-next input.html -o output.html --dry --collapse-whitespace
-
-# Preview directory processing with statistics per file and total
-html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
-# Output: [DRY RUN] Would process directory: src → dist
-#   index.html: 1,234 → 892 bytes (-342, 27.7%)
-#   about.html: 2,100 → 1,654 bytes (-446, 21.2%)
-# ---
-# Total: 3,334 → 2,546 bytes (-788, 23.6%)
-```
-
 ### CLI options
 
 Use `html-minifier-next --help` to check all available options:
@@ -75,6 +36,7 @@ Use `html-minifier-next --help` to check all available options:
 | `--file-ext <extensions>` | Specify file extension(s) to process (overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
 | `-o --output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
 | `-c --config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
+| `-v --verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `-d --dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
 
 ### Configuration file
@@ -141,32 +103,6 @@ See [the original blog post](http://perfectionkills.com/experimenting-with-html-
 
 For lint-like capabilities take a look at [HTMLLint](https://github.com/kangax/html-lint).
 
-## Minification comparison
-
-How does HTML Minifier Next compare to other solutions, like [minimize](https://github.com/Swaagie/minimize), [htmlcompressor.com](http://htmlcompressor.com/), [htmlnano](https://github.com/posthtml/htmlnano), and [minify-html](https://github.com/wilsonzlin/minify-html)? (All with the most aggressive settings, but without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
-
-| Site | Original Size (KB) | HTML Minifier Next | minimize | html­compressor.com | htmlnano | minify-html |
-| --- | --- | --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 62 | **53** | 58 | 56 | 54 | 55 |
-| [Amazon](https://www.amazon.com/) | 715 | **642** | 701 | n/a | n/a | n/a |
-| [Apple](https://www.apple.com/) | 184 | **143** | 170 | 167 | 161 | 166 |
-| [BBC](https://www.bbc.co.uk/) | 618 | **568** | 613 | n/a | 580 | 582 |
-| [CSS-Tricks](https://css-tricks.com/) | 161 | **121** | 148 | 145 | 126 | 144 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7233 | **6338** | 6610 | n/a | 6557 | 6563 |
-| [EFF](https://www.eff.org/) | 57 | **48** | 51 | 51 | 51 | 49 |
-| [FAZ](https://www.faz.net/aktuell/) | 1876 | 1753 | 1790 | n/a | **1652** | n/a |
-| [Frontend Dogma](https://frontenddogma.com/) | 119 | **114** | 128 | 118 | 125 | 119 |
-| [Google](https://www.google.com/) | 18 | **17** | 18 | 18 | **17** | n/a |
-| [Ground News](https://ground.news/) | 1840 | **1591** | 1827 | n/a | 1689 | n/a |
-| [HTML](https://html.spec.whatwg.org/multipage/) | 149 | **147** | 155 | 148 | 153 | 149 |
-| [Leanpub](https://leanpub.com/) | 1567 | **1292** | 1561 | n/a | 1299 | n/a |
-| [Mastodon](https://mastodon.social/explore) | 35 | **26** | 34 | 34 | 30 | 33 |
-| [MDN](https://developer.mozilla.org/en-US/) | 104 | **62** | 67 | 68 | 64 | n/a |
-| [Middle East Eye](https://www.middleeasteye.net/) | 224 | **197** | 204 | 204 | 204 | 201 |
-| [SitePoint](https://www.sitepoint.com/) | 476 | **345** | 473 | n/a | 415 | 456 |
-| [United Nations](https://www.un.org/en/) | 151 | **114** | 130 | 123 | 121 | 124 |
-| [W3C](https://www.w3.org/) | 50 | **36** | 41 | 39 | 39 | 39 |
-
 ## Options quick reference
 
 Most of the options are disabled by default.
@@ -219,6 +155,90 @@ Most of the options are disabled by default.
 ### Sorting attributes and style classes
 
 Minifier options like `sortAttributes` and `sortClassName` won’t impact the plain‑text size of the output. However, they form long, repetitive character chains that should improve the compression ratio of gzip used for HTTP.
+
+## Minification comparison
+
+How does HTML Minifier Next compare to other solutions, like [minimize](https://github.com/Swaagie/minimize), [htmlcompressor.com](http://htmlcompressor.com/), [htmlnano](https://github.com/posthtml/htmlnano), and [minify-html](https://github.com/wilsonzlin/minify-html)? (All with the most aggressive settings, but without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
+
+| Site | Original Size (KB) | HTML Minifier Next | minimize | html­compressor.com | htmlnano | minify-html |
+| --- | --- | --- | --- | --- | --- | --- |
+| [A List Apart](https://alistapart.com/) | 62 | **53** | 58 | 56 | 54 | 55 |
+| [Amazon](https://www.amazon.com/) | 715 | **642** | 701 | n/a | n/a | n/a |
+| [Apple](https://www.apple.com/) | 184 | **143** | 170 | 167 | 161 | 166 |
+| [BBC](https://www.bbc.co.uk/) | 618 | **568** | 613 | n/a | 580 | 582 |
+| [CSS-Tricks](https://css-tricks.com/) | 161 | **121** | 148 | 145 | 126 | 144 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7233 | **6338** | 6610 | n/a | 6557 | 6563 |
+| [EFF](https://www.eff.org/) | 57 | **48** | 51 | 51 | 51 | 49 |
+| [FAZ](https://www.faz.net/aktuell/) | 1876 | 1753 | 1790 | n/a | **1652** | n/a |
+| [Frontend Dogma](https://frontenddogma.com/) | 119 | **114** | 128 | 118 | 125 | 119 |
+| [Google](https://www.google.com/) | 18 | **17** | 18 | 18 | **17** | n/a |
+| [Ground News](https://ground.news/) | 1840 | **1591** | 1827 | n/a | 1689 | n/a |
+| [HTML](https://html.spec.whatwg.org/multipage/) | 149 | **147** | 155 | 148 | 153 | 149 |
+| [Leanpub](https://leanpub.com/) | 1567 | **1292** | 1561 | n/a | 1299 | n/a |
+| [Mastodon](https://mastodon.social/explore) | 35 | **26** | 34 | 34 | 30 | 33 |
+| [MDN](https://developer.mozilla.org/en-US/) | 104 | **62** | 67 | 68 | 64 | n/a |
+| [Middle East Eye](https://www.middleeasteye.net/) | 224 | **197** | 204 | 204 | 204 | 201 |
+| [SitePoint](https://www.sitepoint.com/) | 476 | **345** | 473 | n/a | 415 | 456 |
+| [United Nations](https://www.un.org/en/) | 151 | **114** | 130 | 123 | 121 | 124 |
+| [W3C](https://www.w3.org/) | 50 | **36** | 41 | 39 | 39 | 39 |
+
+## Examples
+
+### CLI
+
+**Sample command line:**
+
+```bash
+html-minifier-next --collapse-whitespace --remove-comments --minify-js true --input-dir=. --output-dir=example
+```
+
+**Process specific file extensions:**
+
+```bash
+# Process only HTML files
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html
+
+# Process multiple file extensions
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,htm,php
+
+# Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,htm"`)
+html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir=dist
+
+# Process all files (default behavior)
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
+# Note: When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier.
+# Consider restricting with “--file-ext” to avoid touching binaries (e.g., images, archives).
+```
+
+**Dry run mode (preview outcome without writing files):**
+
+```bash
+# Preview with output file
+html-minifier-next input.html -o output.html --dry --collapse-whitespace
+
+# Preview directory processing with statistics per file and total
+html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
+# Output: [DRY RUN] Would process directory: src → dist
+#   index.html: 1,234 → 892 bytes (-342, 27.7%)
+#   about.html: 2,100 → 1,654 bytes (-446, 21.2%)
+# ---
+# Total: 3,334 → 2,546 bytes (-788, 23.6%)
+```
+
+**Verbose mode (show detailed processing information):**
+
+```bash
+# Show processing details while minifying
+html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace
+# Output: Options: collapseWhitespace, html5, includeAutoGeneratedTags
+#   ✓ src/index.html: 1,234 → 892 bytes (-342, 27.7%)
+#   ✓ src/about.html: 2,100 → 1,654 bytes (-446, 21.2%)
+# ---
+# Total: 3,334 → 2,546 bytes (-788, 23.6%)
+
+# Note: --dry automatically enables verbose output
+html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
+```
 
 ## Special cases
 
@@ -299,7 +319,9 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 
 **Important:** When using custom `ignoreCustomFragments`, the minifier automatically applies bounded quantifiers to prevent ReDoS attacks, but you can also write safer patterns yourself using explicit bounds.
 
-## Running benchmarks
+## Running HTML Minifier Next
+
+### Benchmarks
 
 Benchmarks for minified HTML:
 
@@ -309,7 +331,7 @@ npm install
 npm run benchmarks
 ```
 
-## Running local server
+## Local server
 
 ```shell
 npm run serve
