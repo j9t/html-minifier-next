@@ -344,12 +344,16 @@ async function countFiles(dir, extensions, skipRootAbs) {
 }
 
 function updateProgress(current, total) {
-  const ratio = total ? Math.min(current / total, 1) : 0;
-  const percentage = (ratio * 100).toFixed(1);
-
   // Clear the line first, then write simple progress
   process.stderr.write(`\r\x1b[K`);
-  process.stderr.write(`Processing: ${current.toLocaleString()}/${total.toLocaleString()} (${percentage}%)`);
+  if (total) {
+    const ratio = Math.min(current / total, 1);
+    const percentage = (ratio * 100).toFixed(1);
+    process.stderr.write(`Processing ${current.toLocaleString()}/${total.toLocaleString()} (${percentage}%)`);
+  } else {
+    // Indeterminate progress - no total known yet
+    process.stderr.write(`Processing ${current.toLocaleString()} files…`);
+  }
 }
 
 function clearProgress() {
@@ -515,12 +519,18 @@ if (inputDir || outputDir) {
     let progress = null;
 
     if (showProgress) {
-      // Count total files first
+      // Start with indeterminate progress, count in background
+      progress = { current: 0, total: null };
+
+      // Start counting in background—will update progress.total when done
       const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
-      const totalFiles = await countFiles(inputDir, extensions, skipRootAbs);
-      if (totalFiles > 0) {
-        progress = { current: 0, total: totalFiles };
-      }
+      countFiles(inputDir, extensions, skipRootAbs).then(total => {
+        if (progress) {
+          progress.total = total;
+        }
+      }).catch(() => {
+        // Ignore count errors, just keep showing indeterminate progress
+      });
     }
 
     const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress);
@@ -528,7 +538,7 @@ if (inputDir || outputDir) {
     // Show completion message and clear progress indicator
     if (progress) {
       clearProgress();
-      console.error(`Processed ${progress.total.toLocaleString()} file${progress.total === 1 ? '' : 's'}`);
+      console.error(`Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}`);
     }
 
     if (isVerbose && stats && stats.length > 0) {
