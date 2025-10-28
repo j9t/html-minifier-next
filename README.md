@@ -207,7 +207,7 @@ html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir
 # Process all files (default behavior)
 html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 # Note: When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier
-# Consider restricting with “--file-ext” to avoid touching binaries (e.g., images, archives)
+# Consider restricting with `--file-ext` to avoid touching binaries (e.g., images, archives)
 ```
 
 **Dry run mode (preview outcome without writing files):**
@@ -236,7 +236,7 @@ html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whites
 # ---
 # Total: 3,334 → 2,546 bytes (-788, 23.6%)
 
-# Note: “--dry” automatically enables verbose output
+# Note: `--dry` automatically enables verbose output
 html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 ```
 
