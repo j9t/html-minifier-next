@@ -133,6 +133,51 @@ describe('cli', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "invalid"`/);
   });
 
+  test('should reject max-line-length with trailing characters', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-line-length=12abc'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "12abc"`/);
+  });
+
+  test('should reject max-input-length with trailing characters', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-input-length=99KB'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "99KB"`/);
+  });
+
+  test('should reject custom-fragment-quantifier-limit with trailing characters', () => {
+    const cliArguments = [
+      'default.html',
+      '--custom-fragment-quantifier-limit=100x'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "100x"`/);
+  });
+
+  test('should reject negative max-line-length', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-line-length=-50'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "-50"`/);
+  });
+
+  test('should reject negative max-input-length', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-input-length=-100'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "-100"`/);
+  });
+
   test('should write files to output directory', () => {
     const cliArguments = [
       '--input-dir=./',

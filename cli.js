@@ -105,10 +105,12 @@ function parseJSONRegExpArray(value) {
 const parseString = value => value;
 
 const parseValidInt = (optionName) => (value) => {
-  const num = parseInt(value, 10);
-  if (isNaN(num)) {
+  const s = String(value).trim();
+  // Accept only non-negative whole integers
+  if (!/^\d+$/.test(s)) {
     fatal(`Invalid number for \`--${paramCase(optionName)}: "${value}"\``);
   }
+  const num = Number(s);
   return num;
 };
 
