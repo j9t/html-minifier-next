@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - Added `--verbose`/`-v` flag to show detailed processing information (active options and file statistics; `--dry` mode automatically enables verbose output)
+- Added automatic progress indicator for directory processing in interactive terminals (shows progress bar, file count, percentage, and current file being processed; automatically disabled in non-TTY environments and when using `--verbose` or `--dry`)
 - Documented and added tests for `--version`/`-V` flag
 
 ### Changed
