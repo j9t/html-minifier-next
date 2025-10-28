@@ -522,7 +522,11 @@ if (inputDir || outputDir) {
       // Start with indeterminate progress, count in background
       progress = { current: 0, total: null };
 
-      // Start counting in background—will update progress.total when done
+      // Note: `countFiles` runs asynchronously and mutates `progress.total` when complete.
+      // This shared-state mutation is safe because JavaScript is single-threaded—
+      // `updateProgress` may read `progress.total` as `null` initially,
+      // then see the updated value once `countFiles` resolves,
+      // transitioning the indicator from indeterminate to determinate progress without race conditions.
       const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
       countFiles(inputDir, extensions, skipRootAbs).then(total => {
         if (progress) {
