@@ -10,12 +10,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Added `--verbose`/`-v` flag to show detailed processing information (active options and file statistics; `--dry` mode automatically enables verbose output)
 - Added automatic progress indicator for directory processing in interactive terminals (shows progress bar, file count, percentage, and current file being processed; automatically disabled in non-TTY environments and when using `--verbose` or `--dry`)
+- Added support for ESM config files via dynamic import fallback (supports `.mjs` files and modules with `"type": "module"`)
 - Documented and added tests for `--version`/`-V` flag
 
 ### Changed
 
 - Made CLI options more explicit in documentation
+- Verbose mode now displays explicitly provided disabled options (e.g., `--no-html5` shows as `no-html5`)
+
+### Internal
+
 - Restructured README
+- Improved return value consistency in `processFile` function (now always returns stats object)
 
 ## [3.1.0] - 2025-10-27
 
