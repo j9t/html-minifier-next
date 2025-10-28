@@ -780,4 +780,12 @@ describe('cli', () => {
     // Should still create output file
     assert.strictEqual(existsFixture('tmp/non-verbose.html'), true);
   });
+
+  test('should display version with --version flag', () => {
+    const result = execCliWithStderr(['--version']);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stdout.match(/^\d+\.\d+\.\d+$/));
+    assert.strictEqual(result.stderr, '');
+  });
 });
