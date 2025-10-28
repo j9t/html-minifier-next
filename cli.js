@@ -282,7 +282,53 @@ function shouldProcessFile(filename, fileExtensions) {
   return fileExtensions.includes(fileExt);
 }
 
-async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs) {
+async function countFiles(dir, extensions, skipRootAbs) {
+  let count = 0;
+
+  const files = await fs.promises.readdir(dir).catch(() => []);
+
+  for (const file of files) {
+    const filePath = path.join(dir, file);
+
+    // Skip anything inside the output root
+    if (skipRootAbs) {
+      const real = await fs.promises.realpath(filePath).catch(() => undefined);
+      if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) {
+        continue;
+      }
+    }
+
+    const lst = await fs.promises.lstat(filePath).catch(() => null);
+    if (!lst || lst.isSymbolicLink()) {
+      continue;
+    }
+
+    if (lst.isDirectory()) {
+      count += await countFiles(filePath, extensions, skipRootAbs);
+    } else if (shouldProcessFile(file, extensions)) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+function updateProgress(current, total, currentFile) {
+  const percentage = total > 0 ? ((current / total) * 100).toFixed(1) : '0.0';
+  const barWidth = 20;
+  const filled = Math.floor((current / total) * barWidth);
+  const bar = '█'.repeat(filled) + '░'.repeat(barWidth - filled);
+  const relativePath = path.relative(process.cwd(), currentFile);
+  const displayPath = relativePath.length > 50 ? '...' + relativePath.slice(-47) : relativePath;
+
+  process.stderr.write(`\rProcessing: [${bar}] ${current}/${total} (${percentage}%) - ${displayPath}`);
+}
+
+function clearProgress() {
+  process.stderr.write('\r\x1b[K'); // Clear the line
+}
+
+async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs, progress = null) {
   // If first call provided a string, normalize once; otherwise assume pre-parsed array
   if (typeof extensions === 'string') {
     extensions = parseFileExtensions(extensions);
@@ -315,11 +361,17 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
     }
 
     if (lst.isDirectory()) {
-      const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, isVerbose, skipRootAbs);
+      const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, isVerbose, skipRootAbs, progress);
       if (dirStats) {
         allStats.push(...dirStats);
       }
     } else if (shouldProcessFile(file, extensions)) {
+      // Update progress before processing
+      if (progress) {
+        progress.current++;
+        updateProgress(progress.current, progress.total, inputFile);
+      }
+
       if (!isDryRun) {
         await fs.promises.mkdir(outputDir, { recursive: true }).catch(err => {
           fatal('Cannot create directory ' + outputDir + '\n' + err.message);
@@ -440,7 +492,25 @@ if (inputDir || outputDir) {
       console.error(`[DRY RUN] Would process directory: ${inputDir} → ${outputDir}`);
     }
 
-    const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs);
+    // Set up progress indicator (only in TTY and when not verbose/dry)
+    const showProgress = process.stderr.isTTY && !isVerbose;
+    let progress = null;
+
+    if (showProgress) {
+      // Count total files first
+      const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
+      const totalFiles = await countFiles(inputDir, extensions, skipRootAbs);
+      if (totalFiles > 0) {
+        progress = { current: 0, total: totalFiles };
+      }
+    }
+
+    const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress);
+
+    // Clear progress indicator when done
+    if (progress) {
+      clearProgress();
+    }
 
     if (isVerbose && stats && stats.length > 0) {
       const totalOriginal = stats.reduce((sum, s) => sum + s.originalSize, 0);
