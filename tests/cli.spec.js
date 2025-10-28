@@ -106,6 +106,33 @@ describe('cli', () => {
     assert.throws(() => execCli(cliArguments), /The option output-dir needs to be used with the option input-dir. If you are working with a single file, use -o/);
   });
 
+  test('should throw error for invalid max-line-length value', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-line-length=abc'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for --max-line-length: "abc"/);
+  });
+
+  test('should throw error for invalid max-input-length value', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-input-length=xyz'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for --max-input-length: "xyz"/);
+  });
+
+  test('should throw error for invalid custom-fragment-quantifier-limit value', () => {
+    const cliArguments = [
+      'default.html',
+      '--custom-fragment-quantifier-limit=invalid'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for --custom-fragment-quantifier-limit: "invalid"/);
+  });
+
   test('should write files to output directory', () => {
     const cliArguments = [
       '--input-dir=./',
