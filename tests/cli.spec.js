@@ -650,4 +650,134 @@ describe('cli', () => {
     // Clean up
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/dry-config.json'));
   });
+
+  // Verbose mode tests
+  test('should show processing info in verbose mode for single file', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '--verbose',
+      '--collapse-whitespace',
+      '-o', 'tmp/verbose-output.html'
+    ]);
+
+    // Should output to stderr
+    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('collapseWhitespace'));
+    assert.ok(result.stderr.includes('✓'));
+    assert.ok(result.stderr.includes('default.html'));
+    assert.ok(result.stderr.includes('→'));
+    assert.ok(result.stderr.includes('bytes'));
+
+    // Should not output to stdout
+    assert.strictEqual(result.stdout, '');
+
+    // Should exit successfully
+    assert.strictEqual(result.exitCode, 0);
+
+    // Should create output file
+    assert.strictEqual(existsFixture('tmp/verbose-output.html'), true);
+  });
+
+  test('should show processing info in verbose mode for directory', () => {
+    const result = execCliWithStderr([
+      '--input-dir=./',
+      '--output-dir=./tmp/verbose-dir',
+      '--verbose',
+      '--collapse-whitespace'
+    ]);
+
+    // Should output to stderr
+    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('✓'));
+    assert.ok(result.stderr.includes('→'));
+    assert.ok(result.stderr.includes('bytes'));
+    assert.ok(result.stderr.includes('Total:'));
+
+    // Should not output to stdout
+    assert.strictEqual(result.stdout, '');
+
+    // Should exit successfully
+    assert.strictEqual(result.exitCode, 0);
+
+    // Should create output files
+    assert.strictEqual(existsFixture('tmp/verbose-dir/default.html'), true);
+  });
+
+  test('should show processing info in verbose mode with STDIN', () => {
+    const input = '<p>  test  </p>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--verbose', '--collapse-whitespace', '-o', 'tmp/verbose-stdin.html'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    const stderrStr = stderr.toString();
+
+    assert.strictEqual(status, 0);
+    assert.ok(stderrStr.includes('Options:'));
+    assert.ok(stderrStr.includes('✓'));
+    assert.ok(stderrStr.includes('STDIN'));
+    assert.ok(stderrStr.includes('→'));
+    assert.ok(stderrStr.includes('bytes'));
+
+    // Should not output to stdout
+    assert.strictEqual(stdout.toString().trim(), '');
+
+    // Should create output file
+    assert.strictEqual(existsFixture('tmp/verbose-stdin.html'), true);
+  });
+
+  test('should automatically enable verbose mode with --dry flag', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '--dry',
+      '--collapse-whitespace'
+    ]);
+
+    // Should show verbose output (options and stats)
+    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('collapseWhitespace'));
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Original:'));
+    assert.ok(result.stderr.includes('Minified:'));
+
+    assert.strictEqual(result.exitCode, 0);
+  });
+
+  test('should work correctly with both --dry and --verbose flags', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '--dry',
+      '--verbose',
+      '--collapse-whitespace'
+    ]);
+
+    // Should show both dry run and verbose output
+    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Would minify:'));
+    assert.ok(result.stderr.includes('Original:'));
+    assert.ok(result.stderr.includes('Minified:'));
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(result.stdout, '');
+  });
+
+  test('should not show verbose output without --verbose flag', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '--collapse-whitespace',
+      '-o', 'tmp/non-verbose.html'
+    ]);
+
+    // Should not show verbose output
+    assert.ok(!result.stderr.includes('Options:'));
+    assert.ok(!result.stderr.includes('✓'));
+
+    // Stderr should be empty or minimal
+    assert.strictEqual(result.stderr, '');
+    assert.strictEqual(result.exitCode, 0);
+
+    // Should still create output file
+    assert.strictEqual(existsFixture('tmp/non-verbose.html'), true);
+  });
 });
