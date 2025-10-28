@@ -343,19 +343,24 @@ async function countFiles(dir, extensions, skipRootAbs) {
   return count;
 }
 
-function updateProgress(current, total, currentFile) {
-  const maxPathLength = 50;
+function updateProgress(current, total, currentFile, lastUpdate) {
   const ratio = total ? Math.min(current / total, 1) : 0;
   const percentage = (ratio * 100).toFixed(1);
-  const barWidth = 20;
-  const filled = Math.floor(ratio * barWidth);
-  const bar = '█'.repeat(filled) + '░'.repeat(barWidth - filled);
-  const relativePath = path.relative(process.cwd(), currentFile);
-  const displayPath = relativePath.length > maxPathLength
-    ? '...' + relativePath.slice(-(maxPathLength - 3))
-    : relativePath;
 
-  process.stderr.write(`\rProcessing: [${bar}] ${current}/${total} (${percentage}%) - ${displayPath}`);
+  // Only update if progress changed by at least 10% or it’s the last file
+  const shouldUpdate = !lastUpdate ||
+    Math.floor(ratio * 10) > Math.floor(lastUpdate.ratio * 10) ||
+    current === total;
+
+  if (!shouldUpdate) {
+    return { ratio, percentage };
+  }
+
+  // Clear the line first, then write simple progress
+  process.stderr.write(`\r\x1b[K`);
+  process.stderr.write(`Processing: ${current}/${total} (${percentage}%)`);
+
+  return { ratio, percentage };
 }
 
 function clearProgress() {
@@ -413,7 +418,7 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
       // Update progress after processing
       if (progress) {
         progress.current++;
-        updateProgress(progress.current, progress.total, inputFile);
+        progress.lastUpdate = updateProgress(progress.current, progress.total, inputFile, progress.lastUpdate);
       }
     }
   }
@@ -525,15 +530,16 @@ if (inputDir || outputDir) {
       const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
       const totalFiles = await countFiles(inputDir, extensions, skipRootAbs);
       if (totalFiles > 0) {
-        progress = { current: 0, total: totalFiles };
+        progress = { current: 0, total: totalFiles, lastUpdate: null };
       }
     }
 
     const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress);
 
-    // Clear progress indicator when done
+    // Show completion message and clear progress indicator
     if (progress) {
       clearProgress();
+      console.error(`Processed ${progress.total} file${progress.total === 1 ? '' : 's'}`);
     }
 
     if (isVerbose && stats && stats.length > 0) {
