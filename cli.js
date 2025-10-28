@@ -83,7 +83,7 @@ function parseJSON(value) {
       return JSON.parse(value);
     } catch {
       if (/^{/.test(value)) {
-        fatal('Could not parse JSON value \'' + value + '\'');
+        fatal('Could not parse JSON value `' + value + '`');
       }
       return value;
     }
@@ -107,7 +107,7 @@ const parseString = value => value;
 const parseValidInt = (optionName) => (value) => {
   const num = parseInt(value, 10);
   if (isNaN(num)) {
-    fatal(`Invalid number for --${paramCase(optionName)}: "${value}"`);
+    fatal(`Invalid number for \`--${paramCase(optionName)}: "${value}"\``);
   }
   return num;
 };
@@ -183,385 +183,419 @@ function readFile(file) {
   }
 }
 
-let config = {};
-program.option('-c --config-file <file>', 'Use config file', async function (configPath) {
+/**
+ * Load config from a file path, trying JSON, CJS, then ESM
+ * @param {string} configPath - Path to config file
+ * @returns {Promise<object>} Loaded config object
+ */
+async function loadConfigFromPath(configPath) {
   const data = readFile(configPath);
+
+  // Try JSON first
   try {
-    config = JSON.parse(data);
+    return JSON.parse(data);
   } catch (je) {
     const abs = path.resolve(configPath);
+
+    // Try CJS require
     try {
-      config = require(abs);
+      const result = require(abs);
+      // Handle ESM interop: if `require()` loads an ESM file, it may return `{__esModule: true, default: …}`
+      return (result && result.__esModule && result.default) ? result.default : result;
     } catch (ne) {
+      // Try ESM import
       try {
-        // ESM fallback
         const mod = await import(pathToFileURL(abs).href);
-        config = mod.default || mod;
+        return mod.default || mod;
       } catch (ee) {
         fatal('Cannot read the specified config file.\nAs JSON: ' + je.message + '\nAs CJS: ' + ne.message + '\nAs ESM: ' + ee.message);
       }
     }
   }
+}
+
+/**
+ * Normalize and validate config object by applying parsers and transforming values.
+ * @param {object} config - Raw config object
+ * @returns {object} Normalized config object
+ */
+function normalizeConfig(config) {
+  const normalized = { ...config };
+
+  // Apply parsers to main options
   mainOptionKeys.forEach(function (key) {
-    if (key in config) {
+    if (key in normalized) {
       const option = mainOptions[key];
       if (Array.isArray(option)) {
-        const value = config[key];
-        config[key] = option[1](typeof value === 'string' ? value : JSON.stringify(value));
+        const value = normalized[key];
+        normalized[key] = option[1](typeof value === 'string' ? value : JSON.stringify(value));
       }
     }
   });
 
   // Handle fileExt in config file
-  if ('fileExt' in config) {
+  if ('fileExt' in normalized) {
     // Support both string (`html,htm`) and array (`["html", "htm"]`) formats
-    if (Array.isArray(config.fileExt)) {
-      config.fileExt = config.fileExt.join(',');
+    if (Array.isArray(normalized.fileExt)) {
+      normalized.fileExt = normalized.fileExt.join(',');
     }
   }
-});
+
+  return normalized;
+}
+
+let config = {};
+program.option('-c --config-file <file>', 'Use config file');
 program.option('--input-dir <dir>', 'Specify an input directory');
 program.option('--output-dir <dir>', 'Specify an output directory');
 program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated), e.g., “html” or “html,htm,php”');
 
-let content;
-program.arguments('[files...]').action(function (files) {
-  content = files.map(readFile).join('');
-}).parse(process.argv);
+(async () => {
+  let content;
+  await program.arguments('[files...]').action(function (files) {
+    content = files.map(readFile).join('');
+  }).parseAsync(process.argv);
 
-const programOptions = program.opts();
+  const programOptions = program.opts();
 
-function createOptions() {
-  const options = {};
-
-  mainOptionKeys.forEach(function (key) {
-    const param = programOptions[key === 'minifyURLs' ? 'minifyUrls' : camelCase(key)];
-
-    if (typeof param !== 'undefined') {
-      options[key] = param;
-    } else if (key in config) {
-      options[key] = config[key];
-    }
-  });
-  return options;
-}
-
-function getActiveOptionsDisplay(minifierOptions) {
-  const activeOptions = Object.entries(minifierOptions)
-    .filter(([k]) => program.getOptionValueSource(k === 'minifyURLs' ? 'minifyUrls' : camelCase(k)) === 'cli')
-    .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));
-  if (activeOptions.length > 0) {
-    console.error('Options: ' + activeOptions.join(', '));
-  }
-}
-
-function calculateStats(original, minified) {
-  const originalSize = Buffer.byteLength(original, 'utf8');
-  const minifiedSize = Buffer.byteLength(minified, 'utf8');
-  const saved = originalSize - minifiedSize;
-  const sign = saved >= 0 ? '-' : '+';
-  const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
-  return { originalSize, minifiedSize, saved, sign, percentage };
-}
-
-async function processFile(inputFile, outputFile, isDryRun = false, isVerbose = false) {
-  const data = await fs.promises.readFile(inputFile, { encoding: 'utf8' }).catch(err => {
-    fatal('Cannot read ' + inputFile + '\n' + err.message);
-  });
-
-  let minified;
-  try {
-    minified = await minify(data, createOptions());
-  } catch (e) {
-    fatal('Minification error on ' + inputFile + '\n' + e.message);
+  // Load and normalize config if `--config-file` was specified
+  if (programOptions.configFile) {
+    config = await loadConfigFromPath(programOptions.configFile);
+    config = normalizeConfig(config);
   }
 
-  const stats = calculateStats(data, minified);
+  function createOptions() {
+    const options = {};
 
-  // Show stats if dry run or verbose mode
-  if (isDryRun || isVerbose) {
-    console.error(`  ✓ ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
-  }
+    mainOptionKeys.forEach(function (key) {
+      const param = programOptions[key === 'minifyURLs' ? 'minifyUrls' : camelCase(key)];
 
-  if (isDryRun) {
-    return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
-  }
-
-  await fs.promises.writeFile(outputFile, minified, { encoding: 'utf8' }).catch(err => {
-    fatal('Cannot write ' + outputFile + '\n' + err.message);
-  });
-
-  return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
-}
-
-function parseFileExtensions(fileExt) {
-  if (!fileExt) return [];
-  const list = fileExt
-    .split(',')
-    .map(ext => ext.trim().replace(/^\.+/, '').toLowerCase())
-    .filter(ext => ext.length > 0);
-  return [...new Set(list)];
-}
-
-function shouldProcessFile(filename, fileExtensions) {
-  if (!fileExtensions || fileExtensions.length === 0) {
-    return true; // No extensions specified, process all files
-  }
-
-  const fileExt = path.extname(filename).replace(/^\.+/, '').toLowerCase();
-  return fileExtensions.includes(fileExt);
-}
-
-async function countFiles(dir, extensions, skipRootAbs) {
-  let count = 0;
-
-  const files = await fs.promises.readdir(dir).catch(() => []);
-
-  for (const file of files) {
-    const filePath = path.join(dir, file);
-
-    // Skip anything inside the output root
-    if (skipRootAbs) {
-      const real = await fs.promises.realpath(filePath).catch(() => undefined);
-      if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) {
-        continue;
+      if (typeof param !== 'undefined') {
+        options[key] = param;
+      } else if (key in config) {
+        options[key] = config[key];
       }
-    }
+    });
+    return options;
+  }
 
-    const lst = await fs.promises.lstat(filePath).catch(() => null);
-    if (!lst || lst.isSymbolicLink()) {
-      continue;
-    }
-
-    if (lst.isDirectory()) {
-      count += await countFiles(filePath, extensions, skipRootAbs);
-    } else if (shouldProcessFile(file, extensions)) {
-      count++;
+  function getActiveOptionsDisplay(minifierOptions) {
+    const activeOptions = Object.entries(minifierOptions)
+      .filter(([k]) => program.getOptionValueSource(k === 'minifyURLs' ? 'minifyUrls' : camelCase(k)) === 'cli')
+      .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));
+    if (activeOptions.length > 0) {
+      console.error('Options: ' + activeOptions.join(', '));
     }
   }
 
-  return count;
-}
-
-function updateProgress(current, total) {
-  // Clear the line first, then write simple progress
-  process.stderr.write(`\r\x1b[K`);
-  if (total) {
-    const ratio = Math.min(current / total, 1);
-    const percentage = (ratio * 100).toFixed(1);
-    process.stderr.write(`Processing ${current.toLocaleString()}/${total.toLocaleString()} (${percentage}%)`);
-  } else {
-    // Indeterminate progress - no total known yet
-    process.stderr.write(`Processing ${current.toLocaleString()} files…`);
-  }
-}
-
-function clearProgress() {
-  process.stderr.write('\r\x1b[K'); // Clear the line
-}
-
-async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs, progress = null) {
-  // If first call provided a string, normalize once; otherwise assume pre-parsed array
-  if (typeof extensions === 'string') {
-    extensions = parseFileExtensions(extensions);
+  function calculateStats(original, minified) {
+    const originalSize = Buffer.byteLength(original, 'utf8');
+    const minifiedSize = Buffer.byteLength(minified, 'utf8');
+    const saved = originalSize - minifiedSize;
+    const sign = saved >= 0 ? '-' : '+';
+    const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
+    return { originalSize, minifiedSize, saved, sign, percentage };
   }
 
-  const files = await fs.promises.readdir(inputDir).catch(err => {
-    fatal('Cannot read directory ' + inputDir + '\n' + err.message);
-  });
-
-  const allStats = [];
-
-  for (const file of files) {
-    const inputFile = path.join(inputDir, file);
-    const outputFile = path.join(outputDir, file);
-
-    // Skip anything inside the output root to avoid reprocessing
-    if (skipRootAbs) {
-      const real = await fs.promises.realpath(inputFile).catch(() => undefined);
-      if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) {
-        continue;
-      }
-    }
-
-    const lst = await fs.promises.lstat(inputFile).catch(err => {
+  async function processFile(inputFile, outputFile, isDryRun = false, isVerbose = false) {
+    const data = await fs.promises.readFile(inputFile, { encoding: 'utf8' }).catch(err => {
       fatal('Cannot read ' + inputFile + '\n' + err.message);
     });
 
-    if (lst.isSymbolicLink()) {
-      continue;
+    let minified;
+    try {
+      minified = await minify(data, createOptions());
+    } catch (e) {
+      fatal('Minification error on ' + inputFile + '\n' + e.message);
     }
 
-    if (lst.isDirectory()) {
-      const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, isVerbose, skipRootAbs, progress);
-      if (dirStats) {
-        allStats.push(...dirStats);
-      }
-    } else if (shouldProcessFile(file, extensions)) {
-      if (!isDryRun) {
-        await fs.promises.mkdir(outputDir, { recursive: true }).catch(err => {
-          fatal('Cannot create directory ' + outputDir + '\n' + err.message);
-        });
-      }
-      const fileStats = await processFile(inputFile, outputFile, isDryRun, isVerbose);
-      if (fileStats) {
-        allStats.push(fileStats);
+    const stats = calculateStats(data, minified);
+
+    // Show stats if dry run or verbose mode
+    if (isDryRun || isVerbose) {
+      console.error(`  ✓ ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+    }
+
+    if (isDryRun) {
+      return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
+    }
+
+    await fs.promises.writeFile(outputFile, minified, { encoding: 'utf8' }).catch(err => {
+      fatal('Cannot write ' + outputFile + '\n' + err.message);
+    });
+
+    return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
+  }
+
+  function parseFileExtensions(fileExt) {
+    if (!fileExt) return [];
+    const list = fileExt
+      .split(',')
+      .map(ext => ext.trim().replace(/^\.+/, '').toLowerCase())
+      .filter(ext => ext.length > 0);
+    return [...new Set(list)];
+  }
+
+  function shouldProcessFile(filename, fileExtensions) {
+    if (!fileExtensions || fileExtensions.length === 0) {
+      return true; // No extensions specified, process all files
+    }
+
+    const fileExt = path.extname(filename).replace(/^\.+/, '').toLowerCase();
+    return fileExtensions.includes(fileExt);
+  }
+
+  async function countFiles(dir, extensions, skipRootAbs) {
+    let count = 0;
+
+    const files = await fs.promises.readdir(dir).catch(() => []);
+
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+
+      // Skip anything inside the output root
+      if (skipRootAbs) {
+        const real = await fs.promises.realpath(filePath).catch(() => undefined);
+        if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) {
+          continue;
+        }
       }
 
-      // Update progress after processing
-      if (progress) {
-        progress.current++;
-        updateProgress(progress.current, progress.total);
+      const lst = await fs.promises.lstat(filePath).catch(() => null);
+      if (!lst || lst.isSymbolicLink()) {
+        continue;
       }
+
+      if (lst.isDirectory()) {
+        count += await countFiles(filePath, extensions, skipRootAbs);
+      } else if (shouldProcessFile(file, extensions)) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  function updateProgress(current, total) {
+    // Clear the line first, then write simple progress
+    process.stderr.write(`\r\x1b[K`);
+    if (total) {
+      const ratio = Math.min(current / total, 1);
+      const percentage = (ratio * 100).toFixed(1);
+      process.stderr.write(`Processing ${current.toLocaleString()}/${total.toLocaleString()} (${percentage}%)`);
+    } else {
+      // Indeterminate progress - no total known yet
+      process.stderr.write(`Processing ${current.toLocaleString()} files…`);
     }
   }
 
-  return allStats;
-}
-
-const writeMinify = async () => {
-  const minifierOptions = createOptions();
-
-  // Show config info if verbose
-  if (programOptions.verbose || programOptions.dry) {
-    getActiveOptionsDisplay(minifierOptions);
+  function clearProgress() {
+    process.stderr.write('\r\x1b[K'); // Clear the line
   }
 
-  let minified;
+  async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs, progress = null) {
+    // If first call provided a string, normalize once; otherwise assume pre-parsed array
+    if (typeof extensions === 'string') {
+      extensions = parseFileExtensions(extensions);
+    }
 
-  try {
-    minified = await minify(content, minifierOptions);
-  } catch (e) {
-    fatal('Minification error:\n' + e.message);
-  }
-
-  const stats = calculateStats(content, minified);
-
-  if (programOptions.dry) {
-    const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
-    const outputDest = programOptions.output || 'STDOUT';
-
-    console.error(`[DRY RUN] Would minify: ${inputSource} → ${outputDest}`);
-    console.error(`  Original: ${stats.originalSize.toLocaleString()} bytes`);
-    console.error(`  Minified: ${stats.minifiedSize.toLocaleString()} bytes`);
-    console.error(`  Saved: ${stats.sign}${Math.abs(stats.saved).toLocaleString()} bytes (${stats.percentage}%)`);
-    return;
-  }
-
-  // Show stats if verbose
-  if (programOptions.verbose) {
-    const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
-    console.error(`  ✓ ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
-  }
-
-  if (programOptions.output) {
-    await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true }).catch((e) => {
-      fatal('Cannot create directory ' + path.dirname(programOptions.output) + '\n' + e.message);
+    const files = await fs.promises.readdir(inputDir).catch(err => {
+      fatal('Cannot read directory ' + inputDir + '\n' + err.message);
     });
-    await new Promise((resolve, reject) => {
-      const fileStream = fs.createWriteStream(programOptions.output)
-        .on('error', reject)
-        .on('finish', resolve);
-      fileStream.end(minified);
-      }).catch((e) => {
-      fatal('Cannot write ' + programOptions.output + '\n' + e.message);
-    });
-    return;
+
+    const allStats = [];
+
+    for (const file of files) {
+      const inputFile = path.join(inputDir, file);
+      const outputFile = path.join(outputDir, file);
+
+      // Skip anything inside the output root to avoid reprocessing
+      if (skipRootAbs) {
+        const real = await fs.promises.realpath(inputFile).catch(() => undefined);
+        if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) {
+          continue;
+        }
+      }
+
+      const lst = await fs.promises.lstat(inputFile).catch(err => {
+        fatal('Cannot read ' + inputFile + '\n' + err.message);
+      });
+
+      if (lst.isSymbolicLink()) {
+        continue;
+      }
+
+      if (lst.isDirectory()) {
+        const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, isVerbose, skipRootAbs, progress);
+        if (dirStats) {
+          allStats.push(...dirStats);
+        }
+      } else if (shouldProcessFile(file, extensions)) {
+        if (!isDryRun) {
+          await fs.promises.mkdir(outputDir, { recursive: true }).catch(err => {
+            fatal('Cannot create directory ' + outputDir + '\n' + err.message);
+          });
+        }
+        const fileStats = await processFile(inputFile, outputFile, isDryRun, isVerbose);
+        if (fileStats) {
+          allStats.push(fileStats);
+        }
+
+        // Update progress after processing
+        if (progress) {
+          progress.current++;
+          updateProgress(progress.current, progress.total);
+        }
+      }
+    }
+
+    return allStats;
   }
 
-  process.stdout.write(minified);
-};
-
-const { inputDir, outputDir, fileExt } = programOptions;
-
-// Resolve file extensions: CLI argument takes priority over config file, even if empty string
-const hasCliFileExt = program.getOptionValueSource('fileExt') === 'cli';
-const resolvedFileExt = hasCliFileExt ? fileExt : config.fileExt;
-
-if (inputDir || outputDir) {
-  if (!inputDir) {
-    fatal('The option output-dir needs to be used with the option input-dir. If you are working with a single file, use -o.');
-  } else if (!outputDir) {
-    fatal('You need to specify where to write the output files with the option --output-dir');
-  }
-
-  (async () => {
-    // `--dry` automatically enables verbose mode
-    const isVerbose = programOptions.verbose || programOptions.dry;
+  const writeMinify = async () => {
+    const minifierOptions = createOptions();
 
     // Show config info if verbose
-    if (isVerbose) {
-      const minifierOptions = createOptions();
+    if (programOptions.verbose || programOptions.dry) {
       getActiveOptionsDisplay(minifierOptions);
     }
 
-    // Prevent traversing into the output directory when it is inside the input directory
-    let inputReal;
-    let outputReal;
-    inputReal = await fs.promises.realpath(inputDir).catch(() => undefined);
+    let minified;
+
     try {
-      outputReal = await fs.promises.realpath(outputDir);
-    } catch {
-      outputReal = path.resolve(outputDir);
+      minified = await minify(content, minifierOptions);
+    } catch (e) {
+      fatal('Minification error:\n' + e.message);
     }
-    let skipRootAbs;
-    if (inputReal && outputReal && (outputReal === inputReal || outputReal.startsWith(inputReal + path.sep))) {
-      // Instead of aborting, skip traversing into the output directory
-      skipRootAbs = outputReal;
-    }
+
+    const stats = calculateStats(content, minified);
 
     if (programOptions.dry) {
-      console.error(`[DRY RUN] Would process directory: ${inputDir} → ${outputDir}`);
+      const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
+      const outputDest = programOptions.output || 'STDOUT';
+
+      console.error(`[DRY RUN] Would minify: ${inputSource} → ${outputDest}`);
+      console.error(`  Original: ${stats.originalSize.toLocaleString()} bytes`);
+      console.error(`  Minified: ${stats.minifiedSize.toLocaleString()} bytes`);
+      console.error(`  Saved: ${stats.sign}${Math.abs(stats.saved).toLocaleString()} bytes (${stats.percentage}%)`);
+      return;
     }
 
-    // Set up progress indicator (only in TTY and when not verbose/dry)
-    const showProgress = process.stderr.isTTY && !isVerbose;
-    let progress = null;
+    // Show stats if verbose
+    if (programOptions.verbose) {
+      const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
+      console.error(`  ✓ ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+    }
 
-    if (showProgress) {
-      // Start with indeterminate progress, count in background
-      progress = { current: 0, total: null };
-
-      // Note: `countFiles` runs asynchronously and mutates `progress.total` when complete.
-      // This shared-state mutation is safe because JavaScript is single-threaded—
-      // `updateProgress` may read `progress.total` as `null` initially,
-      // then see the updated value once `countFiles` resolves,
-      // transitioning the indicator from indeterminate to determinate progress without race conditions.
-      const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
-      countFiles(inputDir, extensions, skipRootAbs).then(total => {
-        if (progress) {
-          progress.total = total;
-        }
-      }).catch(() => {
-        // Ignore count errors, just keep showing indeterminate progress
+    if (programOptions.output) {
+      await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true }).catch((e) => {
+        fatal('Cannot create directory ' + path.dirname(programOptions.output) + '\n' + e.message);
       });
+      await new Promise((resolve, reject) => {
+        const fileStream = fs.createWriteStream(programOptions.output)
+          .on('error', reject)
+          .on('finish', resolve);
+        fileStream.end(minified);
+        }).catch((e) => {
+        fatal('Cannot write ' + programOptions.output + '\n' + e.message);
+      });
+      return;
     }
 
-    const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress);
+    process.stdout.write(minified);
+  };
 
-    // Show completion message and clear progress indicator
-    if (progress) {
-      clearProgress();
-      console.error(`Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}`);
+  const { inputDir, outputDir, fileExt } = programOptions;
+
+  // Resolve file extensions: CLI argument takes priority over config file, even if empty string
+  const hasCliFileExt = program.getOptionValueSource('fileExt') === 'cli';
+  const resolvedFileExt = hasCliFileExt ? fileExt : config.fileExt;
+
+  if (inputDir || outputDir) {
+    if (!inputDir) {
+      fatal('The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `-o`');
+    } else if (!outputDir) {
+      fatal('You need to specify where to write the output files with the option `--output-dir`');
     }
 
-    if (isVerbose && stats && stats.length > 0) {
-      const totalOriginal = stats.reduce((sum, s) => sum + s.originalSize, 0);
-      const totalMinified = stats.reduce((sum, s) => sum + s.minifiedSize, 0);
-      const totalSaved = totalOriginal - totalMinified;
-      const sign = totalSaved >= 0 ? '-' : '+';
-      const totalPercentage = totalOriginal ? ((Math.abs(totalSaved) / totalOriginal) * 100).toFixed(1) : '0.0';
+    await (async () => {
+      // `--dry` automatically enables verbose mode
+      const isVerbose = programOptions.verbose || programOptions.dry;
 
-      console.error('---');
-      console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (${sign}${Math.abs(totalSaved).toLocaleString()}, ${totalPercentage}%)`);
-    }
-  })();
-} else if (content) { // Minifying one or more files specified on the CMD line
-  writeMinify();
-} else { // Minifying input coming from STDIN
-  content = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', function (data) {
-    content += data;
-  }).on('end', writeMinify);
-}
+      // Show config info if verbose
+      if (isVerbose) {
+        const minifierOptions = createOptions();
+        getActiveOptionsDisplay(minifierOptions);
+      }
+
+      // Prevent traversing into the output directory when it is inside the input directory
+      let inputReal;
+      let outputReal;
+      inputReal = await fs.promises.realpath(inputDir).catch(() => undefined);
+      try {
+        outputReal = await fs.promises.realpath(outputDir);
+      } catch {
+        outputReal = path.resolve(outputDir);
+      }
+      let skipRootAbs;
+      if (inputReal && outputReal && (outputReal === inputReal || outputReal.startsWith(inputReal + path.sep))) {
+        // Instead of aborting, skip traversing into the output directory
+        skipRootAbs = outputReal;
+      }
+
+      if (programOptions.dry) {
+        console.error(`[DRY RUN] Would process directory: ${inputDir} → ${outputDir}`);
+      }
+
+      // Set up progress indicator (only in TTY and when not verbose/dry)
+      const showProgress = process.stderr.isTTY && !isVerbose;
+      let progress = null;
+
+      if (showProgress) {
+        // Start with indeterminate progress, count in background
+        progress = {current: 0, total: null};
+
+        // Note: `countFiles` runs asynchronously and mutates `progress.total` when complete.
+        // This shared-state mutation is safe because JavaScript is single-threaded—
+        // `updateProgress` may read `progress.total` as `null` initially,
+        // then see the updated value once `countFiles` resolves,
+        // transitioning the indicator from indeterminate to determinate progress without race conditions.
+        const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
+        countFiles(inputDir, extensions, skipRootAbs).then(total => {
+          if (progress) {
+            progress.total = total;
+          }
+        }).catch(() => {
+          // Ignore count errors, just keep showing indeterminate progress
+        });
+      }
+
+      const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress);
+
+      // Show completion message and clear progress indicator
+      if (progress) {
+        clearProgress();
+        console.error(`Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}`);
+      }
+
+      if (isVerbose && stats && stats.length > 0) {
+        const totalOriginal = stats.reduce((sum, s) => sum + s.originalSize, 0);
+        const totalMinified = stats.reduce((sum, s) => sum + s.minifiedSize, 0);
+        const totalSaved = totalOriginal - totalMinified;
+        const sign = totalSaved >= 0 ? '-' : '+';
+        const totalPercentage = totalOriginal ? ((Math.abs(totalSaved) / totalOriginal) * 100).toFixed(1) : '0.0';
+
+        console.error('---');
+        console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (${sign}${Math.abs(totalSaved).toLocaleString()}, ${totalPercentage}%)`);
+      }
+    })();
+  } else if (content) { // Minifying one or more files specified on the CMD line
+    writeMinify();
+  } else { // Minifying input coming from STDIN
+    content = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', function (data) {
+      content += data;
+    }).on('end', writeMinify);
+  }
+})();
