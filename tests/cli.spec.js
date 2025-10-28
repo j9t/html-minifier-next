@@ -178,6 +178,24 @@ describe('cli', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "-100"`/);
   });
 
+  test('should throw error for malformed JSON array', () => {
+    const cliArguments = [
+      'default.html',
+      '--minify-css=[bad, json]'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Could not parse JSON value `\[bad, json\]`/);
+  });
+
+  test('should throw error for JSON with leading whitespace', () => {
+    const cliArguments = [
+      'default.html',
+      '--minify-js=  {bad: json}'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Could not parse JSON value ` {2}\{bad: json\}`/);
+  });
+
   test('should write files to output directory', () => {
     const cliArguments = [
       '--input-dir=./',
@@ -743,7 +761,7 @@ describe('cli', () => {
     ]);
 
     // Should output to stderr
-    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('collapseWhitespace'));
     assert.ok(result.stderr.includes('✓'));
     assert.ok(result.stderr.includes('default.html'));
@@ -769,7 +787,7 @@ describe('cli', () => {
     ]);
 
     // Should output to stderr
-    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('✓'));
     assert.ok(result.stderr.includes('→'));
     assert.ok(result.stderr.includes('bytes'));
@@ -795,7 +813,7 @@ describe('cli', () => {
     const stderrStr = stderr.toString();
 
     assert.strictEqual(status, 0);
-    assert.ok(stderrStr.includes('Options:'));
+    assert.ok(stderrStr.includes('CLI options:'));
     assert.ok(stderrStr.includes('✓'));
     assert.ok(stderrStr.includes('STDIN'));
     assert.ok(stderrStr.includes('→'));
@@ -816,7 +834,7 @@ describe('cli', () => {
     ]);
 
     // Should show verbose output (options and stats)
-    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('collapseWhitespace'));
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Original:'));
@@ -834,7 +852,7 @@ describe('cli', () => {
     ]);
 
     // Should show both dry run and verbose output
-    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Would minify:'));
     assert.ok(result.stderr.includes('Original:'));
@@ -852,7 +870,7 @@ describe('cli', () => {
     ]);
 
     // Should not show verbose output
-    assert.ok(!result.stderr.includes('Options:'));
+    assert.ok(!result.stderr.includes('CLI options:'));
     assert.ok(!result.stderr.includes('✓'));
 
     // Stderr should be empty or minimal
@@ -904,7 +922,7 @@ describe('cli', () => {
 
     // With verbose, should show per-file stats, not progress
     assert.strictEqual(result.exitCode, 0);
-    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes(path.join('tmp', 'test1.html')));
     assert.ok(result.stderr.includes(path.join('tmp', 'test2.html')));
     assert.ok(!result.stderr.includes('Processing: ['));

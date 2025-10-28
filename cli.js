@@ -82,7 +82,7 @@ function parseJSON(value) {
     try {
       return JSON.parse(value);
     } catch {
-      if (/^{/.test(value)) {
+      if (/^\s*[{[]/.test(value)) {
         fatal('Could not parse JSON value `' + value + '`');
       }
       return value;
@@ -286,7 +286,7 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       .filter(([k]) => program.getOptionValueSource(k === 'minifyURLs' ? 'minifyUrls' : camelCase(k)) === 'cli')
       .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));
     if (activeOptions.length > 0) {
-      console.error('Options: ' + activeOptions.join(', '));
+      console.error('CLI options: ' + activeOptions.join(', '));
     }
   }
 
