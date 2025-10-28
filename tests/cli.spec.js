@@ -788,4 +788,92 @@ describe('cli', () => {
     assert.ok(result.stdout.match(/^\d+\.\d+\.\d+$/));
     assert.strictEqual(result.stderr, '');
   });
+
+  test('should not show progress indicator in non-TTY environment', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace'
+    ]);
+
+    // In non-TTY (CI/piped), no progress should appear in stderr
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(result.stderr, '');
+    assert.strictEqual(result.stdout, '');
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should not show progress indicator with --verbose flag', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace',
+      '--verbose'
+    ]);
+
+    // With verbose, should show per-file stats, not progress
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('Options:'));
+    assert.ok(result.stderr.includes('tmp/test1.html'));
+    assert.ok(result.stderr.includes('tmp/test2.html'));
+    assert.ok(!result.stderr.includes('Processing: ['));
+    assert.strictEqual(result.stdout, '');
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should not show progress indicator with --dry flag', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace',
+      '--dry'
+    ]);
+
+    // With dry run, should show per-file stats, not progress
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('tmp/test1.html'));
+    assert.ok(result.stderr.includes('tmp/test2.html'));
+    assert.ok(!result.stderr.includes('Processing: ['));
+    assert.strictEqual(result.stdout, '');
+
+    // Dry run should not create output files
+    assert.strictEqual(existsFixture('tmp-out'), false);
+  });
+
+  test('should process multiple subdirectories correctly for progress counting', async () => {
+    // Create nested directory structure
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/sub1/sub2'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test 1</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/sub1/test2.html'), '<html><body><h1>Test 2</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/sub1/sub2/test3.html'), '<html><body><h1>Test 3</h1></body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace'
+    ]);
+
+    // Should successfully process all files in nested directories
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(existsFixture('tmp-out/test1.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/sub1/test2.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/sub1/sub2/test3.html'), true);
+
+    await removeFixture('tmp-out');
+  });
 });
