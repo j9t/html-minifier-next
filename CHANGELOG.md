@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+- Made CLI options more explicit in documentation
 - Restructured README
 
 ## [3.1.0] - 2025-10-27
