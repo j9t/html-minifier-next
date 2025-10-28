@@ -95,7 +95,7 @@ describe('cli', () => {
       '--input-dir=./'
     ];
 
-    assert.throws(() => execCli(cliArguments), /You need to specify where to write the output files with the option --output-dir/);
+    assert.throws(() => execCli(cliArguments), /You need to specify where to write the output files with the option `--output-dir`/);
   });
 
   test('should throw if input directory not specified', () => {
@@ -103,7 +103,7 @@ describe('cli', () => {
       '--output-dir=./'
     ];
 
-    assert.throws(() => execCli(cliArguments), /The option output-dir needs to be used with the option input-dir. If you are working with a single file, use -o/);
+    assert.throws(() => execCli(cliArguments), /The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `-o`/);
   });
 
   test('should throw error for invalid max-line-length value', () => {
@@ -112,7 +112,7 @@ describe('cli', () => {
       '--max-line-length=abc'
     ];
 
-    assert.throws(() => execCli(cliArguments), /Invalid number for --max-line-length: "abc"/);
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "abc"`/);
   });
 
   test('should throw error for invalid max-input-length value', () => {
@@ -121,7 +121,7 @@ describe('cli', () => {
       '--max-input-length=xyz'
     ];
 
-    assert.throws(() => execCli(cliArguments), /Invalid number for --max-input-length: "xyz"/);
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "xyz"`/);
   });
 
   test('should throw error for invalid custom-fragment-quantifier-limit value', () => {
@@ -130,7 +130,7 @@ describe('cli', () => {
       '--custom-fragment-quantifier-limit=invalid'
     ];
 
-    assert.throws(() => execCli(cliArguments), /Invalid number for --custom-fragment-quantifier-limit: "invalid"/);
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "invalid"`/);
   });
 
   test('should write files to output directory', () => {
