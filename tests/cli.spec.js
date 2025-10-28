@@ -552,6 +552,16 @@ describe('cli', () => {
     assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
   });
 
+  test('should handle EPIPE gracefully when piping to head', () => {
+    const command = `node "${cliPath}" --collapse-whitespace < default.html | head -n1`;
+    const { status, stderr } = spawnSync('sh', ['-c', command], {
+      cwd: fixturesDir
+    });
+    // Exit code should be 0 and no noisy errors
+    assert.strictEqual(status, 0);
+    assert.strictEqual(stderr.toString().trim(), '');
+  });
+
   // -o flag combination tests
   test('should handle file to file with -o flag in dry run', () => {
     const result = execCliWithStderr([
@@ -874,6 +884,49 @@ describe('cli', () => {
     assert.strictEqual(existsFixture('tmp-out/sub1/test2.html'), true);
     assert.strictEqual(existsFixture('tmp-out/sub1/sub2/test3.html'), true);
 
+    await removeFixture('tmp-out');
+  });
+
+  test('should skip traversing into output directory when nested in input directory', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/in/sub'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/in/a.html'), '<html><body>a</body></html>');
+    const result = execCliWithStderr([
+      '--input-dir=tmp/in',
+      '--output-dir=tmp/in/sub', // nested
+      '--collapse-whitespace'
+    ]);
+    assert.strictEqual(result.exitCode, 0);
+    // Should write only to sub/, and must not reprocess files it just wrote
+    assert.strictEqual(existsFixture('tmp/in/sub/a.html'), true);
+    // Verify it only processed the original file, not the output
+    const output = await readFixture('tmp/in/sub/a.html');
+    assert.ok(output.includes('<html><body>a</body></html>'));
+  });
+
+  test('should skip symbolic links', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/real.html'), '<html><body>x</body></html>');
+    // Create symlink pointing to real.html
+    const target = path.resolve(fixturesDir, 'tmp/real.html');
+    const link = path.resolve(fixturesDir, 'tmp/link.html');
+    try {
+      await fs.promises.symlink(target, link);
+    } catch (err) {
+      // Skip test on Windows if symlinks not supported
+      if (err.code === 'EPERM' || err.code === 'ENOENT') {
+        return;
+      }
+      throw err;
+    }
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace'
+    ]);
+    assert.strictEqual(result.exitCode, 0);
+    // Only real file should be processed
+    assert.strictEqual(existsFixture('tmp-out/real.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/link.html'), false);
     await removeFixture('tmp-out');
   });
 });
