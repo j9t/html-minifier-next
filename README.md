@@ -21,9 +21,7 @@ From npm for programmatic use:
 npm i html-minifier-next
 ```
 
-## Usage
-
-**Note** that almost all options are disabled by default. Experiment and find what works best for you and your project.
+## General usage
 
 ### CLI options
 
@@ -102,11 +100,11 @@ const { minify } = require('html-minifier-next');
 
 See [the original blog post](http://perfectionkills.com/experimenting-with-html-minifier) for details of [how it works](http://perfectionkills.com/experimenting-with-html-minifier#how_it_works), [description of each option](http://perfectionkills.com/experimenting-with-html-minifier#options), [testing results](http://perfectionkills.com/experimenting-with-html-minifier#field_testing), and [conclusions](http://perfectionkills.com/experimenting-with-html-minifier#cost_and_benefits).
 
-For lint-like capabilities take a look at [HTMLLint](https://github.com/kangax/html-lint).
+For lint-like capabilities, take a look at [HTMLLint](https://github.com/kangax/html-lint).
 
 ## Options quick reference
 
-Most of the options are disabled by default.
+Most of the options are disabled by default. Experiment and find what works best for you and your project.
 
 Options can be used in config files (camelCase) or via CLI flags (kebab-case with `--` prefix). Options that default to `true` use `--no-` prefix in CLI to disable them.
 
