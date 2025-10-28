@@ -163,6 +163,7 @@ mainOptionKeys.forEach(function (key) {
   }
 });
 program.option('-o --output <file>', 'Specify output file (reads from file arguments or STDIN; outputs to STDOUT if not specified)');
+program.option('-v --verbose', 'Show detailed processing information');
 program.option('-d --dry', 'Dry run: process and report statistics without writing output');
 
 function readFile(file) {
@@ -229,7 +230,7 @@ function createOptions() {
   return options;
 }
 
-async function processFile(inputFile, outputFile, isDryRun = false) {
+async function processFile(inputFile, outputFile, isDryRun = false, isVerbose = false) {
   const data = await fs.promises.readFile(inputFile, { encoding: 'utf8' }).catch(err => {
     fatal('Cannot read ' + inputFile + '\n' + err.message);
   });
@@ -241,15 +242,18 @@ async function processFile(inputFile, outputFile, isDryRun = false) {
     fatal('Minification error on ' + inputFile + '\n' + e.message);
   }
 
-  if (isDryRun) {
-    const originalSize = Buffer.byteLength(data, 'utf8');
-    const minifiedSize = Buffer.byteLength(minified, 'utf8');
-    const saved = originalSize - minifiedSize;
+  const originalSize = Buffer.byteLength(data, 'utf8');
+  const minifiedSize = Buffer.byteLength(minified, 'utf8');
+  const saved = originalSize - minifiedSize;
+
+  // Show stats if dry run or verbose mode
+  if (isDryRun || isVerbose) {
     const sign = saved >= 0 ? '-' : '+';
     const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
+    console.error(`  ✓ ${path.relative(process.cwd(), inputFile)}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (${sign}${Math.abs(saved).toLocaleString()}, ${percentage}%)`);
+  }
 
-    console.error(`  ${path.relative(process.cwd(), inputFile)}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (${sign}${Math.abs(saved).toLocaleString()}, ${percentage}%)`);
-
+  if (isDryRun) {
     return { originalSize, minifiedSize, saved };
   }
 
@@ -257,7 +261,7 @@ async function processFile(inputFile, outputFile, isDryRun = false) {
     fatal('Cannot write ' + outputFile + '\n' + err.message);
   });
 
-  return null;
+  return isVerbose ? { originalSize, minifiedSize, saved } : null;
 }
 
 function parseFileExtensions(fileExt) {
@@ -278,7 +282,7 @@ function shouldProcessFile(filename, fileExtensions) {
   return fileExtensions.includes(fileExt);
 }
 
-async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, skipRootAbs) {
+async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs) {
   // If first call provided a string, normalize once; otherwise assume pre-parsed array
   if (typeof extensions === 'string') {
     extensions = parseFileExtensions(extensions);
@@ -311,7 +315,7 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
     }
 
     if (lst.isDirectory()) {
-      const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, skipRootAbs);
+      const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, isVerbose, skipRootAbs);
       if (dirStats) {
         allStats.push(...dirStats);
       }
@@ -321,7 +325,7 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
           fatal('Cannot create directory ' + outputDir + '\n' + err.message);
         });
       }
-      const fileStats = await processFile(inputFile, outputFile, isDryRun);
+      const fileStats = await processFile(inputFile, outputFile, isDryRun, isVerbose);
       if (fileStats) {
         allStats.push(fileStats);
       }
@@ -333,6 +337,15 @@ async function processDirectory(inputDir, outputDir, extensions, isDryRun = fals
 
 const writeMinify = async () => {
   const minifierOptions = createOptions();
+
+  // Show config info if verbose
+  if (programOptions.verbose || programOptions.dry) {
+    const activeOptions = Object.keys(minifierOptions).filter(key => minifierOptions[key]);
+    if (activeOptions.length > 0) {
+      console.error('Options: ' + activeOptions.join(', '));
+    }
+  }
+
   let minified;
 
   try {
@@ -341,13 +354,13 @@ const writeMinify = async () => {
     fatal('Minification error:\n' + e.message);
   }
 
-  if (programOptions.dry) {
-    const originalSize = Buffer.byteLength(content, 'utf8');
-    const minifiedSize = Buffer.byteLength(minified, 'utf8');
-    const saved = originalSize - minifiedSize;
-    const sign = saved >= 0 ? '-' : '+';
-    const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
+  const originalSize = Buffer.byteLength(content, 'utf8');
+  const minifiedSize = Buffer.byteLength(minified, 'utf8');
+  const saved = originalSize - minifiedSize;
+  const sign = saved >= 0 ? '-' : '+';
+  const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
 
+  if (programOptions.dry) {
     const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
     const outputDest = programOptions.output || 'STDOUT';
 
@@ -356,6 +369,12 @@ const writeMinify = async () => {
     console.error(`  Minified: ${minifiedSize.toLocaleString()} bytes`);
     console.error(`  Saved: ${sign}${Math.abs(saved).toLocaleString()} bytes (${percentage}%)`);
     return;
+  }
+
+  // Show stats if verbose
+  if (programOptions.verbose) {
+    const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
+    console.error(`  ✓ ${inputSource}: ${originalSize.toLocaleString()} → ${minifiedSize.toLocaleString()} bytes (${sign}${Math.abs(saved).toLocaleString()}, ${percentage}%)`);
   }
 
   if (programOptions.output) {
@@ -390,6 +409,18 @@ if (inputDir || outputDir) {
   }
 
   (async () => {
+    // `--dry` automatically enables verbose mode
+    const isVerbose = programOptions.verbose || programOptions.dry;
+
+    // Show config info if verbose
+    if (isVerbose) {
+      const minifierOptions = createOptions();
+      const activeOptions = Object.keys(minifierOptions).filter(key => minifierOptions[key]);
+      if (activeOptions.length > 0) {
+        console.error('Options: ' + activeOptions.join(', '));
+      }
+    }
+
     // Prevent traversing into the output directory when it is inside the input directory
     let inputReal;
     let outputReal;
@@ -409,9 +440,9 @@ if (inputDir || outputDir) {
       console.error(`[DRY RUN] Would process directory: ${inputDir} → ${outputDir}`);
     }
 
-    const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, skipRootAbs);
+    const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs);
 
-    if (programOptions.dry) {
+    if (isVerbose && stats && stats.length > 0) {
       const totalOriginal = stats.reduce((sum, s) => sum + s.originalSize, 0);
       const totalMinified = stats.reduce((sum, s) => sum + s.minifiedSize, 0);
       const totalSaved = totalOriginal - totalMinified;
