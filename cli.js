@@ -331,13 +331,16 @@ async function countFiles(dir, extensions, skipRootAbs) {
 }
 
 function updateProgress(current, total, currentFile) {
+  const maxPathLength = 50;
   const ratio = total ? Math.min(current / total, 1) : 0;
   const percentage = (ratio * 100).toFixed(1);
   const barWidth = 20;
   const filled = Math.floor(ratio * barWidth);
   const bar = '█'.repeat(filled) + '░'.repeat(barWidth - filled);
   const relativePath = path.relative(process.cwd(), currentFile);
-  const displayPath = relativePath.length > 50 ? '...' + relativePath.slice(-47) : relativePath;
+  const displayPath = relativePath.length > maxPathLength
+    ? '...' + relativePath.slice(-(maxPathLength - 3))
+    : relativePath;
 
   process.stderr.write(`\rProcessing: [${bar}] ${current}/${total} (${percentage}%) - ${displayPath}`);
 }
