@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Made CLI options more explicit in documentation
 - Verbose mode now displays explicitly provided disabled options (e.g., `--no-html5` shows as `no-html5`)
 
+### Fixed
+
+- Fixed numeric option validation to reject invalid input (e.g., `--max-line-length=abc`) with clear error message instead of silently passing `NaN` to minifier
+
 ### Internal
 
 - Restructured README
