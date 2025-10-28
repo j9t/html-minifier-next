@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - Added `--verbose`/`-v` flag to show active options and file statistics (also automatically enabled with `--dry`)
-- Added progress indicator for directory processing in interactive terminals (shows file count and percentage completed, updates every 10%); auto-disabled in non-TTY environments and when using `--verbose` or `--dry`
+- Added progress indicator for directory processing in interactive terminals (shows file count and percentage completed); auto-disabled in non-TTY environments and when using `--verbose` or `--dry`
 - Added ESM config file support via dynamic import fallback (`.mjs` files and modules with `"type": "module"`)
 - Documented and added tests for `--version`/`-V` flag
 
