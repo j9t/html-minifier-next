@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - Fixed numeric option validation to reject invalid input (e.g., `--max-line-length=abc`) with clear error message instead of silently passing `NaN` to minifier
+- Fixed race condition in config file loading by refactoring async option parser to synchronous path capture with explicit post-parse loading, ensuring config is fully loaded and normalized before any minification operations
 
 ### Internal
 
