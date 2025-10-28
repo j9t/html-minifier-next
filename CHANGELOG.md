@@ -22,18 +22,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Restructured README
 - Improved return value consistency in `processFile` function (now always returns stats object)
+- Added tests for edge cases: EPIPE handling when piping to `head`, output directory nested in input directory (skip traversal logic), and symbolic link handling
 
 ## [3.1.0] - 2025-10-27
 
 ### Added
 
 - Added `--dry`/`-d` flag for dry run mode: process and report statistics without writing output files
-- Expanded test coverage with CLI tests (STDIN/STDOUT pipe tests, `-o` flag combination tests, dry run error handling), minifier tests (`maxInputLength` security option, CSS/JS minification error handling, `<dialog>` and `<search>` element validation), and cross-platform CI testing (Ubuntu, macOS, Windows)
 
 ### Changed
 
 - Improved CLI help text and enhanced README documentation for `-o, --output` flag, to clarify what it does and how it works
 - Refactored CLI functionality by closing `-o` file streams, skipping symlinks and the output subtree in directory mode, and handling `EPIPE`
+
+### Internal
+
+- Expanded test coverage with CLI tests (STDIN/STDOUT pipe tests, `-o` flag combination tests, dry run error handling), minifier tests (`maxInputLength` security option, CSS/JS minification error handling, `<dialog>` and `<search>` element validation), and cross-platform CI testing (Ubuntu, macOS, Windows)
 
 ## [3.0.0] - 2025-10-16
 
