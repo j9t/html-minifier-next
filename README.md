@@ -38,6 +38,7 @@ Use `html-minifier-next --help` to check all available options:
 | `-c --config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
 | `-v --verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `-d --dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
+| `-V --version` | Output the version number | `html-minifier-next --version` |
 
 ### Configuration file
 
