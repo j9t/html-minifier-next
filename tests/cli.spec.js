@@ -823,8 +823,8 @@ describe('cli', () => {
     // With verbose, should show per-file stats, not progress
     assert.strictEqual(result.exitCode, 0);
     assert.ok(result.stderr.includes('Options:'));
-    assert.ok(result.stderr.includes('tmp/test1.html'));
-    assert.ok(result.stderr.includes('tmp/test2.html'));
+    assert.ok(result.stderr.includes(path.join('tmp', 'test1.html')));
+    assert.ok(result.stderr.includes(path.join('tmp', 'test2.html')));
     assert.ok(!result.stderr.includes('Processing: ['));
     assert.strictEqual(result.stdout, '');
 
@@ -846,8 +846,8 @@ describe('cli', () => {
     // With dry run, should show per-file stats, not progress
     assert.strictEqual(result.exitCode, 0);
     assert.ok(result.stderr.includes('[DRY RUN]'));
-    assert.ok(result.stderr.includes('tmp/test1.html'));
-    assert.ok(result.stderr.includes('tmp/test2.html'));
+    assert.ok(result.stderr.includes(path.join('tmp', 'test1.html')));
+    assert.ok(result.stderr.includes(path.join('tmp', 'test2.html')));
     assert.ok(!result.stderr.includes('Processing: ['));
     assert.strictEqual(result.stdout, '');
 
