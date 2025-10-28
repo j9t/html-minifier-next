@@ -238,6 +238,15 @@ function createOptions() {
   return options;
 }
 
+function getActiveOptionsDisplay(minifierOptions) {
+  const activeOptions = Object.entries(minifierOptions)
+    .filter(([k]) => program.getOptionValueSource(k === 'minifyURLs' ? 'minifyUrls' : camelCase(k)) === 'cli')
+    .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));
+  if (activeOptions.length > 0) {
+    console.error('Options: ' + activeOptions.join(', '));
+  }
+}
+
 async function processFile(inputFile, outputFile, isDryRun = false, isVerbose = false) {
   const data = await fs.promises.readFile(inputFile, { encoding: 'utf8' }).catch(err => {
     fatal('Cannot read ' + inputFile + '\n' + err.message);
@@ -401,12 +410,7 @@ const writeMinify = async () => {
 
   // Show config info if verbose
   if (programOptions.verbose || programOptions.dry) {
-    const activeOptions = Object.entries(minifierOptions)
-      .filter(([k]) => program.getOptionValueSource(k === 'minifyURLs' ? 'minifyUrls' : camelCase(k)) === 'cli')
-      .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));
-    if (activeOptions.length > 0) {
-      console.error('Options: ' + activeOptions.join(', '));
-    }
+    getActiveOptionsDisplay(minifierOptions);
   }
 
   let minified;
@@ -478,12 +482,7 @@ if (inputDir || outputDir) {
     // Show config info if verbose
     if (isVerbose) {
       const minifierOptions = createOptions();
-      const activeOptions = Object.entries(minifierOptions)
-        .filter(([k]) => program.getOptionValueSource(k === 'minifyURLs' ? 'minifyUrls' : camelCase(k)) === 'cli')
-        .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));
-      if (activeOptions.length > 0) {
-        console.error('Options: ' + activeOptions.join(', '));
-      }
+      getActiveOptionsDisplay(minifierOptions);
     }
 
     // Prevent traversing into the output directory when it is inside the input directory
