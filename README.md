@@ -32,11 +32,11 @@ Use `html-minifier-next --help` to check all available options:
 | `--input-dir <dir>` | Specify an input directory | `--input-dir=src` |
 | `--output-dir <dir>` | Specify an output directory | `--output-dir=dist` |
 | `--file-ext <extensions>` | Specify file extension(s) to process (overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
-| `-o --output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
-| `-c --config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
-| `-v --verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
-| `-d --dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
-| `-V --version` | Output the version number | `html-minifier-next --version` |
+| `-o <file>`, `--output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
+| `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
+| `-v`, `--verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
+| `-d`, `--dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
+| `-V`, `--version` | Output the version number | `html-minifier-next --version` |
 
 ### Configuration file
 
@@ -207,8 +207,8 @@ html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir
 
 # Process all files (default behavior)
 html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
-# Note: When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier.
-# Consider restricting with “--file-ext” to avoid touching binaries (e.g., images, archives).
+# Note: When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier
+# Consider restricting with “--file-ext” to avoid touching binaries (e.g., images, archives)
 ```
 
 **Dry run mode (preview outcome without writing files):**
@@ -237,7 +237,7 @@ html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whites
 # ---
 # Total: 3,334 → 2,546 bytes (-788, 23.6%)
 
-# Note: --dry automatically enables verbose output
+# Note: “--dry” automatically enables verbose output
 html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 ```
 
