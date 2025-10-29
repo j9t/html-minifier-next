@@ -331,7 +331,7 @@ npm install
 npm run benchmarks
 ```
 
-## Local server
+### Local server
 
 ```shell
 npm run serve
