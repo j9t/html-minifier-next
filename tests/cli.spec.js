@@ -54,7 +54,7 @@ const execCliWithStderr = (args = []) => {
   };
 };
 
-describe('cli', () => {
+describe('CLI', () => {
   beforeEach(async () => {
     await removeFixture('tmp');
   });
