@@ -95,7 +95,7 @@ describe('cli', () => {
       '--input-dir=./'
     ];
 
-    assert.throws(() => execCli(cliArguments), /You need to specify where to write the output files with the option --output-dir/);
+    assert.throws(() => execCli(cliArguments), /You need to specify where to write the output files with the option `--output-dir`/);
   });
 
   test('should throw if input directory not specified', () => {
@@ -103,7 +103,97 @@ describe('cli', () => {
       '--output-dir=./'
     ];
 
-    assert.throws(() => execCli(cliArguments), /The option output-dir needs to be used with the option input-dir. If you are working with a single file, use -o/);
+    assert.throws(() => execCli(cliArguments), /The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `-o`/);
+  });
+
+  test('should throw error for invalid max-line-length value', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-line-length=abc'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "abc"`/);
+  });
+
+  test('should throw error for invalid max-input-length value', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-input-length=xyz'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "xyz"`/);
+  });
+
+  test('should throw error for invalid custom-fragment-quantifier-limit value', () => {
+    const cliArguments = [
+      'default.html',
+      '--custom-fragment-quantifier-limit=invalid'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "invalid"`/);
+  });
+
+  test('should reject max-line-length with trailing characters', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-line-length=12abc'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "12abc"`/);
+  });
+
+  test('should reject max-input-length with trailing characters', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-input-length=99KB'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "99KB"`/);
+  });
+
+  test('should reject custom-fragment-quantifier-limit with trailing characters', () => {
+    const cliArguments = [
+      'default.html',
+      '--custom-fragment-quantifier-limit=100x'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "100x"`/);
+  });
+
+  test('should reject negative max-line-length', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-line-length=-50'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "-50"`/);
+  });
+
+  test('should reject negative max-input-length', () => {
+    const cliArguments = [
+      'default.html',
+      '--max-input-length=-100'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "-100"`/);
+  });
+
+  test('should throw error for malformed JSON array', () => {
+    const cliArguments = [
+      'default.html',
+      '--minify-css=[bad, json]'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Could not parse JSON value `\[bad, json\]`/);
+  });
+
+  test('should throw error for JSON with leading whitespace', () => {
+    const cliArguments = [
+      'default.html',
+      '--minify-js=  {bad: json}'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Could not parse JSON value ` {2}\{bad: json\}`/);
   });
 
   test('should write files to output directory', () => {
@@ -552,6 +642,16 @@ describe('cli', () => {
     assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
   });
 
+  test('should handle EPIPE gracefully when piping to head', () => {
+    const command = `node "${cliPath}" --collapse-whitespace < default.html | head -n1`;
+    const { status, stderr } = spawnSync('sh', ['-c', command], {
+      cwd: fixturesDir
+    });
+    // Exit code should be 0 and no noisy errors
+    assert.strictEqual(status, 0);
+    assert.strictEqual(stderr.toString().trim(), '');
+  });
+
   // -o flag combination tests
   test('should handle file to file with -o flag in dry run', () => {
     const result = execCliWithStderr([
@@ -649,5 +749,274 @@ describe('cli', () => {
 
     // Clean up
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/dry-config.json'));
+  });
+
+  // Verbose mode tests
+  test('should show processing info in verbose mode for single file', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '--verbose',
+      '--collapse-whitespace',
+      '-o', 'tmp/verbose-output.html'
+    ]);
+
+    // Should output to stderr
+    assert.ok(result.stderr.includes('CLI options:'));
+    assert.ok(result.stderr.includes('collapseWhitespace'));
+    assert.ok(result.stderr.includes('✓'));
+    assert.ok(result.stderr.includes('default.html'));
+    assert.ok(result.stderr.includes('→'));
+    assert.ok(result.stderr.includes('bytes'));
+
+    // Should not output to stdout
+    assert.strictEqual(result.stdout, '');
+
+    // Should exit successfully
+    assert.strictEqual(result.exitCode, 0);
+
+    // Should create output file
+    assert.strictEqual(existsFixture('tmp/verbose-output.html'), true);
+  });
+
+  test('should show processing info in verbose mode for directory', () => {
+    const result = execCliWithStderr([
+      '--input-dir=./',
+      '--output-dir=./tmp/verbose-dir',
+      '--verbose',
+      '--collapse-whitespace'
+    ]);
+
+    // Should output to stderr
+    assert.ok(result.stderr.includes('CLI options:'));
+    assert.ok(result.stderr.includes('✓'));
+    assert.ok(result.stderr.includes('→'));
+    assert.ok(result.stderr.includes('bytes'));
+    assert.ok(result.stderr.includes('Total:'));
+
+    // Should not output to stdout
+    assert.strictEqual(result.stdout, '');
+
+    // Should exit successfully
+    assert.strictEqual(result.exitCode, 0);
+
+    // Should create output files
+    assert.strictEqual(existsFixture('tmp/verbose-dir/default.html'), true);
+  });
+
+  test('should show processing info in verbose mode with STDIN', () => {
+    const input = '<p>  test  </p>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--verbose', '--collapse-whitespace', '-o', 'tmp/verbose-stdin.html'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    const stderrStr = stderr.toString();
+
+    assert.strictEqual(status, 0);
+    assert.ok(stderrStr.includes('CLI options:'));
+    assert.ok(stderrStr.includes('✓'));
+    assert.ok(stderrStr.includes('STDIN'));
+    assert.ok(stderrStr.includes('→'));
+    assert.ok(stderrStr.includes('bytes'));
+
+    // Should not output to stdout
+    assert.strictEqual(stdout.toString().trim(), '');
+
+    // Should create output file
+    assert.strictEqual(existsFixture('tmp/verbose-stdin.html'), true);
+  });
+
+  test('should automatically enable verbose mode with --dry flag', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '--dry',
+      '--collapse-whitespace'
+    ]);
+
+    // Should show verbose output (options and stats)
+    assert.ok(result.stderr.includes('CLI options:'));
+    assert.ok(result.stderr.includes('collapseWhitespace'));
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Original:'));
+    assert.ok(result.stderr.includes('Minified:'));
+
+    assert.strictEqual(result.exitCode, 0);
+  });
+
+  test('should work correctly with both --dry and --verbose flags', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '--dry',
+      '--verbose',
+      '--collapse-whitespace'
+    ]);
+
+    // Should show both dry run and verbose output
+    assert.ok(result.stderr.includes('CLI options:'));
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes('Would minify:'));
+    assert.ok(result.stderr.includes('Original:'));
+    assert.ok(result.stderr.includes('Minified:'));
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(result.stdout, '');
+  });
+
+  test('should not show verbose output without --verbose flag', () => {
+    const result = execCliWithStderr([
+      'default.html',
+      '--collapse-whitespace',
+      '-o', 'tmp/non-verbose.html'
+    ]);
+
+    // Should not show verbose output
+    assert.ok(!result.stderr.includes('CLI options:'));
+    assert.ok(!result.stderr.includes('✓'));
+
+    // Stderr should be empty or minimal
+    assert.strictEqual(result.stderr, '');
+    assert.strictEqual(result.exitCode, 0);
+
+    // Should still create output file
+    assert.strictEqual(existsFixture('tmp/non-verbose.html'), true);
+  });
+
+  test('should display version with --version flag', () => {
+    const result = execCliWithStderr(['--version']);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stdout.match(/^\d+\.\d+\.\d+$/));
+    assert.strictEqual(result.stderr, '');
+  });
+
+  test('should not show progress indicator in non-TTY environment', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace'
+    ]);
+
+    // In non-TTY (CI/piped), no progress should appear in stderr
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(result.stderr, '');
+    assert.strictEqual(result.stdout, '');
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should not show progress indicator with --verbose flag', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace',
+      '--verbose'
+    ]);
+
+    // With verbose, should show per-file stats, not progress
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('CLI options:'));
+    assert.ok(result.stderr.includes(path.join('tmp', 'test1.html')));
+    assert.ok(result.stderr.includes(path.join('tmp', 'test2.html')));
+    assert.ok(!result.stderr.includes('Processing: ['));
+    assert.strictEqual(result.stdout, '');
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should not show progress indicator with --dry flag', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace',
+      '--dry'
+    ]);
+
+    // With dry run, should show per-file stats, not progress
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(result.stderr.includes(path.join('tmp', 'test1.html')));
+    assert.ok(result.stderr.includes(path.join('tmp', 'test2.html')));
+    assert.ok(!result.stderr.includes('Processing: ['));
+    assert.strictEqual(result.stdout, '');
+
+    // Dry run should not create output files
+    assert.strictEqual(existsFixture('tmp-out'), false);
+  });
+
+  test('should process multiple subdirectories correctly for progress counting', async () => {
+    // Create nested directory structure
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/sub1/sub2'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test 1</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/sub1/test2.html'), '<html><body><h1>Test 2</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/sub1/sub2/test3.html'), '<html><body><h1>Test 3</h1></body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace'
+    ]);
+
+    // Should successfully process all files in nested directories
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(existsFixture('tmp-out/test1.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/sub1/test2.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/sub1/sub2/test3.html'), true);
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should skip traversing into output directory when nested in input directory', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/in/sub'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/in/a.html'), '<html><body>a</body></html>');
+    const result = execCliWithStderr([
+      '--input-dir=tmp/in',
+      '--output-dir=tmp/in/sub', // nested
+      '--collapse-whitespace'
+    ]);
+    assert.strictEqual(result.exitCode, 0);
+    // Should write only to sub/, and must not reprocess files it just wrote
+    assert.strictEqual(existsFixture('tmp/in/sub/a.html'), true);
+    // Verify it only processed the original file, not the output
+    const output = await readFixture('tmp/in/sub/a.html');
+    assert.ok(output.includes('<html><body>a</body></html>'));
+  });
+
+  test('should skip symbolic links', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/real.html'), '<html><body>x</body></html>');
+    // Create symlink pointing to real.html
+    const target = path.resolve(fixturesDir, 'tmp/real.html');
+    const link = path.resolve(fixturesDir, 'tmp/link.html');
+    try {
+      await fs.promises.symlink(target, link);
+    } catch (err) {
+      // Skip test on Windows if symlinks not supported
+      if (err.code === 'EPERM' || err.code === 'ENOENT') {
+        return;
+      }
+      throw err;
+    }
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace'
+    ]);
+    assert.strictEqual(result.exitCode, 0);
+    // Only real file should be processed
+    assert.strictEqual(existsFixture('tmp-out/real.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/link.html'), false);
+    await removeFixture('tmp-out');
   });
 });

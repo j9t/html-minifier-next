@@ -4,17 +4,48 @@ As of version 2.0.0, all notable changes to HTML Minifier Next are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2025-10-28
+
+### Added
+
+- Added `--verbose`/`-v` flag to show active options and file statistics (also automatically enabled with `--dry`)
+- Added progress indicator for directory processing in interactive terminals (shows file count and percentage completed; auto-disabled in non-TTY environments and when using `--verbose` or `--dry`)
+- Added ESM config file support via dynamic import fallback (`.mjs` files and modules with `"type": "module"`)
+- Documented and added tests for `--version`/`-V` flag
+
+### Changed
+
+- Listed CLI options in documentation
+- Verbose mode now displays explicitly provided disabled options (e.g., `--no-html5` shows as `no-html5`)
+
+### Fixed
+
+- Fixed numeric option validation to reject invalid input with clear error messages: now rejects non-numeric values (e.g., `--max-line-length=abc`), values with trailing characters (e.g., `--max-line-length=12abc`), and negative numbers (e.g., `--max-line-length=-50`) instead of silently accepting partial numeric prefixes
+- Fixed JSON option parsing to properly detect and report malformed array-like inputs (e.g., `--minify-css=[bad, json]`) and JSON with leading whitespace
+- Fixed race condition in config file loading by refactoring async option parser to synchronous path capture with explicit post-parse loading, ensuring config is fully loaded and normalized before any minification operations
+
+### Internal
+
+- Restructured README
+- Improved return value consistency in `processFile` function (now always returns stats object)
+- Added tests for edge cases: EPIPE handling when piping to `head`, output directory nested in input directory (skip traversal logic), and symbolic link handling
+
 ## [3.1.0] - 2025-10-27
 
 ### Added
 
-- Added `--dry` / `-d` flag for dry run mode: process and report statistics without writing output files
-- Expanded test coverage with CLI tests (STDIN/STDOUT pipe tests, `-o` flag combination tests, dry run error handling), minifier tests (`maxInputLength` security option, CSS/JS minification error handling, `<dialog>` and `<search>` element validation), and cross-platform CI testing (Ubuntu, macOS, Windows)
+- Added `--dry`/`-d` flag for dry run mode: process and report statistics without writing output files
 
 ### Changed
 
 - Improved CLI help text and enhanced README documentation for `-o, --output` flag, to clarify what it does and how it works
 - Refactored CLI functionality by closing `-o` file streams, skipping symlinks and the output subtree in directory mode, and handling `EPIPE`
+
+### Internal
+
+- Expanded CLI test coverage: STDIN/STDOUT piping, `-o` flag combinations, dry run error handling
+- Added minifier tests: `maxInputLength` security option, CSS/JS error handling, `<dialog>` and `<search>` elements
+- Enabled cross-platform CI testing (Ubuntu, macOS, Windows)
 
 ## [3.0.0] - 2025-10-16
 
