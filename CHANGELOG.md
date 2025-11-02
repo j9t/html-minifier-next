@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Added `search` and `selectedcontent` elements to HTML element registry for complete minification support and proper optional tag removal
 
+### Internal
+
+- Added additional ruby-related test
+
 ## [3.2.1] - 2025-10-29
 
 ### Internal
