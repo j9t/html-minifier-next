@@ -4088,6 +4088,11 @@ describe('HTML', () => {
     input = '<ruby><rtc><rt>annotation</rt></rtc><rt>more</rt></ruby>';
     output = '<ruby><rtc><rt>annotation</rtc><rt>more</ruby>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // `rtc` end tag must be kept before `rp` (can only be omitted before `rb` or `rtc`)
+    input = '<ruby><rb>字</rb><rtc><rt>reading</rt></rtc><rp>(</rp><rt>text</rt><rp>)</rp></ruby>';
+    output = '<ruby><rb>字<rtc><rt>reading</rtc><rp>(<rt>text<rp>)</ruby>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
   });
 
   test('maxInputLength security option', async () => {
