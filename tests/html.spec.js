@@ -693,12 +693,12 @@ describe('HTML', () => {
 
     input = '<style><!--p.e{background:red}\np.f{background:red}\np.g{background:red}--></style>';
     assert.strictEqual(await minify(input), input);
-    output = '<style>p.e{background:red}p.f{background:red}p.g{background:red}</style>';
+    output = '<style>p.e,p.f,p.g{background:red}</style>'; // Lightning CSS merges identical rules
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
 
     input = '<style>p.h{background:red}<!--\np.i{background:red}\n-->p.j{background:red}</style>';
     assert.strictEqual(await minify(input), input);
-    output = '<style>p.h{background:red}p.i{background:red}p.j{background:red}</style>';
+    output = '<style>p.h,p.i,p.j{background:red}</style>'; // Lightning CSS merges identical rules
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
 
     input = '<style type="text/css"><!-- p { color: red } --></style>';
@@ -708,7 +708,7 @@ describe('HTML', () => {
 
     input = '<style type="text/css">p::before { content: "<!--" }</style>';
     assert.strictEqual(await minify(input), input);
-    output = '<style type="text/css">p::before{content:"<!--"}</style>';
+    output = '<style type="text/css">p:before{content:"<!--"}</style>'; // Lightning CSS normalizes `::before` to `:before`
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
 
     input = '<style type="text/html">\n<div>\n</div>\n<!-- aa -->\n</style>';
@@ -781,12 +781,12 @@ describe('HTML', () => {
 
     input = '<style><![CDATA[p.e{background:red}\np.f{background:red}\np.g{background:red}]]></style>';
     assert.strictEqual(await minify(input), input);
-    output = '<style>p.f{background:red}p.g{background:red}</style>';
+    output = '<style></style>'; // Lightning CSS rejects invalid CSS with `CDATA` markers
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
 
     input = '<style>p.h{background:red}<![CDATA[\np.i{background:red}\n]]>p.j{background:red}</style>';
     assert.strictEqual(await minify(input), input);
-    output = '<style>p.h{background:red}]]>p.j{background:red}</style>';
+    output = '<style>p.h{background:red}</style>'; // Lightning CSS parses valid CSS before invalid CDATA
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
 
     input = '<style>/* <![CDATA[ */p { color: red } // ]]></style>';
@@ -873,7 +873,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyURLs: null }), input);
     assert.strictEqual(await minify(input, { minifyURLs: false }), input);
     assert.strictEqual(await minify(input, { minifyURLs: url }), input);
-    output = '<style>.foo{background:url("URL")}</style>';
+    output = '<style>.foo{background:url(URL)}</style>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyURLs: url }), output);
   });
 
@@ -2398,7 +2398,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), input);
 
     input = '<style>div#foo { background-color: red; color: white }</style>';
-    output = '<style>div#foo{background-color:red;color:#fff}</style>';
+    output = '<style>div#foo{color:#fff;background-color:red}</style>'; // Lightning CSS may reorder properties
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
 
@@ -2417,7 +2417,7 @@ describe('HTML', () => {
 
     input = '<div style="background: url(\'images/<% image %>\')"></div>';
     assert.strictEqual(await minify(input), input);
-    output = '<div style="background:url(\'images/<% image %>\')"></div>';
+    output = '<div style="background:url(images/<% image %>)"></div>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
     assert.strictEqual(await minify(input, {
       collapseWhitespace: true,
@@ -2435,7 +2435,7 @@ describe('HTML', () => {
 
     input = '<style>p { background: url("images/<% image %>") }</style>';
     assert.strictEqual(await minify(input), input);
-    output = '<style>p{background:url("images/<% image %>")}</style>';
+    output = '<style>p{background:url(images/<% image %>)}</style>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
     assert.strictEqual(await minify(input, {
       collapseWhitespace: true,
@@ -2444,9 +2444,9 @@ describe('HTML', () => {
 
     input = '<link rel="stylesheet" href="css/style-mobile.css" media="(max-width: 737px)">';
     assert.strictEqual(await minify(input), input);
-    output = '<link rel="stylesheet" href="css/style-mobile.css" media="(max-width:737px)">';
+    output = '<link rel="stylesheet" href="css/style-mobile.css" media="(width<=737px)">'; // Lightning CSS uses modern range syntax
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
-    output = '<link rel=stylesheet href=css/style-mobile.css media=(max-width:737px)>';
+    output = '<link rel=stylesheet href=css/style-mobile.css media="(width<=737px)">'; // Quotes required: contains `<` and `=`
     assert.strictEqual(await minify(input, {
       minifyCSS: true,
       removeAttributeQuotes: true
@@ -2454,9 +2454,9 @@ describe('HTML', () => {
 
     input = '<style media="(max-width: 737px)"></style>';
     assert.strictEqual(await minify(input), input);
-    output = '<style media="(max-width:737px)"></style>';
+    output = '<style media="(width<=737px)"></style>'; // Lightning CSS uses modern range syntax
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
-    output = '<style media=(max-width:737px)></style>';
+    output = '<style media="(width<=737px)"></style>'; // Quotes required: contains `<` and `=`
     assert.strictEqual(await minify(input, {
       minifyCSS: true,
       removeAttributeQuotes: true
@@ -2470,71 +2470,74 @@ describe('HTML', () => {
   });
 
   test('minification of style with custom fragments', async () => {
-    let input;
+    let input, output;
 
+    // Lightning CSS with `errorRecovery` removes invalid CSS fragments and returns empty or partial CSS
     input = '<style><?foo?></style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // Template syntax preserved
 
     input = '<style>\t<?foo?>\t</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // Template syntax preserved
 
     input = '<style><?foo?>{color:red}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>\t<?foo?>\t{color:red}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{<?foo?>}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{\t<?foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style><?foo?>body{color:red}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>\t<?foo?>\tbody{color:red}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{<?foo?>color:red}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{\t<?foo?>\tcolor:red}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{color:red<?foo?>}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{color:red\t<?foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{color:red;<?foo?>}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{color:red;\t<?foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
 
     input = '<style>body{color:red}<?foo?></style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    output = '<style>body{color:red}</style>'; // Lightning CSS keeps valid CSS, removes custom fragment
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
 
     input = '<style>body{color:red}\t<?foo?>\t</style>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    output = '<style>body{color:red}</style>'; // Lightning CSS keeps valid CSS, removes custom fragment
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
   test('url attribute minification', async () => {
@@ -2552,9 +2555,9 @@ describe('HTML', () => {
     input = '<style>body { background: url(\'https://example.com/bg.png\') }</style>';
     assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), input);
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/' } }), input);
-    output = '<style>body{background:url(\'https://example.com/bg.png\')}</style>';
+    output = '<style>body{background:url(https://example.com/bg.png)}</style>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
-    output = '<style>body{background:url(\'bg.png\')}</style>';
+    output = '<style>body{background:url(bg.png)}</style>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, {
       minifyCSS: true,
       minifyURLs: 'https://example.com/'
@@ -2568,7 +2571,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/foo bar/' } }), input);
     output = '<style>body{background:url("https://example.com/foo bar/bg.png")}</style>';
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
-    output = '<style>body{background:url("bg.png")}</style>';
+    output = '<style>body{background:url(bg.png)}</style>'; // Lightning CSS removes quotes when URL no longer has spaces
     assert.strictEqual(await minify(input, {
       minifyCSS: true,
       minifyURLs: { site: 'https://example.com/foo bar/' }
@@ -2578,17 +2581,17 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/' } }), input);
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/foo%20bar/' } }), input);
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/foo%20bar/(baz)/' } }), input);
-    output = '<style>body{background:url("foo%20bar/(baz)/bg.png")}</style>';
+    output = '<style>body{background:url(foo%20bar/\\(baz\\)/bg.png)}</style>'; // Lightning CSS encodes space, escapes parentheses
     assert.strictEqual(await minify(input, {
       minifyCSS: true,
       minifyURLs: { site: 'https://example.com/' }
     }), output);
-    output = '<style>body{background:url("(baz)/bg.png")}</style>';
+    output = '<style>body{background:url(\\(baz\\)/bg.png)}</style>'; // Lightning CSS escapes parentheses
     assert.strictEqual(await minify(input, {
       minifyCSS: true,
       minifyURLs: { site: 'https://example.com/foo%20bar/' }
     }), output);
-    output = '<style>body{background:url("bg.png")}</style>';
+    output = '<style>body{background:url(bg.png)}</style>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, {
       minifyCSS: true,
       minifyURLs: { site: 'https://example.com/foo%20bar/(baz)/' }
@@ -2629,7 +2632,7 @@ describe('HTML', () => {
 
     // Test async function with CSS `url()`
     input = '<style>body { background: url("https://example.com/bg.png") }</style>';
-    output = '<style>body{background:url("bg.png")}</style>';
+    output = '<style>body{background:url(bg.png)}</style>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyURLs: asyncUrlMinifier }), output);
 
     // Test promise-returning function
@@ -2685,13 +2688,13 @@ describe('HTML', () => {
 
     // Test error in CSS `url()` processing
     input = '<style>body { background: url("https://example.com/error.png") }</style>';
-    output = '<style>body{background:url("https://example.com/error.png")}</style>';
+    output = '<style>body{background:url(https://example.com/error.png)}</style>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyURLs: faultyAsyncMinifier }), output);
 
     // Test CSS URLs with parentheses in file name (regression test for CSS URL regex bug)
     const urlWithParens = async (url) => url.replace('https://example.com/', '');
     input = '<style>body { background: url("https://example.com/foo(bar).png") }</style>';
-    output = '<style>body{background:url("foo(bar).png")}</style>';
+    output = '<style>body{background:url(foo\\(bar\\).png)}</style>'; // Lightning CSS escapes parentheses when removing quotes
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyURLs: urlWithParens }), output);
   });
 
@@ -3585,10 +3588,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { decodeEntities: false }), input);
     output = '<div style=\'font: "monospace"\'>foo$</div>';
     assert.strictEqual(await minify(input, { decodeEntities: true }), output);
-    output = '<div style="font:&quot">foo&dollar;</div>';
+    output = '<div style="">foo&dollar;</div>'; // Lightning CSS rejects invalid CSS with HTML entities
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
     assert.strictEqual(await minify(input, { decodeEntities: false, minifyCSS: true }), output);
-    output = '<div style=\'font:"monospace"\'>foo$</div>';
+    output = '<div style=\'font:"monospace"\'>foo$</div>'; // With `decodeEntities`, CSS becomes valid
     assert.strictEqual(await minify(input, { decodeEntities: true, minifyCSS: true }), output);
 
     input = '<a href="/?foo=1&amp;bar=&lt;2&gt;">baz&lt;moo&gt;&copy;</a>';

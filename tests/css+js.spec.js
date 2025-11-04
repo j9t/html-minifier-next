@@ -11,13 +11,13 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('minifyCSS: level 2 optimization', async () => {
+  test('minifyCSS: with custom options', async () => {
     const input = '<style>.class1 { color: red; } .class2 { color: red; }</style>';
     const result = await minify(input, {
-      minifyCSS: { level: 2 }
+      minifyCSS: {}
     });
 
-    // Level 2 optimizations may merge rules or optimize further
+    // Lightning CSS performs optimizations by default when minify is enabled
     assert.ok(result.includes('color:red'), 'Should minify CSS');
     assert.ok(result.length < input.length, 'Output should be shorter');
   });
@@ -33,7 +33,7 @@ describe('CSS and JS', () => {
     const input = '<style>/*! Important license */ body { color: red; }</style>';
     const result = await minify(input, { minifyCSS: true });
 
-    // clean-css preserves /*! comments by default
+    // Lightning CSS preserves “/*!” comments by default
     assert.ok(result.includes('Important license'), 'Important comment should be preserved');
   });
 
