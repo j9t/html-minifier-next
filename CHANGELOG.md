@@ -46,6 +46,10 @@ minify(html, {
 
 If you rely on specific CSS output formatting, review your CSS after upgrading as selector order and formatting may change due to better optimization.
 
+### Internal
+
+- Moved tests
+
 ## [3.2.2] - 2025-11-02
 
 ### Added
