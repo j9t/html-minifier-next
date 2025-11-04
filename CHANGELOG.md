@@ -4,6 +4,48 @@ As of version 2.0.0, all notable changes to HTML Minifier Next are documented in
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2025-11-04
+
+### Breaking Changes
+
+- **BREAKING:** Replaced unmaintained clean-css with [Lightning CSS](https://lightningcss.dev/) for CSS minification. This provides better minification and active maintenance, but introduces behavioral changes in CSS output:
+  - Selector merging: Identical CSS rules are now merged (e.g., `p.a{color:red}p.b{color:red}` becomes `p.a,p.b{color:red}`)
+  - Color normalization: Colors are optimized to shortest format (e.g., `white` becomes `#fff`)
+  - Quote removal: Unnecessary quotes are removed from URLs (e.g., `url("image.png")` becomes `url(image.png)`)
+  - Pseudo-element normalization: Double colons are normalized to single colons where applicable (e.g., `::before` becomes `:before`)
+  - Property reordering: CSS properties may be reordered for better compression
+  - Stricter validation: Invalid CSS (including HTML entities in CSS or CDATA markers) may be rejected and returned unminified
+  - Previous clean-css options (e.g., `level`, `compatibility`, `format`) are no longer supported
+- **BREAKING:** The `minifyCSS` option configuration has changed. Lightning CSS options differ from clean-css options. When passing an object to `minifyCSS`, use Lightning CSS configuration options:
+  - `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`)
+  - `unusedSymbols`: Array of CSS identifiers to remove during minification
+  - `errorRecovery`: Boolean to skip invalid CSS rules (default: `true`)
+  - `sourceMap`: Boolean to generate source maps
+
+### Migration Notes
+
+If you were passing configuration options to `minifyCSS`, review Lightning CSS documentation and update your configuration:
+
+```javascript
+// Before (clean-css)
+minify(html, {
+  minifyCSS: {
+    level: 2,
+    compatibility: 'ie8'
+  }
+});
+
+// After (Lightning CSS)
+minify(html, {
+  minifyCSS: {
+    targets: { ie: 11 }, // Browser targets instead of compatibility string
+    errorRecovery: true  // Enabled by default
+  }
+});
+```
+
+If you rely on specific CSS output formatting, review your CSS after upgrading as selector order and formatting may change due to better optimization.
+
 ## [3.2.2] - 2025-11-02
 
 ### Added
