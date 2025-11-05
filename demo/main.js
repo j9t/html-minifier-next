@@ -71,7 +71,7 @@ const defaultOptions = [
     id: 'minifyCSS',
     type: 'checkbox',
     label: 'Minify CSS',
-    helpText: 'Minify CSS in <code>style</code> elements and <code>style</code> attributes (disabled in browser demo—Lightning CSS requires Node.js)',
+    helpText: 'Minify CSS in <code>style</code> elements and <code>style</code> attributes (disabled in web version—Lightning CSS requires Node.js)',
     checked: false,
     disabled: true
   },
