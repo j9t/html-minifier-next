@@ -27,7 +27,7 @@
               <div>
                 <template x-if="option.type === 'checkbox'">
                   <div class="form-group">
-                    <input type="checkbox" :id="option.id" x-model="option.checked">
+                    <input type="checkbox" :id="option.id" x-model="option.checked" :disabled="option.disabled">
                     <label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
                     <template x-if="option.helpText">
                       <span class="quiet short" x-html="option.helpText"></span>
