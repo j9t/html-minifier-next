@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] - 2025-11-05
+
+### Removed
+
+- Removed UMD bundles (`htmlminifier.umd.bundle.js` and minified variant) as they were undocumented and incompatible with Lightning CSS browser limitations
+
+### Internal
+
+- Fixed browser demo build by disabling CSS minification option (Lightning CSS requires Node.js native bindings and cannot run in-browser)
+- Simplified build configuration to ESM bundle (for demo) and CommonJS (for npm package)
+
 ## [4.0.0] - 2025-11-05
 
 ### Breaking Changes

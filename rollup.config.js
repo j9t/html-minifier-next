@@ -2,13 +2,10 @@ import { defineConfig } from 'rollup';
 import commonjs from '@rollup/plugin-commonjs';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import json from '@rollup/plugin-json';
-import terser from '@rollup/plugin-terser';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 
-// Suppress known harmless warnings from terser and polyfill dependencies
+// Suppress known harmless warnings from dependencies
 const onwarn = (warning, warn) => {
-  // console.log('Warning code:', warning.code, 'Message:', warning.message.substring(0, 50));
-
   // Ignore terser comment parsing warnings
   if (warning.message && warning.message.includes('#__PURE__ comments')) {
     return;
@@ -23,7 +20,8 @@ const onwarn = (warning, warn) => {
   warn(warning);
 };
 
-const bundlePlugins = [
+// Browser bundle plugins (with polyfills for Node.js APIs)
+const browserBundlePlugins = [
   commonjs(),
   nodePolyfills(),
   nodeResolve({
@@ -33,39 +31,9 @@ const bundlePlugins = [
 ];
 
 const config = defineConfig([
-  {
-    input: 'src/htmlminifier.js',
-    output: [{
-      file: 'dist/htmlminifier.umd.bundle.js',
-      format: 'umd',
-      exports: 'named',
-      name: 'HTMLMinifier',
-      globals: {
-        lightningcss: 'lightningcss'
-      }
-    }],
-    external: ['lightningcss'],
-    plugins: bundlePlugins,
-    onwarn
-  },
-  {
-    input: 'src/htmlminifier.js',
-    output: [{
-      file: 'dist/htmlminifier.umd.bundle.min.js',
-      format: 'umd',
-      exports: 'named',
-      name: 'HTMLMinifier',
-      globals: {
-        lightningcss: 'lightningcss'
-      }
-    }],
-    external: ['lightningcss'],
-    plugins: [
-      ...bundlePlugins,
-      terser()
-    ],
-    onwarn
-  },
+  // ESM bundle for browser demo (GitHub Pages)
+  // Bundles all dependencies except lightningcss (which requires Node.js native bindings)
+  // Used by: demo/main.js
   {
     input: 'src/htmlminifier.js',
     output: {
@@ -73,9 +41,12 @@ const config = defineConfig([
       format: 'es'
     },
     external: ['lightningcss'],
-    plugins: bundlePlugins,
+    plugins: browserBundlePlugins,
     onwarn
   },
+  // CommonJS build for npm package (Node.js users)
+  // All dependencies external (installed via npm)
+  // Used by: require('html-minifier-next')
   {
     input: 'src/htmlminifier.js',
     output: {
