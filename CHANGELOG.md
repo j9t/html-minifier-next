@@ -1,6 +1,6 @@
 # Changelog
 
-As of version 2.0.0, all notable changes to HTML Minifier Next are documented in this file, which is (mostly) AI-generated and (always) human-edited. Dependency updates may or may not be called out specifically.
+As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documented in this file, which is (mostly) AI-generated and (always) human-edited. Dependency updates may or may not be called out specifically.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **BREAKING:** The `minifyCSS` option configuration has changed. Lightning CSS options differ from clean-css options. When passing an object to `minifyCSS`, use Lightning CSS configuration options:
   - `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`)
   - `unusedSymbols`: Array of CSS identifiers to remove during minification
-  - `errorRecovery`: Boolean to skip invalid CSS rules (default: `true`)
+  - `errorRecovery`: Boolean to skip invalid CSS rules (enabled by default in HMN)
   - `sourceMap`: Boolean to generate source maps
 
 ### Migration Notes
@@ -39,7 +39,7 @@ minify(html, {
 minify(html, {
   minifyCSS: {
     targets: { ie: 11 }, // Browser targets instead of compatibility string
-    errorRecovery: true  // Enabled by default
+    errorRecovery: true  // Enabled by default in HMN
   }
 });
 ```
@@ -48,7 +48,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 ### Internal
 
-- Moved tests
+- Relocated CSS minification tests to CSS/JS tests (css+js.spec.js)
 
 ## [3.2.2] - 2025-11-02
 

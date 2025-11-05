@@ -180,8 +180,8 @@ Available Lightning CSS options when passed as an object:
 
 * `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`)
 * `unusedSymbols`: Array of class names, IDs, keyframe names, and CSS variables to remove
-* `sourceMap`: Boolean to generate source maps (default: `false`)
-* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors (default: `true` in html-minifier-next)
+* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors (enabled by default in HMN, but can be disabled)
+* `sourceMap`: Boolean to generate source maps
 
 For advanced usage, you can also pass a function:
 
