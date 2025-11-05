@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **BREAKING:** The `minifyCSS` option configuration has changed. Lightning CSS options differ from clean-css options. When passing an object to `minifyCSS`, use Lightning CSS configuration options:
   - `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`)
   - `unusedSymbols`: Array of CSS identifiers to remove during minification
-  - `errorRecovery`: Boolean to skip invalid CSS rules (enabled by default in HMN)
+  - `errorRecovery`: Boolean to skip invalid CSS rules (disabled in Lightning CSS, but enabled by default in HMN)
   - `sourceMap`: Boolean to generate source maps
 
 ### Migration Notes
@@ -39,7 +39,7 @@ minify(html, {
 minify(html, {
   minifyCSS: {
     targets: { ie: 11 }, // Browser targets instead of compatibility string
-    errorRecovery: true  // Enabled by default in HMN
+    errorRecovery: true  // `false` in Lightning CSS, but enabled by default in HMN
   }
 });
 ```
