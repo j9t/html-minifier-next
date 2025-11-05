@@ -48,7 +48,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 ### Internal
 
-- Relocated CSS minification tests to CSS/JS tests (css+js.spec.js)
+- Relocated CSS minification tests from html.spec.js to css+js.spec.js to clean up and consolidate test suites
 
 ## [3.2.2] - 2025-11-02
 
