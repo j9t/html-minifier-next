@@ -1,79 +1,72 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="initial-scale=1,width=device-width">
-    <title>HTML Minifier Next</title>
-    <link rel="stylesheet" href="./main.css">
-    <style>
-      [x-cloak] {
-        display: none !important;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="wrapper">
-      <h1 class="header">HTML Minifier <span id='minifier-version'></span></h1>
-      <div class="main" x-data="minifier" x-cloak>
-        <div class="workspace">
-          <textarea rows="8" cols="40" class="input-content" x-model="input"></textarea>
-          <div class="mr-1"><button type="button" @click="minify()">Minify</button></div>
-          <textarea rows="8" cols="40" class="output-content" readonly x-model="output"></textarea>
-          <p x-text="stats.text" :class="stats.result"></p>
-        </div>
-        <div class="options">
-          <form class="mr-1">
-            <template x-for="option in options">
-              <div>
-                <template x-if="option.type === 'checkbox'">
-                  <div class="form-group">
-                    <input type="checkbox" :id="option.id" x-model="option.checked" :disabled="option.disabled">
-                    <label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
-                    <template x-if="option.helpText">
-                      <span class="quiet short" x-html="option.helpText"></span>
-                    </template>
-                  </div>
-                </template>
-                <template x-if="option.type === 'text'">
-                  <div class="form-group">
-                    <label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
-                    <input type="text" :id="option.id" x-model="option.value">
-                    <template x-if="option.helpText">
-                      <span class="quiet short" x-html="option.helpText"></span>
-                    </template>
-                  </div>
-                </template>
-                <template x-if="option.type === 'number'">
-                  <div class="form-group">
-                    <label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
-                    <input type="number" :id="option.id" x-model="option.value">
-                    <template x-if="option.helpText">
-                      <span class="quiet short" x-html="option.helpText"></span>
-                    </template>
-                  </div>
-                </template>
-              </div>
-            </template>
-          </form>
-          <div>
-            <span>Select:</span>
-            <a href="#" @click.prevent="selectAllOptions(true)">All</a>,
-            <a href="#" @click.prevent="selectAllOptions(false)">None</a>,
-            <a href="#" @click.prevent="resetOptions()">Reset</a>
-          </div>
-        </div>
-      </div>
-      <div class="footer">
-        <p class="quiet">
-          The original HTML Minifier was made by <a href="http://perfectionkills.com/">kangax</a>,
-          using a tweaked version of HTML parser by <a href="https://johnresig.com/">John Resig</a>,
-          which was based on work by <a href="https://web.archive.org/web/20200818163733/http://erik.eae.net/">Erik Arvidsson</a>.
-          HTML Minifier Next is maintained by <a href="https://meiert.com/">Jens Oliver Meiert</a>.
-          Source and bug tracker are <a href="https://github.com/j9t/html-minifier-next">hosted on GitHub</a>.
-        </p>
-      </div>
-    </div>
-    <script src="./main.js" type="module"></script>
-    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
-  </body>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="initial-scale=1,width=device-width">
+		<title>HTML Minifier Next</title>
+		<link rel="stylesheet" href="./main.css">
+	</head>
+	<body>
+		<h1 class="header">HTML Minifier <span id="minifier-version"></span></h1>
+		<div class="main" x-data="minifier" x-cloak>
+			<div class="workspace">
+				<textarea rows="10" cols="40" class="input-content" x-model="input"></textarea>
+				<div class="mr-1"><button type="button" @click="minify()">Minify</button></div>
+				<textarea rows="10" cols="40" class="output-content" readonly x-model="output"></textarea>
+				<p x-text="stats.text" :class="stats.result"></p>
+			</div>
+			<div class="options">
+				<form class="mr-1">
+					<template x-for="option in options">
+						<div>
+							<template x-if="option.type === 'checkbox'">
+								<div class="form-group">
+									<input type="checkbox" :id="option.id" x-model="option.checked" :disabled="option.disabled === true">
+									<label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
+									<template x-if="option.helpText">
+										<span class="quiet short" x-html="option.helpText"></span>
+									</template>
+								</div>
+							</template>
+							<template x-if="option.type === 'text'">
+								<div class="form-group">
+									<label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
+									<input type="text" :id="option.id" x-model="option.value">
+									<template x-if="option.helpText">
+										<span class="quiet short" x-html="option.helpText"></span>
+									</template>
+								</div>
+							</template>
+							<template x-if="option.type === 'number'">
+								<div class="form-group">
+									<label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
+									<input type="number" :id="option.id" x-model="option.value">
+									<template x-if="option.helpText">
+										<span class="quiet short" x-html="option.helpText"></span>
+									</template>
+								</div>
+							</template>
+						</div>
+					</template>
+				</form>
+				<div>
+					<span>Select:</span>
+					<a href="#" @click.prevent="selectAllOptions(true)">All</a>,
+					<a href="#" @click.prevent="selectAllOptions(false)">None</a>,
+					<a href="#" @click.prevent="resetOptions()">Reset</a>
+				</div>
+			</div>
+		</div>
+		<footer>
+			<p class="quiet">
+				The original HTML Minifier was made by <a href="https://perfectionkills.com/">Juriy “kangax” Zaytsev</a>,
+				using a tweaked version of HTML parser by <a href="https://johnresig.com/">John Resig</a>,
+				which was based on work by <a href="https://web.archive.org/web/20200818163733/http://erik.eae.net/">Erik Arvidsson</a>.
+				HTML Minifier Next is maintained by <a href="https://meiert.com/">Jens Oliver Meiert</a>.
+				Source and bug tracker are <a href="https://github.com/j9t/html-minifier-next">hosted on GitHub</a>.
+			</p>
+		</footer>
+		<script src="./main.js" type="module"></script>
+		<script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
+	</body>
 </html>

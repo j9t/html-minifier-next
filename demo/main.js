@@ -287,7 +287,7 @@ const minifierData = () => ({
 
   selectAllOptions(yes = true) {
     this.options = this.options.map((option) => {
-      if (option.type !== 'checkbox') {
+      if (option.type !== 'checkbox' || option.disabled) {
         return option;
       }
 
