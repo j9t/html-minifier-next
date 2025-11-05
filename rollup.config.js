@@ -6,16 +6,18 @@ import nodePolyfills from 'rollup-plugin-polyfill-node';
 
 // Suppress known harmless warnings from dependencies
 const onwarn = (warning, warn) => {
-  // Ignore terser comment parsing warnings
+  // Ignore Terser comment parsing warnings
   if (warning.message && warning.message.includes('#__PURE__ comments')) {
     return;
   }
-  // Ignore circular dependency warnings from node polyfills and terser internals
+
+  // Ignore circular dependency warnings from Node polyfills and Terser internals
   if (warning.code === 'CIRCULAR_DEPENDENCY' &&
       (warning.message.includes('polyfill-node') ||
        warning.message.includes('node_modules/terser'))) {
     return;
   }
+
   // Show all other warnings
   warn(warning);
 };
