@@ -3,7 +3,10 @@ import { defineConfig } from 'vite';
 const config = defineConfig({
   root: 'demo',
   build: {
-    outDir: 'build'
+    outDir: 'build',
+    rollupOptions: {
+      external: ['lightningcss']
+    }
   },
   server: {
     port: 3456
@@ -11,6 +14,9 @@ const config = defineConfig({
   define: {
     'process.env': {},
     'process.platform': JSON.stringify(process.platform)
+  },
+  optimizeDeps: {
+    exclude: ['lightningcss']
   }
 });
 
