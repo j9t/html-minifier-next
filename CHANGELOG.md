@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-- Refreshed demo code and design 
+- Refreshed demo code and design
 
 ### Fixed
 
