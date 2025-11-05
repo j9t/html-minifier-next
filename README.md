@@ -201,25 +201,25 @@ How does HTML Minifier Next compare to other solutions, like [minimize](https://
 
 | Site | Original Size (KB) | HTML Minifier Next | minimize | html­compressor.com | htmlnano | minify-html |
 | --- | --- | --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 62 | **53** | 58 | 56 | 54 | 55 |
+| [A List Apart](https://alistapart.com/) | 62 | **52** | 58 | 56 | 54 | 55 |
 | [Amazon](https://www.amazon.com/) | 206 | **195** | 203 | 200 | 196 | n/a |
-| [Apple](https://www.apple.com/) | 183 | **143** | 169 | 167 | 160 | 166 |
-| [BBC](https://www.bbc.co.uk/) | 689 | **633** | 683 | n/a | 646 | 648 |
-| [CSS-Tricks](https://css-tricks.com/) | 163 | **121** | 149 | 146 | 127 | 145 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7233 | **6338** | 6610 | n/a | 6557 | 6563 |
-| [EFF](https://www.eff.org/) | 57 | **48** | 52 | 52 | 51 | 50 |
-| [FAZ](https://www.faz.net/aktuell/) | 1871 | 1747 | 1785 | n/a | **1647** | n/a |
-| [Frontend Dogma](https://frontenddogma.com/) | 119 | **114** | 128 | 119 | 126 | 119 |
+| [Apple](https://www.apple.com/) | 153 | **116** | 140 | 140 | 133 | 138 |
+| [BBC](https://www.bbc.co.uk/) | 590 | **534** | 585 | n/a | 553 | 555 |
+| [CSS-Tricks](https://css-tricks.com/) | 165 | **124** | 151 | 147 | 129 | 146 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6342** | 6614 | n/a | 6561 | 6567 |
+| [EFF](https://www.eff.org/) | 57 | **48** | 52 | 51 | 51 | 49 |
+| [FAZ](https://www.faz.net/aktuell/) | 1847 | 1722 | 1762 | n/a | **1628** | n/a |
+| [Frontend Dogma](https://frontenddogma.com/) | 219 | **211** | 237 | 218 | 232 | 218 |
 | [Google](https://www.google.com/) | 18 | **16** | 18 | 18 | 17 | n/a |
-| [Ground News](https://ground.news/) | 3308 | **2946** | 3295 | n/a | 3042 | n/a |
+| [Ground News](https://ground.news/) | 1709 | **1463** | 1696 | n/a | 1567 | n/a |
 | [HTML](https://html.spec.whatwg.org/multipage/) | 149 | **147** | 155 | 148 | 153 | 149 |
-| [Leanpub](https://leanpub.com/) | 1279 | **1063** | 1274 | n/a | 1070 | n/a |
+| [Leanpub](https://leanpub.com/) | 1424 | **1190** | 1418 | n/a | 1197 | n/a |
 | [Mastodon](https://mastodon.social/explore) | 35 | **26** | 34 | 34 | 30 | 33 |
-| [MDN](https://developer.mozilla.org/en-US/) | 107 | **61** | 67 | 67 | 63 | n/a |
-| [Middle East Eye](https://www.middleeasteye.net/) | 224 | **197** | 204 | 205 | 204 | 202 |
-| [SitePoint](https://www.sitepoint.com/) | 485 | **354** | 481 | n/a | 423 | 465 |
-| [United Nations](https://www.un.org/en/) | 151 | **114** | 130 | 123 | 121 | 124 |
-| [W3C](https://www.w3.org/) | 50 | **36** | 41 | 39 | 38 | 39 |
+| [MDN](https://developer.mozilla.org/en-US/) | 107 | **62** | 67 | 68 | 64 | n/a |
+| [Middle East Eye](https://www.middleeasteye.net/) | 224 | **197** | 203 | 204 | 204 | 201 |
+| [SitePoint](https://www.sitepoint.com/) | 536 | **405** | 532 | n/a | 474 | 516 |
+| [United Nations](https://www.un.org/en/) | 151 | **113** | 130 | 123 | 121 | 125 |
+| [W3C](https://www.w3.org/) | 50 | **36** | 41 | 39 | 39 | 39 |
 
 ## Examples
 
