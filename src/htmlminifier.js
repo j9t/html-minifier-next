@@ -1453,21 +1453,8 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
 }
 
 /**
- * @typedef {Object} MinifierOptions
- * @prop {boolean} [caseSensitive=false] Treat attributes in case-sensitive manner (useful for custom HTML tags)
- * @prop {boolean} [html5]
- * @prop {boolean | import("lightningcss").TransformOptions<import("lightningcss").CustomAtRules>} [minifyCSS]
- *
- * @prop {boolean | import("terser").MinifyOptions} [minifyJS]
- *   Minify JavaScript in script elements and event attributes
- *   (uses [Terser](https://github.com/terser/terser))
- *
- * @prop {boolean | import("relateurl").Options} [minifyURLs]
- */
-
-/**
  * @param {string} value
- * @param {MinifierOptions} options
+ * @param {MinifierOptions} [options]
  * @returns {Promise<string>}
  */
 export const minify = async function (value, options) {
@@ -1479,3 +1466,334 @@ export const minify = async function (value, options) {
 };
 
 export default { minify };
+
+/**
+ * @typedef {Object} HTMLAttribute
+ *  Representation of an attribute from the HTML parser.
+ *
+ * @prop {string} name
+ * @prop {string} [value]
+ * @prop {string} [quote]
+ * @prop {string} [customAssign]
+ * @prop {string} [customOpen]
+ * @prop {string} [customClose]
+ */
+
+/**
+ * @typedef {Object} MinifierOptions
+ *  Options that control how HTML is minified. All of these are optional
+ *  and usually default to a disabled/safe value unless noted.
+ *
+ * @prop {(tag: string, attrs: HTMLAttribute[], canCollapseWhitespace: (tag: string) => boolean) => boolean} [canCollapseWhitespace]
+ *  Predicate that determines whether whitespace inside a given element
+ *  can be collapsed.
+ *
+ *  Default: Built-in `canCollapseWhitespace` function
+ *
+ * @prop {(tag: string | null, attrs: HTMLAttribute[] | undefined, canTrimWhitespace: (tag: string) => boolean) => boolean} [canTrimWhitespace]
+ *  Predicate that determines whether leading/trailing whitespace around
+ *  the element may be trimmed.
+ *
+ *  Default: Built-in `canTrimWhitespace` function
+ *
+ * @prop {boolean} [caseSensitive]
+ *  When true, tag and attribute names are treated as case-sensitive.
+ *  Useful for custom HTML tags.
+ *  If false (default) names are lower-cased via the `name` function.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [collapseBooleanAttributes]
+ *  Collapse boolean attributes to their name only (for example
+ *  `disabled="disabled"` -> `disabled`).
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [collapseInlineTagWhitespace]
+ *  When false (default) whitespace around `inline` tags is preserved in
+ *  more cases. When true, whitespace around inline tags may be collapsed.
+ *  Must also enable `collapseWhitespace` to have effect.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [collapseWhitespace]
+ *  Collapse multiple whitespace characters into one where allowed. Also
+ *  controls trimming behaviour in several code paths.
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [conservativeCollapse]
+ *  If true, be conservative when collapsing whitespace (preserve more
+ *  whitespace in edge cases). Affects collapse algorithms.
+ *  Must also enable `collapseWhitespace` to have effect.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [continueOnParseError]
+ *  When true, the parser will attempt to continue on recoverable parse
+ *  errors. Otherwise parsing errors may throw.
+ *
+ *  Default: `false`
+ *
+ * @prop {RegExp[]} [customAttrAssign]
+ *  Array of regexes used to recognise custom attribute assignment
+ *  operators (e.g. `'<div flex?="{{mode != cover}}"></div>'`).
+ *  These are concatenated with the built-in assignment patterns.
+ *
+ *  Default: `[]`
+ *
+ * @prop {RegExp} [customAttrCollapse]
+ *  Regex matching attribute names whose values should be collapsed.
+ *  Basically used to remove newlines and excess spaces inside attribute values,
+ *  e.g. `/ng-class/`.
+ *
+ * @prop {[RegExp, RegExp][]} [customAttrSurround]
+ *  Array of `[openRegExp, closeRegExp]` pairs used by the parser to
+ *  detect custom attribute surround patterns (for non-standard syntaxes,
+ *  e.g. `<input {{#if value}}checked="checked"{{/if}}>`).
+ *
+ * @prop {RegExp[]} [customEventAttributes]
+ *  Array of regexes used to detect event handler attributes for `minifyJS`
+ *  (e.g. `ng-click`). The default matches standard `on...` event attributes.
+ *
+ *  Default: `[/^on[a-z]{3,}$/]`
+ *
+ * @prop {number} [customFragmentQuantifierLimit]
+ *  Limits the quantifier used when building a safe regexp for custom
+ *  fragments to avoid ReDoS. See source use for details.
+ *
+ *  Default: `200`
+ *
+ * @prop {boolean} [decodeEntities]
+ *  When true, decodes HTML entities in text and attributes before
+ *  processing, and re-encodes ambiguous ampersands when outputting.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [html5]
+ *  Parse and emit using HTML5 rules. Set to `false` to use non-HTML5
+ *  parsing behavior.
+ *
+ *  Default: `true`
+ *
+ * @prop {RegExp[]} [ignoreCustomComments]
+ *  Comments matching any pattern in this array of regexes will be
+ *  preserved when `removeComments` is enabled. The default preserves
+ *  “bang” comments and comments starting with `#`.
+ *
+ *  Default: `[/^!/, /^\s*#/]`
+ *
+ * @prop {RegExp[]} [ignoreCustomFragments]
+ *  Array of regexes used to identify fragments that should be
+ *  preserved (for example server templates). These fragments are temporarily
+ *  replaced during minification to avoid corrupting template code.
+ *  The default preserves ASP/PHP-style tags.
+ *
+ *  Default: `[/<%[\s\S]*?%>/, /<\?[\s\S]*?\?>/]`
+ *
+ * @prop {boolean} [includeAutoGeneratedTags]
+ *  If false, tags marked as auto-generated by the parser will be omitted
+ *  from output. Useful to skip injected tags.
+ *
+ *  Default: `true`
+ *
+ * @prop {ArrayLike<string>} [inlineCustomElements]
+ *  Collection of custom element tag names that should be treated as inline
+ *  elements for white-space handling, alongside the built-in inline elements.
+ *
+ *  Default: `[]`
+ *
+ * @prop {boolean} [keepClosingSlash]
+ *  Preserve the trailing slash in self-closing tags when present.
+ *
+ *  Default: `false`
+ *
+ * @prop {(message: unknown) => void} [log]
+ *  Logging function used by the minifier for warnings/errors/info.
+ *  You can directly provide `console.log`, but `message` may also be an `Error`
+ *  object or other non-string value.
+ *
+ *  Default: `() => {}` (no-op function)
+ *
+ * @prop {number} [maxInputLength]
+ *  The maximum allowed input length. Used as a guard against ReDoS via
+ *  pathological inputs. If the input exceeds this length an error is
+ *  thrown.
+ *
+ *  Default: No limit
+ *
+ * @prop {number} [maxLineLength]
+ *  Maximum line length for the output. When set the minifier will wrap
+ *  output to the given number of characters where possible.
+ *
+ *  Default: No limit
+ *
+ * @prop {boolean | import("lightningcss").TransformOptions<import("lightningcss").CustomAtRules> | ((text: string, type?: string) => Promise<string> | string)} [minifyCSS]
+ *  When truthy, enables CSS minification for inline `<style>` tags or
+ *  `style` attributes. If an object is provided, it is passed to
+ *  [Lightning CSS](https://www.npmjs.com/package/lightningcss)
+ *  as transform options. If a function is provided, it will be used to perform
+ *  custom CSS minification. If disabled, CSS is not minified.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean | import("terser").MinifyOptions | ((text: string, inline?: boolean) => Promise<string> | string)} [minifyJS]
+ *  When truthy, enables JS minification for `<script>` contents and
+ *  event handler attributes. If an object is provided, it is passed to
+ *  [terser](https://www.npmjs.com/package/terser) as minify options.
+ *  If a function is provided, it will be used to perform
+ *  custom JS minification. If disabled, JS is not minified.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean | string | import("relateurl").Options | ((text: string) => Promise<string> | string)} [minifyURLs]
+ *  When truthy, enables URL rewriting/minification. If an object is provided,
+ *  it is passed to [relateurl](https://www.npmjs.com/package/relateurl)
+ *  as options. If a string is provided, it is treated as an `{ site: string }`
+ *  options object. If a function is provided, it will be used to perform
+ *  custom URL minification. If disabled, URLs are not minified.
+ *
+ *  Default: `false`
+ *
+ * @prop {(name: string) => string} [name]
+ *  Function used to normalise tag/attribute names. By default this lowercases
+ *  names, unless `caseSensitive` is truthy.
+ *
+ *  Default: `(name) => name.toLowerCase()`,
+ *  or `(name) => name` (no-op function) if `caseSensitive` is truthy.
+ *
+ * @prop {boolean} [noNewlinesBeforeTagClose]
+ *  When wrapping lines, prevent inserting a newline directly before a
+ *  closing tag (useful to keep tags like `</a>` on the same line).
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [preserveLineBreaks]
+ *  Preserve a single line break at the start/end of text nodes when
+ *  collapsing/trimming whitespace.
+ *  Must also enable `collapseWhitespace` to have effect.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [preventAttributesEscaping]
+ *  When true, attribute values will not be HTML-escaped (dangerous for
+ *  untrusted input). By default attributes are escaped.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [processConditionalComments]
+ *  When true, conditional comments (for example `<!--[if IE]> ... <![endif]-->`)
+ *  will have their inner content processed by the minifier.
+ *  Useful to minify HTML that appears inside conditional comments.
+ *
+ *  Default: `false`
+ *
+ * @prop {string[]} [processScripts]
+ *  Array of `type` attribute values for `<script>` elements whose contents
+ *  should be processed as HTML
+ *  (e.g. `text/ng-template`, `text/x-handlebars-template`, etc.).
+ *  When present, the contents of matching script tags are recursively minified,
+ *  like normal HTML content.
+ *
+ *  Default: `[]`
+ *
+ * @prop {"\"" | "'"} [quoteCharacter]
+ *  Preferred quote character for attribute values. If unspecified the
+ *  minifier picks the safest quote based on the attribute value.
+ *
+ *  Default: Auto-detected
+ *
+ * @prop {boolean} [removeAttributeQuotes]
+ *  Remove quotes around attribute values where it is safe to do so.
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_attribute_quotes
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [removeComments]
+ *  Remove HTML comments. Comments that match `ignoreCustomComments` will
+ *  still be preserved.
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_comments
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean | ((attrName: string, tag: string) => boolean)} [removeEmptyAttributes]
+ *  If true, removes attributes whose values are empty (some attributes
+ *  are excluded by name). Can also be a function to customise which empty
+ *  attributes are removed.
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_or_blank_attributes
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [removeEmptyElements]
+ *  Remove elements that are empty and safe to remove (for example
+ *  `<script />` without `src`).
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_elements
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [removeOptionalTags]
+ *  Drop optional start/end tags where the HTML specification permits it
+ *  (for example `</li>`, optional `<html>` etc.).
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [removeRedundantAttributes]
+ *  Remove attributes that are redundant because they match the element's
+ *  default values (for example `<button type="submit">`).
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_redundant_attributes
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [removeScriptTypeAttributes]
+ *  Remove `type` attributes from `<script>` when they are unnecessary
+ *  (e.g. `type="text/javascript").
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [removeStyleLinkTypeAttributes]
+ *  Remove `type` attributes from `<style>` and `<link>` elements when
+ *  they are unnecessary (e.g. `type="text/css").
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [removeTagWhitespace]
+ *  **Note that this will currently result in invalid HTML!**
+ *
+ *  When true, extra whitespace between tag name and attributes (or before
+ *  the closing bracket) will be removed where possible. Affects output spacing
+ *  such as the space used in the short doctype representation.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean | ((tag: string, attrs: HTMLAttribute[]) => void)} [sortAttributes]
+ *  When truthy, enable sorting of attributes. If a function is provided it
+ *  will be used as a custom attribute sorter, which should mutate `attrs`
+ *  in-place to the desired order. If disabled, the minifier will attempt to
+ *  preserve the order from the input.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean | ((value: string) => string)} [sortClassName]
+ *  When truthy, enable sorting of class names inside `class` attributes.
+ *  If a function is provided it will be used to transform/sort the class
+ *  name string. If disabled, the minifier will attempt to preserve the
+ *  class-name order from the input.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [trimCustomFragments]
+ *  When true, whitespace around ignored custom fragments may be trimmed
+ *  more aggressively. This affects how preserved fragments interact with
+ *  surrounding whitespace collapse.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [useShortDoctype]
+ *  Replace the HTML doctype with the short `<!doctype html>` form.
+ *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype
+ *
+ *  Default: `false`
+ */
