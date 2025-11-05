@@ -1452,6 +1452,24 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
   return options.collapseWhitespace ? collapseWhitespace(str, options, true, true) : str;
 }
 
+/**
+ * @typedef {Object} MinifierOptions
+ * @prop {boolean} [caseSensitive=false] Treat attributes in case-sensitive manner (useful for custom HTML tags)
+ * @prop {boolean} [html5]
+ * @prop {boolean | import("lightningcss").TransformOptions<import("lightningcss").CustomAtRules>} [minifyCSS]
+ *
+ * @prop {boolean | import("terser").MinifyOptions} [minifyJS]
+ *   Minify JavaScript in script elements and event attributes
+ *   (uses [Terser](https://github.com/terser/terser))
+ *
+ * @prop {boolean | import("relateurl").Options} [minifyURLs]
+ */
+
+/**
+ * @param {string} value
+ * @param {MinifierOptions} options
+ * @returns {Promise<string>}
+ */
 export const minify = async function (value, options) {
   const start = Date.now();
   options = processOptions(options || {});
