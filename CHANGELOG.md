@@ -12,8 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Internal
 
-- Fixed browser demo build by disabling CSS minification option (Lightning CSS requires Node.js native bindings and cannot run in-browser)
 - Simplified build configuration to ESM bundle (for demo) and CommonJS (for npm package)
+- Fixed browser demo build by disabling CSS minification option (Lightning CSS requires Node.js native bindings and cannot run in-browser)
 
 ## [4.0.0] - 2025-11-05
 
