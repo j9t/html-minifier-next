@@ -39,8 +39,12 @@ const config = defineConfig([
       file: 'dist/htmlminifier.umd.bundle.js',
       format: 'umd',
       exports: 'named',
-      name: 'HTMLMinifier'
+      name: 'HTMLMinifier',
+      globals: {
+        lightningcss: 'lightningcss'
+      }
     }],
+    external: ['lightningcss'],
     plugins: bundlePlugins,
     onwarn
   },
@@ -50,8 +54,12 @@ const config = defineConfig([
       file: 'dist/htmlminifier.umd.bundle.min.js',
       format: 'umd',
       exports: 'named',
-      name: 'HTMLMinifier'
+      name: 'HTMLMinifier',
+      globals: {
+        lightningcss: 'lightningcss'
+      }
     }],
+    external: ['lightningcss'],
     plugins: [
       ...bundlePlugins,
       terser()
@@ -64,6 +72,7 @@ const config = defineConfig([
       file: 'dist/htmlminifier.esm.bundle.js',
       format: 'es'
     },
+    external: ['lightningcss'],
     plugins: bundlePlugins,
     onwarn
   },
@@ -74,7 +83,7 @@ const config = defineConfig([
       format: 'cjs',
       exports: 'named'
     },
-    external: ['clean-css', 'terser', 'entities', 'relateurl'],
+    external: ['lightningcss', 'terser', 'entities', 'relateurl'],
     onwarn
   }
 ]);

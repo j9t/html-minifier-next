@@ -129,7 +129,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `keepClosingSlash`<br>`--keep-closing-slash` | Keep the trailing slash on void elements | `false` |
 | `maxInputLength`<br>`--max-input-length` | Maximum input length to prevent ReDoS attacks (disabled by default) | `undefined` |
 | `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | |
-| `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and `style` attributes (uses [clean-css](https://github.com/jakubpawlowicz/clean-css)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
+| `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and `style` attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://github.com/terser/terser)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes (uses [relateurl](https://github.com/stevenvachon/relateurl)) | `false` (could be `String`, `Object`, `Function(text)`, `async Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element | `false` |
@@ -154,7 +154,46 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 ### Sorting attributes and style classes
 
-Minifier options like `sortAttributes` and `sortClassName` won’t impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for gzip and Brotli used over HTTP.
+Minifier options like `sortAttributes` and `sortClassName` won't impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for gzip and Brotli used over HTTP.
+
+### CSS minification with Lightning CSS
+
+When `minifyCSS` is set to `true`, HTML Minifier Next uses [Lightning CSS](https://lightningcss.dev/) to minify CSS in `<style>` elements and `style` attributes. Lightning CSS provides excellent minification by default.
+
+You can pass Lightning CSS configuration options by providing an object:
+
+```js
+const result = await minify(html, {
+  minifyCSS: {
+    targets: {
+      // Browser targets for vendor prefix handling
+      chrome: 95,
+      firefox: 90,
+      safari: 14
+    },
+    unusedSymbols: ['unused-class', 'old-animation']
+  }
+});
+```
+
+Available Lightning CSS options when passed as an object:
+
+* `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`)
+* `unusedSymbols`: Array of class names, IDs, keyframe names, and CSS variables to remove
+* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors (disabled in Lightning CSS, but enabled by default in HMN)
+* `sourceMap`: Boolean to generate source maps
+
+For advanced usage, you can also pass a function:
+
+```js
+const result = await minify(html, {
+  minifyCSS: function(text, type) {
+    // `text`: CSS string to minify
+    // `type`: `inline` for style attributes, `media` for media queries, `undefined` for `<style>` elements
+    return yourCustomMinifier(text);
+  }
+});
+```
 
 ## Minification comparison
 

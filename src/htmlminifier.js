@@ -1,4 +1,4 @@
-import CleanCSS from 'clean-css';
+import { transform as transformCSS } from 'lightningcss';
 import { decodeHTMLStrict, decodeHTML } from 'entities';
 import RelateURL from 'relateurl';
 import { minify as terser } from 'terser';
@@ -390,12 +390,8 @@ function isContentSecurityPolicy(tag, attrs) {
   }
 }
 
-function ignoreCSS(id) {
-  return '/* clean-css ignore:start */' + id + '/* clean-css ignore:end */';
-}
-
-// Wrap CSS declarations for CleanCSS > 3.x
-// See https://github.com/jakubpawlowicz/clean-css/issues/418
+// Wrap CSS declarations for inline styles and media queries
+// This ensures proper context for CSS minification
 function wrapCSS(text, type) {
   switch (type) {
     case 'inline':
@@ -727,7 +723,7 @@ const processOptions = (inputOptions) => {
         return;
       }
 
-      const cleanCssOptions = typeof option === 'object' ? option : {};
+      const lightningCssOptions = typeof option === 'object' ? option : {};
 
       options.minifyCSS = async function (text, type) {
         text = await replaceAsync(
@@ -748,17 +744,38 @@ const processOptions = (inputOptions) => {
 
         const inputCSS = wrapCSS(text, type);
 
-        return new Promise((resolve) => {
-          new CleanCSS(cleanCssOptions).minify(inputCSS, (_err, output) => {
-            if (output.errors.length > 0) {
-              output.errors.forEach(options.log);
-              resolve(text);
-            }
-
-            const outputCSS = unwrapCSS(output.styles, type);
-            resolve(outputCSS);
+        try {
+          const result = transformCSS({
+            filename: 'input.css',
+            code: Buffer.from(inputCSS),
+            minify: true,
+            errorRecovery: true,
+            ...lightningCssOptions
           });
-        });
+
+          const outputCSS = unwrapCSS(result.code.toString(), type);
+
+          // If Lightning CSS removed significant content that looks like template syntax or UIDs, return original
+          // This preserves:
+          // 1. Template code like `<?php ?>`, `<%= %>`, `{{ }}`, etc. (contain `<` or `>` but not `CDATA`)
+          // 2. UIDs representing custom fragments (only lowercase letters and digits, no spaces)
+          // CDATA sections, HTML entities, and other invalid CSS are allowed to be removed
+          const isCDATA = text.includes('<![CDATA[');
+          const uidPattern = /[a-z0-9]{10,}/; // UIDs are long alphanumeric strings
+          const hasUID = uidPattern.test(text) && !isCDATA; // Exclude CDATA from UID detection
+          const looksLikeTemplate = (text.includes('<') || text.includes('>')) && !isCDATA;
+
+          // Preserve if output is empty and input had template syntax or UIDs
+          // This catches cases where Lightning CSS removed content that should be preserved
+          if (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) {
+            return text;
+          }
+
+          return outputCSS;
+        } catch (err) {
+          options.log && options.log(err);
+          return text;
+        }
       };
     } else if (key === 'minifyJS' && typeof option !== 'function') {
       if (!option) {
@@ -996,23 +1013,7 @@ async function minifyHTML(value, options, partialMarkup) {
                 return chunks[1] + uidAttr + index + uidAttr + chunks[2];
               });
 
-              const ids = [];
-              new CleanCSS().minify(wrapCSS(text, type)).warnings.forEach(function (warning) {
-                const match = uidPattern.exec(warning);
-                if (match) {
-                  const id = uidAttr + match[2] + uidAttr;
-                  text = text.replace(id, ignoreCSS(id));
-                  ids.push(id);
-                }
-              });
-
-              return fn(text, type).then(chunk => {
-                ids.forEach(function (id) {
-                  chunk = chunk.replace(ignoreCSS(id), id);
-                });
-
-                return chunk;
-              });
+              return fn(text, type);
             };
           })(options.minifyCSS);
         }

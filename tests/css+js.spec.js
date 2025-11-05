@@ -3,6 +3,120 @@ import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 
 describe('CSS and JS', () => {
+  test('style minification', async () => {
+    let input, output;
+
+    input = '<style></style>div#foo { background-color: red; color: white }';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+
+    input = '<style>div#foo { background-color: red; color: white }</style>';
+    output = '<style>div#foo{color:#fff;background-color:red}</style>'; // Lightning CSS may reorder properties
+    assert.strictEqual(await minify(input), input);
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+
+    input = '<style>div > p.foo + span { border: 10px solid black }</style>';
+    output = '<style>div>p.foo+span{border:10px solid #000}</style>';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+
+    input = '<div style="background: url(images/<% image %>);"></div>';
+    assert.strictEqual(await minify(input), input);
+    output = '<div style="background:url(images/<% image %>)"></div>';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true,
+      minifyCSS: true
+    }), output);
+
+    input = '<div style="background: url(\'images/<% image %>\')"></div>';
+    assert.strictEqual(await minify(input), input);
+    output = '<div style="background:url(images/<% image %>)"></div>'; // Lightning CSS removes unnecessary quotes
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true,
+      minifyCSS: true
+    }), output);
+
+    input = '<style>\np {\n  background: url(images/<% image %>);\n}\n</style>';
+    assert.strictEqual(await minify(input), input);
+    output = '<style>p{background:url(images/<% image %>)}</style>';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true,
+      minifyCSS: true
+    }), output);
+
+    input = '<style>p { background: url("images/<% image %>") }</style>';
+    assert.strictEqual(await minify(input), input);
+    output = '<style>p{background:url(images/<% image %>)}</style>'; // Lightning CSS removes unnecessary quotes
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true,
+      minifyCSS: true
+    }), output);
+
+    input = '<link rel="stylesheet" href="css/style-mobile.css" media="(max-width: 737px)">';
+    assert.strictEqual(await minify(input), input);
+    output = '<link rel="stylesheet" href="css/style-mobile.css" media="(width<=737px)">'; // Lightning CSS uses modern range syntax
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    output = '<link rel=stylesheet href=css/style-mobile.css media="(width<=737px)">'; // Quotes required: contains `<` and `=`
+    assert.strictEqual(await minify(input, {
+      minifyCSS: true,
+      removeAttributeQuotes: true
+    }), output);
+
+    input = '<style media="(max-width: 737px)"></style>';
+    assert.strictEqual(await minify(input), input);
+    output = '<style media="(width<=737px)"></style>'; // Lightning CSS uses modern range syntax
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    output = '<style media="(width<=737px)"></style>'; // Quotes required: contains `<` and `=`
+    assert.strictEqual(await minify(input, {
+      minifyCSS: true,
+      removeAttributeQuotes: true
+    }), output);
+  });
+
+  test('style attribute minification', async () => {
+    const input = '<div style="color: red; background-color: yellow; font-family: Verdana, Arial, sans-serif;"></div>';
+    const output = '<div style="color:red;background-color:#ff0;font-family:Verdana,Arial,sans-serif"></div>';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+  });
+
+  test('CSS minification error handling', async () => {
+    // Test invalid CSS syntax - should attempt to minify or preserve original
+    let input = '<style>body { color: #invalid!!! }</style>';
+    let result = await minify(input, { minifyCSS: true });
+    // Should not crash and should contain style element
+    assert.ok(result.includes('<style>'));
+    assert.ok(result.includes('</style>'));
+
+    // Test completely malformed CSS
+    input = '<style>this is not valid css at all { { { </style>';
+    result = await minify(input, { minifyCSS: true });
+    assert.ok(result.includes('<style>'));
+    assert.ok(result.includes('</style>'));
+
+    // Test CSS with unclosed braces
+    input = '<style>body { color: red;</style>';
+    result = await minify(input, { minifyCSS: true });
+    assert.ok(result.includes('style'));
+
+    // Test empty `style` element
+    input = '<style></style>';
+    result = await minify(input, { minifyCSS: true, removeEmptyElements: false });
+    assert.strictEqual(result, '<style></style>');
+
+    // Test `style` attribute with invalid CSS
+    input = '<div style="color: #invalid!!!">Test</div>';
+    result = await minify(input, { minifyCSS: true });
+    assert.ok(result.includes('div'));
+    assert.ok(result.includes('Test'));
+
+    // Test valid CSS still works
+    input = '<style>  body { color: red; }  </style>';
+    result = await minify(input, { minifyCSS: true });
+    assert.strictEqual(result, '<style>body{color:red}</style>');
+  });
+
   // Tests for minifyCSS configuration options
   test('minifyCSS: basic boolean true', async () => {
     const input = '<style>body { color: red; font-size: 12px; }</style>';
@@ -11,13 +125,13 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('minifyCSS: level 2 optimization', async () => {
+  test('minifyCSS: with custom options', async () => {
     const input = '<style>.class1 { color: red; } .class2 { color: red; }</style>';
     const result = await minify(input, {
-      minifyCSS: { level: 2 }
+      minifyCSS: {}
     });
 
-    // Level 2 optimizations may merge rules or optimize further
+    // Lightning CSS performs optimizations by default when minify is enabled
     assert.ok(result.includes('color:red'), 'Should minify CSS');
     assert.ok(result.length < input.length, 'Output should be shorter');
   });
@@ -33,7 +147,7 @@ describe('CSS and JS', () => {
     const input = '<style>/*! Important license */ body { color: red; }</style>';
     const result = await minify(input, { minifyCSS: true });
 
-    // clean-css preserves /*! comments by default
+    // Lightning CSS preserves “/*!” comments by default
     assert.ok(result.includes('Important license'), 'Important comment should be preserved');
   });
 

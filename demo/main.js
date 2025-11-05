@@ -71,7 +71,7 @@ const defaultOptions = [
     id: 'minifyCSS',
     type: 'checkbox',
     label: 'Minify CSS',
-    helpText: 'Minify CSS in <code>style</code> elements and <code>style</code> attributes (uses clean-css)',
+    helpText: 'Minify CSS in <code>style</code> elements and <code>style</code> attributes (uses Lightning CSS)',
     checked: true
   },
   {

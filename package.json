@@ -6,9 +6,9 @@
   "bugs": "https://github.com/j9t/html-minifier-next/issues",
   "dependencies": {
     "change-case": "^4.1.2",
-    "clean-css": "~5.3.3",
     "commander": "^14.0.2",
     "entities": "^7.0.0",
+    "lightningcss": "^1.28.2",
     "relateurl": "^0.2.7",
     "terser": "^5.44.0"
   },
@@ -78,5 +78,5 @@
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "version": "3.2.2"
+  "version": "4.0.0"
 }
