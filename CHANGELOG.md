@@ -38,8 +38,17 @@ minify(html, {
 // After (Lightning CSS)
 minify(html, {
   minifyCSS: {
-    targets: { ie: 11 }, // Browser targets instead of compatibility string
-    errorRecovery: true  // `false` in Lightning CSS, but enabled by default in HMN
+    targets: { ie: 11, chrome: 95, firefox: 90 } // Browser targets object
+  }
+});
+```
+
+To disable error recovery for strict CSS validation:
+
+```javascript
+minify(html, {
+  minifyCSS: {
+    errorRecovery: false // Disable error recovery (enabled by default in HMN)
   }
 });
 ```
