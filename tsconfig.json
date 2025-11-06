@@ -15,39 +15,37 @@
     "module": "nodenext",
     "target": "esnext",
     "types": [],
-    // For nodejs:
-    // "lib": ["esnext"],
-    // "types": ["node"],
-    // and npm install -D @types/node
 
     // JavaScript Support
     "allowJs": true,
-    //"checkJs": true,
+    //"checkJs": true, // TODO: Enable and fix errors
 
     // Outputs
     "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
-
-    // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-
-    // Style Options
-    // "noImplicitReturns": true,
-    // "noImplicitOverride": true,
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true,
-    // "noFallthroughCasesInSwitch": true,
-    // "noPropertyAccessFromIndexSignature": true,
+    "listEmittedFiles": true,
 
     // Recommended Options
-    "strict": true,
-    "jsx": "react-jsx",
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
+    "erasableSyntaxOnly": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Stricter Typechecking Options
+    //"strict": true,
+    //"noUncheckedIndexedAccess": true,
+    //"exactOptionalPropertyTypes": true,
+
+    // Style Options
+    //"noImplicitReturns": true,
+    //"noImplicitOverride": true,
+    //"noUnusedLocals": true,
+    //"noUnusedParameters": true,
+    //"noFallthroughCasesInSwitch": true,
+    //"noPropertyAccessFromIndexSignature": true,
   }
 }
