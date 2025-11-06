@@ -1533,7 +1533,7 @@ export default { minify };
  *
  * @prop {boolean} [continueOnParseError]
  *  When true, the parser will attempt to continue on recoverable parse
- *  errors. Otherwise parsing errors may throw.
+ *  errors. Otherwise, parsing errors may throw.
  *
  *  Default: `false`
  *
@@ -1561,7 +1561,7 @@ export default { minify };
  *  Default: `[/^on[a-z]{3,}$/]`
  *
  * @prop {number} [customFragmentQuantifierLimit]
- *  Limits the quantifier used when building a safe regexp for custom
+ *  Limits the quantifier used when building a safe regex for custom
  *  fragments to avoid ReDoS. See source use for details.
  *
  *  Default: `200`
@@ -1631,7 +1631,7 @@ export default { minify };
  *  Default: No limit
  *
  * @prop {boolean | import("lightningcss").TransformOptions<import("lightningcss").CustomAtRules> | ((text: string, type?: string) => Promise<string> | string)} [minifyCSS]
- *  When truthy, enables CSS minification for inline `<style>` tags or
+ *  When true, enables CSS minification for inline `<style>` tags or
  *  `style` attributes. If an object is provided, it is passed to
  *  [Lightning CSS](https://www.npmjs.com/package/lightningcss)
  *  as transform options. If a function is provided, it will be used to perform
@@ -1640,7 +1640,7 @@ export default { minify };
  *  Default: `false`
  *
  * @prop {boolean | import("terser").MinifyOptions | ((text: string, inline?: boolean) => Promise<string> | string)} [minifyJS]
- *  When truthy, enables JS minification for `<script>` contents and
+ *  When true, enables JS minification for `<script>` contents and
  *  event handler attributes. If an object is provided, it is passed to
  *  [terser](https://www.npmjs.com/package/terser) as minify options.
  *  If a function is provided, it will be used to perform
@@ -1649,7 +1649,7 @@ export default { minify };
  *  Default: `false`
  *
  * @prop {boolean | string | import("relateurl").Options | ((text: string) => Promise<string> | string)} [minifyURLs]
- *  When truthy, enables URL rewriting/minification. If an object is provided,
+ *  When true, enables URL rewriting/minification. If an object is provided,
  *  it is passed to [relateurl](https://www.npmjs.com/package/relateurl)
  *  as options. If a string is provided, it is treated as an `{ site: string }`
  *  options object. If a function is provided, it will be used to perform
@@ -1658,11 +1658,11 @@ export default { minify };
  *  Default: `false`
  *
  * @prop {(name: string) => string} [name]
- *  Function used to normalise tag/attribute names. By default this lowercases
- *  names, unless `caseSensitive` is truthy.
+ *  Function used to normalise tag/attribute names. By default, this lowercases
+ *  names, unless `caseSensitive` is enabled.
  *
  *  Default: `(name) => name.toLowerCase()`,
- *  or `(name) => name` (no-op function) if `caseSensitive` is truthy.
+ *  or `(name) => name` (no-op function) if `caseSensitive` is enabled.
  *
  * @prop {boolean} [noNewlinesBeforeTagClose]
  *  When wrapping lines, prevent inserting a newline directly before a
@@ -1679,7 +1679,7 @@ export default { minify };
  *
  * @prop {boolean} [preventAttributesEscaping]
  *  When true, attribute values will not be HTML-escaped (dangerous for
- *  untrusted input). By default attributes are escaped.
+ *  untrusted input). By default, attributes are escaped.
  *
  *  Default: `false`
  *
@@ -1749,13 +1749,13 @@ export default { minify };
  *
  * @prop {boolean} [removeScriptTypeAttributes]
  *  Remove `type` attributes from `<script>` when they are unnecessary
- *  (e.g. `type="text/javascript").
+ *  (e.g. `type="text/javascript"`).
  *
  *  Default: `false`
  *
  * @prop {boolean} [removeStyleLinkTypeAttributes]
  *  Remove `type` attributes from `<style>` and `<link>` elements when
- *  they are unnecessary (e.g. `type="text/css").
+ *  they are unnecessary (e.g. `type="text/css"`).
  *
  *  Default: `false`
  *
@@ -1769,7 +1769,7 @@ export default { minify };
  *  Default: `false`
  *
  * @prop {boolean | ((tag: string, attrs: HTMLAttribute[]) => void)} [sortAttributes]
- *  When truthy, enable sorting of attributes. If a function is provided it
+ *  When true, enables sorting of attributes. If a function is provided it
  *  will be used as a custom attribute sorter, which should mutate `attrs`
  *  in-place to the desired order. If disabled, the minifier will attempt to
  *  preserve the order from the input.
@@ -1777,7 +1777,7 @@ export default { minify };
  *  Default: `false`
  *
  * @prop {boolean | ((value: string) => string)} [sortClassName]
- *  When truthy, enable sorting of class names inside `class` attributes.
+ *  When true, enables sorting of class names inside `class` attributes.
  *  If a function is provided it will be used to transform/sort the class
  *  name string. If disabled, the minifier will attempt to preserve the
  *  class-name order from the input.
