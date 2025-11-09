@@ -79,9 +79,10 @@
     "prepack": "npm run build",
     "prepare": "git config core.hooksPath .githooks || true",
     "serve": "npm run build && vite",
-    "test": "node --test tests/*.spec.js",
+    "test": "npm run test:types && node --test tests/*.spec.js",
+    "test:types": "tsc --noEmit tests/types.test.ts",
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "version": "4.0.2"
+  "version": "4.1.0"
 }
