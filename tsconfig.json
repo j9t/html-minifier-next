@@ -1,4 +1,4 @@
-// Visit https://aka.ms/tsconfig to read more about this file
+// https://aka.ms/tsconfig
 
 {
   "$schema": "https://json.schemastore.org/tsconfig",
@@ -6,19 +6,19 @@
     "./src/htmlminifier.js"
   ],
   "compilerOptions": {
-    // File Layout
+    // File layout
     "rootDir": "./src",
     "outDir": "./dist/types",
 
-    // Environment Settings
+    // Environment settings
     // See also https://aka.ms/tsconfig/module
     "module": "nodenext",
     "target": "esnext",
     "types": [],
 
-    // JavaScript Support
+    // JavaScript support
     "allowJs": true,
-    //"checkJs": true, // TODO: Enable and fix errors
+    // "checkJs": true, // @@ Enable and fix errors
 
     // Outputs
     "emitDeclarationOnly": true,
@@ -26,7 +26,7 @@
     "declarationMap": true,
     "listEmittedFiles": true,
 
-    // Recommended Options
+    // Recommended options
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
@@ -35,17 +35,17 @@
     "erasableSyntaxOnly": true,
     "forceConsistentCasingInFileNames": true,
 
-    // Stricter Typechecking Options
-    //"strict": true,
-    //"noUncheckedIndexedAccess": true,
-    //"exactOptionalPropertyTypes": true,
+    // Stricter type-checking options
+    // "strict": true,
+    // "noUncheckedIndexedAccess": true,
+    // "exactOptionalPropertyTypes": true,
 
-    // Style Options
-    //"noImplicitReturns": true,
-    //"noImplicitOverride": true,
-    //"noUnusedLocals": true,
-    //"noUnusedParameters": true,
-    //"noFallthroughCasesInSwitch": true,
-    //"noPropertyAccessFromIndexSignature": true,
+    // Style options
+    // "noImplicitReturns": true,
+    // "noImplicitOverride": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    // "noFallthroughCasesInSwitch": true,
+    // "noPropertyAccessFromIndexSignature": true,
   }
 }
