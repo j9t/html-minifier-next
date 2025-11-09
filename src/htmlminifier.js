@@ -1556,7 +1556,7 @@ export default { minify };
  *
  * @prop {RegExp[]} [customEventAttributes]
  *  Array of regexes used to detect event handler attributes for `minifyJS`
- *  (e.g. `ng-click`). The default matches standard `on...` event attributes.
+ *  (e.g. `ng-click`). The default matches standard `on…` event attributes.
  *
  *  Default: `[/^on[a-z]{3,}$/]`
  *
@@ -1684,7 +1684,7 @@ export default { minify };
  *  Default: `false`
  *
  * @prop {boolean} [processConditionalComments]
- *  When true, conditional comments (for example `<!--[if IE]> ... <![endif]-->`)
+ *  When true, conditional comments (for example `<!--[if IE]> … <![endif]-->`)
  *  will have their inner content processed by the minifier.
  *  Useful to minify HTML that appears inside conditional comments.
  *
