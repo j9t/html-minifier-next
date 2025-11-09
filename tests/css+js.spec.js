@@ -82,7 +82,7 @@ describe('CSS and JS', () => {
   });
 
   test('CSS minification error handling', async () => {
-    // Test invalid CSS syntax - should attempt to minify or preserve original
+    // Test invalid CSS syntax—should attempt to minify or preserve original
     let input = '<style>body { color: #invalid!!! }</style>';
     let result = await minify(input, { minifyCSS: true });
     // Should not crash and should contain style element

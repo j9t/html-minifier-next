@@ -1,0 +1,50 @@
+{
+  // https://aka.ms/tsconfig
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "include": [
+    "./src/htmlminifier.js"
+  ],
+  "compilerOptions": {
+    // File layout
+    "rootDir": "./src",
+    "outDir": "./dist/types",
+
+    // Environment settings
+    // See also https://aka.ms/tsconfig/module
+    "module": "nodenext",
+    "target": "esnext",
+    "types": [],
+
+    // JavaScript support
+    "allowJs": true,
+    // "checkJs": true, // @@ Enable and fix errors
+
+    // Outputs
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": true,
+    "listEmittedFiles": true,
+
+    // Recommended options
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "erasableSyntaxOnly": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Stricter type-checking options
+    // "strict": true,
+    // "noUncheckedIndexedAccess": true,
+    // "exactOptionalPropertyTypes": true,
+
+    // Style options
+    // "noImplicitReturns": true,
+    // "noImplicitOverride": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    // "noFallthroughCasesInSwitch": true,
+    // "noPropertyAccessFromIndexSignature": true,
+  }
+}

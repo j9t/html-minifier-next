@@ -4,6 +4,26 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2025-11-09
+
+### Added
+
+- Added official TypeScript type definitions generated from JSDoc comments, eliminating the need for the community-maintained `@types/html-minifier-next` package
+- Added comprehensive inline documentation for all 50+ minifier options with default values and detailed descriptions
+- Added TypeScript compiler as a build step to generate type definitions alongside the existing Rollup build process
+- Added TypeScript type definition tests to verify type correctness and prevent regressions
+
+### Changed
+
+- Updated build process to clean the `dist` directory before each build via new `prebuild` script
+- Added `@types/relateurl` as a dependency to ensure proper TypeScript type resolution for the `minifyURLs` option
+- Updated test suite to include TypeScript type-checking as part of standard test run
+
+### Internal
+
+- Added TypeScript configuration file (`tsconfig.json`) with modern compiler options for declaration generation
+- Updated package exports to include TypeScript type definitions path
+
 ## [4.0.2] - 2025-11-05
 
 ### Changed
