@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "include": [
+    "./src/**/*",
+    "./tests/**/*.ts"
+  ],
+  "compilerOptions": {
+    // Environment settings
+    "module": "nodenext",
+    "target": "esnext",
+    "types": [],
+
+    // JavaScript support
+    "allowJs": true,
+
+    // Don't emit files, just check types
+    "noEmit": true,
+
+    // Recommended options
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    "erasableSyntaxOnly": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Stricter type-checking options
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true
+  }
+}
