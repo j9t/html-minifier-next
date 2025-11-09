@@ -1,6 +1,5 @@
-// https://aka.ms/tsconfig
-
 {
+  // https://aka.ms/tsconfig
   "$schema": "https://json.schemastore.org/tsconfig",
   "include": [
     "./src/htmlminifier.js"
