@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.1] - 2025-11-11
+
+### Fixed
+
+- Fixed TypeScript type definition for `minifyCSS` option to indicate that all Lightning CSS options are optional (wrapped `TransformOptions` with `Partial<>` to match runtime behavior where defaults are provided)
+
+### Internal
+
+- Updated dependencies to latest versions
+
 ## [4.1.0] - 2025-11-09
 
 ### Added
