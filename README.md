@@ -4,7 +4,7 @@
 
 HTML Minifier Next (HMN) is a highly **configurable, well-tested, JavaScript-based HTML minifier**.
 
-The project has been based on [Terser’s html-minifier-terser](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy Zaytsev’s html-minifier](https://github.com/kangax/html-minifier) (HMN offers additional features, but is compatible with both). It was set up because as of 2025, both html-minifier-terser and html-minifier have been unmaintained for some time. As the project seems maintainable [to me, [Jens](https://meiert.com/)]—even more so with community support—, it’s being updated and documented further in this place.
+The project has been based on [HTML Minifier Terser](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy Zaytsev’s HTML Minifier](https://github.com/kangax/html-minifier) (HMN offers additional features, but is compatible with both). It was set up because as of 2025, both HTML Minifier Terser and HTML Minifier have been unmaintained for some time. As the project seems maintainable [to me, [Jens](https://meiert.com/)]—even more so with community support—, it’s being updated and documented further in this place.
 
 ## Installation
 
