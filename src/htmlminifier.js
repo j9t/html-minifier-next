@@ -1630,7 +1630,7 @@ export default { minify };
  *
  *  Default: No limit
  *
- * @prop {boolean | import("lightningcss").TransformOptions<import("lightningcss").CustomAtRules> | ((text: string, type?: string) => Promise<string> | string)} [minifyCSS]
+ * @prop {boolean | Partial<import("lightningcss").TransformOptions<import("lightningcss").CustomAtRules>> | ((text: string, type?: string) => Promise<string> | string)} [minifyCSS]
  *  When true, enables CSS minification for inline `<style>` tags or
  *  `style` attributes. If an object is provided, it is passed to
  *  [Lightning CSS](https://www.npmjs.com/package/lightningcss)
