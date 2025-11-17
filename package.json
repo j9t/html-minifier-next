@@ -11,7 +11,7 @@
     "entities": "^7.0.0",
     "lightningcss": "^1.28.2",
     "relateurl": "^0.2.7",
-    "terser": "^5.44.0"
+    "terser": "^5.44.1"
   },
   "description": "Highly configurable, well-tested, JavaScript-based HTML minifier",
   "devDependencies": {
