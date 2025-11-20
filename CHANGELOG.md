@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2025-11-20
+
+### Added
+
+- Added shareable URL functionality to demo allowing users to bookmark and share minification configurations and code via URL hash fragments with LZ-String compression (supports ~2 KB of HTML with graceful fallback to options-only sharing for larger content)
+
 ## [4.1.1] - 2025-11-11
 
 ### Fixed
