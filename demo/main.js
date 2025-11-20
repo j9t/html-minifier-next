@@ -404,11 +404,15 @@ const minifierData = () => ({
       window.history.pushState(null, '', result.url);
 
       // Copy to clipboard
-      try {
-        await navigator.clipboard.writeText(result.url);
-        this.share = `✓ URL copied to clipboard (${result.length} characters)`;
-      } catch {
-        this.share = `✓ URL updated (${result.length} characters). Copy from address bar.`;
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        this.share = `✓ URL updated (${result.length} characters). Clipboard not supported—copy from address bar.`;
+      } else {
+        try {
+          await navigator.clipboard.writeText(result.url);
+          this.share = `✓ URL copied to clipboard (${result.length} characters)`;
+        } catch {
+          this.share = `✓ URL updated (${result.length} characters). Copy from address bar.`;
+        }
       }
 
       // Clear message after 5 seconds
@@ -423,11 +427,16 @@ const minifierData = () => ({
       if (optionsOnly.success) {
         window.history.pushState(null, '', optionsOnly.url);
 
-        try {
-          await navigator.clipboard.writeText(optionsOnly.url);
-          this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. URL copied to clipboard.`;
-        } catch {
-          this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. Copy from address bar.`;
+        // Copy to clipboard
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. Clipboard not supported—copy from address bar.`;
+        } else {
+          try {
+            await navigator.clipboard.writeText(optionsOnly.url);
+            this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. URL copied to clipboard.`;
+          } catch {
+            this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. Copy from address bar.`;
+          }
         }
       } else {
         this.share = `✗ Content too large to share via URL (${result.length} characters, max ${MAX_URL_LENGTH})`;
