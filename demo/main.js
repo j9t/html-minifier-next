@@ -439,7 +439,7 @@ const minifierData = () => ({
           }
         }
       } else {
-        this.share = `✗ Content too large to share via URL (${result.length} characters, max ${MAX_URL_LENGTH})`;
+        this.share = `✗ Content too large to share via URL (${optionsOnly.length} characters, max ${MAX_URL_LENGTH})`;
       }
 
       // Clear message after 8 seconds
