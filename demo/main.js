@@ -304,8 +304,9 @@ const decodeState = (hash) => {
     }
 
     return state;
-  } catch (e) {
-    console.error('Failed to decode URL state:', e);
+  } catch {
+    // Silently fail for invalid/corrupted URLs
+    // console.warn('Failed to decode URL state');
     return null;
   }
 };
