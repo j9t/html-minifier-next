@@ -285,8 +285,8 @@ async function processFile(fileName) {
           try {
             await readSizes(info);
             resolve();
-          } catch (error) {
-            reject(new Error(`Failed to read sizes after HTML Minifier processing ${fileName}: ${error.message}`));
+          } catch (err) {
+            reject(new Error(`Failed to read sizes after HTML Minifier processing ${fileName}: ${err.message}`));
           }
         });
 
@@ -313,7 +313,7 @@ async function processFile(fileName) {
             .then(() => writeBuffer(info.filePath, data))
             .then(() => readSizes(info))
             .then(() => resolve())
-            .catch(error => reject(new Error(`Failed after minimize processing ${fileName}: ${error.message}`)));
+            .catch(err => reject(new Error(`Failed after minimize processing ${fileName}: ${err.message}`)));
         });
       });
     }
@@ -383,7 +383,7 @@ async function processFile(fileName) {
                   compressedContent = jsonResponse.result;
                   isSuccess = true;
                 }
-              } catch (e) {
+              } catch (err) {
                 console.warn('Failed to parse JSON response from htmlcompressor.com');
               }
             } else {
@@ -447,8 +447,8 @@ async function processFile(fileName) {
         const result = await htmlnano.process(data, {}, htmlnano.presets.max);
         await writeText(info.filePath, result.html);
         await readSizes(info);
-      } catch (e) {
-        benchmarkErrors.push(`htmlnano failed for ${fileName}: ${e.message}`);
+      } catch (err) {
+        benchmarkErrors.push(`htmlnano failed for ${fileName}: ${err.message}`);
         info.size = 0;
         info.gzSize = 0;
         info.lzSize = 0;
@@ -482,8 +482,8 @@ async function processFile(fileName) {
         });
         await writeBuffer(info.filePath, result);
         await readSizes(info);
-      } catch (e) {
-        benchmarkErrors.push(`minify-html failed for ${fileName}: ${e.message}`);
+      } catch (err) {
+        benchmarkErrors.push(`minify-html failed for ${fileName}: ${err.message}`);
         info.size = 0;
         info.gzSize = 0;
         info.lzSize = 0;

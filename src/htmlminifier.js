@@ -798,8 +798,8 @@ const processOptions = (inputOptions) => {
         try {
           const result = await terser(code, terserOptions);
           return result.code.replace(/;$/, '');
-        } catch (error) {
-          options.log(error);
+        } catch (err) {
+          options.log(err);
           return text;
         }
       };

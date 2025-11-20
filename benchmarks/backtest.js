@@ -66,8 +66,8 @@ async function minify(hash, options) {
       } else {
         throw new Error('unexpected result: ' + minified);
       }
-    } catch (e) {
-      console.error('[' + fileName + ']', e.stack || e);
+    } catch (err) {
+      console.error('[' + fileName + ']', err.stack || err);
     } finally {
       if (!--count) {
         process.disconnect();
@@ -180,8 +180,8 @@ if (process.argv.length > 2) {
             readText(conf).then(data => {
               try {
                 minify(hash, JSON.parse(data));
-              } catch (e) {
-                console.error(`Invalid JSON in ${conf}: ${e.message}`);
+              } catch (err) {
+                console.error(`Invalid JSON in ${conf}: ${err.message}`);
                 process.disconnect();
               }
             }).catch(err => {
