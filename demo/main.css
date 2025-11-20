@@ -94,6 +94,14 @@ code,
 	color: #f33;
 }
 
+.share {
+	background: #e8f4f8;
+	border-left: 3px solid #2196f3;
+	color: #333;
+	margin-top: .5rem;
+	padding: .5rem .75rem;
+}
+
 .mr-1 {
 	margin-bottom: 1rem;
 }

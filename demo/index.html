@@ -11,9 +11,13 @@
 		<div class="main" x-data="minifier" x-cloak>
 			<div class="workspace">
 				<textarea rows="10" cols="40" class="input-content" x-model="input"></textarea>
-				<div class="mr-1"><button type="button" @click="minify()">Minify</button></div>
+				<div class="mr-1">
+					<button type="button" @click="minify()">Minify</button>
+					<button type="button" @click="shareUrl()">Share</button>
+				</div>
 				<textarea rows="10" cols="40" class="output-content" readonly x-model="output"></textarea>
 				<p x-text="stats.text" :class="stats.result"></p>
+				<p x-show="share" x-text="share" class="share"></p>
 			</div>
 			<div class="options">
 				<form class="mr-1">
@@ -66,6 +70,7 @@
 				Source and bug tracker are <a href="https://github.com/j9t/html-minifier-next">hosted on GitHub</a>.
 			</p>
 		</footer>
+		<script src="/lz-string.min.js"></script>
 		<script src="./main.js" type="module"></script>
 		<script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
 	</body>
