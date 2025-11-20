@@ -11,7 +11,7 @@
 		<div class="main" x-data="minifier" x-cloak>
 			<div class="workspace">
 				<textarea rows="10" cols="40" class="input-content" x-model="input"></textarea>
-				<div class="mr-1">
+				<div class="alt">
 					<button type="button" @click="minify()">Minify</button>
 					<button type="button" @click="shareUrl()">Share</button>
 				</div>
@@ -20,7 +20,7 @@
 				<p x-show="share" x-text="share" class="share"></p>
 			</div>
 			<div class="options">
-				<form class="mr-1">
+				<form class="alt">
 					<template x-for="option in options">
 						<div>
 							<template x-if="option.type === 'checkbox'">
