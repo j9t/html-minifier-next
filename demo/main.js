@@ -294,7 +294,7 @@ const decodeState = (hash) => {
     const state = JSON.parse(decompressed);
 
     // Apply option migrations for backward compatibility
-    if (state.o && Object.keys(OPTION_MIGRATIONS).length > 0) {
+    if (state.o) {
       const migratedOptions = {};
       for (const [key, value] of Object.entries(state.o)) {
         const newKey = OPTION_MIGRATIONS[key] || key;
