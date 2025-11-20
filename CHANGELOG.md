@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.1] - 2025-11-20
+
+### Internal
+
+- Standardized error variable naming in catch blocks to consistently use `err` throughout the codebase (main source, CLI, and benchmarks)
+
 ## [4.2.0] - 2025-11-20
 
 ### Added
