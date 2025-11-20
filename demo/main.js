@@ -250,6 +250,85 @@ const getOptions = (options) => {
   return minifierOptions;
 };
 
+// URL State Management
+const MAX_URL_LENGTH = 2000; // Conservative limit for URL hash
+
+// Option migration map for backward compatibility
+// When renaming options, add entries here to preserve old URLs
+// Example: { 'oldOptionName': 'newOptionName' }
+const OPTION_MIGRATIONS = {};
+
+const encodeState = (input, options) => {
+  const state = {
+    i: input || '',
+    o: {}
+  };
+
+  // Only store non-default options
+  options.forEach((option) => {
+    const defaultOption = defaultOptions.find(d => d.id === option.id);
+    if (!defaultOption) return;
+
+    if (option.type === 'checkbox') {
+      if (option.checked !== defaultOption.checked) {
+        state.o[option.id] = option.checked;
+      }
+    } else if (option.type === 'number') {
+      if (option.value !== defaultOption.value) {
+        state.o[option.id] = option.value;
+      }
+    } else if (option.type === 'text') {
+      if (option.value !== defaultOption.value) {
+        state.o[option.id] = option.value;
+      }
+    }
+  });
+
+  return LZString.compressToEncodedURIComponent(JSON.stringify(state));
+};
+
+const decodeState = (hash) => {
+  try {
+    const decompressed = LZString.decompressFromEncodedURIComponent(hash);
+    if (!decompressed) return null;
+    const state = JSON.parse(decompressed);
+
+    // Apply option migrations for backward compatibility
+    if (state.o) {
+      const migratedOptions = {};
+      for (const [key, value] of Object.entries(state.o)) {
+        const newKey = OPTION_MIGRATIONS[key] || key;
+        migratedOptions[newKey] = value;
+      }
+      state.o = migratedOptions;
+    }
+
+    return state;
+  } catch {
+    // Silently fail for invalid/corrupted URLs
+    // console.warn('Failed to decode URL state');
+    return null;
+  }
+};
+
+const loadStateFromUrl = () => {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return null;
+
+  return decodeState(hash);
+};
+
+const updateUrlWithState = (input, options) => {
+  const encoded = encodeState(input, options);
+  const url = `${window.location.origin}${window.location.pathname}#${encoded}`;
+
+  return {
+    url,
+    length: url.length,
+    success: url.length <= MAX_URL_LENGTH
+  };
+};
+
 // Register Alpine data
 const minifierData = () => ({
   options: sillyClone(defaultOptions),
@@ -259,12 +338,37 @@ const minifierData = () => ({
     result: '',
     text: ''
   },
+  share: '',
+  _shareTimeout: null,
+
+  init() {
+    // Load state from URL on page load
+    const state = loadStateFromUrl();
+    if (state) {
+      this.input = state.i || '';
+
+      // Apply saved options
+      if (state.o) {
+        this.options = this.options.map((option) => {
+          if (option.id in state.o) {
+            return {
+              ...option,
+              checked: option.type === 'checkbox' ? state.o[option.id] : option.checked,
+              value: option.type !== 'checkbox' ? state.o[option.id] : option.value
+            };
+          }
+          return option;
+        });
+      }
+    }
+  },
 
   async minify() {
     this.stats = {
       result: '',
       text: ''
     };
+    this.share = '';
 
     const options = getOptions(this.options);
 
@@ -285,6 +389,68 @@ const minifierData = () => ({
     }
   },
 
+  async shareUrl() {
+    // Clear any existing timeout to prevent race conditions
+    if (this._shareTimeout) {
+      clearTimeout(this._shareTimeout);
+      this._shareTimeout = null;
+    }
+
+    this.share = '';
+
+    const result = updateUrlWithState(this.input, this.options);
+
+    if (result.success) {
+      // Update URL in browser
+      window.history.pushState(null, '', result.url);
+
+      // Copy to clipboard
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        this.share = `✓ URL updated (${result.length} characters). Clipboard not supported—copy from address bar.`;
+      } else {
+        try {
+          await navigator.clipboard.writeText(result.url);
+          this.share = `✓ URL copied to clipboard (${result.length} characters)`;
+        } catch {
+          this.share = `✓ URL updated (${result.length} characters). Copy from address bar.`;
+        }
+      }
+
+      // Clear message after 5 seconds
+      this._shareTimeout = setTimeout(() => {
+        this.share = '';
+        this._shareTimeout = null;
+      }, 5000);
+    } else {
+      // Try without input (options only)
+      const optionsOnly = updateUrlWithState('', this.options);
+
+      if (optionsOnly.success) {
+        window.history.pushState(null, '', optionsOnly.url);
+
+        // Copy to clipboard
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+          this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. Clipboard not supported—copy from address bar.`;
+        } else {
+          try {
+            await navigator.clipboard.writeText(optionsOnly.url);
+            this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. URL copied to clipboard.`;
+          } catch {
+            this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. Copy from address bar.`;
+          }
+        }
+      } else {
+        this.share = `✗ Content too large to share via URL (${optionsOnly.length} characters, max ${MAX_URL_LENGTH})`;
+      }
+
+      // Clear message after 8 seconds
+      this._shareTimeout = setTimeout(() => {
+        this.share = '';
+        this._shareTimeout = null;
+      }, 8000);
+    }
+  },
+
   selectAllOptions(yes = true) {
     this.options = this.options.map((option) => {
       if (option.type !== 'checkbox' || option.disabled) {
@@ -302,6 +468,14 @@ const minifierData = () => ({
     this.options = sillyClone(defaultOptions);
     this.output = '';
     this.stats = { result: '', text: '' };
+    this.share = '';
+    // Clear any pending share message timeout
+    if (this._shareTimeout) {
+      clearTimeout(this._shareTimeout);
+      this._shareTimeout = null;
+    }
+    // Clear URL hash
+    window.history.pushState(null, '', window.location.pathname);
   }
 });
 
