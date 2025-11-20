@@ -180,8 +180,8 @@ program.option('-d --dry', 'Dry run: process and report statistics without writi
 function readFile(file) {
   try {
     return fs.readFileSync(file, { encoding: 'utf8' });
-  } catch (e) {
-    fatal('Cannot read ' + file + '\n' + e.message);
+  } catch (err) {
+    fatal('Cannot read ' + file + '\n' + err.message);
   }
 }
 
@@ -196,7 +196,7 @@ async function loadConfigFromPath(configPath) {
   // Try JSON first
   try {
     return JSON.parse(data);
-  } catch (je) {
+  } catch (jsonErr) {
     const abs = path.resolve(configPath);
 
     // Try CJS require
@@ -204,13 +204,13 @@ async function loadConfigFromPath(configPath) {
       const result = require(abs);
       // Handle ESM interop: if `require()` loads an ESM file, it may return `{__esModule: true, default: …}`
       return (result && result.__esModule && result.default) ? result.default : result;
-    } catch (ne) {
+    } catch (cjsErr) {
       // Try ESM import
       try {
         const mod = await import(pathToFileURL(abs).href);
         return mod.default || mod;
-      } catch (ee) {
-        fatal('Cannot read the specified config file.\nAs JSON: ' + je.message + '\nAs CJS: ' + ne.message + '\nAs ESM: ' + ee.message);
+      } catch (esmErr) {
+        fatal('Cannot read the specified config file.\nAs JSON: ' + jsonErr.message + '\nAs CJS: ' + cjsErr.message + '\nAs ESM: ' + esmErr.message);
       }
     }
   }
@@ -307,8 +307,8 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     let minified;
     try {
       minified = await minify(data, createOptions());
-    } catch (e) {
-      fatal('Minification error on ' + inputFile + '\n' + e.message);
+    } catch (err) {
+      fatal('Minification error on ' + inputFile + '\n' + err.message);
     }
 
     const stats = calculateStats(data, minified);
@@ -466,8 +466,8 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
 
     try {
       minified = await minify(content, minifierOptions);
-    } catch (e) {
-      fatal('Minification error:\n' + e.message);
+    } catch (err) {
+      fatal('Minification error:\n' + err.message);
     }
 
     const stats = calculateStats(content, minified);
