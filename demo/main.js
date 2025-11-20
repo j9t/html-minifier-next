@@ -338,6 +338,7 @@ const minifierData = () => ({
     text: ''
   },
   share: '',
+  _shareTimeout: null,
 
   init() {
     // Load state from URL on page load
@@ -388,6 +389,12 @@ const minifierData = () => ({
   },
 
   async shareUrl() {
+    // Clear any existing timeout to prevent race conditions
+    if (this._shareTimeout) {
+      clearTimeout(this._shareTimeout);
+      this._shareTimeout = null;
+    }
+
     this.share = '';
 
     const result = updateUrlWithState(this.input, this.options);
@@ -405,8 +412,9 @@ const minifierData = () => ({
       }
 
       // Clear message after 5 seconds
-      setTimeout(() => {
+      this._shareTimeout = setTimeout(() => {
         this.share = '';
+        this._shareTimeout = null;
       }, 5000);
     } else {
       // Try without input (options only)
@@ -426,8 +434,9 @@ const minifierData = () => ({
       }
 
       // Clear message after 8 seconds
-      setTimeout(() => {
+      this._shareTimeout = setTimeout(() => {
         this.share = '';
+        this._shareTimeout = null;
       }, 8000);
     }
   },
@@ -450,6 +459,11 @@ const minifierData = () => ({
     this.output = '';
     this.stats = { result: '', text: '' };
     this.share = '';
+    // Clear any pending share message timeout
+    if (this._shareTimeout) {
+      clearTimeout(this._shareTimeout);
+      this._shareTimeout = null;
+    }
     // Clear URL hash
     window.history.pushState(null, '', window.location.pathname);
   }

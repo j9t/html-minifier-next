@@ -40,7 +40,8 @@ export default [
       globals: {
         LZString: 'readonly',
         navigator: 'readonly',
-        setTimeout: 'readonly'
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly'
       }
     }
   }
