@@ -349,7 +349,7 @@ const minifierData = () => ({
       // Apply saved options
       if (state.o) {
         this.options = this.options.map((option) => {
-          if (Object.prototype.hasOwnProperty.call(state.o, option.id)) {
+          if (option.id in state.o) {
             return {
               ...option,
               checked: option.type === 'checkbox' ? state.o[option.id] : option.checked,
