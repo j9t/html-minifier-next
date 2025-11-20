@@ -360,6 +360,10 @@ const minifierData = () => ({
           return option;
         });
       }
+
+      if (this.input) {
+        this.minify();
+      }
     }
   },
 
