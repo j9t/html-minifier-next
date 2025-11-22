@@ -13,7 +13,8 @@
   "name": "html-minifier-next-benchmarks",
   "overrides": {
     "ansi-regex": "^5.0.1",
-    "es5-ext": ">=0.10.63"
+    "es5-ext": ">=0.10.63",
+    "js-yaml": ">=4.1.1"
   },
   "overrides_comment": "@@ Remove",
   "private": true,
