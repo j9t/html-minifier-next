@@ -16,7 +16,7 @@
     "es5-ext": ">=0.10.63",
     "js-yaml": ">=4.1.1"
   },
-  "overrides_comment": "@@ Remove",
+  "overrides_comment": "@@ Remove overrides once the respective dependencies have been updated",
   "private": true,
   "scripts": {
     "backtest": "node backtest.js",
