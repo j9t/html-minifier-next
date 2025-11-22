@@ -2528,7 +2528,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
-    // TODO: I think this should be skipped, but it rejects?
+    // ReDoS protection only preserves template syntax if Lightning CSS succeeds
+    // With `continueOnMinifyError: false`, parse errors are thrown before the protection check
     await assert.rejects(
       minify(input, { continueOnMinifyError: false, minifyCSS: true }),
       { message: /Unexpected end of input/ }
@@ -2538,7 +2539,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
-    // TODO: I think this should be skipped, but it rejects?
+    // ReDoS protection only preserves template syntax if Lightning CSS succeeds
+    // With `continueOnMinifyError: false`, parse errors are thrown before the protection check
     await assert.rejects(
       minify(input, { continueOnMinifyError: false, minifyCSS: true }),
       { message: /Unexpected end of input/ }
@@ -2566,7 +2568,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
-    // TODO: I think this should be skipped, but it rejects?
+    // ReDoS protection only preserves template syntax if Lightning CSS succeeds
+    // With `continueOnMinifyError: false`, parse errors are thrown before the protection check
     await assert.rejects(
       minify(input, { continueOnMinifyError: false, minifyCSS: true }),
       { message: /Unexpected token/ }
@@ -2588,7 +2591,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
-    // TODO: I think this should be skipped, but it rejects?
+    // ReDoS protection only preserves template syntax if Lightning CSS succeeds
+    // With `continueOnMinifyError: false`, parse errors are thrown before the protection check
     await assert.rejects(
       minify(input, { continueOnMinifyError: false, minifyCSS: true }),
       { message: /Unexpected end of input/ }
@@ -2598,7 +2602,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
-    // TODO: I think this should be skipped, but it rejects?
+    // ReDoS protection only preserves template syntax if Lightning CSS succeeds
+    // With `continueOnMinifyError: false`, parse errors are thrown before the protection check
     await assert.rejects(
       minify(input, { continueOnMinifyError: false, minifyCSS: true }),
       { message: /Unexpected end of input/ }
@@ -4323,7 +4328,7 @@ describe('HTML', () => {
     assert.strictEqual(result, '<script>console.log("test")</script>');
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
-    // Test event attribute with valid JS (note: quote style may change during minification)
+    // Test event attribute with valid JS (quote style may change during minification)
     input = '<button onclick="  alert( \'test\' )  ">Click</button>';
     result = await minify(input, { minifyJS: true });
     // Minifier may normalize quote styles
