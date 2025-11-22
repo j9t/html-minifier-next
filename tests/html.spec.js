@@ -625,47 +625,76 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
     output = '<script>alert(1)</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script><!--alert(2);--></script>';
     assert.strictEqual(await minify(input), input);
     output = '<script></script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script><!--alert(3);\n--></script>';
     assert.strictEqual(await minify(input), input);
     output = '<script></script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script><!--\nalert(4);--></script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<script><!--alert(5);\nalert(6);\nalert(7);--></script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<script><!--alert(8)</script>';
     assert.strictEqual(await minify(input), input);
     output = '<script></script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script type="text/javascript"> \n <!--\nalert("-->"); -->\n\n   </script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<script type="text/javascript"> \n <!--\nalert("-->");\n -->\n\n   </script>';
     assert.strictEqual(await minify(input), input);
     output = '<script type="text/javascript">alert("--\\x3e")</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script> //   <!--   \n  alert(1)   //  --> </script>';
     assert.strictEqual(await minify(input), input);
     output = '<script>alert(1)</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script type="text/html">\n<div>\n</div>\n<!-- aa -->\n</script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
   });
 
   test('removing comments from styles', async () => {
@@ -722,81 +751,151 @@ describe('HTML', () => {
     input = '<script><![CDATA[\nalert(1)\n]]></script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<script><![CDATA[alert(2)]]></script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<script><![CDATA[alert(3)\n]]></script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<script><![CDATA[\nalert(4)]]></script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<script><![CDATA[alert(5)\nalert(6)\nalert(7)]]></script>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<script>/*<![CDATA[*/alert(8)/*]]>*/</script>';
     assert.strictEqual(await minify(input), input);
     output = '<script>alert(8)</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script>//<![CDATA[\nalert(9)\n//]]></script>';
     assert.strictEqual(await minify(input), input);
     output = '<script>alert(9)</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script type="text/javascript"> /* \n\t  <![CDATA[  */ alert(10) /*  ]]>  */ \n </script>';
     assert.strictEqual(await minify(input), input);
     output = '<script type="text/javascript">alert(10)</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<script>\n\n//<![CDATA[\nalert(11)//]]></script>';
     assert.strictEqual(await minify(input), input);
     output = '<script>alert(11)</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     input = '<style><![CDATA[\np.a{background:red}\n]]></style>';
     assert.strictEqual(await minify(input), input);
     output = '<style></style>';
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style><![CDATA[p.b{background:red}]]></style>';
     assert.strictEqual(await minify(input), input);
     output = '<style></style>';
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style><![CDATA[p.c{background:red}\n]]></style>';
     assert.strictEqual(await minify(input), input);
     output = '<style></style>';
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style><![CDATA[\np.d{background:red}]]></style>';
     assert.strictEqual(await minify(input), input);
     output = '<style></style>';
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style><![CDATA[p.e{background:red}\np.f{background:red}\np.g{background:red}]]></style>';
     assert.strictEqual(await minify(input), input);
     output = '<style></style>'; // Lightning CSS rejects invalid CSS with `CDATA` markers
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style>p.h{background:red}<![CDATA[\np.i{background:red}\n]]>p.j{background:red}</style>';
     assert.strictEqual(await minify(input), input);
     output = '<style>p.h{background:red}</style>'; // Lightning CSS parses valid CSS before invalid CDATA
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Invalid empty selector/ }
+    );
 
     input = '<style>/* <![CDATA[ */p { color: red } // ]]></style>';
     assert.strictEqual(await minify(input), input);
     output = '<style>p{color:red}</style>';
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style type="text/html">\n<div>\n</div>\n<![CDATA[ aa ]]>\n</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
   });
 
   test('custom processors', async () => {
@@ -2398,68 +2497,132 @@ describe('HTML', () => {
     input = '<style><?foo?></style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // Template syntax preserved
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style>\t<?foo?>\t</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // Template syntax preserved
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style><?foo?>{color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
     input = '<style>\t<?foo?>\t{color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
     input = '<style>body{<?foo?>}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    // TODO: I think this should be skipped, but it rejects?
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style>body{\t<?foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    // TODO: I think this should be skipped, but it rejects?
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style><?foo?>body{color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
     input = '<style>\t<?foo?>\tbody{color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
     input = '<style>body{<?foo?>color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
     input = '<style>body{\t<?foo?>\tcolor:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    // TODO: I think this should be skipped, but it rejects?
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected token/ }
+    );
 
     input = '<style>body{color:red<?foo?>}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
     input = '<style>body{color:red\t<?foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
     input = '<style>body{color:red;<?foo?>}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    // TODO: I think this should be skipped, but it rejects?
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style>body{color:red;\t<?foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    // TODO: I think this should be skipped, but it rejects?
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style>body{color:red}<?foo?></style>';
     assert.strictEqual(await minify(input), input);
     output = '<style>body{color:red}</style>'; // Lightning CSS keeps valid CSS, removes custom fragment
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     input = '<style>body{color:red}\t<?foo?>\t</style>';
     assert.strictEqual(await minify(input), input);
     output = '<style>body{color:red}</style>'; // Lightning CSS keeps valid CSS, removes custom fragment
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
   });
 
   test('url attribute minification', async () => {
@@ -2590,6 +2753,10 @@ describe('HTML', () => {
     input = '<a href="https://example.com/good.html">good</a><a href="https://example.com/error.html">bad</a>';
     output = '<a href="good.html">good</a><a href="https://example.com/error.html">bad</a>';
     assert.strictEqual(await minify(input, { minifyURLs: faultyAsyncMinifier }), output);
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyURLs: faultyAsyncMinifier }),
+      { message: 'Minification failed' }
+    );
 
     // Test rejected promise handling
     const rejectingMinifier = (url) => {
@@ -2602,22 +2769,39 @@ describe('HTML', () => {
     input = '<a href="https://example.com/good.html">good</a><a href="https://example.com/reject.html">bad</a>';
     output = '<a href="good.html">good</a><a href="https://example.com/reject.html">bad</a>';
     assert.strictEqual(await minify(input, { minifyURLs: rejectingMinifier }), output);
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyURLs: rejectingMinifier }),
+      { message: 'Rejected' }
+    );
 
     // Test error in `srcset` processing
     input = '<img srcset="https://example.com/good.jpg, https://example.com/error.jpg 2x">';
     output = '<img srcset="good.jpg, https://example.com/error.jpg 2x">';
     assert.strictEqual(await minify(input, { minifyURLs: faultyAsyncMinifier }), output);
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyURLs: faultyAsyncMinifier }),
+      { message: 'Minification failed' }
+    );
 
     // Test error in CSS `url()` processing
     input = '<style>body { background: url("https://example.com/error.png") }</style>';
     output = '<style>body{background:url(https://example.com/error.png)}</style>'; // Lightning CSS removes unnecessary quotes
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyURLs: faultyAsyncMinifier }), output);
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true, minifyURLs: faultyAsyncMinifier }),
+      { message: 'Minification failed' }
+    );
 
     // Test CSS URLs with parentheses in file name (regression test for CSS URL regex bug)
     const urlWithParens = async (url) => url.replace('https://example.com/', '');
     input = '<style>body { background: url("https://example.com/foo(bar).png") }</style>';
     output = '<style>body{background:url(foo\\(bar\\).png)}</style>'; // Lightning CSS escapes parentheses when removing quotes
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyURLs: urlWithParens }), output);
+    await assert.doesNotReject(minify(input, {
+      continueOnMinifyError: false,
+      minifyCSS: true,
+      minifyURLs: urlWithParens
+    }));
   });
 
   test('valueless attributes', async () => {
@@ -3515,6 +3699,29 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { decodeEntities: false, minifyCSS: true }), output);
     output = '<div style=\'font:"monospace"\'>foo$</div>'; // With `decodeEntities`, CSS becomes valid
     assert.strictEqual(await minify(input, { decodeEntities: true, minifyCSS: true }), output);
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, decodeEntities: false }));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, decodeEntities: true }));
+    await assert.rejects(
+      minify(input, {
+        continueOnMinifyError: false,
+        minifyCSS: true
+      }),
+      { message: /Unexpected token/ },
+    );
+    await assert.rejects(
+      minify(input, {
+        continueOnMinifyError: false,
+        decodeEntities: false,
+        minifyCSS: true
+      }),
+      { message: /Unexpected token/ },
+    );
+    await assert.doesNotReject(minify(input, {
+      continueOnMinifyError: false,
+      decodeEntities: true,
+      minifyCSS: true
+    }));
 
     input = '<a href="/?foo=1&amp;bar=&lt;2&gt;">baz&lt;moo&gt;&copy;</a>';
     assert.strictEqual(await minify(input), input);
@@ -3838,6 +4045,15 @@ describe('HTML', () => {
       minifyJS: true,
       collapseWhitespace: true
     }), output);
+    await assert.rejects(
+      minify(input, {
+        continueOnMinifyError: false,
+        minifyCSS: true,
+        minifyJS: true,
+        collapseWhitespace: true
+      }),
+      { message: /Unexpected token/ },
+    );
 
     // Nested iframe `srcdoc` should recurse
     input = '<iframe srcdoc="<iframe srcdoc=\'<p>  Hi  </p>\'></iframe>"></iframe>';
@@ -4061,33 +4277,51 @@ describe('HTML', () => {
     assert.ok(result.includes('</script>'));
     // Invalid JS should be preserved or partially processed
     assert.ok(result.includes('foo'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     // Test completely malformed JavaScript
     input = '<script>{{ this is not valid javascript }} [[</script>';
     result = await minify(input, { minifyJS: true });
     assert.ok(result.includes('<script>'));
     assert.ok(result.includes('</script>'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     // Test JS with unclosed brackets
     input = '<script>function test() { console.log("hi");</script>';
     result = await minify(input, { minifyJS: true });
     assert.ok(result.includes('script'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     // Test empty `script` element
     input = '<script></script>';
     result = await minify(input, { minifyJS: true, removeEmptyElements: false });
     assert.strictEqual(result, '<script></script>');
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     // Test event attribute with invalid JS
     input = '<button onclick="function( { syntax">Click</button>';
     result = await minify(input, { minifyJS: true });
     assert.ok(result.includes('button'));
     assert.ok(result.includes('Click'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
 
     // Test valid JS still works
     input = '<script>  console.log( "test" );  </script>';
     result = await minify(input, { minifyJS: true });
     assert.strictEqual(result, '<script>console.log("test")</script>');
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
     // Test event attribute with valid JS (note: quote style may change during minification)
     input = '<button onclick="  alert( \'test\' )  ">Click</button>';
@@ -4096,6 +4330,7 @@ describe('HTML', () => {
     assert.ok(result.includes('onclick='));
     assert.ok(result.includes('alert'));
     assert.ok(result.includes('test'));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
   });
 
   test('dialog and search elements with optional p tag omission', async () => {

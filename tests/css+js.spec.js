@@ -88,33 +88,54 @@ describe('CSS and JS', () => {
     // Should not crash and should contain style element
     assert.ok(result.includes('<style>'));
     assert.ok(result.includes('</style>'));
+    // Should crash with continueOnMinifyError: false
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected token/ }
+    );
 
     // Test completely malformed CSS
     input = '<style>this is not valid css at all { { { </style>';
     result = await minify(input, { minifyCSS: true });
     assert.ok(result.includes('<style>'));
     assert.ok(result.includes('</style>'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected end of input/ }
+    );
 
     // Test CSS with unclosed braces
     input = '<style>body { color: red;</style>';
     result = await minify(input, { minifyCSS: true });
     assert.ok(result.includes('style'));
+    // Note: Lightning CSS can handle unclosed braces without error, even with `errorRecovery: false`
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
     // Test empty `style` element
     input = '<style></style>';
     result = await minify(input, { minifyCSS: true, removeEmptyElements: false });
     assert.strictEqual(result, '<style></style>');
+    await assert.doesNotReject(minify(input, {
+      continueOnMinifyError: false,
+      minifyCSS: true,
+      removeEmptyElements: false
+    }));
 
     // Test `style` attribute with invalid CSS
     input = '<div style="color: #invalid!!!">Test</div>';
     result = await minify(input, { minifyCSS: true });
     assert.ok(result.includes('div'));
     assert.ok(result.includes('Test'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyCSS: true }),
+      { message: /Unexpected token/ }
+    );
 
     // Test valid CSS still works
     input = '<style>  body { color: red; }  </style>';
     result = await minify(input, { minifyCSS: true });
     assert.strictEqual(result, '<style>body{color:red}</style>');
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
   });
 
   // Tests for minifyCSS configuration options
