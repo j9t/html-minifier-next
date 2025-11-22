@@ -4,6 +4,7 @@
   "collapseInlineTagWhitespace": true,
   "collapseWhitespace": true,
   "conservativeCollapse": false,
+  "continueOnMinifyError": true,
   "continueOnParseError": true,
   "customAttrCollapse": ".*",
   "decodeEntities": true,

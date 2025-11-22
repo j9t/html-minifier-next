@@ -305,6 +305,9 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
       const out = await options.minifyURLs(attrValue);
       return typeof out === 'string' ? out : attrValue;
     } catch (err) {
+      if (!options.continueOnMinifyError) {
+        throw err;
+      }
       options.log && options.log(err);
       return attrValue;
     }
@@ -337,6 +340,9 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
         const out = await options.minifyURLs(url);
         return (typeof out === 'string' ? out : url) + descriptor;
       } catch (err) {
+        if (!options.continueOnMinifyError) {
+          throw err;
+        }
         options.log && options.log(err);
         return url + descriptor;
       }
@@ -691,6 +697,7 @@ const processOptions = (inputOptions) => {
     },
     canCollapseWhitespace,
     canTrimWhitespace,
+    continueOnMinifyError: true,
     html5: true,
     ignoreCustomComments: [
       /^!/,
@@ -736,6 +743,9 @@ const processOptions = (inputOptions) => {
               const out = await options.minifyURLs(url);
               return prefix + quote + (typeof out === 'string' ? out : url) + quote + suffix;
             } catch (err) {
+              if (!options.continueOnMinifyError) {
+                throw err;
+              }
               options.log && options.log(err);
               return match;
             }
@@ -749,7 +759,7 @@ const processOptions = (inputOptions) => {
             filename: 'input.css',
             code: Buffer.from(inputCSS),
             minify: true,
-            errorRecovery: true,
+            errorRecovery: !!options.continueOnMinifyError,
             ...lightningCssOptions
           });
 
@@ -773,6 +783,9 @@ const processOptions = (inputOptions) => {
 
           return outputCSS;
         } catch (err) {
+          if (!options.continueOnMinifyError) {
+            throw err;
+          }
           options.log && options.log(err);
           return text;
         }
@@ -799,7 +812,10 @@ const processOptions = (inputOptions) => {
           const result = await terser(code, terserOptions);
           return result.code.replace(/;$/, '');
         } catch (err) {
-          options.log(err);
+          if (!options.continueOnMinifyError) {
+            throw err;
+          }
+          options.log && options.log(err);
           return text;
         }
       };
@@ -820,7 +836,10 @@ const processOptions = (inputOptions) => {
         try {
           return RelateURL.relate(text, relateUrlOptions);
         } catch (err) {
-          options.log(err);
+          if (!options.continueOnMinifyError) {
+            throw err;
+          }
+          options.log && options.log(err);
           return text;
         }
       };
@@ -1530,6 +1549,13 @@ export default { minify };
  *  Must also enable `collapseWhitespace` to have effect.
  *
  *  Default: `false`
+ *
+ * @prop {boolean} [continueOnMinifyError]
+ *  When set to `false`, minification errors may throw.
+ *  By default, the minifier will attempt to recover from minification
+ *  errors, or ignore them and preserve the original content.
+ *
+ *  Default: `true`
  *
  * @prop {boolean} [continueOnParseError]
  *  When true, the parser will attempt to continue on recoverable parse

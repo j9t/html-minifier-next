@@ -4,6 +4,24 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2025-11-23
+
+### Added
+
+- Added `continueOnMinifyError` option to control error handling during CSS, JavaScript, and URL minification. When set to `false`, minification errors will throw and may abort processing. When set to `true` (the default), the minifier attempts to recover from errors, preserving the original content when minification fails. This provides users with explicit control over error handling and helps ensure invalid syntax is not silently ignored when strict validation is needed.
+- Added CLI flag `--no-continue-on-minify-error` to disable error recovery from the command line
+- Added test coverage including error scenarios across CSS, JavaScript, and URL minification
+
+### Changed
+
+- Enabled dynamic setting of Lightning CSS `errorRecovery` based on the `continueOnMinifyError` option (enabled when `continueOnMinifyError` is `true`, disabled when `false`)
+
+### Documentation
+
+- Added JSDoc documentation for the `continueOnMinifyError` option
+- Updated documentation of the new option and its interaction with Lightning CSS error recovery
+- Updated benchmark configuration to explicitly include the new option
+
 ## [4.2.2] - 2025-11-20
 
 ### Fixed
