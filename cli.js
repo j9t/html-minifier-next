@@ -121,7 +121,7 @@ const mainOptions = {
   collapseInlineTagWhitespace: 'Don’t leave any spaces between “display: inline;” elements when collapsing—use with “collapseWhitespace=true”',
   collapseWhitespace: 'Collapse whitespace that contributes to text nodes in a document tree',
   conservativeCollapse: 'Always collapse to 1 space (never remove it entirely)—use with “collapseWhitespace=true”',
-  continueOnMinifyError: 'Continue on minification errors (use “--no-continue-on-minify-error” to abort on errors)',
+  continueOnMinifyError: 'Continue on minification errors',
   continueOnParseError: 'Handle parse errors instead of aborting',
   customAttrAssign: ['Arrays of regexes that allow to support custom attribute assign expressions (e.g., “<div flex?="{{mode != cover}}"></div>”)', parseJSONRegExpArray],
   customAttrCollapse: ['Regex that specifies custom attribute to strip newlines from (e.g., /ng-class/)', parseRegExp],
