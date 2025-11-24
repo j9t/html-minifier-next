@@ -114,6 +114,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Don’t leave any spaces between `display: inline;` elements when collapsing—use with `collapseWhitespace: true` | `false` |
 | `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier#collapse_whitespace) | `false` |
 | `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to 1 space (never remove it entirely)—use with `collapseWhitespace: true` | `false` |
+| `continueOnMinifyError`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |
 | `continueOnParseError`<br>`--continue-on-parse-error` | [Handle parse errors](https://html.spec.whatwg.org/multipage/parsing.html#parse-errors) instead of aborting | `false` |
 | `customAttrAssign`<br>`--custom-attr-assign` | Arrays of regexes that allow to support custom attribute assign expressions (e.g., `<div flex?="{{mode != cover}}"></div>`) | `[]` |
 | `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | |
@@ -178,10 +179,10 @@ const result = await minify(html, {
 
 Available Lightning CSS options when passed as an object:
 
-* `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`)
-* `unusedSymbols`: Array of class names, IDs, keyframe names, and CSS variables to remove
-* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors (disabled in Lightning CSS, but enabled by default in HMN)
-* `sourceMap`: Boolean to generate source maps
+* `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`).
+* `unusedSymbols`: Array of class names, IDs, keyframe names, and CSS variables to remove.
+* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors. This is disabled by default in Lightning CSS, but enabled in HMN when the `continueOnMinifyError` option is set to `true` (the default). Explicitly setting `errorRecovery` in `minifyCSS` options will override this automatic behavior.
+* `sourceMap`: Boolean to generate source maps.
 
 For advanced usage, you can also pass a function:
 
