@@ -1112,7 +1112,7 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   const parser = new HTMLParser(value, {
-    partialMarkup: partialMarkup || options.partialMarkup,
+    partialMarkup: partialMarkup ?? options.partialMarkup,
     continueOnParseError: options.continueOnParseError,
     customAttrAssign: options.customAttrAssign,
     customAttrSurround: options.customAttrSurround,
