@@ -4458,9 +4458,13 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { partialMarkup: true }), input,
       'partialMarkup should not affect complete documents');
 
-    // Test `partialMarkup` with `removeOptionalTags` (should not remove when partial)
+    // Test that closing a parent tag auto-closes children (even with `partialMarkup`)
     input = '<div><p>Text</div>';
-    assert.strictEqual(await minify(input, { partialMarkup: true, removeOptionalTags: true }), input,
-      'partialMarkup with unclosed tags should not trigger removeOptionalTags');
+    assert.strictEqual(await minify(input, { partialMarkup: true }), '<div><p>Text</p></div>',
+      'closing parent tag auto-closes children, even with partialMarkup');
+
+    // Test `partialMarkup` and `removeOptionalTags` work independently
+    assert.strictEqual(await minify(input, { partialMarkup: true, removeOptionalTags: true }), '<div><p>Text</div>',
+      'partialMarkup and removeOptionalTags work independently (optional </p> is removed)');
   });
 });
