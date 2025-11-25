@@ -23,8 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Documentation
 
 - Added JSDoc documentation for the `partialMarkup` option
-- Added detailed README documentation explaining partial markup use cases
-- Added example code demonstrating partial markup minification
+- Added README documentation explaining partial markup use cases
 
 ## [4.3.1] - 2025-11-25
 
