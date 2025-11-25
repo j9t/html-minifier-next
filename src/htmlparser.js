@@ -443,6 +443,11 @@ export class HTMLParser {
         // Remove the open elements from the stack
         stack.length = pos;
         lastTag = pos && stack[pos - 1].tag;
+      } else if (handler.partialMarkup && tagName) {
+        // In partial markup mode, preserve stray end tags
+        if (handler.end) {
+          handler.end(tagName, [], false);
+        }
       } else if (tagName.toLowerCase() === 'br') {
         if (handler.start) {
           await handler.start(tagName, [], true, '');
