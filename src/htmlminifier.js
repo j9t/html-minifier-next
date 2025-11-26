@@ -1112,7 +1112,7 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   const parser = new HTMLParser(value, {
-    partialMarkup,
+    partialMarkup: partialMarkup ?? options.partialMarkup,
     continueOnParseError: options.continueOnParseError,
     customAttrAssign: options.customAttrAssign,
     customAttrSurround: options.customAttrSurround,
@@ -1693,6 +1693,15 @@ export default { minify };
  * @prop {boolean} [noNewlinesBeforeTagClose]
  *  When wrapping lines, prevent inserting a newline directly before a
  *  closing tag (useful to keep tags like `</a>` on the same line).
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [partialMarkup]
+ *  When true, treat input as a partial HTML fragment rather than a complete
+ *  document. This preserves stray end tags (closing tags without corresponding
+ *  opening tags) and prevents auto-closing of unclosed tags at the end of input.
+ *  Useful for minifying template fragments, SSI includes, or other partial HTML
+ *  that will be combined with other fragments.
  *
  *  Default: `false`
  *

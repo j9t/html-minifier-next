@@ -21,6 +21,7 @@
   "minifyCSS": true,
   "minifyJS": true,
   "noNewlinesBeforeTagClose": true,
+  "partialMarkup": false,
   "preserveLineBreaks": false,
   "preventAttributesEscaping": false,
   "processConditionalComments": true,

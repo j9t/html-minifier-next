@@ -4386,4 +4386,85 @@ describe('HTML', () => {
     input = '<p>Text</p><search>Form</search>';
     assert.strictEqual(await minify(input), input);
   });
+
+  test('partialMarkup option', async () => {
+    let input, output;
+
+    // Test stray end tags are preserved with `partialMarkup`
+    input = '</div></div></div><div class="clearfix"></div>';
+    assert.strictEqual(await minify(input), '<div class="clearfix"></div>',
+      'without partialMarkup, stray end tags should be removed');
+    assert.strictEqual(await minify(input, { partialMarkup: true }), input,
+      'with partialMarkup, stray end tags should be preserved');
+
+    // Test stray end tags with whitespace collapse
+    input = '</div>  </div>  </div>  <div class="clearfix"></div>';
+    output = '</div></div></div><div class="clearfix"></div>';
+    assert.strictEqual(await minify(input, { partialMarkup: true, collapseWhitespace: true }), output,
+      'partialMarkup should work with collapseWhitespace');
+
+    // Test unclosed tags are not auto-closed at end
+    input = '<div><p>Hello';
+    assert.strictEqual(await minify(input), '<div><p>Hello</p></div>',
+      'without partialMarkup, unclosed tags should be auto-closed');
+    assert.strictEqual(await minify(input, { partialMarkup: true }), input,
+      'with partialMarkup, unclosed tags should not be auto-closed');
+
+    // Test mixed stray end tags and normal content
+    input = '</header><main><h1>Title</h1></main>';
+    assert.strictEqual(await minify(input, { partialMarkup: true }), input,
+      'mixed stray end tags and normal content should be preserved');
+
+    // Test multiple stray end tags of different types
+    input = '</div></section></article><footer>Content</footer>';
+    assert.strictEqual(await minify(input, { partialMarkup: true }), input,
+      'multiple different stray end tags should be preserved');
+
+    // Test stray end tags with attributes (attributes should be preserved in output)
+    input = '</div><div id="test">content</div>';
+    assert.strictEqual(await minify(input, { partialMarkup: true }), input,
+      'stray end tags followed by normal tags should be preserved');
+
+    // Test `partialMarkup` with `removeComments`
+    input = '</div><!-- comment --><div>content</div>';
+    output = '</div><div>content</div>';
+    assert.strictEqual(await minify(input, { partialMarkup: true, removeComments: true }), output,
+      'partialMarkup should work with removeComments');
+
+    // Test empty stray end tags
+    input = '</div></span></p>';
+    assert.strictEqual(await minify(input, { partialMarkup: true }), input,
+      'multiple stray end tags should all be preserved');
+
+    // Test SSI include use case (footer fragment)
+    input = '</div></div></div><footer class="site-footer"><p>&copy; 2025</p></footer>';
+    assert.strictEqual(await minify(input, { partialMarkup: true, collapseWhitespace: true }), input,
+      'SSI footer fragment should be preserved');
+
+    // Test template fragment use case (header opening)
+    input = '<header><nav><ul>';
+    assert.strictEqual(await minify(input, { partialMarkup: true }), input,
+      'template fragment with unclosed tags should be preserved');
+
+    // Test `br` and `p` tags (special cases) are preserved in `partialMarkup` mode
+    input = '</br></p>';
+    assert.strictEqual(await minify(input), '<br><p></p>',
+      'without partialMarkup, br and p tags should have special handling');
+    assert.strictEqual(await minify(input, { partialMarkup: true }), '</br></p>',
+      'with partialMarkup, even br and p tags should be preserved as stray end tags');
+
+    // Test `partialMarkup` doesn’t affect normal complete documents
+    input = '<html><body><div>test</div></body></html>';
+    assert.strictEqual(await minify(input, { partialMarkup: true }), input,
+      'partialMarkup should not affect complete documents');
+
+    // Test that closing a parent tag auto-closes children (even with `partialMarkup`)
+    input = '<div><p>Text</div>';
+    assert.strictEqual(await minify(input, { partialMarkup: true }), '<div><p>Text</p></div>',
+      'closing parent tag auto-closes children, even with partialMarkup');
+
+    // Test `partialMarkup` and `removeOptionalTags` work independently
+    assert.strictEqual(await minify(input, { partialMarkup: true, removeOptionalTags: true }), '<div><p>Text</div>',
+      'partialMarkup and removeOptionalTags work independently (optional </p> is removed)');
+  });
 });

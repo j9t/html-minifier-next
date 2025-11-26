@@ -4,6 +4,27 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2025-11-26
+
+### Added
+
+- Added `partialMarkup` option to support minifying partial HTML fragments such as template includes and SSI fragments
+  - Preserves stray end tags (closing tags without corresponding opening tags)
+  - Prevents auto-closing of unclosed tags at the end of input
+  - Useful for minifying HTML fragments that will be combined with other fragments later
+- Added CLI flag `--partial-markup` to enable partial markup mode from command line
+- Added `partialMarkup` option to web demo
+- Added comprehensive test coverage for partial markup functionality
+
+### Changed
+
+- Updated "Working with invalid markup" section in README to reflect new partial markup support with examples
+
+### Documentation
+
+- Added JSDoc documentation for the `partialMarkup` option
+- Added README documentation explaining partial markup use cases
+
 ## [4.3.1] - 2025-11-25
 
 ### Added

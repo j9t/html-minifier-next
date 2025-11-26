@@ -95,6 +95,12 @@ const defaultOptions = [
     helpText: 'Never add a newline before a tag that closes an element'
   },
   {
+    id: 'partialMarkup',
+    type: 'checkbox',
+    label: 'Partial markup',
+    helpText: 'Treat input as a partial HTML fragment, preserving stray end tags and unclosed tags'
+  },
+  {
     id: 'preserveLineBreaks',
     type: 'checkbox',
     label: 'Preserve line-breaks',
