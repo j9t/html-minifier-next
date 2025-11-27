@@ -38,7 +38,7 @@ const defaultOptions = [
   {
     id: 'decodeEntities',
     type: 'checkbox',
-    label: 'Decode Entity Characters',
+    label: 'Decode entity characters',
     helpText: 'Use direct Unicode characters whenever possible',
     checked: true
   },
@@ -91,7 +91,7 @@ const defaultOptions = [
   {
     id: 'noNewlinesBeforeTagClose',
     type: 'checkbox',
-    label: 'No newline before Tag Close',
+    label: 'No newline before tag close',
     helpText: 'Never add a newline before a tag that closes an element'
   },
   {
@@ -103,7 +103,7 @@ const defaultOptions = [
   {
     id: 'preserveLineBreaks',
     type: 'checkbox',
-    label: 'Preserve line-breaks',
+    label: 'Preserve line breaks',
     helpText: `Always collapse to 1 line break (never remove it entirely) when whitespace between tags includes a line break—use with <code>collapseWhitespace=true</code>`
   },
   {
