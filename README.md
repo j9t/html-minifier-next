@@ -33,6 +33,7 @@ Use `html-minifier-next --help` to check all available options:
 | `--file-ext <extensions>` | Specify file extension(s) to process (overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
 | `-o <file>`, `--output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
 | `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
+| `--preset <name>` | Use a preset configuration (conservative, comprehensive) | `--preset=conservative` |
 | `-v`, `--verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `-d`, `--dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
 | `-V`, `--version` | Output the version number | `html-minifier-next --version` |
@@ -70,6 +71,29 @@ html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir
 # CLI arguments override config file settings
 html-minifier-next --config-file=html-minifier.json --file-ext=xml --input-dir=src --output-dir=dist
 ```
+
+### Presets
+
+HTML Minifier Next provides presets for common use cases. Presets are pre-configured option sets that can be used as a starting point:
+
+* `conservative`: Safe minification suitable for most projects. Includes whitespace collapsing, comment removal, and doctype normalization.
+* `comprehensive`: Aggressive minification for maximum file size reduction. Includes all conservative options plus attribute quote removal, optional tag removal, and more.
+
+**Using presets:**
+
+```bash
+# Via CLI flag
+html-minifier-next --preset conservative input.html
+
+# Via config file
+html-minifier-next --config-file=config.json input.html
+# where config.json contains: { "preset": "conservative" }
+
+# Override preset options
+html-minifier-next --preset conservative --remove-empty-attributes input.html
+```
+
+**Priority order:** Presets are applied first, then config file options, then CLI flags. This allows you to start with a preset and customize as needed.
 
 ### Node.js
 
@@ -156,7 +180,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 ### Sorting attributes and style classes
 
-Minifier options like `sortAttributes` and `sortClassName` won't impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for gzip and Brotli used over HTTP.
+Minifier options like `sortAttributes` and `sortClassName` won’t impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for gzip and Brotli used over HTTP.
 
 ### CSS minification with Lightning CSS
 

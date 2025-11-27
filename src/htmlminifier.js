@@ -5,6 +5,7 @@ import { minify as terser } from 'terser';
 import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { replaceAsync } from './utils.js';
+import { presets, getPreset, getPresetNames } from './presets.js';
 
 const trimWhitespace = str => str && str.replace(/^[ \n\r\t\f]+/, '').replace(/[ \n\r\t\f]+$/, '');
 
@@ -1484,7 +1485,9 @@ export const minify = async function (value, options) {
   return result;
 };
 
-export default { minify };
+export { presets, getPreset, getPresetNames };
+
+export default { minify, presets, getPreset, getPresetNames };
 
 /**
  * @typedef {Object} HTMLAttribute

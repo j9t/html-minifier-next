@@ -32,6 +32,7 @@ import { createRequire } from 'module';
 import { camelCase, paramCase } from 'change-case';
 import { Command } from 'commander';
 import { minify } from './src/htmlminifier.js';
+import { getPreset, getPresetNames } from './src/presets.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
@@ -250,9 +251,10 @@ function normalizeConfig(config) {
 
 let config = {};
 program.option('-c --config-file <file>', 'Use config file');
+program.option('--preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('--input-dir <dir>', 'Specify an input directory');
 program.option('--output-dir <dir>', 'Specify an output directory');
-program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated), e.g., “html” or “html,htm,php”');
+program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated), e.g., "html" or "html,htm,php"');
 
 (async () => {
   let content;
@@ -271,19 +273,40 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
   function createOptions() {
     const options = {};
 
-    mainOptionKeys.forEach(function (key) {
-      const param = programOptions[key === 'minifyURLs' ? 'minifyUrls' : camelCase(key)];
+    // Priority order: preset < config < CLI
+    // 1. Apply preset if specified (CLI `--preset` takes priority over config.preset)
+    const presetName = programOptions.preset || config.preset;
+    if (presetName) {
+      const preset = getPreset(presetName);
+      if (!preset) {
+        fatal(`Unknown preset "${presetName}". Available presets: ${getPresetNames().join(', ')}`);
+      }
+      Object.assign(options, preset);
+    }
 
-      if (typeof param !== 'undefined') {
-        options[key] = param;
-      } else if (key in config) {
+    // 2. Apply config file options (overrides preset)
+    mainOptionKeys.forEach(function (key) {
+      if (key in config) {
         options[key] = config[key];
       }
     });
+
+    // 3. Apply CLI options (overrides config and preset)
+    mainOptionKeys.forEach(function (key) {
+      const param = programOptions[key === 'minifyURLs' ? 'minifyUrls' : camelCase(key)];
+      if (typeof param !== 'undefined') {
+        options[key] = param;
+      }
+    });
+
     return options;
   }
 
   function getActiveOptionsDisplay(minifierOptions) {
+    const presetName = programOptions.preset || config.preset;
+    if (presetName) {
+      console.error(`Using preset: ${presetName}`);
+    }
     const activeOptions = Object.entries(minifierOptions)
       .filter(([k]) => program.getOptionValueSource(k === 'minifyURLs' ? 'minifyUrls' : camelCase(k)) === 'cli')
       .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));

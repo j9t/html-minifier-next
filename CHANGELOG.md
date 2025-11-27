@@ -4,10 +4,24 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.4.1] - 2025-11-27
+## [4.5.0] - 2025-11-27
+
+### Added
+
+- Added preset system with two curated configurations:
+  - `conservative`: Safe minification suitable for most projects (12 options including whitespace collapsing, comment removal, and doctype normalization)
+  - `comprehensive`: More aggressive minification for greater file size reduction (22 options including all conservative options plus attribute quote removal, optional tag removal, class sorting, and more)
+- Added `--preset <name>` CLI flag to use presets from command line
+- Added `preset` configuration file option to use presets from config files
+- Added “conservative” and “comprehensive” preset links to web demo UI
+- Added priority system: presets are applied first, then config file options, then CLI flags (allowing preset customization)
+- Exported `getPreset()`, `getPresetNames()`, and `presets` from main module for programmatic access
 
 ### Documentation
 
+- Added “Presets” section to README with usage examples and priority explanation
+- Added `--preset` option to CLI options table in README
+- Updated CLI help text to include preset option
 - Fixed case in web version (demo)
 
 ## [4.4.0] - 2025-11-26
@@ -24,7 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-- Updated "Working with invalid markup" section in README to reflect new partial markup support with examples
+- Updated “Working with invalid markup” section in README to reflect new partial markup support with examples
 
 ### Documentation
 
