@@ -1019,4 +1019,115 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp-out/link.html'), false);
     await removeFixture('tmp-out');
   });
+
+  test('should use conservative preset', () => {
+    const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p>  Hello  </p>  </body></html>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--preset', 'conservative', '--verbose'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    // Conservative preset should apply its options
+    assert.strictEqual(status, 0);
+    assert.ok(stderr.toString().includes('Using preset: conservative'));
+    // Should remove comments, collapse whitespace, use short doctype
+    const output = stdout.toString();
+    assert.ok(!output.includes('<!-- comment -->'));
+    assert.ok(!output.includes('  '));
+  });
+
+  test('should use comprehensive preset', () => {
+    const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p class="z a">  Hello  </p>  </body></html>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--preset', 'comprehensive', '--verbose'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    // Comprehensive preset should apply aggressive options
+    assert.strictEqual(status, 0);
+    assert.ok(stderr.toString().includes('Using preset: comprehensive'));
+    // Should remove comments, collapse whitespace, sort classes
+    const output = stdout.toString();
+    assert.ok(!output.includes('<!-- comment -->'));
+    assert.ok(!output.includes('  '));
+  });
+
+  test('should override preset options with CLI flags', () => {
+    const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p class="">test</p>';
+    // Conservative preset has useShortDoctype, and we add removeEmptyAttributes via CLI
+    const { stdout, status } = spawnSync('node', [cliPath, '--preset', 'conservative', '--remove-empty-attributes'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    // Both preset and CLI options should be applied
+    assert.strictEqual(status, 0);
+    const output = stdout.toString();
+    // useShortDoctype from preset
+    assert.ok(output.includes('<!doctype html>'));
+    // removeEmptyAttributes from CLI (empty class should be removed)
+    assert.ok(!output.includes('class=""'));
+  });
+
+  test('should fail with unknown preset', () => {
+    assert.throws(
+      () => execCli(['--preset', 'unknown', 'default.html']),
+      /Unknown preset "unknown"/
+    );
+  });
+
+  test('should use preset from config file', async () => {
+    const configPath = path.resolve(fixturesDir, 'tmp-preset-config.json');
+    await fs.promises.writeFile(configPath, JSON.stringify({ preset: 'conservative' }));
+
+    const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p>  Hello  </p>  </body></html>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--verbose'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    assert.strictEqual(status, 0);
+    assert.ok(stderr.toString().includes('Using preset: conservative'));
+    assert.ok(!stdout.toString().includes('<!-- comment -->'));
+
+    await fs.promises.rm(configPath, { force: true });
+  });
+
+  test('should override config file options with CLI flags when using preset', async () => {
+    const configPath = path.resolve(fixturesDir, 'tmp-preset-config2.json');
+    await fs.promises.writeFile(configPath, JSON.stringify({
+      preset: 'conservative',
+      useShortDoctype: false  // Override preset's useShortDoctype
+    }));
+
+    const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p>test</p>';
+    // Config says useShortDoctype: false, but CLI should override to true
+    const { stdout, status } = spawnSync('node', [cliPath, '-c', configPath, '--use-short-doctype'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    assert.strictEqual(status, 0);
+    // Short doctype should be used due to CLI override
+    assert.ok(stdout.toString().includes('<!doctype html>'));
+
+    await fs.promises.rm(configPath, { force: true });
+  });
+
+  test('should prioritize CLI preset over config preset', async () => {
+    const configPath = path.resolve(fixturesDir, 'tmp-preset-config3.json');
+    await fs.promises.writeFile(configPath, JSON.stringify({ preset: 'conservative' }));
+
+    const input = '<!DOCTYPE html><html><body><p class="z a">Hello</p></body></html>';
+    // CLI preset should override config preset
+    const { stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--preset', 'comprehensive', '--verbose'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    assert.strictEqual(status, 0);
+    assert.ok(stderr.toString().includes('Using preset: comprehensive'));
+
+    await fs.promises.rm(configPath, { force: true });
+  });
 });

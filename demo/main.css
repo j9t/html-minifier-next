@@ -1,5 +1,5 @@
 :not(code) {
-	font-family: system-ui, sans-serif;
+	font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
 html,

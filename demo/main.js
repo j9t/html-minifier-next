@@ -1,4 +1,4 @@
-import HTMLMinifier from '../dist/htmlminifier.esm.bundle.js';
+import HTMLMinifier, { getPreset } from '../dist/htmlminifier.esm.bundle.js';
 import pkg from '../package.json' with { type: 'json' };
 
 const defaultOptions = [
@@ -38,7 +38,7 @@ const defaultOptions = [
   {
     id: 'decodeEntities',
     type: 'checkbox',
-    label: 'Decode Entity Characters',
+    label: 'Decode entity characters',
     helpText: 'Use direct Unicode characters whenever possible',
     checked: true
   },
@@ -91,7 +91,7 @@ const defaultOptions = [
   {
     id: 'noNewlinesBeforeTagClose',
     type: 'checkbox',
-    label: 'No newline before Tag Close',
+    label: 'No newline before tag close',
     helpText: 'Never add a newline before a tag that closes an element'
   },
   {
@@ -103,7 +103,7 @@ const defaultOptions = [
   {
     id: 'preserveLineBreaks',
     type: 'checkbox',
-    label: 'Preserve line-breaks',
+    label: 'Preserve line breaks',
     helpText: `Always collapse to 1 line break (never remove it entirely) when whitespace between tags includes a line break—use with <code>collapseWhitespace=true</code>`
   },
   {
@@ -472,6 +472,51 @@ const minifierData = () => ({
         checked: Boolean(yes)
       };
     });
+  },
+
+  applyPreset(presetName) {
+    const preset = getPreset(presetName);
+    if (!preset) {
+      console.error(`Unknown preset: ${presetName}`);
+      return;
+    }
+
+    // Apply preset to options
+    this.options = this.options.map((option) => {
+      if (option.type === 'checkbox' && option.id in preset) {
+        return {
+          ...option,
+          checked: preset[option.id]
+        };
+      } else if (option.type !== 'checkbox' && option.id in preset) {
+        return {
+          ...option,
+          value: preset[option.id]
+        };
+      }
+      // For options not in preset, reset to default
+      const defaultOption = defaultOptions.find(d => d.id === option.id);
+      if (option.type === 'checkbox') {
+        return {
+          ...option,
+          checked: defaultOption?.checked || false
+        };
+      } else {
+        return {
+          ...option,
+          value: defaultOption?.value || ''
+        };
+      }
+    });
+
+    // Clear output and stats when applying preset
+    this.output = '';
+    this.stats = { result: '', text: '' };
+    this.share = '';
+    if (this._shareTimeout) {
+      clearTimeout(this._shareTimeout);
+      this._shareTimeout = null;
+    }
   },
 
   resetOptions() {
