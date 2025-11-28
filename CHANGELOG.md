@@ -4,6 +4,15 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.5.2] - 2025-11-28
+
+### Internal
+
+- Added test coverage for bare returns with `customEventAttributes` option
+  - Ensures compatibility with future JavaScript minifiers (oxc-minify, @swc/core) that may handle bare return statements differently than Terser
+  - Covers return with function calls, conditional returns, multiple statements with returns, and early return guard patterns
+  - Tests framework-specific event attributes (Angular `ng-click`, Vue `@click`, Alpine.js `x-on:click`) with bare returns
+
 ## [4.5.1] - 2025-11-28
 
 ### Changed
