@@ -3165,6 +3165,46 @@ describe('HTML', () => {
     }), output);
   });
 
+  test('JSON script minification for application/ld+json', async () => {
+    const input = '<script type="application/ld+json">{"foo":  "bar"}\n\n</script>';
+    const output = '<script type="application/ld+json">{"foo":"bar"}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for application/ld+json (invalid/malformed)', async () => {
+    const input = '<script type="application/ld+json">{"foo:  "bar"}\n\n</script>';
+    const output = '<script type="application/ld+json">{"foo:  "bar"}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for importmap', async () => {
+    const input = '<script type="importmap">\n{\n  "imports": {\n    "lodash": "/js/lodash.js",\n    "vue": "https://cdn.jsdelivr.net/npm/vue@3/dist/vue.esm-browser.js"\n  }\n}\n</script>';
+    const output = '<script type="importmap">{"imports":{"lodash":"/js/lodash.js","vue":"https://cdn.jsdelivr.net/npm/vue@3/dist/vue.esm-browser.js"}}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for application/json', async () => {
+    const input = '<script type="application/json">{\n  "data": {\n    "name": "test",\n    "value": 123\n  }\n}</script>';
+    const output = '<script type="application/json">{"data":{"name":"test","value":123}}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for speculationrules', async () => {
+    const input = '<script type="speculationrules">{\n  "prerender": [\n    {\n      "source": "list",\n      "urls": ["/page1", "/page2"]\n    }\n  ]\n}</script>';
+    const output = '<script type="speculationrules">{"prerender":[{"source":"list","urls":["/page1","/page2"]}]}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
   test('ignore', async () => {
     let input, output;
 
