@@ -2484,6 +2484,42 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
   });
 
+  test('bare returns with customEventAttributes', async () => {
+    // Ensures compatibility with future JS minifiers (oxc-minify, @swc/core)
+    // that may handle bare returns differently. Critical requirement: support
+    // for `module:false` or `bare_returns:true` equivalent option.
+    let input, output;
+
+    // Return with function call (common pattern)
+    input = '<a href="#" onclick="return confirm(\'Delete?\');">Delete</a>';
+    output = '<a href="#" onclick=\'return confirm("Delete?")\'>Delete</a>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Conditional bare return (control flow)
+    input = '<button onclick="if (valid) return true; alert(\'Invalid\');">Submit</button>';
+    output = '<button onclick=\'if(valid)return!0;alert("Invalid")\'>Submit</button>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Multiple statements with bare return
+    input = '<a onclick="event.preventDefault(); return false;">Link</a>';
+    output = '<a onclick="return event.preventDefault(),!1">Link</a>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Early return guard pattern
+    input = '<button onclick="if (!valid) return; process();">Process</button>';
+    output = '<button onclick="if(!valid)return;process()">Process</button>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Framework-specific attributes: Angular, Vue, Alpine.js
+    input = '<div ng-click="if (x) return;" @click="return false;" x-on:click="return confirm(\'OK?\')">Button</div>';
+    // Without patterns, only standard attributes minified
+    output = '<div ng-click="if (x) return;" @click="return false;" x-on:click="return confirm(\'OK?\')">Button</div>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+    // With patterns, all framework attributes minified including bare returns
+    output = '<div ng-click="if(x)return" @click="return!1" x-on:click=\'return confirm("OK?")\'>Button</div>';
+    assert.strictEqual(await minify(input, { minifyJS: true, customEventAttributes: [/^ng-/, /^@/, /^x-on:/] }), output);
+  });
+
   test('escaping closing script tag', async () => {
     const input = '<script>window.jQuery || document.write(\'<script src="jquery.js"><\\/script>\')</script>';
     const output = '<script>window.jQuery||document.write(\'<script src="jquery.js"><\\/script>\')</script>';
