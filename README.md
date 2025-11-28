@@ -72,29 +72,6 @@ html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir
 html-minifier-next --config-file=html-minifier.json --file-ext=xml --input-dir=src --output-dir=dist
 ```
 
-### Presets
-
-HTML Minifier Next provides presets for common use cases. Presets are pre-configured option sets that can be used as a starting point:
-
-* `conservative`: Safe minification suitable for most projects. Includes whitespace collapsing, comment removal, and doctype normalization.
-* `comprehensive`: Aggressive minification for maximum file size reduction. Includes all conservative options plus attribute quote removal, optional tag removal, and more.
-
-**Using presets:**
-
-```bash
-# Via CLI flag
-html-minifier-next --preset conservative input.html
-
-# Via config file
-html-minifier-next --config-file=config.json input.html
-# where config.json contains: { "preset": "conservative" }
-
-# Override preset options
-html-minifier-next --preset conservative --remove-empty-attributes input.html
-```
-
-**Priority order:** Presets are applied first, then config file options, then CLI flags. This allows you to start with a preset and customize as needed.
-
 ### Node.js
 
 ESM with Node.js ≥16.14:
@@ -124,6 +101,29 @@ const { minify } = require('html-minifier-next');
 See [the original blog post](https://perfectionkills.com/experimenting-with-html-minifier) for details of [how it works](https://perfectionkills.com/experimenting-with-html-minifier#how_it_works), [description of each option](https://perfectionkills.com/experimenting-with-html-minifier#options), [testing results](https://perfectionkills.com/experimenting-with-html-minifier#field_testing), and [conclusions](https://perfectionkills.com/experimenting-with-html-minifier#cost_and_benefits).
 
 For lint-like capabilities, take a look at [HTMLLint](https://github.com/kangax/html-lint).
+
+## Presets
+
+HTML Minifier Next provides presets for common use cases. Presets are pre-configured option sets that can be used as a starting point:
+
+* `conservative`: Safe minification suitable for most projects. Includes whitespace collapsing, comment removal, and doctype normalization.
+* `comprehensive`: Aggressive minification for maximum file size reduction. Includes all conservative options plus attribute quote removal, optional tag removal, and more.
+
+**Using presets:**
+
+```bash
+# Via CLI flag
+html-minifier-next --preset conservative input.html
+
+# Via config file
+html-minifier-next --config-file=html-minifier.json input.html
+# where html-minifier.json contains: { "preset": "conservative" }
+
+# Override preset options
+html-minifier-next --preset conservative --remove-empty-attributes input.html
+```
+
+**Priority order:** Presets are applied first, then config file options, then CLI flags. This allows you to start with a preset and customize as needed.
 
 ## Options quick reference
 
