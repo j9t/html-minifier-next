@@ -2510,6 +2510,21 @@ describe('HTML', () => {
     output = '<button onclick="if(!valid)return;process()">Process</button>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
 
+    // Complex boolean expression (parser stress test)
+    input = '<a onclick="return someObject.method() && checkCondition();">Link</a>';
+    output = '<a onclick="return someObject.method()&&checkCondition()">Link</a>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Ternary operator (important edge case for expression parsing)
+    input = '<button onclick="return isValid ? true : false;">Check</button>';
+    output = '<button onclick="return!!isValid">Check</button>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Object literal return (edge case, less common but valid)
+    input = '<button onclick="return {success: true};">Data</button>';
+    output = '<button onclick="return{success:!0}">Data</button>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
     // Framework-specific attributes: Angular, Vue, Alpine.js
     input = '<div ng-click="if (x) return;" @click="return false;" x-on:click="return confirm(\'OK?\')">Button</div>';
     // Without patterns, only standard attributes minified
