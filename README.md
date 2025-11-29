@@ -107,7 +107,7 @@ For lint-like capabilities, take a look at [HTMLLint](https://github.com/kangax/
 HTML Minifier Next provides presets for common use cases. Presets are pre-configured option sets that can be used as a starting point:
 
 * `conservative`: Safe minification suitable for most projects. Includes whitespace collapsing, comment removal, and doctype normalization.
-* `comprehensive`: Aggressive minification for maximum file size reduction. Includes all conservative options plus attribute quote removal, optional tag removal, and more.
+* `comprehensive`: Aggressive minification for maximum file size reduction. Includes relevant conservative options plus attribute quote removal, optional tag removal, and more.
 
 **Using presets:**
 
