@@ -432,7 +432,7 @@ function unwrapCSS(text, type) {
  *
  * @param {string} comment - The raw comment text to process.
  * @param {object} options - Minification options; relevant flag: `processConditionalComments`.
- * @returns {string} The conditional comment with its inner HTML minified, or the original comment if not processed.
+ * @returns {Promise<string>} The conditional comment with its inner HTML minified, or the original comment if not processed.
  */
 async function cleanConditionalComment(comment, options) {
   return options.processConditionalComments
@@ -490,7 +490,7 @@ function hasJsonScriptType(attrs) {
  * @param {string} text - The raw contents of the <script> element.
  * @param {MinifierOptions} options - Effective minifier options controlling processing behavior.
  * @param {Array<{name:string,value:string}>} currentAttrs - Attributes of the script element.
- * @returns {string} The processed script content: minified JSON if the type is a JSON MIME type, minified HTML if the type is listed in `options.processScripts`, or the original text otherwise.
+ * @returns {Promise<string>} The processed script content: minified JSON if the type is a JSON MIME type, minified HTML if the type is listed in `options.processScripts`, or the original text otherwise.
  */
 async function processScript(text, options, currentAttrs) {
   for (let i = 0, len = currentAttrs.length; i < len; i++) {
@@ -1019,7 +1019,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
  * @param {string} value - The HTML source to minify.
  * @param {object} options - Configuration controlling minification behavior (whitespace collapsing, tag omission, script/style processing, attribute normalization, sorting, URL/CSS/JS minifiers, etc.).
  * @param {boolean} [partialMarkup] - If true, treat `value` as partial HTML markup (overrides options.partialMarkup when provided).
- * @returns {string} The resulting minified HTML.
+ * @returns {Promise<string>} The resulting minified HTML.
  * @throws {Error} If `options.maxInputLength` is set and `value.length` exceeds that limit.
  */
 async function minifyHTML(value, options, partialMarkup) {
