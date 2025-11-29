@@ -1,6 +1,6 @@
 # Changelog
 
-As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documented in this file, which is (mostly) AI-generated and (always) human-edited. Dependency updates may or may not be called out specifically.
+As of version 2.0.0, all significant changes to HTML Minifier Next (HMN) are documented in this file, which is (mostly) AI-generated and (always) human-edited. Dependency updates, docstring additions, and typo corrections are likely not specifically mentioned.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
