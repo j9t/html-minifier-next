@@ -3174,6 +3174,33 @@ describe('HTML', () => {
     }), output);
   });
 
+  test('processScripts matching semantics (raw value) vs JSON detection (normalized value)', async () => {
+    // processScripts should match against RAW value (case-sensitive, exact match)
+    let input = '<script type="Text/NG-Template"><div> test </div></script>';
+    let result = await minify(input, {
+      collapseWhitespace: true,
+      processScripts: ['Text/NG-Template']  // Must match exact case
+    });
+    assert.ok(result.includes('<div>test</div>'), 'processScripts should match raw case-sensitive value');
+
+    // processScripts should not match if case differs
+    result = await minify(input, {
+      collapseWhitespace: true,
+      processScripts: ['text/ng-template']  // Different case
+    });
+    assert.ok(result.includes('<div> test </div>'), 'processScripts should not match different case');
+
+    // JSON detection should use normalized value (case-insensitive)
+    input = '<script type="Application/LD+JSON">{"foo": "bar"}</script>';
+    result = await minify(input, { collapseWhitespace: true });
+    assert.strictEqual(result, '<script type="Application/LD+JSON">{"foo":"bar"}</script>', 'JSON detection should be case-insensitive');
+
+    // JSON detection should strip parameters
+    input = '<script type="application/json; charset=utf-8">{"foo": "bar"}</script>';
+    result = await minify(input, { collapseWhitespace: true });
+    assert.ok(result.includes('{"foo":"bar"}'), 'JSON detection should strip parameters');
+  });
+
   test('JSON script minification for application/ld+json', async () => {
     const input = '<script type="application/ld+json">{"foo":  "bar"}\n\n</script>';
     const output = '<script type="application/ld+json">{"foo":"bar"}</script>';
