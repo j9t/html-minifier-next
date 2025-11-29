@@ -423,6 +423,17 @@ function unwrapCSS(text, type) {
   return matches ? matches[1] : text;
 }
 
+/**
+ * Minifies the inner HTML of an Internet Explorer conditional comment while preserving its conditional markers.
+ *
+ * If `options.processConditionalComments` is true and the input matches a conditional comment (`[if ...]>...<![endif]`),
+ * the function minifies the content between the opening and closing conditional markers and returns the reconstructed comment.
+ * If processing is disabled or the input does not match the pattern, the original comment is returned unchanged.
+ *
+ * @param {string} comment - The raw comment text to process.
+ * @param {object} options - Minification options; relevant flag: `processConditionalComments`.
+ * @returns {string} The conditional comment with its inner HTML minified, or the original comment if not processed.
+ */
 async function cleanConditionalComment(comment, options) {
   return options.processConditionalComments
     ? await replaceAsync(comment, /^(\[if\s[^\]]+]>)([\s\S]*?)(<!\[endif])$/, async function (match, prefix, text, suffix) {
@@ -440,6 +451,12 @@ const jsonScriptTypes = [
   'speculationrules',
 ];
 
+/**
+ * Minifies JSON text by parsing and re-stringifying it.
+ * @param {string} text - The JSON text to minify.
+ * @param {{log?: (err: any) => void}} options - Optional settings. If provided, `options.log` will be called with the parse error when JSON parsing fails.
+ * @returns {string} The compacted JSON string when parsing succeeds, or the original `text` when parsing fails.
+ */
 function minifyJson(text, options) {
   try {
     return JSON.stringify(JSON.parse(text));
@@ -452,6 +469,12 @@ function minifyJson(text, options) {
   }
 }
 
+/**
+ * Determines whether a script element's attributes indicate a JSON-like script type.
+ *
+ * @param {Array<{name: string, value: string}>} attrs - List of attributes for the element; each object must include `name` and `value`.
+ * @returns {boolean} `true` if an attribute named `type` (case-insensitive) has a value that is one of the recognized JSON script MIME types, `false` otherwise.
+ */
 function hasJsonScriptType(attrs) {
   for (let i = 0, len = attrs.length; i < len; i++) {
     if (attrs[i].name.toLowerCase() === 'type' &&
@@ -462,6 +485,13 @@ function hasJsonScriptType(attrs) {
   return false;
 }
 
+/**
+ * Minifies or processes script tag content based on the script's `type` attribute.
+ * @param {string} text - The raw contents of the <script> element.
+ * @param {MinifierOptions} options - Effective minifier options controlling processing behavior.
+ * @param {Array<{name:string,value:string}>} currentAttrs - Attributes of the script element.
+ * @returns {string} The processed script content: minified JSON if the type is a JSON MIME type, minified HTML if the type is listed in `options.processScripts`, or the original text otherwise.
+ */
 async function processScript(text, options, currentAttrs) {
   for (let i = 0, len = currentAttrs.length; i < len; i++) {
     if (currentAttrs[i].name.toLowerCase() === 'type') {
@@ -983,6 +1013,15 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
   }
 }
 
+/**
+ * Minifies an HTML string according to the provided options.
+ *
+ * @param {string} value - The HTML source to minify.
+ * @param {object} options - Configuration controlling minification behavior (whitespace collapsing, tag omission, script/style processing, attribute normalization, sorting, URL/CSS/JS minifiers, etc.).
+ * @param {boolean} [partialMarkup] - If true, treat `value` as partial HTML markup (overrides options.partialMarkup when provided).
+ * @returns {string} The resulting minified HTML.
+ * @throws {Error} If `options.maxInputLength` is set and `value.length` exceeds that limit.
+ */
 async function minifyHTML(value, options, partialMarkup) {
   // Check input length limitation to prevent ReDoS attacks
   if (options.maxInputLength && value.length > options.maxInputLength) {
