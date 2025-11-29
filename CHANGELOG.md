@@ -11,7 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added automatic minification for JSON script tags
   - Supports `application/json`, `application/ld+json`, `application/manifest+json`, `application/vnd.geo+json`, `importmap`, and `speculationrules` script types
   - JSON is parsed and re-stringified to remove whitespace
-  - Malformed JSON is logged and returned unchanged
+  - When `continueOnMinifyError` is `true` (default), malformed JSON is logged and returned unchanged; when `false`, JSON parse errors throw, consistent with CSS/JS/URL minification
 
 ### Internal
 
