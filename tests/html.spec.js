@@ -1284,6 +1284,15 @@ describe('HTML', () => {
     input = '<script type="text/vbscript">MsgBox("foo bar")</script>';
     output = '<script type="text/vbscript">MsgBox("foo bar")</script>';
     assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+
+    // JSON script types should not be removed (would make them executable JS)
+    input = '<script type="application/ld+json">{"foo":"bar"}</script>';
+    output = '<script type="application/ld+json">{"foo":"bar"}</script>';
+    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+
+    input = '<script type="importmap">{"imports":{}}</script>';
+    output = '<script type="importmap">{"imports":{}}</script>';
+    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
   });
 
   test('removing type="text/css" attributes', async () => {
@@ -3163,6 +3172,174 @@ describe('HTML', () => {
       removeComments: true,
       processScripts: ['text/ng-template']
     }), output);
+  });
+
+  test('processScripts matching semantics (raw value) vs JSON detection (normalized value)', async () => {
+    // processScripts should match against RAW value (case-sensitive, exact match)
+    let input = '<script type="Text/NG-Template"><div> test </div></script>';
+    let result = await minify(input, {
+      collapseWhitespace: true,
+      processScripts: ['Text/NG-Template']  // Must match exact case
+    });
+    assert.ok(result.includes('<div>test</div>'), 'processScripts should match raw case-sensitive value');
+
+    // processScripts should not match if case differs
+    result = await minify(input, {
+      collapseWhitespace: true,
+      processScripts: ['text/ng-template']  // Different case
+    });
+    assert.ok(result.includes('<div> test </div>'), 'processScripts should not match different case');
+
+    // JSON detection should use normalized value (case-insensitive)
+    input = '<script type="Application/LD+JSON">{"foo": "bar"}</script>';
+    result = await minify(input, { collapseWhitespace: true });
+    assert.strictEqual(result, '<script type="Application/LD+JSON">{"foo":"bar"}</script>', 'JSON detection should be case-insensitive');
+
+    // JSON detection should strip parameters
+    input = '<script type="application/json; charset=utf-8">{"foo": "bar"}</script>';
+    result = await minify(input, { collapseWhitespace: true });
+    assert.ok(result.includes('{"foo":"bar"}'), 'JSON detection should strip parameters');
+  });
+
+  test('JSON script minification for application/ld+json', async () => {
+    const input = '<script type="application/ld+json">{"foo":  "bar"}\n\n</script>';
+    const output = '<script type="application/ld+json">{"foo":"bar"}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for application/ld+json (invalid/malformed)', async () => {
+    const input = '<script type="application/ld+json">{"foo:  "bar"}\n\n</script>';
+    const output = '<script type="application/ld+json">{"foo:  "bar"}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for importmap', async () => {
+    const input = '<script type="importmap">\n{\n  "imports": {\n    "lodash": "/js/lodash.js",\n    "vue": "https://cdn.jsdelivr.net/npm/vue@3/dist/vue.esm-browser.js"\n  }\n}\n</script>';
+    const output = '<script type="importmap">{"imports":{"lodash":"/js/lodash.js","vue":"https://cdn.jsdelivr.net/npm/vue@3/dist/vue.esm-browser.js"}}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for application/json', async () => {
+    const input = '<script type="application/json">{\n  "data": {\n    "name": "test",\n    "value": 123\n  }\n}</script>';
+    const output = '<script type="application/json">{"data":{"name":"test","value":123}}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for speculationrules', async () => {
+    const input = '<script type="speculationrules">{\n  "prerender": [\n    {\n      "source": "list",\n      "urls": ["/page1", "/page2"]\n    }\n  ]\n}</script>';
+    const output = '<script type="speculationrules">{"prerender":[{"source":"list","urls":["/page1","/page2"]}]}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for application/manifest+json', async () => {
+    const input = '<script type="application/manifest+json">{\n  "name": "App",\n  "version": "1.0"\n}</script>';
+    const output = '<script type="application/manifest+json">{"name":"App","version":"1.0"}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for application/manifest+json (invalid/malformed)', async () => {
+    const input = '<script type="application/manifest+json">{"name": invalid}\n</script>';
+    const output = '<script type="application/manifest+json">{"name": invalid}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for application/vnd.geo+json', async () => {
+    const input = '<script type="application/vnd.geo+json">{\n  "type": "Point",\n  "coordinates": [100.0, 0.0]\n}</script>';
+    const output = '<script type="application/vnd.geo+json">{"type":"Point","coordinates":[100,0]}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for application/vnd.geo+json (invalid/malformed)', async () => {
+    const input = '<script type="application/vnd.geo+json">{"type": Point}\n</script>';
+    const output = '<script type="application/vnd.geo+json">{"type": Point}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for case-insensitive type attribute', async () => {
+    const input = '<script type="Application/JSON">{\n  "test": "value"\n}</script>';
+    const output = '<script type="Application/JSON">{"test":"value"}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for type attribute with whitespace', async () => {
+    const input = '<script type=" application/json ">{\n  "test": "value"\n}</script>';
+    const output = '<script type="application/json">{"test":"value"}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for type attribute with charset parameter', async () => {
+    const input = '<script type="application/json; charset=utf-8">{\n  "test": "value"\n}</script>';
+    const output = '<script type="application/json;charset=utf-8">{"test":"value"}</script>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true
+    }), output);
+  });
+
+  test('JSON script minification for error handling', async () => {
+    // Malformed JSON should be preserved with default `continueOnMinifyError: true`
+    let input = '<script type="application/ld+json">{"foo:  "bar"}</script>';
+    let result = await minify(input, { collapseWhitespace: true });
+    assert.strictEqual(result, input);
+
+    // Malformed JSON should throw with `continueOnMinifyError: false`
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, collapseWhitespace: true }),
+      SyntaxError
+    );
+
+    // Valid JSON should work fine with `continueOnMinifyError: false`
+    input = '<script type="application/ld+json">{"foo": "bar"}</script>';
+    const output = '<script type="application/ld+json">{"foo":"bar"}</script>';
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, collapseWhitespace: true }));
+    result = await minify(input, { continueOnMinifyError: false, collapseWhitespace: true });
+    assert.strictEqual(result, output);
+  });
+
+  test('JSON script minification with presets', async () => {
+    const { getPreset } = await import('../src/presets.js');
+
+    // Test with conservative preset
+    let input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n    <script type="application/ld+json">\n{\n  "name": "Test",\n  "url": "https://example.com/page"\n}\n    </script>\n  </head>\n</html>';
+    let conservativeResult = await minify(input, getPreset('conservative'));
+    // Conservative preset should: remove comments, collapse whitespace, minify JSON, use short doctype
+    assert.ok(!conservativeResult.includes('<!-- Comment -->'), 'Conservative: should remove comments');
+    assert.ok(conservativeResult.includes('<!doctype html>'), 'Conservative: should use short doctype');
+    assert.ok(conservativeResult.includes('{"name":"Test","url":"https://example.com/page"}'), 'Conservative: should minify JSON');
+    assert.ok(!conservativeResult.includes('\n{\n'), 'Conservative: should collapse whitespace in script content');
+
+    // Test with comprehensive preset
+    input = '<script type="importmap">\n{\n  "imports": {\n    "vue": "https://cdn.example.com/vue.js"\n  }\n}\n</script>';
+    let comprehensiveResult = await minify(input, getPreset('comprehensive'));
+    // Comprehensive preset should: minify JSON, collapse whitespace, remove quotes from attributes where possible
+    assert.ok(comprehensiveResult.includes('{"imports":{"vue":"https://cdn.example.com/vue.js"}}'), 'Comprehensive: should minify JSON');
+    assert.ok(comprehensiveResult.includes('type=importmap'), 'Comprehensive: should remove attribute quotes');
+
+    // Verify JSON minification works even with no options (automatic behavior)
+    input = '<script type="application/json">{\n  "test": "value"\n}</script>';
+    const noOptionsResult = await minify(input, {});
+    assert.strictEqual(noOptionsResult, '<script type="application/json">{"test":"value"}</script>', 'No options: should still minify JSON automatically');
   });
 
   test('ignore', async () => {

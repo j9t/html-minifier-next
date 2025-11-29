@@ -431,11 +431,55 @@ async function cleanConditionalComment(comment, options) {
     : comment;
 }
 
+const jsonScriptTypes = new Set([
+  'application/json',
+  'application/ld+json',
+  'application/manifest+json',
+  'application/vnd.geo+json',
+  'importmap',
+  'speculationrules',
+]);
+
+function minifyJson(text, options) {
+  try {
+    return JSON.stringify(JSON.parse(text));
+  }
+  catch (err) {
+    if (!options.continueOnMinifyError) {
+      throw err;
+    }
+    options.log && options.log(err);
+    return text;
+  }
+}
+
+function hasJsonScriptType(attrs) {
+  for (let i = 0, len = attrs.length; i < len; i++) {
+    const attrName = attrs[i].name.toLowerCase();
+    if (attrName === 'type') {
+      const attrValue = trimWhitespace((attrs[i].value || '').split(/;/, 2)[0]).toLowerCase();
+      if (jsonScriptTypes.has(attrValue)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 async function processScript(text, options, currentAttrs) {
   for (let i = 0, len = currentAttrs.length; i < len; i++) {
-    if (currentAttrs[i].name.toLowerCase() === 'type' &&
-      options.processScripts.indexOf(currentAttrs[i].value) > -1) {
-      return await minifyHTML(text, options);
+    const attrName = currentAttrs[i].name.toLowerCase();
+    if (attrName === 'type') {
+      const rawValue = currentAttrs[i].value;
+      const normalizedValue = trimWhitespace((rawValue || '').split(/;/, 2)[0]).toLowerCase();
+      // Minify JSON script types automatically
+      if (jsonScriptTypes.has(normalizedValue)) {
+        return minifyJson(text, options);
+      }
+      // Process custom script types if specified
+      if (options.processScripts && options.processScripts.indexOf(rawValue) > -1) {
+        return await minifyHTML(text, options);
+      }
     }
   }
   return text;
@@ -1315,7 +1359,7 @@ async function minifyHTML(value, options, partialMarkup) {
           text = collapseWhitespace(text, options, false, false, true);
         }
       }
-      if (options.processScripts && specialContentTags.has(currentTag)) {
+      if (specialContentTags.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs))) {
         text = await processScript(text, options, currentAttrs);
       }
       if (isExecutableScript(currentTag, currentAttrs)) {
