@@ -426,7 +426,7 @@ function unwrapCSS(text, type) {
 /**
  * Minifies the inner HTML of an Internet Explorer conditional comment while preserving its conditional markers.
  *
- * If `options.processConditionalComments` is true and the input matches a conditional comment (`[if ...]>...<![endif]`),
+ * If `options.processConditionalComments` is true and the input matches a conditional comment (`[if …]>…<![endif]`),
  * the function minifies the content between the opening and closing conditional markers and returns the reconstructed comment.
  * If processing is disabled or the input does not match the pattern, the original comment is returned unchanged.
  *
@@ -470,7 +470,7 @@ function minifyJson(text, options) {
 }
 
 /**
- * Determines whether a script element's attributes indicate a JSON-like script type.
+ * Determines whether a script element’s attributes indicate a JSON-like script type.
  *
  * @param {Array<{name: string, value: string}>} attrs - List of attributes for the element; each object must include `name` and `value`.
  * @returns {boolean} `true` if an attribute named `type` (case-insensitive) has a value that is one of the recognized JSON script MIME types, `false` otherwise.
@@ -486,7 +486,7 @@ function hasJsonScriptType(attrs) {
 }
 
 /**
- * Minifies or processes script tag content based on the script's `type` attribute.
+ * Minifies or processes script tag content based on the script’s `type` attribute.
  * @param {string} text - The raw contents of the <script> element.
  * @param {MinifierOptions} options - Effective minifier options controlling processing behavior.
  * @param {Array<{name:string,value:string}>} currentAttrs - Attributes of the script element.
