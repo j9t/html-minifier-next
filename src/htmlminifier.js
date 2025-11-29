@@ -431,14 +431,14 @@ async function cleanConditionalComment(comment, options) {
     : comment;
 }
 
-const jsonScriptTypes = [
+const jsonScriptTypes = new Set([
   'application/json',
   'application/ld+json',
   'application/manifest+json',
   'application/vnd.geo+json',
   'importmap',
   'speculationrules',
-];
+]);
 
 function minifyJson(text, options) {
   try {
@@ -458,7 +458,7 @@ function hasJsonScriptType(attrs) {
     const attrName = attrs[i].name.toLowerCase();
     if (attrName === 'type') {
       const attrValue = trimWhitespace((attrs[i].value || '').split(/;/, 2)[0]).toLowerCase();
-      if (jsonScriptTypes.includes(attrValue)) {
+      if (jsonScriptTypes.has(attrValue)) {
         return true;
       }
     }
@@ -470,13 +470,14 @@ async function processScript(text, options, currentAttrs) {
   for (let i = 0, len = currentAttrs.length; i < len; i++) {
     const attrName = currentAttrs[i].name.toLowerCase();
     if (attrName === 'type') {
-      const attrValue = trimWhitespace((currentAttrs[i].value || '').split(/;/, 2)[0]).toLowerCase();
+      const rawValue = currentAttrs[i].value;
+      const normalizedValue = trimWhitespace((rawValue || '').split(/;/, 2)[0]).toLowerCase();
       // Minify JSON script types automatically
-      if (jsonScriptTypes.includes(attrValue)) {
+      if (jsonScriptTypes.has(normalizedValue)) {
         return minifyJson(text, options);
       }
       // Process custom script types if specified
-      if (options.processScripts && options.processScripts.includes(attrValue)) {
+      if (options.processScripts && options.processScripts.indexOf(rawValue) > -1) {
         return await minifyHTML(text, options);
       }
     }
