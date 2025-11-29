@@ -445,18 +445,22 @@ function minifyJson(text, options) {
     return JSON.stringify(JSON.parse(text));
   }
   catch (err) {
-    if (options.log) {
-      options.log(err);
+    if (!options.continueOnMinifyError) {
+      throw err;
     }
+    options.log && options.log(err);
     return text;
   }
 }
 
 function hasJsonScriptType(attrs) {
   for (let i = 0, len = attrs.length; i < len; i++) {
-    if (attrs[i].name.toLowerCase() === 'type' &&
-        jsonScriptTypes.includes(attrs[i].value)) {
-      return true;
+    const attrName = attrs[i].name.toLowerCase();
+    if (attrName === 'type') {
+      const attrValue = trimWhitespace((attrs[i].value || '').split(/;/, 2)[0]).toLowerCase();
+      if (jsonScriptTypes.includes(attrValue)) {
+        return true;
+      }
     }
   }
   return false;
@@ -464,13 +468,15 @@ function hasJsonScriptType(attrs) {
 
 async function processScript(text, options, currentAttrs) {
   for (let i = 0, len = currentAttrs.length; i < len; i++) {
-    if (currentAttrs[i].name.toLowerCase() === 'type') {
+    const attrName = currentAttrs[i].name.toLowerCase();
+    if (attrName === 'type') {
+      const attrValue = trimWhitespace((currentAttrs[i].value || '').split(/;/, 2)[0]).toLowerCase();
       // Minify JSON script types automatically
-      if (jsonScriptTypes.includes(currentAttrs[i].value)) {
+      if (jsonScriptTypes.includes(attrValue)) {
         return minifyJson(text, options);
       }
       // Process custom script types if specified
-      if (options.processScripts && options.processScripts.includes(currentAttrs[i].value)) {
+      if (options.processScripts && options.processScripts.includes(attrValue)) {
         return await minifyHTML(text, options);
       }
     }
