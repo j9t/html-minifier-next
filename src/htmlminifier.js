@@ -489,7 +489,7 @@ function hasJsonScriptType(attrs) {
  * Minifies or processes script tag content based on the script’s `type` attribute.
  * @param {string} text - The raw contents of the <script> element.
  * @param {MinifierOptions} options - Effective minifier options controlling processing behavior.
- * @param {Array<{name:string,value:string}>} currentAttrs - Attributes of the script element.
+ * @param {Array<{name: string, value: string}>} currentAttrs - Attributes of the script element.
  * @returns {string} The processed script content: minified JSON if the type is a JSON MIME type, minified HTML if the type is listed in `options.processScripts`, or the original text otherwise.
  */
 async function processScript(text, options, currentAttrs) {
