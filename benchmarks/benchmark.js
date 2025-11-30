@@ -710,7 +710,7 @@ let start = data.indexOf('## Minification comparison');
 start = data.indexOf('|', start);
 let end = data.indexOf('##', start);
 
-// Check if there's already a date stamp and remove it
+// Check if there’s already a date stamp and remove it
 const existingDateStamp = data.slice(start, end).match(/\(Last updated:.*?\)\n*/);
 if (existingDateStamp) {
   end = start + data.slice(start, end).lastIndexOf(existingDateStamp[0]) + existingDateStamp[0].length;
