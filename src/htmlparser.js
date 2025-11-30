@@ -116,6 +116,14 @@ export class HTMLParser {
     const stack = []; let lastTag;
     const attribute = attrForHandler(handler);
     let last, prevTag, nextTag;
+
+    // Track position for better error messages
+    let position = 0;
+    const getLineColumn = (pos) => {
+      const lines = this.html.slice(0, pos).split('\n');
+      return { line: lines.length, column: lines[lines.length - 1].length + 1 };
+    };
+
     while (html) {
       last = html;
       // Make sure we’re not in a `script` or `style` element
@@ -233,8 +241,22 @@ export class HTMLParser {
       }
 
       if (html === last) {
-        throw new Error('Parse Error: ' + html);
+        if (handler.continueOnParseError) {
+          // Skip the problematic character and continue
+          if (handler.chars) {
+            await handler.chars(html[0], prevTag, '');
+          }
+          html = html.substring(1);
+          position++;
+          continue;
+        }
+        const loc = getLineColumn(position);
+        const snippet = html.slice(0, 200).replace(/\n/g, ' ');
+        throw new Error(
+          `Parse error at line ${loc.line}, column ${loc.column}:\n${snippet}${html.length > 200 ? '…' : ''}`
+        );
       }
+      position = this.html.length - html.length;
     }
 
     if (!handler.partialMarkup) {
@@ -251,10 +273,48 @@ export class HTMLParser {
         };
         input = input.slice(start[0].length);
         let end, attr;
-        while (!(end = input.match(startTagClose)) && (attr = input.match(attribute))) {
+
+        // Safety limit: max length of input to check for attributes
+        // Protects against catastrophic backtracking on massive attribute values
+        const MAX_ATTR_PARSE_LENGTH = 20000; // 20 KB should be enough for any reasonable tag
+
+        while (true) {
+          // Check for closing tag first
+          end = input.match(startTagClose);
+          if (end) {
+            break;
+          }
+
+          // Limit the input length we pass to the regex to prevent catastrophic backtracking
+          const searchInput = input.length > MAX_ATTR_PARSE_LENGTH
+            ? input.slice(0, MAX_ATTR_PARSE_LENGTH)
+            : input;
+
+          attr = searchInput.match(attribute);
+          if (!attr) {
+            // No more attributes found in the limited range
+            // Check if we hit the limit and there’s more input
+            if (input.length > MAX_ATTR_PARSE_LENGTH) {
+              // Skip to closing tag or give up
+              const closePos = input.indexOf('>');
+              if (closePos !== -1) {
+                input = input.slice(closePos);
+                continue;
+              } else if (handler.continueOnParseError) {
+                // No closing tag found, skip this tag
+                match.rest = input;
+                return match;
+              }
+            }
+            break;
+          }
+
           input = input.slice(attr[0].length);
           match.attrs.push(attr);
         }
+
+        // Check for closing tag
+        end = input.match(startTagClose);
         if (end) {
           match.unarySlash = end[1];
           match.rest = input.slice(end[0].length);
