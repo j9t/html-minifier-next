@@ -18,6 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Limited attribute regex input to 20 KB to prevent catastrophic backtracking
   - Attributes exceeding 20 KB are extracted using manual string parsing (preserving all data)
   - Parser now gracefully handles pathological cases in SSR framework output
+- Fixed `sortAttributes` incorrectly parsing JSON-LD script content as HTML
+  - The `scan()` function (used for attribute sorting analysis) now only recursively processes `text/html` script content
+  - JSON-LD and other non-HTML script types are correctly skipped during the scan phase
+  - Prevents corruption when using `sortAttributes` with `processScripts: ["application/ld+json"]`
 
 ## [4.6.0] - 2025-11-29
 
