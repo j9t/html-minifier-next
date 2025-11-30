@@ -322,6 +322,7 @@ async function processFile(fileName) {
     async function testhtmlnano() {
       const data = await readText(filePath);
       const info = infos.htmlnano;
+      info.startTime = Date.now();
 
       try {
         const result = await htmlnano.process(data, {}, htmlnano.presets.max);
@@ -365,6 +366,7 @@ async function processFile(fileName) {
     async function testMinifyHTML() {
       const data = await readBuffer(filePath);
       const info = infos.minifyhtml;
+      info.startTime = Date.now();
 
       try {
         const result = minifyHTML(data, {
@@ -730,6 +732,7 @@ let end = data.indexOf('##', start);
 // Check if there’s already a date stamp and remove it
 const existingDateStamp = data.slice(start, end).match(/\(Last updated:.*?\)\n*/);
 if (existingDateStamp) {
+  // Move end pointer past the old date stamp so it gets replaced
   end = start + data.slice(start, end).lastIndexOf(existingDateStamp[0]) + existingDateStamp[0].length;
 }
 
