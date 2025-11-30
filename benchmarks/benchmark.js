@@ -235,6 +235,13 @@ async function processFile(fileName) {
       };
     });
 
+    function resetSizes(info) {
+      info.size = 0;
+      info.gzSize = 0;
+      info.lzSize = 0;
+      info.brSize = 0;
+    }
+
     async function readSizes(info) {
       info.endTime = Date.now();
 
@@ -266,21 +273,25 @@ async function processFile(fileName) {
       const configPath = path.join(__dirname, 'html-minifier-benchmarks.json');
       const args = [filePath, '-c', configPath, '--minify-urls', site, '-o', info.filePath];
 
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         const child = fork(path.join(__dirname, '../cli.js'), args);
         let timeoutId;
 
         // Set timeout for CLI process (30 seconds)
         timeoutId = setTimeout(() => {
           child.kill('SIGTERM');
-          reject(new Error(`HTML Minifier CLI timed out after 30 seconds for ${fileName}`));
+          benchmarkErrors.push(`HTML Minifier CLI timed out after 30 seconds for ${fileName}`);
+          resetSizes(info);
+          resolve();
         }, 30000);
 
         child.on('exit', async function (code, signal) {
           clearTimeout(timeoutId);
 
           if (code !== 0) {
-            reject(new Error(`HTML Minifier CLI failed with exit code ${code}${signal ? ` (signal: ${signal})` : ''} for ${fileName}`));
+            benchmarkErrors.push(`HTML Minifier CLI failed with exit code ${code}${signal ? ` (signal: ${signal})` : ''} for ${fileName}`);
+            resetSizes(info);
+            resolve();
             return;
           }
 
@@ -288,13 +299,17 @@ async function processFile(fileName) {
             await readSizes(info);
             resolve();
           } catch (err) {
-            reject(new Error(`Failed to read sizes after HTML Minifier processing ${fileName}: ${err.message}`));
+            benchmarkErrors.push(`Failed to read sizes after HTML Minifier processing ${fileName}: ${err.message}`);
+            resetSizes(info);
+            resolve();
           }
         });
 
         child.on('error', function (error) {
           clearTimeout(timeoutId);
-          reject(new Error(`HTML Minifier CLI process error for ${fileName}: ${error.message}`));
+          benchmarkErrors.push(`HTML Minifier CLI process error for ${fileName}: ${error.message}`);
+          resetSizes(info);
+          resolve();
         });
       });
     }
@@ -310,10 +325,7 @@ async function processFile(fileName) {
         await readSizes(info);
       } catch (err) {
         benchmarkErrors.push(`htmlnano failed for ${fileName}: ${err.message}`);
-        info.size = 0;
-        info.gzSize = 0;
-        info.lzSize = 0;
-        info.brSize = 0;
+        resetSizes(info);
       }
     }
 
@@ -341,10 +353,7 @@ async function processFile(fileName) {
         await readSizes(info);
       } catch (err) {
         benchmarkErrors.push(`@swc/html failed for ${fileName}: ${err.message}`);
-        info.size = 0;
-        info.gzSize = 0;
-        info.lzSize = 0;
-        info.brSize = 0;
+        resetSizes(info);
       }
     }
 
@@ -376,10 +385,7 @@ async function processFile(fileName) {
         await readSizes(info);
       } catch (err) {
         benchmarkErrors.push(`minify-html failed for ${fileName}: ${err.message}`);
-        info.size = 0;
-        info.gzSize = 0;
-        info.lzSize = 0;
-        info.brSize = 0;
+        resetSizes(info);
       }
     }
 
@@ -422,10 +428,7 @@ async function processFile(fileName) {
       function failed() {
         // Site refused to process content
         if (info) {
-          info.size = 0;
-          info.gzSize = 0;
-          info.lzSize = 0;
-          info.brSize = 0;
+          resetSizes(info);
           info = null;
         }
       }
