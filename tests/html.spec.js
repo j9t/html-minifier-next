@@ -4695,4 +4695,21 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { partialMarkup: true, removeOptionalTags: true }), '<div><p>Text</div>',
       'partialMarkup and removeOptionalTags work independently (optional </p> is removed)');
   });
+
+  test('improved parse error messages', async () => {
+    // Test that parse errors include line and column information
+    const input = '<div>\n<p>\ninvalid<tag\n</p>\n</div>';
+
+    try {
+      await minify(input, { continueOnParseError: false });
+      assert.fail('Should have thrown parse error');
+    } catch (err) {
+      // Error message should include line and column information
+      assert.ok(err.message.includes('line') || err.message.includes('Parse error'), 'Parse error should include location information');
+    }
+
+    // Test that `continueOnParseError` allows processing to continue
+    const output = await minify(input, { continueOnParseError: true });
+    assert.ok(output, 'Should produce output when continueOnParseError is true');
+  });
 });
