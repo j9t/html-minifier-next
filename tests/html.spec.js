@@ -4700,13 +4700,14 @@ describe('HTML', () => {
     // Test that parse errors include line and column information
     const input = '<div>\n<p>\ninvalid<tag\n</p>\n</div>';
 
-    try {
-      await minify(input, { continueOnParseError: false });
-      assert.fail('Should have thrown parse error');
-    } catch (err) {
-      // Error message should include line and column information
-      assert.ok(err.message.includes('line') || err.message.includes('Parse error'), 'Parse error should include location information');
-    }
+    await assert.rejects(
+      async () => { await minify(input, { continueOnParseError: false }); },
+      (err) => {
+        // Require both positional info and an offending-markup snippet
+        return /line\s+\d+.*column\s+\d+/i.test(err.message) && err.message.includes('invalid<tag');
+      },
+      'Error must include line/column numbers and offending markup'
+    );
 
     // Test that `continueOnParseError` allows processing to continue
     const output = await minify(input, { continueOnParseError: true });
