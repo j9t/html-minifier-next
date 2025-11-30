@@ -947,8 +947,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
         currentTag = '';
       },
       chars: async function (text) {
+        // Only recursively scan HTML content, not JSON-LD or other non-HTML script types
+        // `scan()` is for analyzing HTML attribute order, not for parsing JSON
         if (options.processScripts && specialContentTags.has(currentTag) &&
-          options.processScripts.indexOf(currentType) > -1) {
+          options.processScripts.indexOf(currentType) > -1 &&
+          currentType === 'text/html') {
           await scan(text);
         }
       }
@@ -961,7 +964,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
   options.log = identity;
   options.sortAttributes = false;
   options.sortClassName = false;
-  await scan(await minifyHTML(value, options));
+  const firstPassOutput = await minifyHTML(value, options);
+  await scan(firstPassOutput);
   options.log = log;
   if (attrChains) {
     const attrSorters = Object.create(null);
