@@ -14,6 +14,7 @@ import Minimize from 'minimize';
 import Progress from 'progress';
 import Table from 'cli-table3';
 import htmlnano from 'htmlnano';
+import { minify as minifySWC } from '@swc/html';
 import minifyHTMLPkg from '@minify-html/node';
 
 const { minify: minifyHTML } = minifyHTMLPkg;
@@ -37,10 +38,10 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
 });
 
 const table = new Table({
-  head: ['File', 'Before', 'HTML Minifier Next', 'htmlnano', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
+  head: ['File', 'Before', 'HTML Minifier Next', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
   colWidths: [fileNames.reduce(function (length, fileName) {
     return Math.max(length, fileName.length);
-  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 20]
+  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 25, 20]
 });
 
 function toKb(size, precision) {
@@ -129,6 +130,7 @@ function generateMarkdownTable() {
     'Original Size (KB)',
     'HTML Minifier Next',
     'htmlnano',
+    '@swc/html',
     'minify-html',
     'minimize',
     'html­com­pressor.­com'
@@ -224,7 +226,7 @@ async function processFile(fileName) {
       brFilePath: path.join('./generated/', fileName + '.html.br')
     };
     const infos = {};
-    ['minifier', 'htmlnano', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
+    ['minifier', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
       infos[name] = {
         filePath: path.join('./generated/', fileName + '.' + name + '.html'),
         gzFilePath: path.join('./generated/', fileName + '.' + name + '.html.gz'),
@@ -308,6 +310,37 @@ async function processFile(fileName) {
         await readSizes(info);
       } catch (err) {
         benchmarkErrors.push(`htmlnano failed for ${fileName}: ${err.message}`);
+        info.size = 0;
+        info.gzSize = 0;
+        info.lzSize = 0;
+        info.brSize = 0;
+      }
+    }
+
+    // @swc/html, https://swc.rs/docs/usage/html
+    async function testSWCHTML() {
+      const data = await readText(filePath);
+      const info = infos.swchtml;
+      info.startTime = Date.now();
+
+      try {
+        const result = await minifySWC(data, {
+          // Use most aggressive settings that keep HTML valid
+          minify_js: true,
+          minify_css: true,
+          collapseWhitespaces: 'all',
+          remove_comments: true,
+          remove_empty_attributes: true,
+          remove_redundant_attributes: true,
+          collapse_boolean_attributes: true,
+          normalize_attributes: true,
+          remove_empty_metadata_elements: true,
+          minify_conditional_comments: true
+        });
+        await writeText(info.filePath, result.code);
+        await readSizes(info);
+      } catch (err) {
+        benchmarkErrors.push(`@swc/html failed for ${fileName}: ${err.message}`);
         info.size = 0;
         info.gzSize = 0;
         info.lzSize = 0;
@@ -494,6 +527,7 @@ async function processFile(fileName) {
     await readSizes(original);
     await testHTMLMinifier();
     await testhtmlnano();
+    await testSWCHTML();
     await testMinifyHTML();
     await testMinimize();
     await testHTMLCompressor();
@@ -664,11 +698,23 @@ if (benchmarkErrors.length > 0) {
 }
 
 const content = generateMarkdownTable();
+
+// Generate date stamp in format “MMM DD, YYYY”
+const now = new Date();
+const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dateStamp = `(Last updated: ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()})`;
+
 const readme = '../README.md';
 const data = await readText(readme);
 let start = data.indexOf('## Minification comparison');
 start = data.indexOf('|', start);
 let end = data.indexOf('##', start);
-end = data.lastIndexOf('|\n', end) + '|\n'.length;
-const newData = data.slice(0, start) + content + data.slice(end);
+
+// Check if there's already a date stamp and remove it
+const existingDateStamp = data.slice(start, end).match(/\(Last updated:.*?\)\n*/);
+if (existingDateStamp) {
+  end = start + data.slice(start, end).lastIndexOf(existingDateStamp[0]) + existingDateStamp[0].length;
+}
+
+const newData = data.slice(0, start) + content + '\n' + dateStamp + '\n' + data.slice(end);
 await writeText(readme, newData);
