@@ -286,26 +286,38 @@ export class HTMLParser {
           }
 
           // Limit the input length we pass to the regex to prevent catastrophic backtracking
-          const searchInput = input.length > MAX_ATTR_PARSE_LENGTH
-            ? input.slice(0, MAX_ATTR_PARSE_LENGTH)
-            : input;
+          const isLimited = input.length > MAX_ATTR_PARSE_LENGTH;
+          const searchInput = isLimited ? input.slice(0, MAX_ATTR_PARSE_LENGTH) : input;
 
           attr = searchInput.match(attribute);
-          if (!attr) {
-            // No more attributes found in the limited range
-            // Check if we hit the limit and there’s more input
-            if (input.length > MAX_ATTR_PARSE_LENGTH) {
-              // Skip to closing tag or give up
-              const closePos = input.indexOf('>');
-              if (closePos !== -1) {
-                input = input.slice(closePos);
-                continue;
-              } else if (handler.continueOnParseError) {
-                // No closing tag found, skip this tag
-                match.rest = input;
-                return match;
+
+          // If we limited the input and got a match, check if the value might be truncated
+          if (attr && isLimited) {
+            // Check if the attribute value extends beyond our search window
+            const attrEnd = attr[0].length;
+            // If the match ends near the limit, the value might be truncated
+            if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
+              // Manually extract this attribute to handle potentially huge value
+              const manualMatch = input.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
+              if (manualMatch) {
+                const quoteChar = input[manualMatch[0].length];
+                if (quoteChar === '"' || quoteChar === "'") {
+                  const closeQuote = input.indexOf(quoteChar, manualMatch[0].length + 1);
+                  if (closeQuote !== -1) {
+                    const fullAttr = input.slice(0, closeQuote + 1);
+                    attr = [fullAttr];
+                    attr[1] = manualMatch[1]; // Attribute name
+                    attr[2] = input.slice(manualMatch[0].length + 1, closeQuote); // Value
+                    input = input.slice(fullAttr.length);
+                    match.attrs.push(attr);
+                    continue;
+                  }
+                }
               }
             }
+          }
+
+          if (!attr) {
             break;
           }
 
