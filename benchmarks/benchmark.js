@@ -37,7 +37,7 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
 });
 
 const table = new Table({
-  head: ['File', 'Before', 'HTML Minifier Next', 'Minimize', 'htmlcompressor.com', 'htmlnano', 'minify-html', 'Savings', 'Time'],
+  head: ['File', 'Before', 'HTML Minifier Next', 'htmlnano', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
   colWidths: [fileNames.reduce(function (length, fileName) {
     return Math.max(length, fileName.length);
   }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 20]
@@ -128,10 +128,10 @@ function generateMarkdownTable() {
     'Site',
     'Original Size (KB)',
     'HTML Minifier Next',
-    'minimize',
-    'html­compressor.com',
     'htmlnano',
-    'minify-html'
+    'minify-html',
+    'minimize',
+    'html­com­pressor.­com'
   ];
 
   fileNames.forEach(function (fileName) {
@@ -224,7 +224,7 @@ async function processFile(fileName) {
       brFilePath: path.join('./generated/', fileName + '.html.br')
     };
     const infos = {};
-    ['minifier', 'minimize', 'compressor', 'htmlnano', 'minifyhtml'].forEach(function (name) {
+    ['minifier', 'htmlnano', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
       infos[name] = {
         filePath: path.join('./generated/', fileName + '.' + name + '.html'),
         gzFilePath: path.join('./generated/', fileName + '.' + name + '.html.gz'),
@@ -295,6 +295,59 @@ async function processFile(fileName) {
           reject(new Error(`HTML Minifier CLI process error for ${fileName}: ${error.message}`));
         });
       });
+    }
+
+    // htmlnano, https://htmlnano.netlify.app/presets
+    async function testhtmlnano() {
+      const data = await readText(filePath);
+      const info = infos.htmlnano;
+
+      try {
+        const result = await htmlnano.process(data, {}, htmlnano.presets.max);
+        await writeText(info.filePath, result.html);
+        await readSizes(info);
+      } catch (err) {
+        benchmarkErrors.push(`htmlnano failed for ${fileName}: ${err.message}`);
+        info.size = 0;
+        info.gzSize = 0;
+        info.lzSize = 0;
+        info.brSize = 0;
+      }
+    }
+
+    // minify-html, https://github.com/wilsonzlin/minify-html
+    async function testMinifyHTML() {
+      const data = await readBuffer(filePath);
+      const info = infos.minifyhtml;
+
+      try {
+        const result = minifyHTML(data, {
+          keep_closing_tags: false,
+          keep_comments: false,
+          keep_html_and_head_opening_tags: false,
+          keep_input_type_text_attr: false,
+          keep_ssi_comments: false,
+          minify_css: true,
+          minify_js: true, // Disable if Rust panics get too frequent
+          preserve_brace_template_syntax: false,
+          preserve_chevron_percent_template_syntax: false,
+          remove_bangs: true,
+          remove_processing_instructions: true,
+          // Excluded invalidating options:
+          // allow_noncompliant_unquoted_attribute_values
+          // allow_optimal_entities
+          // allow_removing_spaces_between_attributes
+          // minify_doctype
+        });
+        await writeBuffer(info.filePath, result);
+        await readSizes(info);
+      } catch (err) {
+        benchmarkErrors.push(`minify-html failed for ${fileName}: ${err.message}`);
+        info.size = 0;
+        info.gzSize = 0;
+        info.lzSize = 0;
+        info.brSize = 0;
+      }
     }
 
     // Minimize, https://github.com/Swaagie/minimize
@@ -438,65 +491,12 @@ async function processFile(fileName) {
       });
     }
 
-    // htmlnano, https://htmlnano.netlify.app/presets
-    async function testhtmlnano() {
-      const data = await readText(filePath);
-      const info = infos.htmlnano;
-
-      try {
-        const result = await htmlnano.process(data, {}, htmlnano.presets.max);
-        await writeText(info.filePath, result.html);
-        await readSizes(info);
-      } catch (err) {
-        benchmarkErrors.push(`htmlnano failed for ${fileName}: ${err.message}`);
-        info.size = 0;
-        info.gzSize = 0;
-        info.lzSize = 0;
-        info.brSize = 0;
-      }
-    }
-
-    // minify-html, https://github.com/wilsonzlin/minify-html
-    async function testMinifyHTML() {
-      const data = await readBuffer(filePath);
-      const info = infos.minifyhtml;
-
-      try {
-        const result = minifyHTML(data, {
-          keep_closing_tags: false,
-          keep_comments: false,
-          keep_html_and_head_opening_tags: false,
-          keep_input_type_text_attr: false,
-          keep_ssi_comments: false,
-          minify_css: true,
-          minify_js: true, // Disable if Rust panics get too frequent
-          preserve_brace_template_syntax: false,
-          preserve_chevron_percent_template_syntax: false,
-          remove_bangs: true,
-          remove_processing_instructions: true,
-          // Excluded invalidating options:
-          // allow_noncompliant_unquoted_attribute_values
-          // allow_optimal_entities
-          // allow_removing_spaces_between_attributes
-          // minify_doctype
-        });
-        await writeBuffer(info.filePath, result);
-        await readSizes(info);
-      } catch (err) {
-        benchmarkErrors.push(`minify-html failed for ${fileName}: ${err.message}`);
-        info.size = 0;
-        info.gzSize = 0;
-        info.lzSize = 0;
-        info.brSize = 0;
-      }
-    }
-
     await readSizes(original);
     await testHTMLMinifier();
-    await testMinimize();
-    await testHTMLCompressor();
     await testhtmlnano();
     await testMinifyHTML();
+    await testMinimize();
+    await testHTMLCompressor();
 
     const display = [
       [fileName, '+ gzip', '+ lzma', '+ brotli'].join('\n'),
