@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Fixed parser hang on HTML with massive attribute values (e.g., large SVG path data)
   - Limited attribute regex input to 20 KB to prevent catastrophic backtracking
+  - Attributes exceeding 20 KB are extracted using manual string parsing (preserving all data)
   - Parser now gracefully handles pathological cases in SSR framework output
 
 ## [4.6.0] - 2025-11-29
