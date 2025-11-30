@@ -53,34 +53,29 @@ function redSize(size) {
 }
 
 function greenSize(size) {
-  // Treat 0 or invalid sizes as failures
-  if (!size || size <= 0 || typeof size !== 'number') {
-    return styleText(['white'], 'n/a');
+  // Only accept valid positive numbers
+  if (typeof size === 'number' && size > 0) {
+    return styleText(['green', 'bold'], String(size)) + styleText(['white'], ' (' + toKb(size, 2) + ' KB)');
   }
-  return styleText(['green', 'bold'], String(size)) + styleText(['white'], ' (' + toKb(size, 2) + ' KB)');
+  return styleText(['white'], 'n/a');
 }
 
 function blueSavings(oldSize, newSize) {
-  // Handle invalid inputs
-  if (!oldSize || oldSize <= 0 || typeof oldSize !== 'number') {
-    return styleText(['white'], 'N/A');
+  // Only calculate savings when both inputs are valid positive numbers
+  if (typeof oldSize === 'number' && oldSize > 0 && typeof newSize === 'number' && newSize > 0) {
+    const savingsPercent = (1 - newSize / oldSize) * 100;
+    const savings = oldSize - newSize;
+    return styleText(['cyan', 'bold'], savingsPercent.toFixed(2)) + styleText(['white'], '% (' + toKb(savings, 2) + ' KB)');
   }
-  if (typeof newSize !== 'number' || newSize <= 0) {
-    // Treat “0” or invalid newSize as failure (not 100% savings)
-    return styleText(['white'], 'N/A');
-  }
-
-  const savingsPercent = (1 - newSize / oldSize) * 100;
-  const savings = oldSize - newSize;
-  return styleText(['cyan', 'bold'], savingsPercent.toFixed(2)) + styleText(['white'], '% (' + toKb(savings, 2) + ' KB)');
+  return styleText(['white'], 'n/a');
 }
 
 function blueTime(time) {
-  // Handle invalid or missing timestamps
-  if (typeof time !== 'number' || isNaN(time) || time < 0) {
-    return styleText(['white'], 'N/A');
+  // Only accept valid non-negative numbers
+  if (typeof time === 'number' && !isNaN(time) && time >= 0) {
+    return styleText(['cyan', 'bold'], String(time)) + styleText(['white'], ' ms');
   }
-  return styleText(['cyan', 'bold'], String(time)) + styleText(['white'], ' ms');
+  return styleText(['white'], 'n/a');
 }
 
 async function readBuffer(filePath) {
@@ -719,7 +714,17 @@ const dateStamp = `(Last updated: ${months[now.getMonth()]} ${now.getDate()}, ${
 const readme = '../README.md';
 const data = await readText(readme);
 let start = data.indexOf('## Minification comparison');
-start = data.indexOf('|', start);
+
+// Use specific table header for more stable anchor
+const tableHeader = '| Site | Original Size (KB) |';
+let headerPos = data.indexOf(tableHeader, start);
+if (headerPos !== -1) {
+  start = headerPos;
+} else {
+  // Fallback to first pipe for backward compatibility
+  start = data.indexOf('|', start);
+}
+
 let end = data.indexOf('##', start);
 
 // Check if there’s already a date stamp and remove it
