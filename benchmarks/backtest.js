@@ -164,9 +164,9 @@ if (process.argv.length > 2) {
   }
 } else {
   process.on('message', function (hash) {
-    const paths = ['src', 'benchmark.conf', 'html-minifier-benchmarks.json'];
+    const paths = ['src', 'benchmark.conf', 'html-minifier.json'];
     git('reset', 'HEAD', '--', paths, function () {
-      let conf = 'html-minifier-benchmarks.json';
+      let conf = 'html-minifier.json';
 
       function checkout() {
         const targetPath = paths.shift();

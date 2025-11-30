@@ -270,7 +270,7 @@ async function processFile(fileName) {
     async function testHTMLMinifier() {
       const info = infos.minifier;
       info.startTime = Date.now();
-      const configPath = path.join(__dirname, 'html-minifier-benchmarks.json');
+      const configPath = path.join(__dirname, 'html-minifier.json');
       const args = [filePath, '-c', configPath, '--minify-urls', site, '-o', info.filePath];
 
       return new Promise((resolve) => {
