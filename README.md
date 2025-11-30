@@ -230,13 +230,15 @@ How does HTML Minifier Next compare to other solutions, like [htmlnano](https://
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 62 | **52** | 54 | 55 | 55 | 58 | 56 |
 | [Apple](https://www.apple.com/) | 188 | **145** | 164 | 168 | 170 | 173 | 171 |
-| [BBC](https://www.bbc.co.uk/) | 728 | **662** | 685 | 685 | 686 | 722 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 824 | **700** | 766 | 778 | 780 | 817 | n/a |
 | [Codeberg](https://codeberg.org/) | 33 | 29 | **27** | 30 | 30 | 30 | 30 |
 | [CSS-Tricks](https://css-tricks.com/) | 165 | **125** | 129 | 146 | 146 | 151 | 148 |
 | [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6342** | 6561 | 6444 | 6567 | 6615 | n/a |
+| [EFF](https://www.eff.org/) | 54 | **46** | 49 | 47 | 47 | 49 | 49 |
+| [FAZ](https://www.faz.net/aktuell/) | 1565 | n/a | **1393** | 1490 | 1501 | 1513 | n/a |
 | [Frontend Dogma](https://frontenddogma.com/) | 220 | **211** | 232 | 217 | 219 | 237 | 218 |
 | [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | n/a | 18 | 18 |
-| [Ground News](https://ground.news/) | 1688 | **1462** | 1553 | 1577 | n/a | 1675 | n/a |
+| [Ground News](https://ground.news/) | 1754 | **1513** | 1609 | 1640 | n/a | 1741 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | 153 | **147** | 149 | 155 | 148 |
 | [Leanpub](https://leanpub.com/) | 1293 | **1102** | 1109 | 1107 | n/a | 1288 | n/a |
 | [Mastodon](https://mastodon.social/explore) | 35 | **26** | 30 | 33 | 33 | 34 | 34 |
