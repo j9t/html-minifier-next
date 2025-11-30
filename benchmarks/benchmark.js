@@ -41,7 +41,7 @@ const table = new Table({
   head: ['File', 'Before', 'HTML Minifier Next', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
   colWidths: [fileNames.reduce(function (length, fileName) {
     return Math.max(length, fileName.length);
-  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 25, 20]
+  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 20]
 });
 
 function toKb(size, precision) {
@@ -53,6 +53,10 @@ function redSize(size) {
 }
 
 function greenSize(size) {
+  // Treat 0 or invalid sizes as failures
+  if (!size || size <= 0 || typeof size !== 'number') {
+    return styleText(['white'], 'n/a');
+  }
   return styleText(['green', 'bold'], String(size)) + styleText(['white'], ' (' + toKb(size, 2) + ' KB)');
 }
 
@@ -61,8 +65,9 @@ function blueSavings(oldSize, newSize) {
   if (!oldSize || oldSize <= 0 || typeof oldSize !== 'number') {
     return styleText(['white'], 'N/A');
   }
-  if (typeof newSize !== 'number' || newSize < 0) {
-    newSize = 0; // Treat invalid newSize as 0
+  if (typeof newSize !== 'number' || newSize <= 0) {
+    // Treat “0” or invalid newSize as failure (not 100% savings)
+    return styleText(['white'], 'N/A');
   }
 
   const savingsPercent = (1 - newSize / oldSize) * 100;
@@ -71,6 +76,10 @@ function blueSavings(oldSize, newSize) {
 }
 
 function blueTime(time) {
+  // Handle invalid or missing timestamps
+  if (typeof time !== 'number' || isNaN(time) || time < 0) {
+    return styleText(['white'], 'N/A');
+  }
   return styleText(['cyan', 'bold'], String(time)) + styleText(['white'], ' ms');
 }
 
