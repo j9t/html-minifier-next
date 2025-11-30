@@ -223,29 +223,33 @@ const result = await minify(html, {
 
 ## Minification comparison
 
-How does HTML Minifier Next compare to other solutions, like [minimize](https://github.com/Swaagie/minimize), [htmlcompressor.com](http://htmlcompressor.com/), [htmlnano](https://github.com/posthtml/htmlnano), and [minify-html](https://github.com/wilsonzlin/minify-html)? (All with the most aggressive settings, though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
+How does HTML Minifier Next compare to other minifiers, like [htmlnano](https://github.com/posthtml/htmlnano), [@swc/html](https://github.com/swc-project/swc), [minify-html](https://github.com/wilsonzlin/minify-html), [minimize](https://github.com/Swaagie/minimize), and [htmlcompressor.com](https://htmlcompressor.com/)? (All with the most aggressive settings, though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
 
-| Site | Original Size (KB) | HTML Minifier Next | minimize | html­compressor.com | htmlnano | minify-html |
-| --- | --- | --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 62 | **52** | 58 | 56 | 54 | 55 |
-| [Amazon](https://www.amazon.com/) | 822 | **735** | 806 | n/a | n/a | n/a |
-| [Apple](https://www.apple.com/) | 210 | **166** | 195 | 192 | 186 | 191 |
-| [BBC](https://www.bbc.co.uk/) | 698 | **632** | 692 | n/a | 655 | 656 |
-| [CSS-Tricks](https://css-tricks.com/) | 163 | **124** | 149 | 146 | 127 | 145 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6342** | 6615 | n/a | 6561 | 6567 |
-| [EFF](https://www.eff.org/) | 54 | **46** | 49 | 49 | 49 | 47 |
-| [FAZ](https://www.faz.net/aktuell/) | 1860 | **1737** | 1775 | n/a | n/a | 1779 |
-| [Frontend Dogma](https://frontenddogma.com/) | 218 | **209** | 235 | 216 | 230 | 217 |
-| [Google](https://www.google.com/) | 18 | **17** | 18 | 18 | **17** | n/a |
-| [Ground News](https://ground.news/) | 1827 | **1585** | 1814 | n/a | 1679 | n/a |
-| [HTML](https://html.spec.whatwg.org/multipage/) | 149 | **147** | 155 | 148 | 153 | 149 |
-| [Leanpub](https://leanpub.com/) | 1161 | **974** | 1155 | n/a | 981 | n/a |
-| [Mastodon](https://mastodon.social/explore) | 35 | **26** | 34 | 34 | 30 | 33 |
-| [MDN](https://developer.mozilla.org/en-US/) | 107 | **62** | 67 | 68 | 64 | n/a |
-| [Middle East Eye](https://www.middleeasteye.net/) | 223 | **196** | 203 | 203 | 203 | 200 |
-| [SitePoint](https://www.sitepoint.com/) | 494 | **353** | 491 | n/a | 429 | 474 |
-| [United Nations](https://www.un.org/en/) | 152 | **113** | 131 | 124 | 122 | 126 |
-| [W3C](https://www.w3.org/) | 50 | **36** | 41 | 39 | 39 | 39 |
+<!-- Auto-generated benchmarks, don’t edit -->
+| Site | Original Size (KB) | HTML Minifier Next | htmlnano | @swc/html | minify-html | minimize | html­com­pressor.­com |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [A List Apart](https://alistapart.com/) | 62 | **52** | 54 | 55 | 55 | 58 | 56 |
+| [Apple](https://www.apple.com/) | 188 | **145** | 164 | 168 | 170 | 173 | 171 |
+| [BBC](https://www.bbc.co.uk/) | 728 | **662** | 685 | 685 | 686 | 722 | n/a |
+| [Codeberg](https://codeberg.org/) | 33 | 29 | **27** | 30 | 30 | 30 | 30 |
+| [CSS-Tricks](https://css-tricks.com/) | 165 | **125** | 129 | 146 | 146 | 151 | 148 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6342** | 6561 | 6444 | 6567 | 6615 | n/a |
+| [EFF](https://www.eff.org/) | 54 | **46** | 49 | 47 | 47 | 49 | 49 |
+| [FAZ](https://www.faz.net/aktuell/) | 1597 | n/a | **1419** | 1520 | 1532 | 1543 | n/a |
+| [Frontend Dogma](https://frontenddogma.com/) | 220 | **211** | 232 | 217 | 219 | 237 | 218 |
+| [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | n/a | 18 | 18 |
+| [Ground News](https://ground.news/) | 1743 | **1504** | 1602 | 1630 | n/a | 1730 | n/a |
+| [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | 153 | **147** | 149 | 155 | 148 |
+| [Leanpub](https://leanpub.com/) | 1293 | **1102** | 1109 | 1107 | n/a | 1288 | n/a |
+| [Mastodon](https://mastodon.social/explore) | 35 | **26** | 30 | 33 | 33 | 34 | 34 |
+| [MDN](https://developer.mozilla.org/en-US/) | 107 | **62** | 64 | 64 | n/a | 67 | 67 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 224 | **197** | 204 | 202 | 201 | 204 | 205 |
+| [SitePoint](https://www.sitepoint.com/) | 481 | **350** | 419 | 454 | 461 | 477 | n/a |
+| [United Nations](https://www.un.org/en/) | 152 | **113** | 122 | 126 | 126 | 131 | 124 |
+| [W3C](https://www.w3.org/) | 50 | **36** | 38 | 38 | 38 | 40 | 38 |
+
+(Last updated: Nov 30, 2025)
+<!-- End auto-generated -->
 
 ## Examples
 
