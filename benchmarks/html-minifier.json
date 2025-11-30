@@ -6,7 +6,6 @@
   "conservativeCollapse": false,
   "continueOnMinifyError": true,
   "continueOnParseError": true,
-  "customAttrCollapse": ".*",
   "decodeEntities": true,
   "html5": true,
   "ignoreCustomFragments": [
@@ -38,8 +37,8 @@
   "removeScriptTypeAttributes": true,
   "removeStyleLinkTypeAttributes": true,
   "removeTagWhitespace": true,
-  "sortAttributes": true,
-  "sortClassName": true,
+  "sortAttributes": false,
+  "sortClassName": false,
   "trimCustomFragments": true,
   "useShortDoctype": true
 }
