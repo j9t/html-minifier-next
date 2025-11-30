@@ -115,7 +115,7 @@ export class HTMLParser {
 
     const stack = []; let lastTag;
     const attribute = attrForHandler(handler);
-    let last, prevTag, nextTag;
+    let last, prevTag = undefined, nextTag = undefined;
 
     // Track position for better error messages
     let position = 0;
@@ -251,9 +251,13 @@ export class HTMLParser {
           continue;
         }
         const loc = getLineColumn(position);
-        const snippet = html.slice(0, 200).replace(/\n/g, ' ');
+        // Include some context before the error position so the snippet contains
+        // the offending markup plus preceding characters (e.g. "invalid<tag").
+        const CONTEXT_BEFORE = 50;
+        const startPos = Math.max(0, position - CONTEXT_BEFORE);
+        const snippet = this.html.slice(startPos, startPos + 200).replace(/\n/g, ' ');
         throw new Error(
-          `Parse error at line ${loc.line}, column ${loc.column}:\n${snippet}${html.length > 200 ? '…' : ''}`
+          `Parse error at line ${loc.line}, column ${loc.column}:\n${snippet}${this.html.length > startPos + 200 ? '…' : ''}`
         );
       }
       position = this.html.length - html.length;
@@ -307,7 +311,13 @@ export class HTMLParser {
                     const fullAttr = input.slice(0, closeQuote + 1);
                     attr = [fullAttr];
                     attr[1] = manualMatch[1]; // Attribute name
-                    attr[2] = input.slice(manualMatch[0].length + 1, closeQuote); // Value
+                    attr[2] = '='; // customAssign
+                    // Place value at correct index based on quote type
+                    if (quoteChar === '"') {
+                      attr[3] = input.slice(manualMatch[0].length + 1, closeQuote); // Double-quoted value
+                    } else {
+                      attr[4] = input.slice(manualMatch[0].length + 1, closeQuote); // Single-quoted value
+                    }
                     input = input.slice(fullAttr.length);
                     match.attrs.push(attr);
                     continue;
