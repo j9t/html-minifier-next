@@ -223,7 +223,7 @@ const result = await minify(html, {
 
 ## Minification comparison
 
-How does HTML Minifier Next compare to other solutions, like [htmlnano](https://github.com/posthtml/htmlnano), [@swc/html](https://github.com/swc-project/swc), [minify-html](https://github.com/wilsonzlin/minify-html), [minimize](https://github.com/Swaagie/minimize), and [htmlcompressor.com](http://htmlcompressor.com/)? (All with the most aggressive settings, though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
+How does HTML Minifier Next compare to other minifiers, like [htmlnano](https://github.com/posthtml/htmlnano), [@swc/html](https://github.com/swc-project/swc), [minify-html](https://github.com/wilsonzlin/minify-html), [minimize](https://github.com/Swaagie/minimize), and [htmlcompressor.com](https://htmlcompressor.com/)? (All with the most aggressive settings, though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
 
 <!-- Auto-generated benchmarks, don’t edit -->
 | Site | Original Size (KB) | HTML Minifier Next | htmlnano | @swc/html | minify-html | minimize | html­com­pressor.­com |
