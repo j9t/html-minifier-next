@@ -103,6 +103,9 @@ function joinSingleAttrAssigns(handler) {
   }).join('|');
 }
 
+// Number of captured parts per `customAttrSurround` pattern
+const NCP = 7;
+
 export class HTMLParser {
   constructor(html, handler) {
     this.html = html;
@@ -311,7 +314,7 @@ export class HTMLParser {
                   if (closeQuote !== -1) {
                     const fullAttr = input.slice(0, closeQuote + 1);
                     const numCustomParts = handler.customAttrSurround
-                      ? handler.customAttrSurround.length * 7 // Keep in sync with handleStartTag’s ncp
+                      ? handler.customAttrSurround.length * NCP
                       : 0;
                     const baseIndex = 1 + numCustomParts;
 
@@ -437,7 +440,6 @@ export class HTMLParser {
 
       const attrs = match.attrs.map(function (args) {
         let name, value, customOpen, customClose, customAssign, quote;
-        const ncp = 7; // Number of captured parts, scalar
 
         // Hackish workaround for FF bug https://bugzilla.mozilla.org/show_bug.cgi?id=369778
         if (IS_REGEX_CAPTURING_BROKEN && args[0].indexOf('""') === -1) {
@@ -465,7 +467,7 @@ export class HTMLParser {
 
         let j = 1;
         if (handler.customAttrSurround) {
-          for (let i = 0, l = handler.customAttrSurround.length; i < l; i++, j += ncp) {
+          for (let i = 0, l = handler.customAttrSurround.length; i < l; i++, j += NCP) {
             name = args[j + 1];
             if (name) {
               quote = populate(j + 2);
