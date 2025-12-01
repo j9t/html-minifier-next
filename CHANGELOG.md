@@ -4,6 +4,25 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.1] - 2025-12-01
+
+### Changed
+
+- Improved parser error handling
+  - Added line/column tracking for better error messages
+  - Improved `continueOnParseError` to skip problematic characters instead of failing
+
+### Fixed
+
+- Fixed parser hang on HTML with massive attribute values (e.g., large SVG path data)
+  - Limited attribute regex input to 20 KB to prevent catastrophic backtracking
+  - Attributes exceeding 20 KB are extracted using manual string parsing (preserving all data)
+  - Parser now gracefully handles pathological cases in SSR framework output
+- Fixed `sortAttributes` incorrectly parsing JSON-LD script content as HTML
+  - The `scan()` function (used for attribute sorting analysis) now only recursively processes `text/html` script content
+  - JSON-LD and other non-HTML script types are correctly skipped during the scan phase
+  - Prevents corruption when using `sortAttributes` with `processScripts: ["application/ld+json"]`
+
 ## [4.6.0] - 2025-11-29
 
 ### Added

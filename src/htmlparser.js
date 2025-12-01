@@ -103,6 +103,9 @@ function joinSingleAttrAssigns(handler) {
   }).join('|');
 }
 
+// Number of captured parts per `customAttrSurround` pattern
+const NCP = 7;
+
 export class HTMLParser {
   constructor(html, handler) {
     this.html = html;
@@ -115,7 +118,15 @@ export class HTMLParser {
 
     const stack = []; let lastTag;
     const attribute = attrForHandler(handler);
-    let last, prevTag, nextTag;
+    let last, prevTag = undefined, nextTag = undefined;
+
+    // Track position for better error messages
+    let position = 0;
+    const getLineColumn = (pos) => {
+      const lines = this.html.slice(0, pos).split('\n');
+      return { line: lines.length, column: lines[lines.length - 1].length + 1 };
+    };
+
     while (html) {
       last = html;
       // Make sure we’re not in a `script` or `style` element
@@ -233,8 +244,27 @@ export class HTMLParser {
       }
 
       if (html === last) {
-        throw new Error('Parse Error: ' + html);
+        if (handler.continueOnParseError) {
+          // Skip the problematic character and continue
+          if (handler.chars) {
+            await handler.chars(html[0], prevTag, '');
+          }
+          html = html.substring(1);
+          position++;
+          prevTag = '';
+          continue;
+        }
+        const loc = getLineColumn(position);
+        // Include some context before the error position so the snippet contains
+        // the offending markup plus preceding characters (e.g. "invalid<tag").
+        const CONTEXT_BEFORE = 50;
+        const startPos = Math.max(0, position - CONTEXT_BEFORE);
+        const snippet = this.html.slice(startPos, startPos + 200).replace(/\n/g, ' ');
+        throw new Error(
+          `Parse error at line ${loc.line}, column ${loc.column}:\n${snippet}${this.html.length > startPos + 200 ? '…' : ''}`
+        );
       }
+      position = this.html.length - html.length;
     }
 
     if (!handler.partialMarkup) {
@@ -251,10 +281,77 @@ export class HTMLParser {
         };
         input = input.slice(start[0].length);
         let end, attr;
-        while (!(end = input.match(startTagClose)) && (attr = input.match(attribute))) {
+
+        // Safety limit: max length of input to check for attributes
+        // Protects against catastrophic backtracking on massive attribute values
+        const MAX_ATTR_PARSE_LENGTH = 20000; // 20 KB should be enough for any reasonable tag
+
+        while (true) {
+          // Check for closing tag first
+          end = input.match(startTagClose);
+          if (end) {
+            break;
+          }
+
+          // Limit the input length we pass to the regex to prevent catastrophic backtracking
+          const isLimited = input.length > MAX_ATTR_PARSE_LENGTH;
+          const searchInput = isLimited ? input.slice(0, MAX_ATTR_PARSE_LENGTH) : input;
+
+          attr = searchInput.match(attribute);
+
+          // If we limited the input and got a match, check if the value might be truncated
+          if (attr && isLimited) {
+            // Check if the attribute value extends beyond our search window
+            const attrEnd = attr[0].length;
+            // If the match ends near the limit, the value might be truncated
+            if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
+              // Manually extract this attribute to handle potentially huge value
+              const manualMatch = input.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
+              if (manualMatch) {
+                const quoteChar = input[manualMatch[0].length];
+                if (quoteChar === '"' || quoteChar === "'") {
+                  const closeQuote = input.indexOf(quoteChar, manualMatch[0].length + 1);
+                  if (closeQuote !== -1) {
+                    const fullAttr = input.slice(0, closeQuote + 1);
+                    const numCustomParts = handler.customAttrSurround
+                      ? handler.customAttrSurround.length * NCP
+                      : 0;
+                    const baseIndex = 1 + numCustomParts;
+
+                    attr = [];
+                    attr[0] = fullAttr;
+                    attr[baseIndex] = manualMatch[1]; // Attribute name
+                    attr[baseIndex + 1] = '='; // customAssign (falls back to “=” for huge attributes)
+                    const value = input.slice(manualMatch[0].length + 1, closeQuote);
+                    // Place value at correct index based on quote type
+                    if (quoteChar === '"') {
+                      attr[baseIndex + 2] = value; // Double-quoted value
+                    } else {
+                      attr[baseIndex + 3] = value; // Single-quoted value
+                    }
+                    input = input.slice(fullAttr.length);
+                    match.attrs.push(attr);
+                    continue;
+                  }
+                }
+                // Note: Unquoted attribute values are intentionally not handled here.
+                // Per HTML spec, unquoted values cannot contain spaces or special chars,
+                // making a 20 KB+ unquoted value practically impossible. If encountered,
+                // it’s malformed HTML and using the truncated regex match is acceptable.
+              }
+            }
+          }
+
+          if (!attr) {
+            break;
+          }
+
           input = input.slice(attr[0].length);
           match.attrs.push(attr);
         }
+
+        // Check for closing tag
+        end = input.match(startTagClose);
         if (end) {
           match.unarySlash = end[1];
           match.rest = input.slice(end[0].length);
@@ -347,7 +444,6 @@ export class HTMLParser {
 
       const attrs = match.attrs.map(function (args) {
         let name, value, customOpen, customClose, customAssign, quote;
-        const ncp = 7; // Number of captured parts, scalar
 
         // Hackish workaround for FF bug https://bugzilla.mozilla.org/show_bug.cgi?id=369778
         if (IS_REGEX_CAPTURING_BROKEN && args[0].indexOf('""') === -1) {
@@ -375,7 +471,7 @@ export class HTMLParser {
 
         let j = 1;
         if (handler.customAttrSurround) {
-          for (let i = 0, l = handler.customAttrSurround.length; i < l; i++, j += ncp) {
+          for (let i = 0, l = handler.customAttrSurround.length; i < l; i++, j += NCP) {
             name = args[j + 1];
             if (name) {
               quote = populate(j + 2);
