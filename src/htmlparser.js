@@ -248,6 +248,7 @@ export class HTMLParser {
           }
           html = html.substring(1);
           position++;
+          prevTag = '';
           continue;
         }
         const loc = getLineColumn(position);
