@@ -310,14 +310,21 @@ export class HTMLParser {
                   const closeQuote = input.indexOf(quoteChar, manualMatch[0].length + 1);
                   if (closeQuote !== -1) {
                     const fullAttr = input.slice(0, closeQuote + 1);
-                    attr = [fullAttr];
-                    attr[1] = manualMatch[1]; // Attribute name
-                    attr[2] = '='; // customAssign
+                    const numCustomParts = handler.customAttrSurround
+                      ? handler.customAttrSurround.length * 7 // Keep in sync with handleStartTag’s ncp
+                      : 0;
+                    const baseIndex = 1 + numCustomParts;
+
+                    attr = [];
+                    attr[0] = fullAttr;
+                    attr[baseIndex] = manualMatch[1]; // Attribute name
+                    attr[baseIndex + 1] = '='; // customAssign (falls back to “=” for huge attributes)
+                    const value = input.slice(manualMatch[0].length + 1, closeQuote);
                     // Place value at correct index based on quote type
                     if (quoteChar === '"') {
-                      attr[3] = input.slice(manualMatch[0].length + 1, closeQuote); // Double-quoted value
+                      attr[baseIndex + 2] = value; // Double-quoted value
                     } else {
-                      attr[4] = input.slice(manualMatch[0].length + 1, closeQuote); // Single-quoted value
+                      attr[baseIndex + 3] = value; // Single-quoted value
                     }
                     input = input.slice(fullAttr.length);
                     match.attrs.push(attr);
