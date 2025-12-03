@@ -390,6 +390,12 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 
 ## Running HTML Minifier Next
 
+### Local server
+
+```shell
+npm run serve
+```
+
 ### Benchmarks
 
 Benchmarks for minified HTML:
@@ -398,12 +404,6 @@ Benchmarks for minified HTML:
 cd benchmarks
 npm install
 npm run benchmarks
-```
-
-### Local server
-
-```shell
-npm run serve
 ```
 
 ## Acknowledgements
