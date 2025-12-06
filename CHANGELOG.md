@@ -16,7 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Internal
 
-- Fixed benchmark timing measurement to exclude config file I/O for fair comparisons
+- Added progress messages for download and processing phases
+- Added verbose logging mode (`VERBOSE=true npm run benchmarks`) for debugging
 - Updated all benchmark dependencies to latest versions
 
 ## [4.6.2] - 2025-12-05
