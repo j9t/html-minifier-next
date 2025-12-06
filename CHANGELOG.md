@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.7.0] - 2025-12-07
+
+### Performance
+
+- Added 200-item LRU cache for CSS and JavaScript minification to avoid re-processing identical inline styles/scripts (50–90% faster for pages with repeated content or batch processing)
+- Optimized hot-path code for 5–15% faster minification: hoisted RegExp patterns, added fast-path checks for expensive operations, optimized string operations (`trimWhitespace`, whitespace detection, character escaping)
+
+### Internal
+
+- Improved benchmark code quality and test parity: extracted `TEST_TIMEOUT` constant for reuse, added `--minify-urls` flag to both CLI invocations for accurate comparison between HTML Minifier Next and HTML Minifier Terser
+
 ## [4.6.3] - 2025-12-06
 
 ### Documentation
