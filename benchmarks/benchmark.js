@@ -675,25 +675,25 @@ async function processFile(fileName) {
 
     await readSizes(original);
 
-    log(`${fileName}: Starting HTML Minifier Next`);
+    log(`${fileName}: Running HTML Minifier Next`);
     await testHTMLMinifier();
 
-    log(`${fileName}: Starting HTML Minifier Terser`);
+    log(`${fileName}: Running HTML Minifier Terser`);
     await testHTMLMinifierTerser();
 
-    log(`${fileName}: Starting htmlnano`);
+    log(`${fileName}: Running htmlnano`);
     await testhtmlnano();
 
-    log(`${fileName}: Starting @swc/html`);
+    log(`${fileName}: Running @swc/html`);
     await testSWCHTML();
 
-    log(`${fileName}: Starting minify-html`);
+    log(`${fileName}: Running minify-html`);
     await testMinifyHTML();
 
-    log(`${fileName}: Starting Minimize`);
+    log(`${fileName}: Running Minimize`);
     await testMinimize();
 
-    log(`${fileName}: Starting htmlcompressor.com`);
+    log(`${fileName}: Running htmlcompressor.com`);
     await testHTMLCompressor();
 
     const display = [
