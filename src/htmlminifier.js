@@ -21,6 +21,48 @@ const RE_CAN_REMOVE_ATTR_QUOTES = /^[^ \t\n\f\r"'`=<>]+$/;
 const RE_TRAILING_SEMICOLON = /;$/;
 const RE_AMP_ENTITY = /&(#?[0-9a-zA-Z]+;)/g;
 
+// Tiny stable stringify for options signatures (sorted keys, shallow, nested objects)
+function stableStringify(obj) {
+  if (obj == null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(stableStringify).join(',') + ']';
+  const keys = Object.keys(obj).sort();
+  let out = '{';
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    out += JSON.stringify(k) + ':' + stableStringify(obj[k]) + (i < keys.length - 1 ? ',' : '');
+  }
+  return out + '}';
+}
+
+// Minimal LRU cache for strings and promises
+class LRU {
+  constructor(limit = 200) {
+    this.limit = limit;
+    this.map = new Map();
+  }
+  get(key) {
+    const v = this.map.get(key);
+    if (v !== undefined) {
+      this.map.delete(key);
+      this.map.set(key, v);
+    }
+    return v;
+  }
+  set(key, value) {
+    if (this.map.has(key)) this.map.delete(key);
+    this.map.set(key, value);
+    if (this.map.size > this.limit) {
+      const first = this.map.keys().next().value;
+      this.map.delete(first);
+    }
+  }
+  delete(key) { this.map.delete(key); }
+}
+
+// Per-process caches
+const jsMinifyCache = new LRU(200);
+const cssMinifyCache = new LRU(200);
+
 const trimWhitespace = str => {
   if (!str) return str;
   // Fast path: if no whitespace at start or end, return early
@@ -831,10 +873,19 @@ const processOptions = (inputOptions) => {
             }
           }
         );
-
+        // Cache key: wrapped content, type, options signature
         const inputCSS = wrapCSS(text, type);
+        const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
+        const cssKey = inputCSS.length > 2048
+          ? (inputCSS.length + '|' + type + '|' + cssSig)
+          : (inputCSS + '|' + type + '|' + cssSig);
 
         try {
+          const cached = cssMinifyCache.get(cssKey);
+          if (cached) {
+            return cached;
+          }
+
           const result = transformCSS({
             filename: 'input.css',
             code: Buffer.from(inputCSS),
@@ -857,12 +908,12 @@ const processOptions = (inputOptions) => {
 
           // Preserve if output is empty and input had template syntax or UIDs
           // This catches cases where Lightning CSS removed content that should be preserved
-          if (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) {
-            return text;
-          }
+          const finalOutput = (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
 
-          return outputCSS;
+          cssMinifyCache.set(cssKey, finalOutput);
+          return finalOutput;
         } catch (err) {
+          cssMinifyCache.delete(cssKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }
@@ -888,14 +939,38 @@ const processOptions = (inputOptions) => {
 
         terserOptions.parse.bare_returns = inline;
 
+        let jsKey;
         try {
           // Fast path: avoid invoking Terser for empty/whitespace-only content
           if (!code || !code.trim()) {
             return '';
           }
-          const result = await terser(code, terserOptions);
-          return result.code.replace(RE_TRAILING_SEMICOLON, '');
+          // Cache key: content, inline, options signature (subset)
+          const terserSig = stableStringify({
+            compress: terserOptions.compress,
+            mangle: terserOptions.mangle,
+            ecma: terserOptions.ecma,
+            toplevel: terserOptions.toplevel,
+            module: terserOptions.module,
+            keep_fnames: terserOptions.keep_fnames,
+            format: terserOptions.format,
+            cont: !!options.continueOnMinifyError,
+          });
+          jsKey = (code.length > 2048 ? (code.length + '|') : (code + '|')) + (inline ? '1' : '0') + '|' + terserSig;
+          const cached = jsMinifyCache.get(jsKey);
+          if (cached) {
+            return await cached;
+          }
+          const inFlight = (async () => {
+            const result = await terser(code, terserOptions);
+            return result.code.replace(RE_TRAILING_SEMICOLON, '');
+          })();
+          jsMinifyCache.set(jsKey, inFlight);
+          const resolved = await inFlight;
+          jsMinifyCache.set(jsKey, resolved);
+          return resolved;
         } catch (err) {
+          if (jsKey) jsMinifyCache.delete(jsKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }
