@@ -16,7 +16,6 @@ import Table from 'cli-table3';
 import htmlnano from 'htmlnano';
 import { minify as minifySWC } from '@swc/html';
 import minifyHTMLPkg from '@minify-html/node';
-import { minify as minifyTerser } from 'html-minifier-terser';
 
 const { minify: minifyHTML } = minifyHTMLPkg;
 
@@ -38,6 +37,17 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
   clear: true,
   stream: process.stderr
 });
+
+// Verbose logging flag (run via `VERBOSE=true npm run benchmarks`)
+const VERBOSE = process.env.VERBOSE === 'true';
+function log(message) {
+  if (VERBOSE) {
+    console.error(`[DEBUG] ${message}`);
+  }
+}
+
+// Timeout for forked processes (HMN and HM Terser)
+const TEST_TIMEOUT = 30000;
 
 const table = new Table({
   head: ['File', 'Before', 'HTML Minifier Next', 'HTML Minifier Terser', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
@@ -222,7 +232,9 @@ function generateMarkdownTable() {
   // Add average processing time row
   const timeRow = ['**Average processing time**', ''];
   const minifierNames = ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'];
-  const totalSites = fileNames.length;
+
+  // Count only sites that were actually processed (not skipped due to download failure)
+  const processedSites = fileNames.filter(name => rows[name] && rows[name].report).length;
 
   // Calculate averages and find fastest
   const averages = {};
@@ -242,7 +254,7 @@ function generateMarkdownTable() {
     const successCount = successCounts[name];
     if (successCount > 0) {
       const avgTime = Math.round(averages[name]);
-      const display = avgTime + ' ms (' + successCount + '/' + totalSites + ')';
+      const display = avgTime + ' ms (' + successCount + '/' + processedSites + ')';
       // Bold if this is the fastest average
       if (fastestAvg !== null && averages[name] === fastestAvg) {
         timeRow.push('**' + display + '**');
@@ -270,14 +282,16 @@ function displayTable() {
   // Add average processing time row
   const timeRow = ['Average processing time', ''];
   const minifierNames = ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'];
-  const totalSites = fileNames.length;
+
+  // Count only sites that were actually processed (not skipped due to download failure)
+  const processedSites = fileNames.filter(name => rows[name]).length;
 
   minifierNames.forEach(function (name) {
     const successCount = successCounts[name];
     if (successCount > 0) {
       const avgTime = Math.round(totalTimes[name] / successCount);
       const display = styleText(['cyan', 'bold'], String(avgTime)) +
-                      styleText(['white'], ' ms (' + successCount + '/' + totalSites + ')');
+                      styleText(['white'], ' ms (' + successCount + '/' + processedSites + ')');
       timeRow.push(display);
     } else {
       timeRow.push(styleText(['white'], 'n/a'));
@@ -395,20 +409,52 @@ async function processFile(fileName) {
       });
     }
 
-    // HTML Minifier Terser
+    // HTML Minifier Terser (run in separate process for timeout support)
     async function testHTMLMinifierTerser() {
-      const data = await readText(filePath);
       const info = infos.minifierterser;
       info.startTime = Date.now();
+      const configPath = path.join(__dirname, 'html-minifier.json');
+      const args = [filePath, '-c', configPath, '-o', info.filePath];
 
-      try {
-        const result = await minifyTerser(data, minifierConfig);
-        await writeText(info.filePath, result);
-        await readSizes(info);
-      } catch (err) {
-        benchmarkErrors.push(`HTML Minifier Terser failed for ${fileName}: ${err.message}`);
-        resetSizes(info);
-      }
+      return new Promise((resolve) => {
+        const child = fork(path.join(__dirname, 'node_modules/html-minifier-terser/cli.js'), args);
+        let timeoutId;
+
+        // Set timeout for CLI process (30 seconds)
+        timeoutId = setTimeout(() => {
+          child.kill('SIGTERM');
+          benchmarkErrors.push(`HTML Minifier Terser timed out after 30 seconds for ${fileName}`);
+          resetSizes(info);
+          resolve();
+        }, TEST_TIMEOUT);
+
+        child.on('exit', async function (code, signal) {
+          clearTimeout(timeoutId);
+
+          if (code !== 0) {
+            benchmarkErrors.push(`HTML Minifier Terser failed with exit code ${code}${signal ? ` (signal: ${signal})` : ''} for ${fileName}`);
+            resetSizes(info);
+            resolve();
+            return;
+          }
+
+          try {
+            await readSizes(info);
+            resolve();
+          } catch (err) {
+            benchmarkErrors.push(`Failed to read sizes after HTML Minifier Terser processing ${fileName}: ${err.message}`);
+            resetSizes(info);
+            resolve();
+          }
+        });
+
+        child.on('error', function (error) {
+          clearTimeout(timeoutId);
+          benchmarkErrors.push(`HTML Minifier Terser process error for ${fileName}: ${error.message}`);
+          resetSizes(info);
+          resolve();
+        });
+      });
     }
 
     // htmlnano, https://htmlnano.netlify.app/presets
@@ -629,12 +675,26 @@ async function processFile(fileName) {
     }
 
     await readSizes(original);
+
+    log(`${fileName}: Starting HTML Minifier Next`);
     await testHTMLMinifier();
+
+    log(`${fileName}: Starting HTML Minifier Terser`);
     await testHTMLMinifierTerser();
+
+    log(`${fileName}: Starting htmlnano`);
     await testhtmlnano();
+
+    log(`${fileName}: Starting @swc/html`);
     await testSWCHTML();
+
+    log(`${fileName}: Starting minify-html`);
     await testMinifyHTML();
+
+    log(`${fileName}: Starting Minimize`);
     await testMinimize();
+
+    log(`${fileName}: Starting htmlcompressor.com`);
     await testHTMLCompressor();
 
     const display = [
@@ -788,13 +848,19 @@ async function processFile(fileName) {
     });
   }
 
+  log(`Starting ${fileName}`);
+  log(`Downloading ${fileName}…`);
   progress.tick(0, { fileName: `Starting ${fileName}` });
+
   const site = await get(urls[fileName]);
   if (!site) {
     benchmarkErrors.push(`Skipping ${fileName} due to download failure`);
     rows[fileName] = null; // Explicitly mark as skipped
     return;
   }
+
+  log(`Processing ${fileName}…`);
+  log(`${fileName}: Downloaded, starting processing`);
   await processFileInternal(site);
 }
 
