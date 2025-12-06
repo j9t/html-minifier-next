@@ -4,6 +4,21 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.6.3] - 2025-12-06
+
+### Documentation
+
+- Added HTML Minifier Terser to benchmark comparison table for direct comparison with HMN’s original parent
+- Added average processing time metrics to benchmarks showing performance across all minifiers
+  - Displays average time per successful completion with success rate (e.g., “150 ms (10/10)”)
+  - Fastest tool is determined by lowest average time across successful runs
+  - Success rate is shown for transparency, allowing users to make informed decisions
+
+### Internal
+
+- Fixed benchmark timing measurement to exclude config file I/O for fair comparisons
+- Updated all benchmark dependencies to latest versions
+
 ## [4.6.2] - 2025-12-05
 
 ### Documentation
