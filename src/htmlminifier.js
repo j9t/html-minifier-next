@@ -7,17 +7,45 @@ import TokenChain from './tokenchain.js';
 import { replaceAsync } from './utils.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-const trimWhitespace = str => str && str.replace(/^[ \n\r\t\f]+/, '').replace(/[ \n\r\t\f]+$/, '');
+// Hoisted, reusable RegExp patterns and tiny helpers to avoid repeated allocations in hot paths
+const RE_WS_START = /^[ \n\r\t\f]+/;
+const RE_WS_END = /[ \n\r\t\f]+$/;
+const RE_ALL_WS_NBSP = /[ \n\r\t\f\xA0]+/g;
+const RE_NBSP_LEADING_GROUP = /(^|\xA0+)[^\xA0]+/g;
+const RE_NBSP_LEAD_GROUP = /(\xA0+)[^\xA0]+/g;
+const RE_NBSP_TRAILING_GROUP = /[^\xA0]+(\xA0+)/g;
+const RE_NBSP_TRAILING_STRIP = /[^\xA0]+$/;
+const RE_CONDITIONAL_COMMENT = /^\[if\s[^\]]+]|\[endif]$/;
+const RE_EVENT_ATTR_DEFAULT = /^on[a-z]{3,}$/;
+const RE_CAN_REMOVE_ATTR_QUOTES = /^[^ \t\n\f\r"'`=<>]+$/;
+const RE_TRAILING_SEMICOLON = /;$/;
+const RE_AMP_ENTITY = /&(#?[0-9a-zA-Z]+;)/g;
+
+const trimWhitespace = str => {
+  if (!str) return str;
+  // Fast path: if no whitespace at start or end, return early
+  if (!/^[ \n\r\t\f]/.test(str) && !/[ \n\r\t\f]$/.test(str)) {
+    return str;
+  }
+  return str.replace(RE_WS_START, '').replace(RE_WS_END, '');
+};
 
 function collapseWhitespaceAll(str) {
+  if (!str) return str;
+  // Fast path: if there are no common whitespace characters, return early
+  if (!/[ \n\r\t\f\xA0]/.test(str)) {
+    return str;
+  }
   // Non-breaking space is specifically handled inside the replacer function here:
-  return str && str.replace(/[ \n\r\t\f\xA0]+/g, function (spaces) {
-    return spaces === '\t' ? '\t' : spaces.replace(/(^|\xA0+)[^\xA0]+/g, '$1 ');
+  return str.replace(RE_ALL_WS_NBSP, function (spaces) {
+    return spaces === '\t' ? '\t' : spaces.replace(RE_NBSP_LEADING_GROUP, '$1 ');
   });
 }
 
 function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   let lineBreakBefore = ''; let lineBreakAfter = '';
+
+  if (!str) return str;
 
   if (options.preserveLineBreaks) {
     str = str.replace(/^[ \n\r\t\f]*?[\n\r][ \n\r\t\f]*/, function () {
@@ -36,7 +64,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
       if (conservative && spaces === '\t') {
         return '\t';
       }
-      return spaces.replace(/^[^\xA0]+/, '').replace(/(\xA0+)[^\xA0]+/g, '$1 ') || (conservative ? ' ' : '');
+      return spaces.replace(/^[^\xA0]+/, '').replace(RE_NBSP_LEAD_GROUP, '$1 ') || (conservative ? ' ' : '');
     });
   }
 
@@ -47,7 +75,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
       if (conservative && spaces === '\t') {
         return '\t';
       }
-      return spaces.replace(/[^\xA0]+(\xA0+)/g, ' $1').replace(/[^\xA0]+$/, '') || (conservative ? ' ' : '');
+      return spaces.replace(RE_NBSP_TRAILING_GROUP, ' $1').replace(RE_NBSP_TRAILING_STRIP, '') || (conservative ? ' ' : '');
     });
   }
 
@@ -79,7 +107,7 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, options, inlineElements,
 }
 
 function isConditionalComment(text) {
-  return /^\[if\s[^\]]+]|\[endif]$/.test(text);
+  return RE_CONDITIONAL_COMMENT.test(text);
 }
 
 function isIgnoredComment(text, options) {
@@ -101,12 +129,12 @@ function isEventAttribute(attrName, options) {
     }
     return false;
   }
-  return /^on[a-z]{3,}$/.test(attrName);
+  return RE_EVENT_ATTR_DEFAULT.test(attrName);
 }
 
 function canRemoveAttributeQuotes(value) {
   // https://mathiasbynens.be/notes/unquoted-attribute-values
-  return /^[^ \t\n\f\r"'`=<>]+$/.test(value);
+  return RE_CAN_REMOVE_ATTR_QUOTES.test(value);
 }
 
 function attributesInclude(attributes, attribute) {
@@ -317,7 +345,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
   } else if (attrName === 'style') {
     attrValue = trimWhitespace(attrValue);
     if (attrValue) {
-      if (/;$/.test(attrValue) && !/&#?[0-9a-zA-Z]+;$/.test(attrValue)) {
+      if (attrValue.endsWith(';') && !/&#?[0-9a-zA-Z]+;$/.test(attrValue)) {
         attrValue = attrValue.replace(/\s*;$/, ';');
       }
       attrValue = await options.minifyCSS(attrValue, 'inline');
@@ -636,7 +664,10 @@ async function normalizeAttr(attr, attrs, tag, options) {
   let attrValue = attr.value;
 
   if (options.decodeEntities && attrValue) {
-    attrValue = decodeHTMLStrict(attrValue);
+    // Fast path: only decode when entities are present
+    if (attrValue.indexOf('&') !== -1) {
+      attrValue = decodeHTMLStrict(attrValue);
+    }
   }
 
   if ((options.removeRedundantAttributes &&
@@ -657,8 +688,8 @@ async function normalizeAttr(attr, attrs, tag, options) {
     return;
   }
 
-  if (options.decodeEntities && attrValue) {
-    attrValue = attrValue.replace(/&(#?[0-9a-zA-Z]+;)/g, '&amp;$1');
+  if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
+    attrValue = attrValue.replace(RE_AMP_ENTITY, '&amp;$1');
   }
 
   return {
@@ -778,6 +809,10 @@ const processOptions = (inputOptions) => {
       const lightningCssOptions = typeof option === 'object' ? option : {};
 
       options.minifyCSS = async function (text, type) {
+        // Fast path: nothing to minify
+        if (!text || !text.trim()) {
+          return text;
+        }
         text = await replaceAsync(
           text,
           /(url\s*\(\s*)(?:"([^"]*)"|'([^']*)'|([^\s)]+))(\s*\))/ig,
@@ -854,8 +889,12 @@ const processOptions = (inputOptions) => {
         terserOptions.parse.bare_returns = inline;
 
         try {
+          // Fast path: avoid invoking Terser for empty/whitespace-only content
+          if (!code || !code.trim()) {
+            return '';
+          }
           const result = await terser(code, terserOptions);
-          return result.code.replace(/;$/, '');
+          return result.code.replace(RE_TRAILING_SEMICOLON, '');
         } catch (err) {
           if (!options.continueOnMinifyError) {
             throw err;
@@ -1318,7 +1357,9 @@ async function minifyHTML(value, options, partialMarkup) {
       prevTag = prevTag === '' ? 'comment' : prevTag;
       nextTag = nextTag === '' ? 'comment' : nextTag;
       if (options.decodeEntities && text && !specialContentTags.has(currentTag)) {
-        text = decodeHTML(text);
+        if (text.indexOf('&') !== -1) {
+          text = decodeHTML(text);
+        }
       }
       if (options.collapseWhitespace) {
         if (!stackNoTrimWhitespace.length) {
@@ -1392,11 +1433,16 @@ async function minifyHTML(value, options, partialMarkup) {
       charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
       if (options.decodeEntities && text && !specialContentTags.has(currentTag)) {
         // Escape any `&` symbols that start either:
-        // 1) a legacy named character reference (i.e. one that doesn't end with `;`)
-        // 2) or any other character reference (i.e. one that does end with `;`)
+        // 1) a legacy named character reference (i.e., one that doesn’t end with `;`)
+        // 2) or any other character reference (i.e., one that does end with `;`)
         // Note that `&` can be escaped as `&amp`, without the semi-colon.
         // https://mathiasbynens.be/notes/ambiguous-ampersands
-        text = text.replace(/&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt)(?!;)|(?:#?[0-9a-zA-Z]+;))/g, '&amp$1').replace(/</g, '&lt;');
+        if (text.indexOf('&') !== -1) {
+          text = text.replace(/&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt)(?!;)|(?:#?[0-9a-zA-Z]+;))/g, '&amp$1');
+        }
+        if (text.indexOf('<') !== -1) {
+          text = text.replace(/</g, '&lt;');
+        }
       }
       if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
         text = text.replace(uidPattern, function (match, prefix, index) {
