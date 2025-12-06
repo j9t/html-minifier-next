@@ -5,6 +5,7 @@
     "@swc/html": "^1.15.3",
     "cli-table3": "^0.6.5",
     "cssnano": "^7.0.9",
+    "html-minifier-terser": "^7.2.0",
     "htmlnano": "^2.1.2",
     "lzma": "^2.3.2",
     "minimize": "^2.2.0",

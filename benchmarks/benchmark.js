@@ -16,6 +16,7 @@ import Table from 'cli-table3';
 import htmlnano from 'htmlnano';
 import { minify as minifySWC } from '@swc/html';
 import minifyHTMLPkg from '@minify-html/node';
+import { minify as minifyTerser } from 'html-minifier-terser';
 
 const { minify: minifyHTML } = minifyHTMLPkg;
 
@@ -38,10 +39,10 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
 });
 
 const table = new Table({
-  head: ['File', 'Before', 'HTML Minifier Next', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
+  head: ['File', 'Before', 'HTML Minifier Next', 'HTML Minifier Terser', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
   colWidths: [fileNames.reduce(function (length, fileName) {
     return Math.max(length, fileName.length);
-  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 20]
+  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 25, 20]
 });
 
 function toKb(size, precision) {
@@ -133,6 +134,7 @@ function generateMarkdownTable() {
     'Site',
     'Original Size (KB)',
     'HTML Minifier Next',
+    'HTML Minifier Terser',
     'htmlnano',
     '@swc/html',
     'minify-html',
@@ -230,7 +232,7 @@ async function processFile(fileName) {
       brFilePath: path.join('./generated/', fileName + '.html.br')
     };
     const infos = {};
-    ['minifier', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
+    ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
       infos[name] = {
         filePath: path.join('./generated/', fileName + '.' + name + '.html'),
         gzFilePath: path.join('./generated/', fileName + '.' + name + '.html.gz'),
@@ -316,6 +318,24 @@ async function processFile(fileName) {
           resolve();
         });
       });
+    }
+
+    // HTML Minifier Terser
+    async function testHTMLMinifierTerser() {
+      const data = await readText(filePath);
+      const info = infos.minifierterser;
+      info.startTime = Date.now();
+
+      try {
+        const configData = await readText(path.join(__dirname, 'html-minifier.json'));
+        const config = JSON.parse(configData);
+        const result = await minifyTerser(data, config);
+        await writeText(info.filePath, result);
+        await readSizes(info);
+      } catch (err) {
+        benchmarkErrors.push(`HTML Minifier Terser failed for ${fileName}: ${err.message}`);
+        resetSizes(info);
+      }
     }
 
     // htmlnano, https://htmlnano.netlify.app/presets
@@ -535,6 +555,7 @@ async function processFile(fileName) {
 
     await readSizes(original);
     await testHTMLMinifier();
+    await testHTMLMinifierTerser();
     await testhtmlnano();
     await testSWCHTML();
     await testMinifyHTML();
