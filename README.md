@@ -226,29 +226,29 @@ const result = await minify(html, {
 How does HTML Minifier Next compare to other minifiers, like [htmlnano](https://github.com/posthtml/htmlnano), [@swc/html](https://github.com/swc-project/swc), [minify-html](https://github.com/wilsonzlin/minify-html), [minimize](https://github.com/Swaagie/minimize), and [htmlcompressor.com](https://htmlcompressor.com/)? (All with the most aggressive settings, though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized).)
 
 <!-- Auto-generated benchmarks, don’t edit -->
-| Site | Original Size (KB) | HTML Minifier Next | htmlnano | @swc/html | minify-html | minimize | html­com­pressor.­com |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 62 | **52** | 54 | 55 | 55 | 58 | 56 |
-| [Apple](https://www.apple.com/) | 190 | **146** | 166 | 169 | 172 | 175 | 172 |
-| [BBC](https://www.bbc.co.uk/) | 673 | **613** | 633 | 633 | 634 | 668 | n/a |
-| [Codeberg](https://codeberg.org/) | 33 | 29 | **27** | 30 | 30 | 30 | 30 |
-| [CSS-Tricks](https://css-tricks.com/) | 165 | **125** | 129 | 146 | 146 | 151 | 148 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6341** | 6561 | 6444 | 6567 | 6615 | n/a |
-| [EFF](https://www.eff.org/) | 54 | **46** | 49 | 47 | 47 | 49 | 49 |
-| [FAZ](https://www.faz.net/aktuell/) | 1609 | 1500 | **1431** | 1532 | 1544 | 1555 | n/a |
-| [Frontend Dogma](https://frontenddogma.com/) | 220 | **211** | 232 | 217 | 219 | 237 | 218 |
-| [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | n/a | 18 | 18 |
-| [Ground News](https://ground.news/) | 2358 | **2067** | 2169 | 2199 | n/a | 2345 | n/a |
-| [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | 153 | **147** | 149 | 155 | 148 |
-| [Leanpub](https://leanpub.com/) | 1348 | **1142** | 1149 | 1148 | n/a | 1343 | n/a |
-| [Mastodon](https://mastodon.social/explore) | 35 | **26** | 30 | 33 | 33 | 34 | 34 |
-| [MDN](https://developer.mozilla.org/en-US/) | 107 | **62** | 64 | 64 | n/a | 67 | 67 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 224 | **197** | 204 | 202 | 202 | 204 | 205 |
-| [SitePoint](https://www.sitepoint.com/) | 492 | **350** | 426 | 465 | 472 | 488 | n/a |
-| [United Nations](https://www.un.org/en/) | 151 | **113** | 121 | 125 | 125 | 130 | 123 |
-| [W3C](https://www.w3.org/) | 50 | **36** | 38 | 38 | 38 | 40 | 38 |
+| Site | Original Size (KB) | HTML Minifier Next | HTML Minifier Terser | htmlnano | @swc/html | minify-html | minimize | html­com­pressor.­com |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [A List Apart](https://alistapart.com/) | 59 | **49** | 52 | 51 | 52 | 51 | 54 | 52 |
+| [Apple](https://www.apple.com/) | 185 | **144** | 147 | 163 | 166 | 167 | 171 | 169 |
+| [BBC](https://www.bbc.co.uk/) | 710 | **645** | 659 | 667 | 667 | 668 | 704 | n/a |
+| [CSS-Tricks](https://css-tricks.com/) | 162 | **121** | 126 | 127 | 142 | 142 | 147 | 144 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7237 | **6341** | 6342 | 6561 | 6444 | 6567 | 6614 | n/a |
+| [EFF](https://www.eff.org/) | 55 | **47** | 48 | 49 | 48 | 49 | 50 | 50 |
+| [FAZ](https://www.faz.net/aktuell/) | 1519 | 1416 | 1432 | **1366** | 1446 | 1457 | 1468 | n/a |
+| [Frontend Dogma](https://frontenddogma.com/) | 222 | **214** | 222 | 235 | 220 | 221 | 240 | 221 |
+| [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | **17** | 18 | 18 | 18 |
+| [Ground News](https://ground.news/) | 1491 | **1271** | 1275 | 1369 | 1395 | 1401 | 1478 | n/a |
+| [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | **147** | 153 | **147** | 149 | 155 | 149 |
+| [Leanpub](https://leanpub.com/) | 1723 | **1472** | 1474 | 1479 | 1478 | 1473 | 1718 | n/a |
+| [Mastodon](https://mastodon.social/explore) | 35 | **26** | **26** | 30 | 33 | 33 | 34 | 34 |
+| [MDN](https://developer.mozilla.org/en-US/) | 107 | **62** | 63 | 64 | 64 | 65 | 67 | 67 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 222 | **195** | 196 | 202 | 200 | 200 | 202 | 203 |
+| [SitePoint](https://www.sitepoint.com/) | 508 | **366** | 368 | 444 | 482 | 486 | 504 | n/a |
+| [United Nations](https://www.un.org/en/) | 153 | **114** | 120 | 123 | 127 | 126 | 132 | 125 |
+| [W3C](https://www.w3.org/) | 50 | **36** | 38 | 38 | 38 | 38 | 40 | 38 |
+| **Average processing time** |  | 373 ms (18/18) | 331 ms (18/18) | 210 ms (18/18) | 75 ms (18/18) | **20 ms (18/18)** | 435 ms (18/18) | 1543 ms (12/18) |
 
-(Last updated: Dec 1, 2025)
+(Last updated: Dec 6, 2025)
 <!-- End auto-generated -->
 
 ## Examples

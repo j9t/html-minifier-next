@@ -25,6 +25,7 @@ const __dirname = path.dirname(__filename);
 const user_agent = 'html-minifier-next-benchmarks/0.0';
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
+const minifierConfig = JSON.parse(await fs.readFile(path.join(__dirname, 'html-minifier.json'), 'utf8'));
 const minimize = new Minimize();
 const benchmarkErrors = [];
 
@@ -37,11 +38,22 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
   stream: process.stderr
 });
 
+// Verbose logging flag (run via `VERBOSE=true npm run benchmarks`)
+const VERBOSE = process.env.VERBOSE === 'true';
+function log(message) {
+  if (VERBOSE) {
+    console.error(`[DEBUG] ${message}`);
+  }
+}
+
+// Timeout for forked processes (HMN and HM Terser)
+const TEST_TIMEOUT = 30000;
+
 const table = new Table({
-  head: ['File', 'Before', 'HTML Minifier Next', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
+  head: ['File', 'Before', 'HTML Minifier Next', 'HTML Minifier Terser', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
   colWidths: [fileNames.reduce(function (length, fileName) {
     return Math.max(length, fileName.length);
-  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 20]
+  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 25, 20]
 });
 
 function toKb(size, precision) {
@@ -127,12 +139,31 @@ function promiseLzma(data) {
 }
 
 const rows = {};
+const totalTimes = {
+  minifier: 0,
+  minifierterser: 0,
+  htmlnano: 0,
+  swchtml: 0,
+  minifyhtml: 0,
+  minimize: 0,
+  compressor: 0
+};
+const successCounts = {
+  minifier: 0,
+  minifierterser: 0,
+  htmlnano: 0,
+  swchtml: 0,
+  minifyhtml: 0,
+  minimize: 0,
+  compressor: 0
+};
 
 function generateMarkdownTable() {
   const headers = [
     'Site',
     'Original Size (KB)',
     'HTML Minifier Next',
+    'HTML Minifier Terser',
     'htmlnano',
     '@swc/html',
     'minify-html',
@@ -198,6 +229,44 @@ function generateMarkdownTable() {
     output(rows[fileName].report);
   });
 
+  // Add average processing time row
+  const timeRow = ['**Average processing time**', ''];
+  const minifierNames = ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'];
+
+  // Count only sites that were actually processed (not skipped due to download failure)
+  const processedSites = fileNames.filter(name => rows[name] && rows[name].report).length;
+
+  // Calculate averages and find fastest
+  const averages = {};
+  let fastestAvg = null;
+  minifierNames.forEach(function (name) {
+    const successCount = successCounts[name];
+    if (successCount > 0) {
+      averages[name] = totalTimes[name] / successCount;
+      // Find the fastest average across all tools that succeeded on at least one site
+      if (fastestAvg === null || averages[name] < fastestAvg) {
+        fastestAvg = averages[name];
+      }
+    }
+  });
+
+  minifierNames.forEach(function (name) {
+    const successCount = successCounts[name];
+    if (successCount > 0) {
+      const avgTime = Math.round(averages[name]);
+      const display = avgTime + ' ms (' + successCount + '/' + processedSites + ')';
+      // Bold if this is the fastest average
+      if (fastestAvg !== null && averages[name] === fastestAvg) {
+        timeRow.push('**' + display + '**');
+      } else {
+        timeRow.push(display);
+      }
+    } else {
+      timeRow.push('n/a');
+    }
+  });
+  output(timeRow);
+
   return content;
 }
 
@@ -209,6 +278,28 @@ function displayTable() {
       benchmarkErrors.push(`No data available for ${fileName}. Skipping.`);
     }
   });
+
+  // Add average processing time row
+  const timeRow = ['Average processing time', ''];
+  const minifierNames = ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'];
+
+  // Count only sites that were actually processed (not skipped due to download failure)
+  const processedSites = fileNames.filter(name => rows[name]).length;
+
+  minifierNames.forEach(function (name) {
+    const successCount = successCounts[name];
+    if (successCount > 0) {
+      const avgTime = Math.round(totalTimes[name] / successCount);
+      const display = styleText(['cyan', 'bold'], String(avgTime)) +
+                      styleText(['white'], ' ms (' + successCount + '/' + processedSites + ')');
+      timeRow.push(display);
+    } else {
+      timeRow.push(styleText(['white'], 'n/a'));
+    }
+  });
+  timeRow.push('', '');
+  table.push(timeRow);
+
   console.log();
   console.log(table.toString());
 }
@@ -230,7 +321,7 @@ async function processFile(fileName) {
       brFilePath: path.join('./generated/', fileName + '.html.br')
     };
     const infos = {};
-    ['minifier', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
+    ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
       infos[name] = {
         filePath: path.join('./generated/', fileName + '.' + name + '.html'),
         gzFilePath: path.join('./generated/', fileName + '.' + name + '.html.gz'),
@@ -318,6 +409,54 @@ async function processFile(fileName) {
       });
     }
 
+    // HTML Minifier Terser (run in separate process for timeout support)
+    async function testHTMLMinifierTerser() {
+      const info = infos.minifierterser;
+      info.startTime = Date.now();
+      const configPath = path.join(__dirname, 'html-minifier.json');
+      const args = [filePath, '-c', configPath, '-o', info.filePath];
+
+      return new Promise((resolve) => {
+        const child = fork(path.join(__dirname, 'node_modules/html-minifier-terser/cli.js'), args);
+        let timeoutId;
+
+        // Set timeout for CLI process (30 seconds)
+        timeoutId = setTimeout(() => {
+          child.kill('SIGTERM');
+          benchmarkErrors.push(`HTML Minifier Terser timed out after 30 seconds for ${fileName}`);
+          resetSizes(info);
+          resolve();
+        }, TEST_TIMEOUT);
+
+        child.on('exit', async function (code, signal) {
+          clearTimeout(timeoutId);
+
+          if (code !== 0) {
+            benchmarkErrors.push(`HTML Minifier Terser failed with exit code ${code}${signal ? ` (signal: ${signal})` : ''} for ${fileName}`);
+            resetSizes(info);
+            resolve();
+            return;
+          }
+
+          try {
+            await readSizes(info);
+            resolve();
+          } catch (err) {
+            benchmarkErrors.push(`Failed to read sizes after HTML Minifier Terser processing ${fileName}: ${err.message}`);
+            resetSizes(info);
+            resolve();
+          }
+        });
+
+        child.on('error', function (error) {
+          clearTimeout(timeoutId);
+          benchmarkErrors.push(`HTML Minifier Terser process error for ${fileName}: ${error.message}`);
+          resetSizes(info);
+          resolve();
+        });
+      });
+    }
+
     // htmlnano, https://htmlnano.netlify.app/presets
     async function testhtmlnano() {
       const data = await readText(filePath);
@@ -398,14 +537,15 @@ async function processFile(fileName) {
     // Minimize, https://github.com/Swaagie/minimize
     async function testMinimize() {
       const data = await readText(filePath);
+      const info = infos.minimize;
+      info.startTime = Date.now();
+
       return new Promise((resolve, reject) => {
         minimize.parse(data, function (err, data) {
           if (err) {
             benchmarkErrors.push(`Minimize failed for ${fileName}: ${err.message}`);
             return reject(new Error(`Minimize failed for ${fileName}: ${err.message}`));
           }
-
-          const info = infos.minimize;
 
           Promise.resolve()
             .then(() => writeBuffer(info.filePath, data))
@@ -430,6 +570,7 @@ async function processFile(fileName) {
       };
 
       let info = infos.compressor;
+      info.startTime = Date.now();
 
       function failed() {
         // Site refused to process content
@@ -534,11 +675,26 @@ async function processFile(fileName) {
     }
 
     await readSizes(original);
+
+    log(`${fileName}: Starting HTML Minifier Next`);
     await testHTMLMinifier();
+
+    log(`${fileName}: Starting HTML Minifier Terser`);
+    await testHTMLMinifierTerser();
+
+    log(`${fileName}: Starting htmlnano`);
     await testhtmlnano();
+
+    log(`${fileName}: Starting @swc/html`);
     await testSWCHTML();
+
+    log(`${fileName}: Starting minify-html`);
     await testMinifyHTML();
+
+    log(`${fileName}: Starting Minimize`);
     await testMinimize();
+
+    log(`${fileName}: Starting htmlcompressor.com`);
     await testHTMLCompressor();
 
     const display = [
@@ -581,6 +737,16 @@ async function processFile(fileName) {
       display: display,
       report: report
     };
+
+    // Accumulate total processing times and count successes
+    for (const name in infos) {
+      const info = infos[name];
+      if (info.startTime && info.endTime && info.size > 0) {
+        totalTimes[name] += (info.endTime - info.startTime);
+        successCounts[name]++;
+      }
+    }
+
     progress.tick({ fileName: `Completed ${fileName}` });
   }
 
@@ -682,13 +848,19 @@ async function processFile(fileName) {
     });
   }
 
+  log(`Starting ${fileName}`);
+  log(`Downloading ${fileName}…`);
   progress.tick(0, { fileName: `Starting ${fileName}` });
+
   const site = await get(urls[fileName]);
   if (!site) {
     benchmarkErrors.push(`Skipping ${fileName} due to download failure`);
     rows[fileName] = null; // Explicitly mark as skipped
     return;
   }
+
+  log(`Processing ${fileName}…`);
+  log(`${fileName}: Downloaded, starting processing`);
   await processFileInternal(site);
 }
 
