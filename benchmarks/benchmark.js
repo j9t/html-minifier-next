@@ -29,15 +29,6 @@ const minifierConfig = JSON.parse(await fs.readFile(path.join(__dirname, 'html-m
 const minimize = new Minimize();
 const benchmarkErrors = [];
 
-const progress = new Progress(':current/:total [:bar] :percent :etas :fileName', {
-  width: 40,
-  total: fileNames.length,
-  complete: '=',
-  incomplete: '-',
-  clear: true,
-  stream: process.stderr
-});
-
 // Verbose logging flag (run via `VERBOSE=true npm run benchmarks`)
 const VERBOSE = process.env.VERBOSE === 'true';
 function log(message) {
@@ -45,6 +36,15 @@ function log(message) {
     console.error(`[DEBUG] ${message}`);
   }
 }
+
+const progress = new Progress(':current/:total [:bar] :percent :etas :fileName', {
+  width: 40,
+  total: fileNames.length,
+  complete: '=',
+  incomplete: '-',
+  clear: !VERBOSE,
+  stream: process.stderr
+});
 
 // Timeout for forked processes (HMN and HM Terser)
 const TEST_TIMEOUT = 30000;
