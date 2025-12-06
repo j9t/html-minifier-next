@@ -876,8 +876,9 @@ const processOptions = (inputOptions) => {
         // Cache key: wrapped content, type, options signature
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
+        // For large inputs, use length and content fingerprint (first/last 50 chars) to prevent collisions
         const cssKey = inputCSS.length > 2048
-          ? (inputCSS.length + '|' + type + '|' + cssSig)
+          ? (inputCSS.length + '|' + inputCSS.slice(0, 50) + inputCSS.slice(-50) + '|' + type + '|' + cssSig)
           : (inputCSS + '|' + type + '|' + cssSig);
 
         try {
@@ -956,7 +957,8 @@ const processOptions = (inputOptions) => {
             format: terserOptions.format,
             cont: !!options.continueOnMinifyError,
           });
-          jsKey = (code.length > 2048 ? (code.length + '|') : (code + '|')) + (inline ? '1' : '0') + '|' + terserSig;
+          // For large inputs, use length and content fingerprint (first/last 50 chars) to prevent collisions
+          jsKey = (code.length > 2048 ? (code.length + '|' + code.slice(0, 50) + code.slice(-50) + '|') : (code + '|')) + (inline ? '1' : '0') + '|' + terserSig;
           const cached = jsMinifyCache.get(jsKey);
           if (cached) {
             return await cached;
