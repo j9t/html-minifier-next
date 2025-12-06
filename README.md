@@ -230,23 +230,22 @@ How does HTML Minifier Next compare to other minifiers, like [HTML Minifier Ters
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **49** | 50 | 51 | 52 | 51 | 54 | 52 |
 | [Apple](https://www.apple.com/) | 185 | **144** | **144** | 163 | 166 | 167 | 171 | 169 |
-| [BBC](https://www.bbc.co.uk/) | 710 | **645** | 656 | 667 | 668 | 669 | 705 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 712 | **646** | 656 | 668 | 669 | 670 | 706 | n/a |
 | [CSS-Tricks](https://css-tricks.com/) | 161 | 121 | **119** | 127 | 142 | 142 | 147 | 144 |
 | [ECMAScript](https://tc39.es/ecma262/) | 7237 | **6341** | **6341** | 6561 | 6444 | 6567 | 6614 | n/a |
 | [EFF](https://www.eff.org/) | 55 | **47** | **47** | 49 | 48 | 49 | 50 | 50 |
-| [FAZ](https://www.faz.net/aktuell/) | 1530 | 1426 | 1431 | **1375** | 1456 | 1467 | 1478 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1530 | 1425 | 1430 | **1375** | 1456 | 1467 | 1478 | n/a |
 | [Frontend Dogma](https://frontenddogma.com/) | 221 | **212** | **212** | 233 | 218 | 220 | 238 | 219 |
 | [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | **17** | **17** | 18 | 18 |
-| [Ground News](https://ground.news/) | 1495 | **1273** | 1276 | 1375 | 1399 | 1405 | 1482 | n/a |
+| [Ground News](https://ground.news/) | 1503 | **1287** | 1290 | 1385 | 1407 | 1413 | 1490 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | **147** | 153 | **147** | 149 | 155 | 149 |
 | [Leanpub](https://leanpub.com/) | 1723 | **1472** | **1472** | 1479 | 1478 | 1473 | 1718 | n/a |
 | [Mastodon](https://mastodon.social/explore) | 35 | **26** | **26** | 30 | 33 | 33 | 34 | 34 |
 | [MDN](https://developer.mozilla.org/en-US/) | 107 | **62** | **62** | 64 | 64 | 65 | 67 | 67 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 222 | **195** | **195** | 202 | 200 | 200 | 202 | 203 |
 | [SitePoint](https://www.sitepoint.com/) | 508 | **366** | **366** | 444 | 482 | 486 | 504 | n/a |
 | [United Nations](https://www.un.org/en/) | 153 | **114** | 116 | 123 | 127 | 126 | 132 | 125 |
 | [W3C](https://www.w3.org/) | 50 | **36** | **36** | 38 | 38 | 38 | 40 | 38 |
-| **Average processing time** |  | 366 ms (18/18) | 411 ms (18/18) | 202 ms (18/18) | 76 ms (18/18) | **20 ms (18/18)** | 431 ms (18/18) | 1459 ms (12/18) |
+| **Average processing time** |  | 388 ms (17/17) | 434 ms (17/17) | 219 ms (17/17) | 83 ms (17/17) | **21 ms (17/17)** | 455 ms (17/17) | 1348 ms (11/17) |
 
 (Last updated: Dec 6, 2025)
 <!-- End auto-generated -->
