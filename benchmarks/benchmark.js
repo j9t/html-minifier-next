@@ -162,13 +162,13 @@ function generateMarkdownTable() {
   const headers = [
     'Site',
     'Original Size (KB)',
-    'HTML Minifier Next',
-    'HTML Minifier Terser',
-    'htmlnano',
-    '@swc/html',
-    'minify-html',
-    'minimize',
-    'html­com­pressor.­com'
+    '[HTML Minifier Next](https://github.com/j9t/html-minifier-next)<br>![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)',
+    '[HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)',
+    '[htmlnano](https://github.com/posthtml/htmlnano)<br>![npm last update](https://img.shields.io/npm/last-update/htmlnano)',
+    '[@swc/html](https://github.com/swc-project/swc)<br>![npm last update](https://img.shields.io/npm/last-update/@swc/html)',
+    '[minify-html](https://github.com/wilsonzlin/minify-html)<br>![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)',
+    '[minimize](https://github.com/Swaagie/minimize)<br>![npm last update](https://img.shields.io/npm/last-update/minimize)',
+    '[html­com­pressor.­com](https://htmlcompressor.com/)'
   ];
 
   fileNames.forEach(function (fileName) {
