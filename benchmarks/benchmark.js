@@ -29,15 +29,6 @@ const minifierConfig = JSON.parse(await fs.readFile(path.join(__dirname, 'html-m
 const minimize = new Minimize();
 const benchmarkErrors = [];
 
-const progress = new Progress(':current/:total [:bar] :percent :etas :fileName', {
-  width: 40,
-  total: fileNames.length,
-  complete: '=',
-  incomplete: '-',
-  clear: true,
-  stream: process.stderr
-});
-
 // Verbose logging flag (run via `VERBOSE=true npm run benchmarks`)
 const VERBOSE = process.env.VERBOSE === 'true';
 function log(message) {
@@ -45,6 +36,15 @@ function log(message) {
     console.error(`[DEBUG] ${message}`);
   }
 }
+
+const progress = new Progress(':current/:total [:bar] :percent :etas :fileName', {
+  width: 40,
+  total: fileNames.length,
+  complete: '=',
+  incomplete: '-',
+  clear: !VERBOSE,
+  stream: process.stderr
+});
 
 // Timeout for forked processes (HMN and HM Terser)
 const TEST_TIMEOUT = 30000;
@@ -184,34 +184,22 @@ function generateMarkdownTable() {
     // Minifier results start at index 2 (HTML Minifier Next)
     const minifierResults = [];
     for (let i = 2; i < row.length; i++) {
-      const value = row[i];
-      // Skip “n/a” results and parse numeric values
-      if (value !== 'n/a' && value !== '<1') {
-        const numericValue = parseFloat(value);
-        if (!isNaN(numericValue)) {
-          minifierResults.push({ index: i, value: numericValue, originalText: value });
-        }
+      const raw = row[i];
+      // Skip non-numeric markers
+      if (raw === 'n/a' || raw === '<1') continue;
+
+      const numericValue = parseFloat(raw);
+      if (!Number.isNaN(numericValue)) {
+        minifierResults.push({ index: i, value: numericValue });
       }
     }
 
     if (minifierResults.length > 0) {
-      // Find the minimum value
+      // Find and store indices of cells with minimum value
       const minValue = Math.min(...minifierResults.map(r => r.value));
-
-      // Bold all results that equal the minimum value
-      minifierResults.forEach(result => {
-        if (result.value === minValue) {
-          // Prevent double-bolding when regenerating README table
-          if (!result.originalText.startsWith('**')) {
-            row[result.index] = '**' + result.originalText + '**';
-          }
-        } else {
-          // Remove existing bold formatting if it’s not the best result
-          if (result.originalText.startsWith('**') && result.originalText.endsWith('**')) {
-            row[result.index] = result.originalText.slice(2, -2);
-          }
-        }
-      });
+      rows[fileName].boldIndices = new Set(
+        minifierResults.filter(r => r.value === minValue).map(r => r.index)
+      );
     }
   });
 
@@ -226,7 +214,11 @@ function generateMarkdownTable() {
 
   fileNames.forEach(function (fileName) {
     if (!rows[fileName] || !rows[fileName].report) return; // Prevent outputting rows with missing data
-    output(rows[fileName].report);
+    const row = rows[fileName].report;
+    const boldIndices = rows[fileName].boldIndices;
+    // Apply bold formatting during output without modifying original data
+    const formattedRow = row.map((cell, i) => boldIndices?.has(i) ? `**${cell}**` : cell);
+    output(formattedRow);
   });
 
   // Add average processing time row
@@ -366,19 +358,20 @@ async function processFile(fileName) {
       const info = infos.minifier;
       info.startTime = Date.now();
       const configPath = path.join(__dirname, 'html-minifier.json');
+      // Pass site URL via CLI (not config) since each test uses a different base URL
       const args = [filePath, '-c', configPath, '--minify-urls', site, '-o', info.filePath];
 
       return new Promise((resolve) => {
         const child = fork(path.join(__dirname, '../cli.js'), args);
         let timeoutId;
 
-        // Set timeout for CLI process (30 seconds)
+        // Set timeout for CLI process
         timeoutId = setTimeout(() => {
           child.kill('SIGTERM');
-          benchmarkErrors.push(`HTML Minifier CLI timed out after 30 seconds for ${fileName}`);
+          benchmarkErrors.push(`HTML Minifier CLI timed out after ${TEST_TIMEOUT / 1000} seconds for ${fileName}`);
           resetSizes(info);
           resolve();
-        }, 30000);
+        }, TEST_TIMEOUT);
 
         child.on('exit', async function (code, signal) {
           clearTimeout(timeoutId);
@@ -414,16 +407,17 @@ async function processFile(fileName) {
       const info = infos.minifierterser;
       info.startTime = Date.now();
       const configPath = path.join(__dirname, 'html-minifier.json');
-      const args = [filePath, '-c', configPath, '-o', info.filePath];
+      // Pass site URL via CLI (not config) since each test uses a different base URL
+      const args = [filePath, '-c', configPath, '--minify-urls', site, '-o', info.filePath];
 
       return new Promise((resolve) => {
         const child = fork(path.join(__dirname, 'node_modules/html-minifier-terser/cli.js'), args);
         let timeoutId;
 
-        // Set timeout for CLI process (30 seconds)
+        // Set timeout for CLI process
         timeoutId = setTimeout(() => {
           child.kill('SIGTERM');
-          benchmarkErrors.push(`HTML Minifier Terser timed out after 30 seconds for ${fileName}`);
+          benchmarkErrors.push(`HTML Minifier Terser timed out after ${TEST_TIMEOUT / 1000} seconds for ${fileName}`);
           resetSizes(info);
           resolve();
         }, TEST_TIMEOUT);
@@ -540,18 +534,23 @@ async function processFile(fileName) {
       const info = infos.minimize;
       info.startTime = Date.now();
 
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         minimize.parse(data, function (err, data) {
           if (err) {
             benchmarkErrors.push(`Minimize failed for ${fileName}: ${err.message}`);
-            return reject(new Error(`Minimize failed for ${fileName}: ${err.message}`));
+            resetSizes(info);
+            return resolve();
           }
 
           Promise.resolve()
             .then(() => writeBuffer(info.filePath, data))
             .then(() => readSizes(info))
             .then(() => resolve())
-            .catch(err => reject(new Error(`Failed after minimize processing ${fileName}: ${err.message}`)));
+            .catch(err => {
+              benchmarkErrors.push(`Failed after minimize processing ${fileName}: ${err.message}`);
+              resetSizes(info);
+              resolve();
+            });
         });
       });
     }
@@ -676,25 +675,25 @@ async function processFile(fileName) {
 
     await readSizes(original);
 
-    log(`${fileName}: Starting HTML Minifier Next`);
+    log(`${fileName}: Running HTML Minifier Next`);
     await testHTMLMinifier();
 
-    log(`${fileName}: Starting HTML Minifier Terser`);
+    log(`${fileName}: Running HTML Minifier Terser`);
     await testHTMLMinifierTerser();
 
-    log(`${fileName}: Starting htmlnano`);
+    log(`${fileName}: Running htmlnano`);
     await testhtmlnano();
 
-    log(`${fileName}: Starting @swc/html`);
+    log(`${fileName}: Running @swc/html`);
     await testSWCHTML();
 
-    log(`${fileName}: Starting minify-html`);
+    log(`${fileName}: Running minify-html`);
     await testMinifyHTML();
 
-    log(`${fileName}: Starting Minimize`);
+    log(`${fileName}: Running Minimize`);
     await testMinimize();
 
-    log(`${fileName}: Starting htmlcompressor.com`);
+    log(`${fileName}: Running htmlcompressor.com`);
     await testHTMLCompressor();
 
     const display = [
