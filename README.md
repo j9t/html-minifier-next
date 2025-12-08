@@ -405,10 +405,12 @@ npm run serve
 Benchmarks for minified HTML:
 
 ```shell
-cd benchmarks
-npm install
+cd benchmarks;
+npm i;
 npm run benchmarks
 ```
+
+(In case of dependency conflicts, run `npm i` with the `--legacy-peer-deps` flag.)
 
 ## Acknowledgements
 
