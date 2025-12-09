@@ -258,8 +258,10 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
 
 (async () => {
   let content;
+  let filesProvided = false;
   await program.arguments('[files...]').action(function (files) {
     content = files.map(readFile).join('');
+    filesProvided = files.length > 0;
   }).parseAsync(process.argv);
 
   const programOptions = program.opts();
@@ -616,7 +618,7 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
         console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (${sign}${Math.abs(totalSaved).toLocaleString()}, ${totalPercentage}%)`);
       }
     })();
-  } else if (content) { // Minifying one or more files specified on the CMD line
+  } else if (filesProvided) { // Minifying one or more files specified on the CMD line
     writeMinify();
   } else { // Minifying input coming from STDIN
     content = '';
