@@ -715,7 +715,7 @@ function parseElementSpec(str, options) {
 
   // Parse attributes from string (supports double quotes, single quotes, and unquoted values)
   const attrs = {};
-  const attrRegex = /([a-zA-Z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g;
+  const attrRegex = /([a-zA-Z][\w:-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>/]+))/g;
   let attrMatch;
 
   while ((attrMatch = attrRegex.exec(attrString))) {
