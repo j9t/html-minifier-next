@@ -1727,6 +1727,40 @@ describe('HTML', () => {
       removeEmptyElements: true,
       removeEmptyElementsUnless: ['td']
     }), output);
+
+    // Case sensitivity: lowercase spec does not preserve uppercase element
+    input = '<div><TD></TD><td></td></div>';
+    output = '<div><td></td></div>';
+    assert.strictEqual(await minify(input, {
+      caseSensitive: true,
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['td']
+    }), output);
+
+    // Case sensitivity: exact-case spec preserves matching element
+    input = '<div><TD></TD><td></td></div>';
+    output = '<div><TD></TD></div>';
+    assert.strictEqual(await minify(input, {
+      caseSensitive: true,
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['TD']
+    }), output);
+
+    // Attribute order invariance
+    input = '<div><span aria-hidden="true" class="icon"></span></div>';
+    output = '<div><span aria-hidden="true" class="icon"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span class="icon" aria-hidden="true">']
+    }), output);
+
+    // Unquoted attribute value matches quoted spec
+    input = '<div><span aria-hidden=true></span></div>';
+    output = '<div><span aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+    }), output);
   });
 
   test('collapsing boolean attributes', async () => {
