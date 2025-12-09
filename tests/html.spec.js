@@ -1608,6 +1608,127 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), output);
   });
 
+  test('removeEmptyElementsUnless option', async () => {
+    let input, output;
+
+    // removeEmptyElementsUnless has no effect without removeEmptyElements
+    input = '<p></p><span></span>';
+    assert.strictEqual(await minify(input, { removeEmptyElementsUnless: ['p', 'span'] }), input);
+
+    // Simple tag name preservation
+    input = '<table><tr><td>Name</td><td>Age</td><td></td></tr></table>';
+    output = '<table><tr><td>Name</td><td>Age</td><td></td></tr></table>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['td']
+    }), output);
+
+    // Multiple tag names
+    input = '<div><span></span><td></td><th></th></div>';
+    output = '<div><td></td><th></th></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['td', 'th']
+    }), output);
+
+    // HTML-like markup with double quotes
+    input = '<div><span aria-hidden="true"></span><span class="other"></span></div>';
+    output = '<div><span aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+    }), output);
+
+    // HTML-like markup with single quotes
+    input = '<div><span aria-hidden="true"></span><span class="other"></span></div>';
+    output = '<div><span aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ["<span aria-hidden='true'>"]
+    }), output);
+
+    // HTML-like markup with unquoted attribute
+    input = '<div><span aria-hidden="true"></span><span class="other"></span></div>';
+    output = '<div><span aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span aria-hidden=true>']
+    }), output);
+
+    // Closing tag in markup (should work the same)
+    input = '<div><td></td><span></span></div>';
+    output = '<div><td></td></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<td></td>']
+    }), output);
+
+    // Element with matching tag but different attribute value should be removed
+    input = '<div><span aria-hidden="true"></span><span aria-hidden="false"></span></div>';
+    output = '<div><span aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+    }), output);
+
+    // Multiple attributes must all match
+    input = '<div><span class="icon" aria-hidden="true"></span><span class="icon"></span></div>';
+    output = '<div><span class="icon" aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span class="icon" aria-hidden="true">']
+    }), output);
+
+    // Additional attributes are allowed
+    input = '<div><span class="icon" aria-hidden="true" data-test="x"></span></div>';
+    output = '<div><span class="icon" aria-hidden="true" data-test="x"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+    }), output);
+
+    // Mixed formats in array
+    input = '<div><td></td><span aria-hidden="true"></span><div></div></div>';
+    output = '<div><td></td><span aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['td', '<span aria-hidden="true">']
+    }), output);
+
+    // Case insensitivity (tags are normalized via options.name)
+    input = '<div><TD></TD><Span></Span></div>';
+    output = '<div><td></td></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['td'],
+      caseSensitive: false
+    }), output);
+
+    // Bulma burger example from issue #94
+    input = '<a role="button" class="navbar-burger"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></a>';
+    output = '<a role="button" class="navbar-burger"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></a>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+    }), output);
+
+    // Empty table cell example from issue #94
+    input = '<table><tr><td>Kira</td><td>Goddess</td><td></td></tr></table>';
+    output = '<table><tr><td>Kira</td><td>Goddess</td><td></td></tr></table>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['td']
+    }), output);
+
+    // Non-matching elements still get removed
+    input = '<div><td></td><span></span><p></p></div>';
+    output = '<div><td></td></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['td']
+    }), output);
+  });
+
   test('collapsing boolean attributes', async () => {
     let input, output;
 
