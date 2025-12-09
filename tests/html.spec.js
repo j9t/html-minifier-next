@@ -1608,19 +1608,19 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), output);
   });
 
-  test('removeEmptyElementsUnless option', async () => {
+  test('removeEmptyElementsExcept option', async () => {
     let input, output;
 
-    // removeEmptyElementsUnless has no effect without removeEmptyElements
+    // removeEmptyElementsExcept has no effect without removeEmptyElements
     input = '<p></p><span></span>';
-    assert.strictEqual(await minify(input, { removeEmptyElementsUnless: ['p', 'span'] }), input);
+    assert.strictEqual(await minify(input, { removeEmptyElementsExcept: ['p', 'span'] }), input);
 
     // Simple tag name preservation
     input = '<table><tr><td>Name</td><td>Age</td><td></td></tr></table>';
     output = '<table><tr><td>Name</td><td>Age</td><td></td></tr></table>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['td']
+      removeEmptyElementsExcept: ['td']
     }), output);
 
     // Multiple tag names
@@ -1628,7 +1628,7 @@ describe('HTML', () => {
     output = '<div><td></td><th></th></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['td', 'th']
+      removeEmptyElementsExcept: ['td', 'th']
     }), output);
 
     // HTML-like markup with double quotes
@@ -1636,7 +1636,7 @@ describe('HTML', () => {
     output = '<div><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span aria-hidden="true">']
     }), output);
 
     // HTML-like markup with single quotes
@@ -1644,7 +1644,7 @@ describe('HTML', () => {
     output = '<div><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ["<span aria-hidden='true'>"]
+      removeEmptyElementsExcept: ["<span aria-hidden='true'>"]
     }), output);
 
     // HTML-like markup with unquoted attribute
@@ -1652,7 +1652,7 @@ describe('HTML', () => {
     output = '<div><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span aria-hidden=true>']
+      removeEmptyElementsExcept: ['<span aria-hidden=true>']
     }), output);
 
     // Closing tag in markup (should work the same)
@@ -1660,7 +1660,7 @@ describe('HTML', () => {
     output = '<div><td></td></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<td></td>']
+      removeEmptyElementsExcept: ['<td></td>']
     }), output);
 
     // Element with matching tag but different attribute value should be removed
@@ -1668,7 +1668,7 @@ describe('HTML', () => {
     output = '<div><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span aria-hidden="true">']
     }), output);
 
     // Multiple attributes must all match
@@ -1676,7 +1676,7 @@ describe('HTML', () => {
     output = '<div><span class="icon" aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span class="icon" aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span class="icon" aria-hidden="true">']
     }), output);
 
     // Additional attributes are allowed
@@ -1684,7 +1684,7 @@ describe('HTML', () => {
     output = '<div><span class="icon" aria-hidden="true" data-test="x"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span aria-hidden="true">']
     }), output);
 
     // Mixed formats in array
@@ -1692,7 +1692,7 @@ describe('HTML', () => {
     output = '<div><td></td><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['td', '<span aria-hidden="true">']
+      removeEmptyElementsExcept: ['td', '<span aria-hidden="true">']
     }), output);
 
     // Case insensitivity (tags are normalized via options.name)
@@ -1700,7 +1700,7 @@ describe('HTML', () => {
     output = '<div><td></td></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['td'],
+      removeEmptyElementsExcept: ['td'],
       caseSensitive: false
     }), output);
 
@@ -1709,7 +1709,7 @@ describe('HTML', () => {
     output = '<a role="button" class="navbar-burger"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></a>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span aria-hidden="true">']
     }), output);
 
     // Empty table cell example from issue #94
@@ -1717,7 +1717,7 @@ describe('HTML', () => {
     output = '<table><tr><td>Kira</td><td>Goddess</td><td></td></tr></table>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['td']
+      removeEmptyElementsExcept: ['td']
     }), output);
 
     // Non-matching elements still get removed
@@ -1725,7 +1725,7 @@ describe('HTML', () => {
     output = '<div><td></td></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['td']
+      removeEmptyElementsExcept: ['td']
     }), output);
 
     // Case sensitivity: lowercase spec does not preserve uppercase element
@@ -1734,7 +1734,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, {
       caseSensitive: true,
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['td']
+      removeEmptyElementsExcept: ['td']
     }), output);
 
     // Case sensitivity: exact-case spec preserves matching element
@@ -1743,7 +1743,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, {
       caseSensitive: true,
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['TD']
+      removeEmptyElementsExcept: ['TD']
     }), output);
 
     // Attribute order invariance
@@ -1751,7 +1751,7 @@ describe('HTML', () => {
     output = '<div><span aria-hidden="true" class="icon"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span class="icon" aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span class="icon" aria-hidden="true">']
     }), output);
 
     // Unquoted attribute value matches quoted spec
@@ -1759,7 +1759,7 @@ describe('HTML', () => {
     output = '<div><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span aria-hidden="true">']
     }), output);
 
     // Case-insensitive attribute name matching (uppercase HTML attribute)
@@ -1767,7 +1767,7 @@ describe('HTML', () => {
     output = '<div><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span aria-hidden="true">']
     }), output);
 
     // Case-insensitive attribute name matching (mixed case HTML attribute)
@@ -1775,7 +1775,7 @@ describe('HTML', () => {
     output = '<div><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+      removeEmptyElementsExcept: ['<span aria-hidden="true">']
     }), output);
 
     // Boolean attribute matching—element with boolean attribute is preserved
@@ -1783,7 +1783,7 @@ describe('HTML', () => {
     output = '<div><button disabled="disabled"></button></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<button disabled>']
+      removeEmptyElementsExcept: ['<button disabled>']
     }), output);
 
     // Boolean attribute matching—element without boolean attribute is removed
@@ -1791,7 +1791,7 @@ describe('HTML', () => {
     output = '<div><span hidden="hidden"></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span hidden>']
+      removeEmptyElementsExcept: ['<span hidden>']
     }), output);
 
     // Boolean attribute with valued attribute—both must match
@@ -1799,7 +1799,7 @@ describe('HTML', () => {
     output = '<div><button type="button" disabled="disabled"></button></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<button type="button" disabled>']
+      removeEmptyElementsExcept: ['<button type="button" disabled>']
     }), output);
 
     // Multiple boolean attributes in spec
@@ -1807,7 +1807,7 @@ describe('HTML', () => {
     output = '<div><button disabled="disabled" hidden></button></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<button disabled hidden>']
+      removeEmptyElementsExcept: ['<button disabled hidden>']
     }), output);
 
     // Boolean attribute matches regardless of how it appears in HTML (preserves original format)
@@ -1815,7 +1815,7 @@ describe('HTML', () => {
     output = '<div><span hidden></span><span hidden="hidden"></span><span hidden=""></span></div>';
     assert.strictEqual(await minify(input, {
       removeEmptyElements: true,
-      removeEmptyElementsUnless: ['<span hidden>']
+      removeEmptyElementsExcept: ['<span hidden>']
     }), output);
   });
 

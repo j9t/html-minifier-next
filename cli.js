@@ -151,7 +151,7 @@ const mainOptions = {
   removeComments: 'Strip HTML comments',
   removeEmptyAttributes: 'Remove all attributes with whitespace-only values',
   removeEmptyElements: 'Remove all elements with empty contents',
-  removeEmptyElementsUnless: ['Array of elements to preserve when “--remove-empty-elements” is enabled (e.g., “td”, “["td", "<span aria-hidden=\'true\'>"]”)', parseJSONArray],
+  removeEmptyElementsExcept: ['Array of elements to preserve when “--remove-empty-elements” is enabled (e.g., “td”, “["td", "<span aria-hidden=\'true\'>"]”)', parseJSONArray],
   removeOptionalTags: 'Remove unrequired tags',
   removeRedundantAttributes: 'Remove attributes when value matches default',
   removeScriptTypeAttributes: 'Remove “type="text/javascript"” from “script” elements; other “type” attribute values are left intact',

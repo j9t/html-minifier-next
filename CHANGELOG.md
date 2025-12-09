@@ -8,11 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-- Added `removeEmptyElementsUnless` option to preserve specific empty elements when `removeEmptyElements` is enabled
+- Added `removeEmptyElementsExcept` option to preserve specific empty elements when `removeEmptyElements` is enabled
   - Accepts array of element specifications: simple tag names (e.g., `"td"`) or HTML-like markup with attributes (e.g., `"<span aria-hidden='true'>"`)
   - Supports double quotes, single quotes, and unquoted attribute values
   - When attributes are specified, all must match for preservation (additional attributes allowed)
-  - Available in API, CLI (`--remove-empty-elements-unless`), and web demo
+  - Available in API, CLI (`--remove-empty-elements-except`), and web demo
   - Addresses use cases like preserving empty table cells or framework-required empty elements (e.g., Bulma navbar burger)
 
 ### Documentation

@@ -162,9 +162,9 @@ const defaultOptions = [
     unsafe: true
   },
   {
-    id: 'removeEmptyElementsUnless',
+    id: 'removeEmptyElementsExcept',
     type: 'text',
-    label: 'Remove empty elements unless',
+    label: 'Remove empty elements except',
     helpText: 'List of elements to preserve when `removeEmptyElements` is enabled (e.g., <code>td, &lt;span aria-hidden=\'true\'&gt;</code>)'
   },
   {
@@ -252,7 +252,7 @@ const getOptions = (options) => {
       value = option.value;
     }
 
-    if (option.id === 'processScripts' || option.id === 'removeEmptyElementsUnless') {
+    if (option.id === 'processScripts' || option.id === 'removeEmptyElementsExcept') {
       value = value.split(/\s*,\s*/);
     }
 
