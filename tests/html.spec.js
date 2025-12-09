@@ -1761,6 +1761,62 @@ describe('HTML', () => {
       removeEmptyElements: true,
       removeEmptyElementsUnless: ['<span aria-hidden="true">']
     }), output);
+
+    // Case-insensitive attribute name matching (uppercase HTML attribute)
+    input = '<div><span ARIA-HIDDEN="true"></span></div>';
+    output = '<div><span aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+    }), output);
+
+    // Case-insensitive attribute name matching (mixed case HTML attribute)
+    input = '<div><span Aria-Hidden="true"></span></div>';
+    output = '<div><span aria-hidden="true"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span aria-hidden="true">']
+    }), output);
+
+    // Boolean attribute matching—element with boolean attribute is preserved
+    input = '<div><button disabled></button><button></button></div>';
+    output = '<div><button disabled="disabled"></button></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<button disabled>']
+    }), output);
+
+    // Boolean attribute matching—element without boolean attribute is removed
+    input = '<div><span></span><span hidden="hidden"></span></div>';
+    output = '<div><span hidden="hidden"></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span hidden>']
+    }), output);
+
+    // Boolean attribute with valued attribute—both must match
+    input = '<div><button type="button" disabled></button><button type="button"></button><button disabled></button></div>';
+    output = '<div><button type="button" disabled="disabled"></button></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<button type="button" disabled>']
+    }), output);
+
+    // Multiple boolean attributes in spec
+    input = '<div><button disabled hidden></button><button disabled></button><button></button></div>';
+    output = '<div><button disabled="disabled" hidden></button></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<button disabled hidden>']
+    }), output);
+
+    // Boolean attribute matches regardless of how it appears in HTML (preserves original format)
+    input = '<div><span hidden></span><span hidden="hidden"></span><span hidden=""></span></div>';
+    output = '<div><span hidden></span><span hidden="hidden"></span><span hidden=""></span></div>';
+    assert.strictEqual(await minify(input, {
+      removeEmptyElements: true,
+      removeEmptyElementsUnless: ['<span hidden>']
+    }), output);
   });
 
   test('collapsing boolean attributes', async () => {
