@@ -7,20 +7,20 @@ import { presets, getPreset, getPresetNames } from './presets.js';
 
 // Lazy-load heavy dependencies only when needed
 
-let lightningCSSMinify;
+let lightningCSSPromise;
 async function getLightningCSS() {
-  if (!lightningCSSMinify) {
-    lightningCSSMinify = (await import('lightningcss')).transform;
+  if (!lightningCSSPromise) {
+    lightningCSSPromise = import('lightningcss').then(m => m.transform);
   }
-  return lightningCSSMinify;
+  return lightningCSSPromise;
 }
 
-let terserMinify;
+let terserPromise;
 async function getTerser() {
-  if (!terserMinify) {
-    terserMinify = (await import('terser')).minify;
+  if (!terserPromise) {
+    terserPromise = import('terser').then(m => m.minify);
   }
-  return terserMinify;
+  return terserPromise;
 }
 
 // Type definitions
