@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.2] - 2025-12-10
+
+### Performance
+
+- Pre-compiled regexes for common special elements (`script`, `style`, `noscript`) in HTML parser to eliminate regex creation overhead during parsing
+- Lazy-load heavy dependencies (Terser, Lightning CSS) only when CSS/JS minification is enabled
+- Optimized attribute quote counting by replacing two regex operations with single-pass character iteration
+- Cached inline element Sets to avoid redundant creation when no custom elements are configured
+- Improved attribute processing by replacing O(n²) unshift operations with O(n) push and reverse (faster for elements with many attributes)
+
 ## [4.8.1] - 2025-12-10
 
 ### Internal
