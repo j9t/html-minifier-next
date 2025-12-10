@@ -420,9 +420,9 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     }))).join(', ');
   } else if (isMetaViewport(tag, attrs) && attrName === 'content') {
     attrValue = attrValue.replace(/\s+/g, '').replace(/[0-9]+\.[0-9]+/g, function (numString) {
-      // "0.90000" -> "0.9"
-      // "1.0" -> "1"
-      // "1.0001" -> "1.0001" (unchanged)
+      // “0.90000” → “0.9”
+      // “1.0” → “1”
+      // “1.0001” → “1.0001” (unchanged)
       return (+numString).toString();
     });
   } else if (isContentSecurityPolicy(tag, attrs) && attrName.toLowerCase() === 'content') {
@@ -694,14 +694,23 @@ function canRemoveElement(tag, attrs) {
 }
 
 function parseElementSpec(str, options) {
+  if (typeof str !== 'string') {
+    return null;
+  }
+
+  const trimmed = str.trim();
+  if (!trimmed) {
+    return null;
+  }
+
   // Simple tag name: “td”
-  if (!/[<>]/.test(str)) {
-    return { tag: options.name(str.trim()), attrs: null };
+  if (!/[<>]/.test(trimmed)) {
+    return { tag: options.name(trimmed), attrs: null };
   }
 
   // HTML-like markup: “<span aria-hidden='true'>” or “<td></td>”
   // Extract opening tag using regex
-  const match = str.match(/^<([a-zA-Z][\w:-]*)((?:\s+[^>]*)?)>/);
+  const match = trimmed.match(/^<([a-zA-Z][\w:-]*)((?:\s+[^>]*)?)>/);
   if (!match) {
     return null;
   }
@@ -1235,7 +1244,15 @@ async function minifyHTML(value, options, partialMarkup) {
   const inlineElements = new Set([...inlineElementsToKeepWhitespaceAround, ...normalizedCustomElements]);
 
   // Parse `removeEmptyElementsExcept` option
-  const removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept || [], options);
+  let removeEmptyElementsExcept;
+  if (options.removeEmptyElementsExcept && !Array.isArray(options.removeEmptyElementsExcept)) {
+    if (options.log) {
+      options.log('Warning: "removeEmptyElementsExcept" option must be an array, received: ' + typeof options.removeEmptyElementsExcept);
+    }
+    removeEmptyElementsExcept = [];
+  } else {
+    removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
+  }
 
   // Temporarily replace ignored chunks with comments,
   // so that we don’t have to worry what’s there.
@@ -1507,10 +1524,15 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       if (options.removeEmptyElements && isElementEmpty && canRemoveElement(tag, attrs)) {
-        // Normalize attribute names for case-insensitive comparison with specs
-        const normalizedAttrs = attrs.map(attr => ({ ...attr, name: options.name(attr.name) }));
-        if (!shouldPreserveEmptyElement(tag, normalizedAttrs, removeEmptyElementsExcept)) {
-          // Remove last "element" from buffer
+        let preserve = false;
+        if (removeEmptyElementsExcept.length) {
+          // Normalize attribute names for comparison with specs
+          const normalizedAttrs = attrs.map(attr => ({ ...attr, name: options.name(attr.name) }));
+          preserve = shouldPreserveEmptyElement(tag, normalizedAttrs, removeEmptyElementsExcept);
+        }
+
+        if (!preserve) {
+          // Remove last “element” from buffer
           removeStartTag();
           optionalStartTag = '';
           optionalEndTag = '';
@@ -1810,7 +1832,7 @@ export default { minify, presets, getPreset, getPresetNames };
  *
  * @prop {boolean} [collapseBooleanAttributes]
  *  Collapse boolean attributes to their name only (for example
- *  `disabled="disabled"` -> `disabled`).
+ *  `disabled="disabled"` → `disabled`).
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes
  *
  *  Default: `false`
