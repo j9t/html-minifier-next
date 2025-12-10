@@ -1,11 +1,27 @@
-import { transform as transformCSS } from 'lightningcss';
 import { decodeHTMLStrict, decodeHTML } from 'entities';
 import RelateURL from 'relateurl';
-import { minify as terser } from 'terser';
 import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { replaceAsync } from './utils.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
+
+// Lazy-load heavy dependencies only when needed
+
+let lightningCSSMinify;
+async function getLightningCSS() {
+  if (!lightningCSSMinify) {
+    lightningCSSMinify = (await import('lightningcss')).transform;
+  }
+  return lightningCSSMinify;
+}
+
+let terserMinify;
+async function getTerser() {
+  if (!terserMinify) {
+    terserMinify = (await import('terser')).minify;
+  }
+  return terserMinify;
+}
 
 // Type definitions
 
@@ -1386,6 +1402,7 @@ const processOptions = (inputOptions) => {
             return cached;
           }
 
+          const transformCSS = await getLightningCSS();
           const result = transformCSS({
             filename: 'input.css',
             code: Buffer.from(inputCSS),
@@ -1463,6 +1480,7 @@ const processOptions = (inputOptions) => {
             return await cached;
           }
           const inFlight = (async () => {
+            const terser = await getTerser();
             const result = await terser(code, terserOptions);
             return result.code.replace(RE_TRAILING_SEMICOLON, '');
           })();
