@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Internal
 
 - Moved type definitions and JSDoc comments to follow standard practices
-- Added extra context (link to Socket overview) to minifier overview
+- Added extra context (link to Socket overview) to benchmark comparison table
 
 ## [4.8.0] - 2025-12-10
 
