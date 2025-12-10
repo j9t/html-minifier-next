@@ -40,7 +40,8 @@ const config = defineConfig([
     input: 'src/htmlminifier.js',
     output: {
       file: 'dist/htmlminifier.esm.bundle.js',
-      format: 'es'
+      format: 'es',
+      inlineDynamicImports: true
     },
     external: ['lightningcss'],
     plugins: browserBundlePlugins,
@@ -54,7 +55,8 @@ const config = defineConfig([
     output: {
       file: 'dist/htmlminifier.cjs',
       format: 'cjs',
-      exports: 'named'
+      exports: 'named',
+      inlineDynamicImports: true
     },
     external: ['lightningcss', 'terser', 'entities', 'relateurl'],
     onwarn
