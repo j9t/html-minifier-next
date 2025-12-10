@@ -1,11 +1,27 @@
-import { transform as transformCSS } from 'lightningcss';
 import { decodeHTMLStrict, decodeHTML } from 'entities';
 import RelateURL from 'relateurl';
-import { minify as terser } from 'terser';
 import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { replaceAsync } from './utils.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
+
+// Lazy-load heavy dependencies only when needed
+
+let lightningCSSPromise;
+async function getLightningCSS() {
+  if (!lightningCSSPromise) {
+    lightningCSSPromise = import('lightningcss').then(m => m.transform);
+  }
+  return lightningCSSPromise;
+}
+
+let terserPromise;
+async function getTerser() {
+  if (!terserPromise) {
+    terserPromise = import('terser').then(m => m.minify);
+  }
+  return terserPromise;
+}
 
 // Type definitions
 
@@ -504,7 +520,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
 }
 
 // Non-empty elements that will maintain whitespace around them
-const inlineElementsToKeepWhitespaceAround = ['a', 'abbr', 'acronym', 'b', 'bdi', 'bdo', 'big', 'button', 'cite', 'code', 'del', 'dfn', 'em', 'font', 'i', 'img', 'input', 'ins', 'kbd', 'label', 'mark', 'math', 'meter', 'nobr', 'object', 'output', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'select', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'svg', 'textarea', 'time', 'tt', 'u', 'var', 'wbr'];
+const inlineElementsToKeepWhitespaceAround = new Set(['a', 'abbr', 'acronym', 'b', 'bdi', 'bdo', 'big', 'button', 'cite', 'code', 'del', 'dfn', 'em', 'font', 'i', 'img', 'input', 'ins', 'kbd', 'label', 'mark', 'math', 'meter', 'nobr', 'object', 'output', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'select', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'svg', 'textarea', 'time', 'tt', 'u', 'var', 'wbr']);
 // Non-empty elements that will maintain whitespace within them
 const inlineElementsToKeepWhitespaceWithin = new Set(['a', 'abbr', 'acronym', 'b', 'big', 'del', 'em', 'font', 'i', 'ins', 'kbd', 'mark', 'nobr', 's', 'samp', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'time', 'tt', 'u', 'var']);
 // Elements that will always maintain whitespace around them
@@ -1244,8 +1260,12 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     ~attrValue.indexOf(uidAttr) || !canRemoveAttributeQuotes(attrValue))) {
     if (!options.preventAttributesEscaping) {
       if (typeof options.quoteCharacter === 'undefined') {
-        const apos = (attrValue.match(/'/g) || []).length;
-        const quot = (attrValue.match(/"/g) || []).length;
+        // Count quotes in a single pass instead of two regex operations
+        let apos = 0, quot = 0;
+        for (let i = 0; i < attrValue.length; i++) {
+          if (attrValue[i] === "'") apos++;
+          else if (attrValue[i] === '"') quot++;
+        }
         attrQuote = apos < quot ? '\'' : '"';
       } else {
         attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
@@ -1382,6 +1402,7 @@ const processOptions = (inputOptions) => {
             return cached;
           }
 
+          const transformCSS = await getLightningCSS();
           const result = transformCSS({
             filename: 'input.css',
             code: Buffer.from(inputCSS),
@@ -1459,6 +1480,7 @@ const processOptions = (inputOptions) => {
             return await cached;
           }
           const inFlight = (async () => {
+            const terser = await getTerser();
             const result = await terser(code, terserOptions);
             return result.code.replace(RE_TRAILING_SEMICOLON, '');
           })();
@@ -1640,8 +1662,13 @@ async function minifyHTML(value, options, partialMarkup) {
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
   const normalizedCustomElements = customElementsArr.map(name => options.name(name));
-  const inlineTextSet = new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements]);
-  const inlineElements = new Set([...inlineElementsToKeepWhitespaceAround, ...normalizedCustomElements]);
+  // Fast path: reuse base Sets if no custom elements
+  const inlineTextSet = normalizedCustomElements.length
+    ? new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements])
+    : inlineElementsToKeepWhitespaceWithin;
+  const inlineElements = normalizedCustomElements.length
+    ? new Set([...inlineElementsToKeepWhitespaceAround, ...normalizedCustomElements])
+    : inlineElementsToKeepWhitespaceAround;
 
   // Parse `removeEmptyElementsExcept` option
   let removeEmptyElementsExcept;
@@ -1861,10 +1888,11 @@ async function minifyHTML(value, options, partialMarkup) {
       for (let i = attrs.length, isLast = true; --i >= 0;) {
         const normalized = await normalizeAttr(attrs[i], attrs, tag, options);
         if (normalized) {
-          parts.unshift(buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr));
+          parts.push(buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr));
           isLast = false;
         }
       }
+      parts.reverse();
       if (parts.length > 0) {
         buffer.push(' ');
         buffer.push.apply(buffer, parts);

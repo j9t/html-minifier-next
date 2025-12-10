@@ -231,26 +231,26 @@ How does HTML Minifier Next compare to other minifiers? (All with the most aggre
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **49** | 50 | 51 | 52 | 51 | 54 | 52 |
 | [Apple](https://www.apple.com/) | 258 | **202** | **202** | 230 | 233 | 234 | 236 | 237 |
-| [BBC](https://www.bbc.co.uk/) | 638 | **580** | 590 | 599 | 599 | 600 | 633 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 633 | **575** | 585 | 594 | 594 | 595 | 628 | n/a |
 | [CSS-Tricks](https://css-tricks.com/) | 161 | 121 | **119** | 126 | 141 | 141 | 147 | 143 |
 | [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6341** | **6341** | 6561 | 6444 | 6567 | 6614 | n/a |
-| [EFF](https://www.eff.org/) | 56 | **47** | **47** | 50 | 48 | 49 | 50 | 50 |
-| [FAZ](https://www.faz.net/aktuell/) | 1608 | 1498 | 1503 | **1440** | 1531 | 1543 | 1554 | n/a |
+| [EFF](https://www.eff.org/) | 55 | **47** | **47** | 50 | 48 | 49 | 50 | 50 |
+| [FAZ](https://www.faz.net/aktuell/) | 1573 | 1465 | 1470 | **1411** | 1498 | 1509 | 1520 | n/a |
 | [Frontend Dogma](https://frontenddogma.com/) | 222 | **213** | **213** | 234 | 219 | 221 | 239 | 220 |
-| [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | **17** | 18 | 18 | 18 |
-| [Ground News](https://ground.news/) | 1780 | **1538** | 1541 | 1639 | 1662 | 1668 | 1767 | n/a |
+| [Google](https://www.google.com/) | 76 | **71** | 72 | n/a | 72 | 73 | 76 | 75 |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | **147** | 153 | **147** | 149 | 155 | 149 |
+| [Igalia](https://www.igalia.com/) | 49 | **33** | **33** | 35 | 35 | 35 | 36 | 36 |
 | [Leanpub](https://leanpub.com/) | 1457 | **1225** | **1225** | 1232 | 1231 | 1226 | 1451 | n/a |
 | [Mastodon](https://mastodon.social/explore) | 35 | **26** | **26** | 30 | 33 | 33 | 34 | 34 |
 | [MDN](https://developer.mozilla.org/en-US/) | 107 | **62** | **62** | 64 | 64 | 65 | 67 | 68 |
 | [Middle East Eye](https://www.middleeasteye.net/) | 222 | **195** | **195** | 202 | 200 | 200 | 202 | 203 |
 | [Nielsen Norman Group](https://www.nngroup.com/) | 84 | 71 | 71 | **53** | 71 | 72 | 74 | 73 |
-| [SitePoint](https://www.sitepoint.com/) | 493 | **351** | **351** | 429 | 466 | 471 | 489 | n/a |
-| [TetraLogical](https://tetralogical.com/) | 44 | 38 | 38 | **35** | 38 | 38 | 39 | 39 |
+| [SitePoint](https://www.sitepoint.com/) | 495 | **353** | **353** | 431 | 469 | 473 | 491 | n/a |
+| [TetraLogical](https://tetralogical.com/) | 44 | 38 | 38 | **35** | 37 | 38 | 39 | 39 |
 | [TPGi](https://www.tpgi.com/) | 99 | **79** | **79** | 84 | 84 | 84 | 88 | 86 |
 | [United Nations](https://www.un.org/en/) | 154 | **115** | 116 | 123 | 127 | 127 | 133 | 126 |
-| [W3C](https://www.w3.org/) | 50 | **35** | **35** | 38 | 38 | 38 | 40 | 38 |
-| **Average processing time** |  | 359 ms (21/21) | 392 ms (21/21) | 197 ms (21/21) | 69 ms (21/21) | **19 ms (21/21)** | 383 ms (21/21) | 1433 ms (15/21) |
+| [W3C](https://www.w3.org/) | 50 | **36** | **36** | 38 | 38 | 38 | 40 | 39 |
+| **Average processing time** |  | 352 ms (21/21) | 401 ms (21/21) | 175 ms (20/21) | 56 ms (21/21) | **17 ms (21/21)** | 395 ms (21/21) | 1481 ms (16/21) |
 
 (Last updated: Dec 10, 2025)
 <!-- End auto-generated -->
