@@ -420,9 +420,9 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     }))).join(', ');
   } else if (isMetaViewport(tag, attrs) && attrName === 'content') {
     attrValue = attrValue.replace(/\s+/g, '').replace(/[0-9]+\.[0-9]+/g, function (numString) {
-      // "0.90000" -> "0.9"
-      // "1.0" -> "1"
-      // "1.0001" -> "1.0001" (unchanged)
+      // “0.90000” → “0.9”
+      // “1.0” → “1”
+      // “1.0001” → “1.0001” (unchanged)
       return (+numString).toString();
     });
   } else if (isContentSecurityPolicy(tag, attrs) && attrName.toLowerCase() === 'content') {
@@ -691,6 +691,107 @@ function canRemoveElement(tag, attrs) {
       break;
   }
   return true;
+}
+
+function parseElementSpec(str, options) {
+  if (typeof str !== 'string') {
+    return null;
+  }
+
+  const trimmed = str.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  // Simple tag name: “td”
+  if (!/[<>]/.test(trimmed)) {
+    return { tag: options.name(trimmed), attrs: null };
+  }
+
+  // HTML-like markup: “<span aria-hidden='true'>” or “<td></td>”
+  // Extract opening tag using regex
+  const match = trimmed.match(/^<([a-zA-Z][\w:-]*)((?:\s+[^>]*)?)>/);
+  if (!match) {
+    return null;
+  }
+
+  const tag = options.name(match[1]);
+  const attrString = match[2];
+
+  if (!attrString.trim()) {
+    return { tag, attrs: null };
+  }
+
+  // Parse attributes from string
+  const attrs = {};
+  const attrRegex = /([a-zA-Z][\w:-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>/]+)))?/g;
+  let attrMatch;
+
+  while ((attrMatch = attrRegex.exec(attrString))) {
+    const attrName = options.name(attrMatch[1]);
+    const attrValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4];
+    // Boolean attributes have no value (undefined)
+    attrs[attrName] = attrValue;
+  }
+
+  return {
+    tag,
+    attrs: Object.keys(attrs).length > 0 ? attrs : null
+  };
+}
+
+function parseRemoveEmptyElementsExcept(input, options) {
+  if (!Array.isArray(input)) {
+    return [];
+  }
+
+  return input.map(item => {
+    if (typeof item === 'string') {
+      const spec = parseElementSpec(item, options);
+      if (!spec && options.log) {
+        options.log('Warning: Unable to parse “removeEmptyElementsExcept” specification: "' + item + '"');
+      }
+      return spec;
+    }
+    if (options.log) {
+      options.log('Warning: “removeEmptyElementsExcept” specification must be a string, received: ' + typeof item);
+    }
+    return null;
+  }).filter(Boolean);
+}
+
+function shouldPreserveEmptyElement(tag, attrs, preserveList) {
+  for (const spec of preserveList) {
+    // Tag name must match
+    if (spec.tag !== tag) {
+      continue;
+    }
+
+    // If no attributes specified in spec, tag match is enough
+    if (!spec.attrs) {
+      return true;
+    }
+
+    // Check if all specified attributes match
+    const allAttrsMatch = Object.entries(spec.attrs).every(([name, value]) => {
+      const attr = attrs.find(a => a.name === name);
+      if (!attr) {
+        return false; // Attribute not present
+      }
+      // Boolean attribute in spec (undefined value) matches if attribute is present
+      if (value === undefined) {
+        return true;
+      }
+      // Valued attribute must match exactly
+      return attr.value === value;
+    });
+
+    if (allAttrsMatch) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function canCollapseWhitespace(tag) {
@@ -1142,6 +1243,17 @@ async function minifyHTML(value, options, partialMarkup) {
   const inlineTextSet = new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements]);
   const inlineElements = new Set([...inlineElementsToKeepWhitespaceAround, ...normalizedCustomElements]);
 
+  // Parse `removeEmptyElementsExcept` option
+  let removeEmptyElementsExcept;
+  if (options.removeEmptyElementsExcept && !Array.isArray(options.removeEmptyElementsExcept)) {
+    if (options.log) {
+      options.log('Warning: "removeEmptyElementsExcept" option must be an array, received: ' + typeof options.removeEmptyElementsExcept);
+    }
+    removeEmptyElementsExcept = [];
+  } else {
+    removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
+  }
+
   // Temporarily replace ignored chunks with comments,
   // so that we don’t have to worry what’s there.
   // For all we care there might be
@@ -1169,7 +1281,7 @@ async function minifyHTML(value, options, partialMarkup) {
     // Warn about potential ReDoS if custom fragments use unlimited quantifiers
     for (let i = 0; i < customFragments.length; i++) {
       if (/[*+]/.test(customFragments[i])) {
-        options.log('Warning: Custom fragment contains unlimited quantifiers (* or +) which may cause ReDoS vulnerability');
+        options.log('Warning: Custom fragment contains unlimited quantifiers (“*” or “+”) which may cause ReDoS vulnerability');
         break;
       }
     }
@@ -1412,10 +1524,32 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       if (options.removeEmptyElements && isElementEmpty && canRemoveElement(tag, attrs)) {
-        // Remove last “element” from buffer
-        removeStartTag();
-        optionalStartTag = '';
-        optionalEndTag = '';
+        let preserve = false;
+        if (removeEmptyElementsExcept.length) {
+          // Normalize attribute names for comparison with specs
+          const normalizedAttrs = attrs.map(attr => ({ ...attr, name: options.name(attr.name) }));
+          preserve = shouldPreserveEmptyElement(tag, normalizedAttrs, removeEmptyElementsExcept);
+        }
+
+        if (!preserve) {
+          // Remove last “element” from buffer
+          removeStartTag();
+          optionalStartTag = '';
+          optionalEndTag = '';
+        } else {
+          // Preserve the element - add closing tag
+          if (autoGenerated && !options.includeAutoGeneratedTags) {
+            optionalEndTag = '';
+          } else {
+            buffer.push('</' + tag + '>');
+          }
+          charsPrevTag = '/' + tag;
+          if (!inlineElements.has(tag)) {
+            currentChars = '';
+          } else if (isElementEmpty) {
+            currentChars += '|';
+          }
+        }
       } else {
         if (autoGenerated && !options.includeAutoGeneratedTags) {
           optionalEndTag = '';
@@ -1698,7 +1832,7 @@ export default { minify, presets, getPreset, getPresetNames };
  *
  * @prop {boolean} [collapseBooleanAttributes]
  *  Collapse boolean attributes to their name only (for example
- *  `disabled="disabled"` -> `disabled`).
+ *  `disabled="disabled"` → `disabled`).
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes
  *
  *  Default: `false`
@@ -1942,6 +2076,31 @@ export default { minify, presets, getPreset, getPresetNames };
  *
  *  Default: `false`
  *
+ * @prop {string[]} [removeEmptyElementsExcept]
+ *  Specifies empty elements to preserve when `removeEmptyElements` is enabled.
+ *  Has no effect unless `removeEmptyElements: true`.
+ *
+ *  Accepts tag names or HTML-like element specifications:
+ *
+ *  * Tag name only: `["td", "span"]`—preserves all empty elements of these types
+ *  * With valued attributes: `["<span aria-hidden='true'>"]`—preserves only when attribute values match
+ *  * With boolean attributes: `["<input disabled>"]`—preserves only when boolean attribute is present
+ *  * Mixed: `["<button type='button' disabled>"]`—all specified attributes must match
+ *
+ *  Attribute matching:
+ *
+ *  * All specified attributes must be present and match (valued attributes must have exact values)
+ *  * Additional attributes on the element are allowed
+ *  * Attribute name matching respects the `caseSensitive` option
+ *  * Supports double quotes, single quotes, and unquoted attribute values in specifications
+ *
+ *  Limitations:
+ *
+ *  * Self-closing syntax (e.g., `["<span/>"]`) is not supported; use `["span"]` instead
+ *  * Definitions containing `>` within quoted attribute values (e.g., `["<span title='a>b'>"]`) are not supported
+ *
+ *  Default: `[]`
+ *
  * @prop {boolean} [removeOptionalTags]
  *  Drop optional start/end tags where the HTML specification permits it
  *  (for example `</li>`, optional `<html>` etc.).
@@ -1969,7 +2128,7 @@ export default { minify, presets, getPreset, getPresetNames };
  *  Default: `false`
  *
  * @prop {boolean} [removeTagWhitespace]
- *  **Note that this will currently result in invalid HTML!**
+ *  **Note that this will result in invalid HTML!**
  *
  *  When true, extra whitespace between tag name and attributes (or before
  *  the closing bracket) will be removed where possible. Affects output spacing

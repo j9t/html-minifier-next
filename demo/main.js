@@ -19,7 +19,7 @@ const defaultOptions = [
     id: 'collapseInlineTagWhitespace',
     type: 'checkbox',
     label: 'Collapse inline tag whitespace',
-    helpText: `Don’t leave any spaces between <code>display: inline;</code> elements when collapsing—use with <code>collapseWhitespace=true</code>`,
+    helpText: `Don’t leave any spaces between <code>display: inline;</code> elements when collapsing—use with <code>collapseWhitespace</code>`,
     unsafe: true
   },
   {
@@ -33,7 +33,7 @@ const defaultOptions = [
     id: 'conservativeCollapse',
     type: 'checkbox',
     label: 'Conservative collapse',
-    helpText: `Always collapse to 1 space (never remove it entirely)—use with <code>collapseWhitespace=true</code>`
+    helpText: `Always collapse to 1 space (never remove it entirely)—use with <code>collapseWhitespace</code>`
   },
   {
     id: 'decodeEntities',
@@ -104,7 +104,7 @@ const defaultOptions = [
     id: 'preserveLineBreaks',
     type: 'checkbox',
     label: 'Preserve line breaks',
-    helpText: `Always collapse to 1 line break (never remove it entirely) when whitespace between tags includes a line break—use with <code>collapseWhitespace=true</code>`
+    helpText: `Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with <code>collapseWhitespace</code>`
   },
   {
     id: 'preventAttributesEscaping',
@@ -160,6 +160,12 @@ const defaultOptions = [
     label: 'Remove empty elements',
     helpText: 'Remove all elements with empty contents',
     unsafe: true
+  },
+  {
+    id: 'removeEmptyElementsExcept',
+    type: 'text',
+    label: 'Remove empty elements except',
+    helpText: 'List of elements to preserve when `removeEmptyElements` is enabled (e.g., <code>td, &lt;span aria-hidden=\'true\'&gt;</code>)'
   },
   {
     id: 'removeOptionalTags',
@@ -246,7 +252,7 @@ const getOptions = (options) => {
       value = option.value;
     }
 
-    if (option.id === 'processScripts') {
+    if (option.id === 'processScripts' || option.id === 'removeEmptyElementsExcept') {
       value = value.split(/\s*,\s*/);
     }
 

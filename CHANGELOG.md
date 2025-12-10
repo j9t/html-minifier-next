@@ -4,6 +4,21 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.8.0] - 2025-12-10
+
+### Added
+
+- Added `removeEmptyElementsExcept` option to preserve specific empty elements when `removeEmptyElements` is enabled
+  - Accepts array of element specifications: simple tag names (e.g., `"td"`) or HTML-like markup with attributes (e.g., `"<span aria-hidden='true'>"`)
+  - Supports double quotes, single quotes, and unquoted attribute values
+  - When attributes are specified, all must match for preservation (additional attributes allowed)
+  - Available in API, CLI (`--remove-empty-elements-except`), and web demo
+  - Addresses use cases like preserving empty table cells or framework-required empty elements (e.g., Bulma navbar burger)
+
+### Documentation
+
+- Made README and CLI documentation more consistent
+
 ## [4.7.1] - 2025-12-09
 
 ### Fixed
