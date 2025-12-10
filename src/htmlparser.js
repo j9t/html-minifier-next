@@ -76,6 +76,14 @@ const nonPhrasing = new CaseInsensitiveSet(['address', 'article', 'aside', 'base
 
 const reCache = {};
 
+// Pre-compiled regexes for common special elements (`script`, `style`, `noscript`)
+// These are used frequently and pre-compiling them avoids regex creation overhead
+const preCompiledStackedTags = {
+  'script': /([\s\S]*?)<\/script[^>]*>/i,
+  'style': /([\s\S]*?)<\/style[^>]*>/i,
+  'noscript': /([\s\S]*?)<\/noscript[^>]*>/i
+};
+
 function attrForHandler(handler) {
   let pattern = singleAttrIdentifier.source +
     '(?:\\s*(' + joinSingleAttrAssigns(handler) + ')' +
@@ -224,7 +232,8 @@ export class HTMLParser {
         prevTag = '';
       } else {
         const stackedTag = lastTag.toLowerCase();
-        const reStackedTag = reCache[stackedTag] || (reCache[stackedTag] = new RegExp('([\\s\\S]*?)</' + stackedTag + '[^>]*>', 'i'));
+        // Use pre-compiled regex for common tags (`script`, `style`, `noscript`) to avoid regex creation overhead
+        const reStackedTag = preCompiledStackedTags[stackedTag] || reCache[stackedTag] || (reCache[stackedTag] = new RegExp('([\\s\\S]*?)</' + stackedTag + '[^>]*>', 'i'));
 
         html = await replaceAsync(html, reStackedTag, async (_, text) => {
           if (stackedTag !== 'script' && stackedTag !== 'style' && stackedTag !== 'noscript') {
