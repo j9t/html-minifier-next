@@ -2072,6 +2072,11 @@ export default { minify, presets, getPreset, getPresetNames };
  *  * Attribute name matching respects the `caseSensitive` option
  *  * Supports double quotes, single quotes, and unquoted attribute values in specifications
  *
+ *  Limitations:
+ *
+ *  * Self-closing syntax (e.g., `["<span/>"]`) is not supported; use `["span"]` instead
+ *  * Definitions containing `>` within quoted attribute values (e.g., `["<span title='a>b'>"]`) are not supported
+ *
  *  Default: `[]`
  *
  * @prop {boolean} [removeOptionalTags]
