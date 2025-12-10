@@ -162,12 +162,12 @@ function generateMarkdownTable() {
   const headers = [
     'Site',
     'Original Size (KB)',
-    '[HTML Minifier Next](https://github.com/j9t/html-minifier-next)<br>![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)',
-    '[HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)',
-    '[htmlnano](https://github.com/posthtml/htmlnano)<br>![npm last update](https://img.shields.io/npm/last-update/htmlnano)',
-    '[@swc/html](https://github.com/swc-project/swc)<br>![npm last update](https://img.shields.io/npm/last-update/@swc/html)',
-    '[minify-html](https://github.com/wilsonzlin/minify-html)<br>![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)',
-    '[minimize](https://github.com/Swaagie/minimize)<br>![npm last update](https://img.shields.io/npm/last-update/minimize)',
+    '[HTML Minifier Next](https://github.com/j9t/html-minifier-next)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next)',
+    '[HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)](https://socket.dev/npm/package/html-minifier-terser)',
+    '[htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano)',
+    '[@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html)',
+    '[minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node)',
+    '[minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize)',
     '[html­com­pressor.­com](https://htmlcompressor.com/)'
   ];
 
