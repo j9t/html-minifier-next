@@ -392,7 +392,7 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 
 **Important:** When using custom `ignoreCustomFragments`, the minifier automatically applies bounded quantifiers to prevent ReDoS attacks, but you can also write safer patterns yourself using explicit bounds.
 
-## Running HTML Minifier Next
+## Running HTML Minifier Next locally
 
 ### Local server
 
