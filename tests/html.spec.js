@@ -1414,10 +1414,11 @@ describe('HTML', () => {
 
   test('removing attribute quotes—URL edge cases', async () => {
     const testCases = [
-      { name: 'URL with ampersand', input: '<a href="/?foo=1&bar=2">link</a>', expected: '<a href="/?foo=1&bar=2">link</a>' },
-      { name: 'URL with equals', input: '<a href="/?key=value">link</a>', expected: '<a href="/?key=value">link</a>' },
-      { name: 'simple path', input: '<a href="/path/to/file">link</a>', expected: '<a href=/path/to/file>link</a>' },
-      { name: 'URL with protocol', input: '<a href="https://example.com/path">link</a>', expected: '<a href=https://example.com/path>link</a>' }
+      { name: 'URL with ampersand only (can remove quotes)', input: '<a href="/?foo&bar">link</a>', expected: '<a href=/?foo&bar>link</a>' },
+      { name: 'URL with equals (must keep quotes)', input: '<a href="/?key=value">link</a>', expected: '<a href="/?key=value">link</a>' },
+      { name: 'URL with ampersand and equals (must keep quotes)', input: '<a href="/?foo=1&bar=2">link</a>', expected: '<a href="/?foo=1&bar=2">link</a>' },
+      { name: 'simple path (can remove quotes)', input: '<a href="/path/to/file">link</a>', expected: '<a href=/path/to/file>link</a>' },
+      { name: 'URL with protocol (can remove quotes)', input: '<a href="https://example.com/path">link</a>', expected: '<a href=https://example.com/path>link</a>' }
     ];
 
     for (const { name, input, expected } of testCases) {
