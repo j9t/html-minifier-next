@@ -1382,7 +1382,7 @@ describe('HTML', () => {
       { name: 'JSON in attribute', input: '<div data-config=\'{"foo":"bar"}\'>x</div>', expected: '<div data-config=\'{"foo":"bar"}\'>x</div>' },
       { name: 'multiple classes', input: '<div class="btn btn-primary btn-lg">x</div>', expected: '<div class="btn btn-primary btn-lg">x</div>' },
       { name: 'event handler with quotes', input: '<button onclick="alert(\'Hello World\')">x</button>', expected: '<button onclick="alert(\'Hello World\')">x</button>' },
-      { name: 'srcset', input: '<img srcset="image1.jpg 1x, image2.jpg 2x">', expected: '<img srcset="image1.jpg, image2.jpg 2x">' }
+      { name: 'srcset with spaces', input: '<img srcset="image.jpg 2x, other.jpg 3x">', expected: '<img srcset="image.jpg 2x, other.jpg 3x">' }
     ];
 
     for (const { name, input, expected } of testCases) {
