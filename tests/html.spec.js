@@ -1353,13 +1353,95 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=https://example.com/ title=blah>\nfoo\n\n</a>');
 
     input = '<a title="blah" href="https://example.com/">\nfoo\n\n</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a title=blah href=https://example.com/ >\nfoo\n\n</a>');
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a title=blah href=https://example.com/>\nfoo\n\n</a>');
 
     input = '<a href="https://example.com/" title="">\nfoo\n\n</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, removeEmptyAttributes: true }), '<a href=https://example.com/ >\nfoo\n\n</a>');
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, removeEmptyAttributes: true }), '<a href=https://example.com/>\nfoo\n\n</a>');
 
     input = '<p class=foo|bar:baz></p>';
     assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<p class=foo|bar:baz></p>');
+
+    // Whitespace characters require quotes
+    input = '<div data-test="a\tb">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\tb">test</div>');
+    input = '<div data-test="a\nb">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\nb">test</div>');
+    input = '<div data-test="a\fb">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\fb">test</div>');
+    input = '<div data-test="a\rb">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\rb">test</div>');
+
+    // Special HTML characters require quotes
+    input = '<div data-test="a=b">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a=b">test</div>');
+    input = '<div data-test="a<b">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a<b">test</div>');
+    input = '<div data-test="a>b">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a>b">test</div>');
+    input = '<div data-test="a`b">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a`b">test</div>');
+
+    // Quote characters require quotes
+    input = '<div data-test="a\'b">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\'b">test</div>');
+    input = "<div data-test='a\"b'>test</div>";
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), "<div data-test='a\"b'>test</div>");
+
+    // URL edge cases
+    input = '<a href="/?foo=1&bar=2">link</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href="/?foo=1&bar=2">link</a>');
+    input = '<a href="/?key=value">link</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href="/?key=value">link</a>');
+    input = '<a href="/path/to/file">link</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=/path/to/file>link</a>');
+    input = '<a href="https://example.com/path">link</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=https://example.com/path>link</a>');
+
+    // Safe values can have quotes removed
+    input = '<div id="test123">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div id=test123>x</div>');
+    input = '<div data-name="foo_bar">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-name=foo_bar>x</div>');
+    input = '<div data-version="1.2.3">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-version=1.2.3>x</div>');
+    input = '<div data-time="12:30:00">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-time=12:30:00>x</div>');
+    input = '<a href="#section">link</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=#section>link</a>');
+    input = '<div class="foo|bar">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div class=foo|bar>x</div>');
+    input = '<div data-path="path/to/file">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-path=path/to/file>x</div>');
+
+    // Complex real-world cases
+    input = '<div data-config=\'{"foo":"bar"}\'>x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-config=\'{"foo":"bar"}\'>x</div>');
+    input = '<div class="btn btn-primary btn-lg">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div class="btn btn-primary btn-lg">x</div>');
+    input = '<button onclick="alert(\'Hello World\')">x</button>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<button onclick="alert(\'Hello World\')">x</button>');
+    input = '<img srcset="image1.jpg 1x, image2.jpg 2x">';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<img srcset="image1.jpg, image2.jpg 2x">');
+    input = '<div class="container">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div class=container>x</div>');
+
+    // Edge cases with empty and minimal values
+    input = '<div class="x">test</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div class=x>test</div>');
+    input = '<div data-id="42">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-id=42>x</div>');
+    input = '<div data-value="-123">x</div>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-value=-123>x</div>');
+
+    // Regression test: no extra space before closing tag when unquoted values end with /
+    input = '<a href="/topics/html/">html</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=/topics/html/>html</a>');
+    input = '<a title="test" href="/topics/html/">html</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a title=test href=/topics/html/>html</a>');
+    input = '<a href="/path/" title="test">link</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=/path/ title=test>link</a>');
+    input = '<a href="/docs/">Documentation</a>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=/docs/>Documentation</a>');
   });
 
   test('preserving custom attribute-wrapping markup', async () => {
