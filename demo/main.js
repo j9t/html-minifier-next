@@ -132,6 +132,7 @@ const defaultOptions = [
     type: 'text',
     label: 'Quote character',
     helpText: 'Type of quote to use for attribute values (<code>\'</code> or <code>"</code>)',
+    value: ''
   },
   {
     id: 'removeAttributeQuotes',
@@ -165,7 +166,8 @@ const defaultOptions = [
     id: 'removeEmptyElementsExcept',
     type: 'text',
     label: 'Remove empty elements except',
-    helpText: 'List of elements to preserve when `removeEmptyElements` is enabled (e.g., <code>td, &lt;span aria-hidden=\'true\'&gt;</code>)'
+    helpText: 'List of elements to preserve when `removeEmptyElements` is enabled (e.g., <code>td, &lt;span aria-hidden=\'true\'&gt;</code>)',
+    value: ''
   },
   {
     id: 'removeOptionalTags',
