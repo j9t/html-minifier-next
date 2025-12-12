@@ -1334,7 +1334,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), input);
   });
 
-  test('removing attribute quotes', async () => {
+  test('removing attribute quotes—basic cases', async () => {
     let input;
 
     input = '<p title="blah" class="a23B-foo.bar_baz:qux" id="moo">foo</p>';
@@ -1353,13 +1353,94 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=https://example.com/ title=blah>\nfoo\n\n</a>');
 
     input = '<a title="blah" href="https://example.com/">\nfoo\n\n</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a title=blah href=https://example.com/ >\nfoo\n\n</a>');
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a title=blah href=https://example.com/>\nfoo\n\n</a>');
 
     input = '<a href="https://example.com/" title="">\nfoo\n\n</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, removeEmptyAttributes: true }), '<a href=https://example.com/ >\nfoo\n\n</a>');
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, removeEmptyAttributes: true }), '<a href=https://example.com/>\nfoo\n\n</a>');
 
     input = '<p class=foo|bar:baz></p>';
     assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<p class=foo|bar:baz></p>');
+  });
+
+  test('removing attribute quotes—must keep quotes for special characters', async () => {
+    const testCases = [
+      // Whitespace characters
+      { name: 'space', input: '<input value="hello world">', expected: '<input value="hello world">' },
+      { name: 'tab', input: '<div data-test="a\tb">test</div>', expected: '<div data-test="a\tb">test</div>' },
+      { name: 'newline', input: '<div data-test="a\nb">test</div>', expected: '<div data-test="a\nb">test</div>' },
+      { name: 'form feed', input: '<div data-test="a\fb">test</div>', expected: '<div data-test="a\fb">test</div>' },
+      { name: 'carriage return', input: '<div data-test="a\rb">test</div>', expected: '<div data-test="a\rb">test</div>' },
+      // Special HTML characters
+      { name: 'equals sign', input: '<div data-test="a=b">test</div>', expected: '<div data-test="a=b">test</div>' },
+      { name: 'less than', input: '<div data-test="a<b">test</div>', expected: '<div data-test="a<b">test</div>' },
+      { name: 'greater than', input: '<div data-test="a>b">test</div>', expected: '<div data-test="a>b">test</div>' },
+      { name: 'backtick', input: '<div data-test="a`b">test</div>', expected: '<div data-test="a`b">test</div>' },
+      // Quote characters
+      { name: 'single quote in double quotes', input: '<div data-test="a\'b">test</div>', expected: '<div data-test="a\'b">test</div>' },
+      { name: 'double quote in single quotes', input: "<div data-test='a\"b'>test</div>", expected: "<div data-test='a\"b'>test</div>" },
+      // Complex real-world cases
+      { name: 'JSON in attribute', input: '<div data-config=\'{"foo":"bar"}\'>x</div>', expected: '<div data-config=\'{"foo":"bar"}\'>x</div>' },
+      { name: 'multiple classes', input: '<div class="btn btn-primary btn-lg">x</div>', expected: '<div class="btn btn-primary btn-lg">x</div>' },
+      { name: 'event handler with quotes', input: '<button onclick="alert(\'Hello World\')">x</button>', expected: '<button onclick="alert(\'Hello World\')">x</button>' },
+      { name: 'srcset with spaces', input: '<img srcset="image.jpg 2x, other.jpg 3x">', expected: '<img srcset="image.jpg 2x, other.jpg 3x">' }
+    ];
+
+    await Promise.all(testCases.map(async ({ name, input, expected }) => {
+      const result = await minify(input, { removeAttributeQuotes: true });
+      assert.strictEqual(result, expected, `Failed for: ${name}`);
+    }));
+  });
+
+  test('removing attribute quotes—can remove quotes for safe values', async () => {
+    const testCases = [
+      { name: 'alphanumeric', input: '<div id="test123">x</div>', expected: '<div id=test123>x</div>' },
+      { name: 'underscore', input: '<div data-name="foo_bar">x</div>', expected: '<div data-name=foo_bar>x</div>' },
+      { name: 'dots', input: '<div data-version="1.2.3">x</div>', expected: '<div data-version=1.2.3>x</div>' },
+      { name: 'colons', input: '<div data-time="12:30:00">x</div>', expected: '<div data-time=12:30:00>x</div>' },
+      { name: 'hash', input: '<a href="#section">link</a>', expected: '<a href=#section>link</a>' },
+      { name: 'pipe', input: '<div class="foo|bar">x</div>', expected: '<div class=foo|bar>x</div>' },
+      { name: 'forward slash', input: '<div data-path="path/to/file">x</div>', expected: '<div data-path=path/to/file>x</div>' },
+      { name: 'single char', input: '<div class="x">test</div>', expected: '<div class=x>test</div>' },
+      { name: 'number', input: '<div data-id="42">x</div>', expected: '<div data-id=42>x</div>' },
+      { name: 'negative number', input: '<div data-value="-123">x</div>', expected: '<div data-value=-123>x</div>' },
+      { name: 'single class', input: '<div class="container">x</div>', expected: '<div class=container>x</div>' }
+    ];
+
+    await Promise.all(testCases.map(async ({ name, input, expected }) => {
+      const result = await minify(input, { removeAttributeQuotes: true });
+      assert.strictEqual(result, expected, `Failed for: ${name}`);
+    }));
+  });
+
+  test('removing attribute quotes—URL edge cases', async () => {
+    const testCases = [
+      { name: 'URL with ampersand only (can remove quotes)', input: '<a href="/?foo&bar">link</a>', expected: '<a href=/?foo&bar>link</a>' },
+      { name: 'URL with equals (must keep quotes)', input: '<a href="/?key=value">link</a>', expected: '<a href="/?key=value">link</a>' },
+      { name: 'URL with ampersand and equals (must keep quotes)', input: '<a href="/?foo=1&bar=2">link</a>', expected: '<a href="/?foo=1&bar=2">link</a>' },
+      { name: 'simple path (can remove quotes)', input: '<a href="/path/to/file">link</a>', expected: '<a href=/path/to/file>link</a>' },
+      { name: 'URL with protocol (can remove quotes)', input: '<a href="https://example.com/path">link</a>', expected: '<a href=https://example.com/path>link</a>' }
+    ];
+
+    await Promise.all(testCases.map(async ({ name, input, expected }) => {
+      const result = await minify(input, { removeAttributeQuotes: true });
+      assert.strictEqual(result, expected, `Failed for: ${name}`);
+    }));
+  });
+
+  test('removing attribute quotes—trailing slash regression', async () => {
+    // Regression test for bug where unquoted attribute values ending with “/” incorrectly added extra space before closing tag
+    const testCases = [
+      { name: 'single attribute ending with /', input: '<a href="/topics/html/">html</a>', options: { removeAttributeQuotes: true }, expected: '<a href=/topics/html/>html</a>' },
+      { name: 'multiple attributes, last ends with /', input: '<a title="test" href="/topics/html/">html</a>', options: { removeAttributeQuotes: true }, expected: '<a title=test href=/topics/html/>html</a>' },
+      { name: 'first attribute ends with /, second does not', input: '<a href="/path/" title="test">link</a>', options: { removeAttributeQuotes: true }, expected: '<a href=/path/ title=test>link</a>' },
+      { name: 'simple path with trailing slash', input: '<a href="/docs/">Documentation</a>', options: { removeAttributeQuotes: true }, expected: '<a href=/docs/>Documentation</a>' },
+      { name: 'with removeTagWhitespace (reported bug scenario)', input: '<a href="/topics/html/">html</a>', options: { removeAttributeQuotes: true, removeTagWhitespace: true }, expected: '<a href=/topics/html/>html</a>' }
+    ];
+
+    await Promise.all(testCases.map(async ({ name, input, options, expected }) => {
+      const result = await minify(input, options);
+      assert.strictEqual(result, expected, `Failed for: ${name}`);
+    }));
   });
 
   test('preserving custom attribute-wrapping markup', async () => {
