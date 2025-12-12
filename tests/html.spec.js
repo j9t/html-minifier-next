@@ -1334,7 +1334,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), input);
   });
 
-  test('removing attribute quotes', async () => {
+  test('removing attribute quotes—basic cases', async () => {
     let input;
 
     input = '<p title="blah" class="a23B-foo.bar_baz:qux" id="moo">foo</p>';
@@ -1360,88 +1360,86 @@ describe('HTML', () => {
 
     input = '<p class=foo|bar:baz></p>';
     assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<p class=foo|bar:baz></p>');
+  });
 
-    // Whitespace characters require quotes
-    input = '<div data-test="a\tb">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\tb">test</div>');
-    input = '<div data-test="a\nb">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\nb">test</div>');
-    input = '<div data-test="a\fb">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\fb">test</div>');
-    input = '<div data-test="a\rb">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\rb">test</div>');
+  test('removing attribute quotes—must keep quotes for special characters', async () => {
+    const testCases = [
+      // Whitespace characters
+      { name: 'space', input: '<input value="hello world">', expected: '<input value="hello world">' },
+      { name: 'tab', input: '<div data-test="a\tb">test</div>', expected: '<div data-test="a\tb">test</div>' },
+      { name: 'newline', input: '<div data-test="a\nb">test</div>', expected: '<div data-test="a\nb">test</div>' },
+      { name: 'form feed', input: '<div data-test="a\fb">test</div>', expected: '<div data-test="a\fb">test</div>' },
+      { name: 'carriage return', input: '<div data-test="a\rb">test</div>', expected: '<div data-test="a\rb">test</div>' },
+      // Special HTML characters
+      { name: 'equals sign', input: '<div data-test="a=b">test</div>', expected: '<div data-test="a=b">test</div>' },
+      { name: 'less than', input: '<div data-test="a<b">test</div>', expected: '<div data-test="a<b">test</div>' },
+      { name: 'greater than', input: '<div data-test="a>b">test</div>', expected: '<div data-test="a>b">test</div>' },
+      { name: 'backtick', input: '<div data-test="a`b">test</div>', expected: '<div data-test="a`b">test</div>' },
+      // Quote characters
+      { name: 'single quote in double quotes', input: '<div data-test="a\'b">test</div>', expected: '<div data-test="a\'b">test</div>' },
+      { name: 'double quote in single quotes', input: "<div data-test='a\"b'>test</div>", expected: "<div data-test='a\"b'>test</div>" },
+      // Complex real-world cases
+      { name: 'JSON in attribute', input: '<div data-config=\'{"foo":"bar"}\'>x</div>', expected: '<div data-config=\'{"foo":"bar"}\'>x</div>' },
+      { name: 'multiple classes', input: '<div class="btn btn-primary btn-lg">x</div>', expected: '<div class="btn btn-primary btn-lg">x</div>' },
+      { name: 'event handler with quotes', input: '<button onclick="alert(\'Hello World\')">x</button>', expected: '<button onclick="alert(\'Hello World\')">x</button>' },
+      { name: 'srcset', input: '<img srcset="image1.jpg 1x, image2.jpg 2x">', expected: '<img srcset="image1.jpg, image2.jpg 2x">' }
+    ];
 
-    // Special HTML characters require quotes
-    input = '<div data-test="a=b">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a=b">test</div>');
-    input = '<div data-test="a<b">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a<b">test</div>');
-    input = '<div data-test="a>b">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a>b">test</div>');
-    input = '<div data-test="a`b">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a`b">test</div>');
+    for (const { name, input, expected } of testCases) {
+      const result = await minify(input, { removeAttributeQuotes: true });
+      assert.strictEqual(result, expected, `Failed for: ${name}`);
+    }
+  });
 
-    // Quote characters require quotes
-    input = '<div data-test="a\'b">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-test="a\'b">test</div>');
-    input = "<div data-test='a\"b'>test</div>";
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), "<div data-test='a\"b'>test</div>");
+  test('removing attribute quotes—can remove quotes for safe values', async () => {
+    const testCases = [
+      { name: 'alphanumeric', input: '<div id="test123">x</div>', expected: '<div id=test123>x</div>' },
+      { name: 'underscore', input: '<div data-name="foo_bar">x</div>', expected: '<div data-name=foo_bar>x</div>' },
+      { name: 'dots', input: '<div data-version="1.2.3">x</div>', expected: '<div data-version=1.2.3>x</div>' },
+      { name: 'colons', input: '<div data-time="12:30:00">x</div>', expected: '<div data-time=12:30:00>x</div>' },
+      { name: 'hash', input: '<a href="#section">link</a>', expected: '<a href=#section>link</a>' },
+      { name: 'pipe', input: '<div class="foo|bar">x</div>', expected: '<div class=foo|bar>x</div>' },
+      { name: 'forward slash', input: '<div data-path="path/to/file">x</div>', expected: '<div data-path=path/to/file>x</div>' },
+      { name: 'single char', input: '<div class="x">test</div>', expected: '<div class=x>test</div>' },
+      { name: 'number', input: '<div data-id="42">x</div>', expected: '<div data-id=42>x</div>' },
+      { name: 'negative number', input: '<div data-value="-123">x</div>', expected: '<div data-value=-123>x</div>' },
+      { name: 'single class', input: '<div class="container">x</div>', expected: '<div class=container>x</div>' }
+    ];
 
-    // URL edge cases
-    input = '<a href="/?foo=1&bar=2">link</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href="/?foo=1&bar=2">link</a>');
-    input = '<a href="/?key=value">link</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href="/?key=value">link</a>');
-    input = '<a href="/path/to/file">link</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=/path/to/file>link</a>');
-    input = '<a href="https://example.com/path">link</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=https://example.com/path>link</a>');
+    for (const { name, input, expected } of testCases) {
+      const result = await minify(input, { removeAttributeQuotes: true });
+      assert.strictEqual(result, expected, `Failed for: ${name}`);
+    }
+  });
 
-    // Safe values can have quotes removed
-    input = '<div id="test123">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div id=test123>x</div>');
-    input = '<div data-name="foo_bar">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-name=foo_bar>x</div>');
-    input = '<div data-version="1.2.3">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-version=1.2.3>x</div>');
-    input = '<div data-time="12:30:00">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-time=12:30:00>x</div>');
-    input = '<a href="#section">link</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=#section>link</a>');
-    input = '<div class="foo|bar">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div class=foo|bar>x</div>');
-    input = '<div data-path="path/to/file">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-path=path/to/file>x</div>');
+  test('removing attribute quotes—URL edge cases', async () => {
+    const testCases = [
+      { name: 'URL with ampersand', input: '<a href="/?foo=1&bar=2">link</a>', expected: '<a href="/?foo=1&bar=2">link</a>' },
+      { name: 'URL with equals', input: '<a href="/?key=value">link</a>', expected: '<a href="/?key=value">link</a>' },
+      { name: 'simple path', input: '<a href="/path/to/file">link</a>', expected: '<a href=/path/to/file>link</a>' },
+      { name: 'URL with protocol', input: '<a href="https://example.com/path">link</a>', expected: '<a href=https://example.com/path>link</a>' }
+    ];
 
-    // Complex real-world cases
-    input = '<div data-config=\'{"foo":"bar"}\'>x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-config=\'{"foo":"bar"}\'>x</div>');
-    input = '<div class="btn btn-primary btn-lg">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div class="btn btn-primary btn-lg">x</div>');
-    input = '<button onclick="alert(\'Hello World\')">x</button>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<button onclick="alert(\'Hello World\')">x</button>');
-    input = '<img srcset="image1.jpg 1x, image2.jpg 2x">';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<img srcset="image1.jpg, image2.jpg 2x">');
-    input = '<div class="container">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div class=container>x</div>');
+    for (const { name, input, expected } of testCases) {
+      const result = await minify(input, { removeAttributeQuotes: true });
+      assert.strictEqual(result, expected, `Failed for: ${name}`);
+    }
+  });
 
-    // Edge cases with empty and minimal values
-    input = '<div class="x">test</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div class=x>test</div>');
-    input = '<div data-id="42">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-id=42>x</div>');
-    input = '<div data-value="-123">x</div>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<div data-value=-123>x</div>');
+  test('removing attribute quotes—trailing slash regression', async () => {
+    // Regression test for bug where unquoted attribute values ending with “/” incorrectly added extra space before closing tag
+    const testCases = [
+      { name: 'single attribute ending with /', input: '<a href="/topics/html/">html</a>', options: { removeAttributeQuotes: true }, expected: '<a href=/topics/html/>html</a>' },
+      { name: 'multiple attributes, last ends with /', input: '<a title="test" href="/topics/html/">html</a>', options: { removeAttributeQuotes: true }, expected: '<a title=test href=/topics/html/>html</a>' },
+      { name: 'first attribute ends with /, second does not', input: '<a href="/path/" title="test">link</a>', options: { removeAttributeQuotes: true }, expected: '<a href=/path/ title=test>link</a>' },
+      { name: 'simple path with trailing slash', input: '<a href="/docs/">Documentation</a>', options: { removeAttributeQuotes: true }, expected: '<a href=/docs/>Documentation</a>' },
+      { name: 'with removeTagWhitespace (reported bug scenario)', input: '<a href="/topics/html/">html</a>', options: { removeAttributeQuotes: true, removeTagWhitespace: true }, expected: '<a href=/topics/html/>html</a>' }
+    ];
 
-    // Regression test: no extra space before closing tag when unquoted values end with /
-    input = '<a href="/topics/html/">html</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=/topics/html/>html</a>');
-    input = '<a title="test" href="/topics/html/">html</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a title=test href=/topics/html/>html</a>');
-    input = '<a href="/path/" title="test">link</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=/path/ title=test>link</a>');
-    input = '<a href="/docs/">Documentation</a>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<a href=/docs/>Documentation</a>');
+    for (const { name, input, options, expected } of testCases) {
+      const result = await minify(input, options);
+      assert.strictEqual(result, expected, `Failed for: ${name}`);
+    }
   });
 
   test('preserving custom attribute-wrapping markup', async () => {
