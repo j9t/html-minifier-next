@@ -1385,10 +1385,10 @@ describe('HTML', () => {
       { name: 'srcset with spaces', input: '<img srcset="image.jpg 2x, other.jpg 3x">', expected: '<img srcset="image.jpg 2x, other.jpg 3x">' }
     ];
 
-    for (const { name, input, expected } of testCases) {
+    await Promise.all(testCases.map(async ({ name, input, expected }) => {
       const result = await minify(input, { removeAttributeQuotes: true });
       assert.strictEqual(result, expected, `Failed for: ${name}`);
-    }
+    }));
   });
 
   test('removing attribute quotes—can remove quotes for safe values', async () => {
@@ -1406,10 +1406,10 @@ describe('HTML', () => {
       { name: 'single class', input: '<div class="container">x</div>', expected: '<div class=container>x</div>' }
     ];
 
-    for (const { name, input, expected } of testCases) {
+    await Promise.all(testCases.map(async ({ name, input, expected }) => {
       const result = await minify(input, { removeAttributeQuotes: true });
       assert.strictEqual(result, expected, `Failed for: ${name}`);
-    }
+    }));
   });
 
   test('removing attribute quotes—URL edge cases', async () => {
@@ -1421,10 +1421,10 @@ describe('HTML', () => {
       { name: 'URL with protocol (can remove quotes)', input: '<a href="https://example.com/path">link</a>', expected: '<a href=https://example.com/path>link</a>' }
     ];
 
-    for (const { name, input, expected } of testCases) {
+    await Promise.all(testCases.map(async ({ name, input, expected }) => {
       const result = await minify(input, { removeAttributeQuotes: true });
       assert.strictEqual(result, expected, `Failed for: ${name}`);
-    }
+    }));
   });
 
   test('removing attribute quotes—trailing slash regression', async () => {
@@ -1437,10 +1437,10 @@ describe('HTML', () => {
       { name: 'with removeTagWhitespace (reported bug scenario)', input: '<a href="/topics/html/">html</a>', options: { removeAttributeQuotes: true, removeTagWhitespace: true }, expected: '<a href=/topics/html/>html</a>' }
     ];
 
-    for (const { name, input, options, expected } of testCases) {
+    await Promise.all(testCases.map(async ({ name, input, options, expected }) => {
       const result = await minify(input, options);
       assert.strictEqual(result, expected, `Failed for: ${name}`);
-    }
+    }));
   });
 
   test('preserving custom attribute-wrapping markup', async () => {
