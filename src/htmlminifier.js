@@ -1280,10 +1280,11 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     if (!isLast && !options.removeTagWhitespace) {
       emittedAttrValue += ' ';
     }
-  } else if (isLast && !hasUnarySlash && !/\/$/.test(attrValue)) {
-    // Make sure trailing slash is not interpreted as HTML self-closing tag
+  } else if (isLast && !hasUnarySlash) {
+    // Last attribute in a non-self-closing tag: no space needed
     emittedAttrValue = attrValue;
   } else {
+    // Not last attribute, or is a self-closing tag: add space
     emittedAttrValue = attrValue + ' ';
   }
 
