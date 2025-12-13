@@ -412,9 +412,12 @@ program.option('--ignore-dir <patterns>', 'Exclude directories from processing (
     const dirName = path.basename(dirPath);
 
     return ignorePatterns.some(pattern => {
+      // Normalize pattern to use platform-specific path separator
+      const normalizedPattern = pattern.split('/').join(path.sep);
+
       // Support both exact directory names and relative paths
-      return dirName === pattern || relativePath === pattern ||
-             relativePath.startsWith(pattern + path.sep);
+      return dirName === pattern || relativePath === normalizedPattern ||
+             relativePath.startsWith(normalizedPattern + path.sep);
     });
   }
 
