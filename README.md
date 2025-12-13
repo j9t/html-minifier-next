@@ -29,11 +29,12 @@ Use `html-minifier-next --help` to check all available options:
 | Option | Description | Example |
 | --- | --- | --- |
 | `--input-dir <dir>` | Specify an input directory (best restricted with `--file-ext`) | `--input-dir=src` |
+| `--ignore-dir <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>` | Specify an output directory | `--output-dir=dist` |
-| `--file-ext <extensions>` | Specify file extension(s) to process (overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
+| `--file-ext <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
 | `-o <file>`, `--output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
 | `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
-| `--preset <name>` | Use a preset configuration (conservative, comprehensive) | `--preset=conservative` |
+| `--preset <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
 | `-v`, `--verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `-d`, `--dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
 | `-V`, `--version` | Output the version number | `html-minifier-next --version` |
@@ -48,7 +49,8 @@ You can also use a configuration file to specify options. The file can be either
 {
   "collapseWhitespace": true,
   "removeComments": true,
-  "fileExt": "html,htm"
+  "fileExt": "html,htm",
+  "ignoreDir": "libs,vendor"
 }
 ```
 
@@ -58,7 +60,8 @@ You can also use a configuration file to specify options. The file can be either
 module.exports = {
   collapseWhitespace: true,
   removeComments: true,
-  fileExt: "html,htm"
+  fileExt: "html,htm",
+  ignoreDir: ["libs", "vendor"]
 };
 ```
 
@@ -282,6 +285,19 @@ html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir
 html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 # When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier
 # Consider restricting with `--file-ext` to avoid touching binaries (e.g., images, archives)
+```
+
+**Exclude directories from processing:**
+
+```bash
+# Ignore a single directory
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=libs
+
+# Ignore multiple directories
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=libs,vendor,node_modules
+
+# Ignore by relative path (only ignores src/static/libs, not other “libs” directories)
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=static/libs
 ```
 
 **Dry run mode (preview outcome without writing files):**
