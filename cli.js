@@ -386,14 +386,14 @@ program.option('--ignore-dir <patterns>', 'Exclude directories from processing (
 
   /**
    * Parse comma-separated ignore patterns into an array
-   * @param {string} patterns - Comma-separated directory patterns (e.g., “libs,vendor”)
-   * @returns {string[]} Array of trimmed pattern strings
+   * @param {string} patterns - Comma-separated directory patterns (e.g., "libs,vendor")
+   * @returns {string[]} Array of trimmed pattern strings with normalized separators
    */
   function parseIgnorePatterns(patterns) {
     if (!patterns) return [];
     return patterns
       .split(',')
-      .map(p => p.trim())
+      .map(p => p.trim().replace(/\\/g, '/'))
       .filter(p => p.length > 0);
   }
 
@@ -401,23 +401,21 @@ program.option('--ignore-dir <patterns>', 'Exclude directories from processing (
    * Check if a directory should be ignored based on ignore patterns
    * Supports matching by directory name or relative path
    * @param {string} dirPath - Absolute path to the directory
-   * @param {string[]} ignorePatterns - Array of patterns to match against
+   * @param {string[]} ignorePatterns - Array of patterns to match against (with forward slashes)
    * @param {string} baseDir - Base directory for relative path calculation
    * @returns {boolean} True if directory should be ignored
    */
   function shouldIgnoreDirectory(dirPath, ignorePatterns, baseDir) {
     if (!ignorePatterns || ignorePatterns.length === 0) return false;
 
-    const relativePath = path.relative(baseDir, dirPath);
+    // Normalize to forward slashes for cross-platform comparison
+    const relativePath = path.relative(baseDir, dirPath).replace(/\\/g, '/');
     const dirName = path.basename(dirPath);
 
     return ignorePatterns.some(pattern => {
-      // Normalize pattern to use platform-specific path separator
-      const normalizedPattern = pattern.split('/').join(path.sep);
-
       // Support both exact directory names and relative paths
-      return dirName === pattern || relativePath === normalizedPattern ||
-             relativePath.startsWith(normalizedPattern + path.sep);
+      return dirName === pattern || relativePath === pattern ||
+             relativePath.startsWith(pattern + '/');
     });
   }
 
