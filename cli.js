@@ -645,6 +645,9 @@ program.option('--ignore-dir <patterns>', 'Exclude directories from processing (
       // Parse ignore patterns
       const ignorePatterns = parseIgnorePatterns(resolvedIgnoreDir);
 
+      // Resolve base directory for consistent path comparisons
+      const inputDirResolved = await fs.promises.realpath(inputDir).catch(() => inputDir);
+
       if (showProgress) {
         // Start with indeterminate progress, count in background
         progress = {current: 0, total: null};
@@ -655,7 +658,6 @@ program.option('--ignore-dir <patterns>', 'Exclude directories from processing (
         // then see the updated value once `countFiles` resolves,
         // transitioning the indicator from indeterminate to determinate progress without race conditions.
         const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
-        const inputDirResolved = await fs.promises.realpath(inputDir).catch(() => inputDir);
         countFiles(inputDir, extensions, skipRootAbs, ignorePatterns, inputDirResolved).then(total => {
           if (progress) {
             progress.total = total;
@@ -665,7 +667,7 @@ program.option('--ignore-dir <patterns>', 'Exclude directories from processing (
         });
       }
 
-      const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress, ignorePatterns);
+      const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress, ignorePatterns, inputDirResolved);
 
       // Show completion message and clear progress indicator
       if (progress) {
