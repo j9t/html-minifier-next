@@ -476,7 +476,7 @@ describe('CLI', () => {
   test('should override config file extensions with CLI argument', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     const configContent = JSON.stringify({
-      fileExt: 'html',  // Config specifies html
+      fileExt: 'html', // Config specifies html
       collapseWhitespace: true
     });
     fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test-config-override.json'), configContent);
@@ -505,7 +505,7 @@ describe('CLI', () => {
   test('should override config file extensions with empty CLI argument', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     const configContent = JSON.stringify({
-      fileExt: 'html',  // Config restricts to HTML only
+      fileExt: 'html', // Config restricts to HTML only
       collapseWhitespace: true
     }, null, 2);
     fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test-config-empty-override.json'), configContent);
@@ -1302,7 +1302,7 @@ describe('CLI', () => {
     const result = execCliWithStderr([
       '--input-dir=tmp',
       '--output-dir=tmp-out',
-      '--ignore-dir=libs, vendor',  // Note the space after comma
+      '--ignore-dir=libs, vendor', // Note the space after comma
       '--collapse-whitespace'
     ]);
 
@@ -1310,6 +1310,25 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp-out/a.html'), true);
     assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
     assert.strictEqual(existsFixture('tmp-out/vendor/c.html'), false);
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should handle ignore-dir with trailing slashes', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--ignore-dir=libs/', // Trailing slash should be stripped
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(existsFixture('tmp-out/a.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
 
     await removeFixture('tmp-out');
   });

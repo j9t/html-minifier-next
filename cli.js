@@ -393,7 +393,7 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     if (!patterns) return [];
     return patterns
       .split(',')
-      .map(p => p.trim().replace(/\\/g, '/'))
+      .map(p => p.trim().replace(/\\/g, '/').replace(/\/+$/, ''))
       .filter(p => p.length > 0);
   }
 
