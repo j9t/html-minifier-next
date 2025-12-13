@@ -1130,4 +1130,187 @@ describe('CLI', () => {
 
     await fs.promises.rm(configPath, { force: true });
   });
+
+  test('should ignore single directory by name', async () => {
+    // Create test structure: tmp/a.html, tmp/libs/b.html, tmp/sub/c.html
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs/sub'), { recursive: true });
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/sub'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/sub/d.html'), '<html><body>d</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/sub/c.html'), '<html><body>c</body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--ignore-dir=libs',
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    // Should process a.html and sub/c.html
+    assert.strictEqual(existsFixture('tmp-out/a.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/sub/c.html'), true);
+    // Should not process libs/b.html and libs/sub/d.html
+    assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
+    assert.strictEqual(existsFixture('tmp-out/libs/sub/d.html'), false);
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should ignore multiple directories', async () => {
+    // Create test structure
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/src'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/vendor/c.html'), '<html><body>c</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/src/d.html'), '<html><body>d</body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--ignore-dir=libs,vendor',
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    // Should process a.html and src/d.html
+    assert.strictEqual(existsFixture('tmp-out/a.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/src/d.html'), true);
+    // Should not process libs/b.html and vendor/c.html
+    assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
+    assert.strictEqual(existsFixture('tmp-out/vendor/c.html'), false);
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should ignore directories by relative path', async () => {
+    // Create test structure
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/static/libs'), { recursive: true });
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/static/libs/b.html'), '<html><body>b</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/c.html'), '<html><body>c</body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--ignore-dir=static/libs',
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    // Should process a.html and libs/c.html
+    assert.strictEqual(existsFixture('tmp-out/a.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/libs/c.html'), true);
+    // Should not process static/libs/b.html
+    assert.strictEqual(existsFixture('tmp-out/static/libs/b.html'), false);
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should support ignoreDir from config file as string', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
+
+    const configContent = JSON.stringify({
+      collapseWhitespace: true,
+      ignoreDir: 'libs'
+    }, null, 2);
+    fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test-config-ignore.json'), configContent);
+
+    const result = execCliWithStderr([
+      '--config-file=./tmp/test-config-ignore.json',
+      '--input-dir=tmp',
+      '--output-dir=tmp-out'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(existsFixture('tmp-out/a.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should support ignoreDir from config file as array', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/vendor/c.html'), '<html><body>c</body></html>');
+
+    const configContent = JSON.stringify({
+      collapseWhitespace: true,
+      ignoreDir: ['libs', 'vendor']
+    }, null, 2);
+    fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test-config-ignore-array.json'), configContent);
+
+    const result = execCliWithStderr([
+      '--config-file=./tmp/test-config-ignore-array.json',
+      '--input-dir=tmp',
+      '--output-dir=tmp-out'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(existsFixture('tmp-out/a.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
+    assert.strictEqual(existsFixture('tmp-out/vendor/c.html'), false);
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should allow CLI ignore-dir to override config file', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/vendor/c.html'), '<html><body>c</body></html>');
+
+    const configContent = JSON.stringify({
+      collapseWhitespace: true,
+      ignoreDir: 'libs'  // Config says ignore libs
+    }, null, 2);
+    fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test-config-ignore-override.json'), configContent);
+
+    const result = execCliWithStderr([
+      '--config-file=./tmp/test-config-ignore-override.json',
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--ignore-dir=vendor'  // CLI overrides to ignore vendor instead
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(existsFixture('tmp-out/a.html'), true);
+    // libs should be processed (not ignored) due to CLI override
+    assert.strictEqual(existsFixture('tmp-out/libs/b.html'), true);
+    // vendor should be ignored
+    assert.strictEqual(existsFixture('tmp-out/vendor/c.html'), false);
+
+    await removeFixture('tmp-out');
+  });
+
+  test('should handle ignore-dir with spaces in comma-separated list', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/vendor/c.html'), '<html><body>c</body></html>');
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--ignore-dir=libs, vendor',  // Note the space after comma
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.strictEqual(existsFixture('tmp-out/a.html'), true);
+    assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
+    assert.strictEqual(existsFixture('tmp-out/vendor/c.html'), false);
+
+    await removeFixture('tmp-out');
+  });
 });
