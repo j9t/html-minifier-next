@@ -262,9 +262,9 @@ let config = {};
 program.option('-c --config-file <file>', 'Use config file');
 program.option('--preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('--input-dir <dir>', 'Specify an input directory');
+program.option('--ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 program.option('--output-dir <dir>', 'Specify an output directory');
 program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated), e.g., “html” or “html,htm,php”');
-program.option('--ignore-dir <patterns>', 'Exclude directories from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 
 (async () => {
   let content;

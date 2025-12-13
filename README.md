@@ -29,9 +29,9 @@ Use `html-minifier-next --help` to check all available options:
 | Option | Description | Example |
 | --- | --- | --- |
 | `--input-dir <dir>` | Specify an input directory (best restricted with `--file-ext`) | `--input-dir=src` |
-| `--ignore-dir <patterns>` | Exclude directories from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
+| `--ignore-dir <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>` | Specify an output directory | `--output-dir=dist` |
-| `--file-ext <extensions>` | Specify file extension(s) to process (overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
+| `--file-ext <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
 | `-o <file>`, `--output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
 | `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
 | `--preset <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
