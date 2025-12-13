@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.0] - 2025-12-13
+
+### Added
+
+- Added `--ignore-dir` option to exclude directories from processing when using `--input-dir`
+  - Accepts comma-separated directory patterns (e.g., `--ignore-dir=libs,vendor,node_modules`)
+  - Supports both directory name matching (e.g., `libs` matches any directory named "libs") and relative path matching (e.g., `static/libs` matches only that specific path)
+  - Available in CLI and config files (`ignoreDir` property)
+  - Config file supports both string (`"ignoreDir": "libs,vendor"`) and array (`"ignoreDir": ["libs", "vendor"]`) formats
+  - CLI arguments override config file settings
+
 ## [4.8.3] - 2025-12-12
 
 ### Fixed
