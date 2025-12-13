@@ -247,6 +247,14 @@ function normalizeConfig(config) {
     }
   }
 
+  // Handle `ignoreDir` in config file
+  if ('ignoreDir' in normalized) {
+    // Support both string (`libs,vendor`) and array (`["libs", "vendor"]`) formats
+    if (Array.isArray(normalized.ignoreDir)) {
+      normalized.ignoreDir = normalized.ignoreDir.join(',');
+    }
+  }
+
   return normalized;
 }
 
@@ -255,7 +263,8 @@ program.option('-c --config-file <file>', 'Use config file');
 program.option('--preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('--input-dir <dir>', 'Specify an input directory');
 program.option('--output-dir <dir>', 'Specify an output directory');
-program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated), e.g., "html" or "html,htm,php"');
+program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated), e.g., “html” or “html,htm,php”');
+program.option('--ignore-dir <patterns>', 'Exclude directories from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 
 (async () => {
   let content;
@@ -375,7 +384,41 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     return fileExtensions.includes(fileExt);
   }
 
-  async function countFiles(dir, extensions, skipRootAbs) {
+  /**
+   * Parse comma-separated ignore patterns into an array
+   * @param {string} patterns - Comma-separated directory patterns (e.g., “libs,vendor”)
+   * @returns {string[]} Array of trimmed pattern strings
+   */
+  function parseIgnorePatterns(patterns) {
+    if (!patterns) return [];
+    return patterns
+      .split(',')
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+  }
+
+  /**
+   * Check if a directory should be ignored based on ignore patterns
+   * Supports matching by directory name or relative path
+   * @param {string} dirPath - Absolute path to the directory
+   * @param {string[]} ignorePatterns - Array of patterns to match against
+   * @param {string} baseDir - Base directory for relative path calculation
+   * @returns {boolean} True if directory should be ignored
+   */
+  function shouldIgnoreDirectory(dirPath, ignorePatterns, baseDir) {
+    if (!ignorePatterns || ignorePatterns.length === 0) return false;
+
+    const relativePath = path.relative(baseDir, dirPath);
+    const dirName = path.basename(dirPath);
+
+    return ignorePatterns.some(pattern => {
+      // Support both exact directory names and relative paths
+      return dirName === pattern || relativePath === pattern ||
+             relativePath.startsWith(pattern + path.sep);
+    });
+  }
+
+  async function countFiles(dir, extensions, skipRootAbs, ignorePatterns, baseDir) {
     let count = 0;
 
     const files = await fs.promises.readdir(dir).catch(() => []);
@@ -397,7 +440,11 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       }
 
       if (lst.isDirectory()) {
-        count += await countFiles(filePath, extensions, skipRootAbs);
+        // Skip ignored directories
+        if (shouldIgnoreDirectory(filePath, ignorePatterns, baseDir)) {
+          continue;
+        }
+        count += await countFiles(filePath, extensions, skipRootAbs, ignorePatterns, baseDir);
       } else if (shouldProcessFile(file, extensions)) {
         count++;
       }
@@ -423,10 +470,15 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     process.stderr.write('\r\x1b[K'); // Clear the line
   }
 
-  async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs, progress = null) {
+  async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs, progress = null, ignorePatterns = [], baseDir = null) {
     // If first call provided a string, normalize once; otherwise assume pre-parsed array
     if (typeof extensions === 'string') {
       extensions = parseFileExtensions(extensions);
+    }
+
+    // Set `baseDir` on first call
+    if (baseDir === null) {
+      baseDir = inputDir;
     }
 
     const files = await fs.promises.readdir(inputDir).catch(err => {
@@ -456,7 +508,11 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       }
 
       if (lst.isDirectory()) {
-        const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, isVerbose, skipRootAbs, progress);
+        // Skip ignored directories
+        if (shouldIgnoreDirectory(inputFile, ignorePatterns, baseDir)) {
+          continue;
+        }
+        const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, isVerbose, skipRootAbs, progress, ignorePatterns, baseDir);
         if (dirStats) {
           allStats.push(...dirStats);
         }
@@ -535,11 +591,15 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     process.stdout.write(minified);
   };
 
-  const { inputDir, outputDir, fileExt } = programOptions;
+  const { inputDir, outputDir, fileExt, ignoreDir } = programOptions;
 
   // Resolve file extensions: CLI argument takes priority over config file, even if empty string
   const hasCliFileExt = program.getOptionValueSource('fileExt') === 'cli';
   const resolvedFileExt = hasCliFileExt ? fileExt : config.fileExt;
+
+  // Resolve ignore patterns: CLI argument takes priority over config file
+  const hasCliIgnoreDir = program.getOptionValueSource('ignoreDir') === 'cli';
+  const resolvedIgnoreDir = hasCliIgnoreDir ? ignoreDir : config.ignoreDir;
 
   if (inputDir || outputDir) {
     if (!inputDir) {
@@ -581,6 +641,9 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       const showProgress = process.stderr.isTTY && !isVerbose;
       let progress = null;
 
+      // Parse ignore patterns
+      const ignorePatterns = parseIgnorePatterns(resolvedIgnoreDir);
+
       if (showProgress) {
         // Start with indeterminate progress, count in background
         progress = {current: 0, total: null};
@@ -591,7 +654,8 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
         // then see the updated value once `countFiles` resolves,
         // transitioning the indicator from indeterminate to determinate progress without race conditions.
         const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
-        countFiles(inputDir, extensions, skipRootAbs).then(total => {
+        const inputDirResolved = await fs.promises.realpath(inputDir).catch(() => inputDir);
+        countFiles(inputDir, extensions, skipRootAbs, ignorePatterns, inputDirResolved).then(total => {
           if (progress) {
             progress.total = total;
           }
@@ -600,7 +664,7 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
         });
       }
 
-      const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress);
+      const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress, ignorePatterns);
 
       // Show completion message and clear progress indicator
       if (progress) {
