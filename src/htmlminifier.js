@@ -1657,6 +1657,7 @@ async function minifyHTML(value, options, partialMarkup) {
   const ignoredMarkupChunks = [];
   const ignoredCustomMarkupChunks = [];
   let uidIgnore;
+  let uidIgnorePlaceholderPattern;
   let uidAttr;
   let uidPattern;
   // Create inline tags/text sets with custom elements
@@ -1690,6 +1691,7 @@ async function minifyHTML(value, options, partialMarkup) {
     if (!uidIgnore) {
       uidIgnore = uniqueId(value);
       const pattern = new RegExp('^' + uidIgnore + '([0-9]+)$');
+      uidIgnorePlaceholderPattern = new RegExp('^<!--' + uidIgnore + '(\\d+)-->$');
       if (options.ignoreCustomComments) {
         options.ignoreCustomComments = options.ignoreCustomComments.slice();
       } else {
@@ -2116,9 +2118,8 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       // Optimize whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
-      if (options.collapseWhitespace && text && uidIgnore) {
-        const ignorePlaceholderPattern = new RegExp('^<!--' + uidIgnore + '\\d+-->$');
-        if (ignorePlaceholderPattern.test(text)) {
+      if (options.collapseWhitespace && text && uidIgnorePlaceholderPattern) {
+        if (uidIgnorePlaceholderPattern.test(text)) {
           // Check if previous buffer items are: [ignore-placeholder, whitespace-only text]
           if (buffer.length >= 2) {
             const prevText = buffer[buffer.length - 1];
@@ -2126,10 +2127,10 @@ async function minifyHTML(value, options, partialMarkup) {
 
             // Check if previous item is whitespace-only and item before that is ignore-placeholder
             if (prevText && /^\s+$/.test(prevText) &&
-                prevComment && ignorePlaceholderPattern.test(prevComment)) {
+                prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
               // Extract the index from both placeholders to check their content
-              const currentMatch = text.match(new RegExp('^<!--' + uidIgnore + '(\\d+)-->$'));
-              const prevMatch = prevComment.match(new RegExp('^<!--' + uidIgnore + '(\\d+)-->$'));
+              const currentMatch = text.match(uidIgnorePlaceholderPattern);
+              const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
 
               if (currentMatch && prevMatch) {
                 const currentContent = ignoredMarkupChunks[+currentMatch[1]];
@@ -2157,9 +2158,12 @@ async function minifyHTML(value, options, partialMarkup) {
                       // Apply `collapseWhitespace` with appropriate context
                       if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
                         // Not in pre or other no-collapse context
-                        if (options.conservativeCollapse) {
+                        if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
+                          // Preserve line breaks if option is enabled
+                          collapsedText = prevText.replace(/^[ \t\f]*[\n\r][ \t\f]*/, '\n');
+                        } else if (options.conservativeCollapse) {
                           // Conservative mode: keep single space
-                          collapsedText = collapsedText.replace(/\s+/g, ' ');
+                          collapsedText = ' ';
                         } else {
                           // Aggressive mode: remove all whitespace
                           collapsedText = '';
