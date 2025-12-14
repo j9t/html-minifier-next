@@ -2133,45 +2133,50 @@ async function minifyHTML(value, options, partialMarkup) {
               const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
 
               if (currentMatch && prevMatch) {
-                const currentContent = ignoredMarkupChunks[+currentMatch[1]];
-                const prevContent = ignoredMarkupChunks[+prevMatch[1]];
+                const currentIndex = +currentMatch[1];
+                const prevIndex = +prevMatch[1];
 
-                // Only collapse whitespace if both blocks contain HTML (start with `<`)
-                // Don’t collapse if either contains plain text, as that would change meaning
-                if (currentContent && prevContent &&
-                    /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
-                  // Extract tag names from the HTML content
-                  const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
-                  const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                // Defensive bounds check to ensure indices are valid
+                if (currentIndex < ignoredMarkupChunks.length && prevIndex < ignoredMarkupChunks.length) {
+                  const currentContent = ignoredMarkupChunks[currentIndex];
+                  const prevContent = ignoredMarkupChunks[prevIndex];
 
-                  // Only collapse if both tags are not inline elements
-                  // Inline elements need whitespace preserved between them
-                  if (currentTagMatch && prevTagMatch) {
-                    const currentTag = options.name(currentTagMatch[1]);
-                    const prevTag = options.name(prevTagMatch[1]);
+                  // Only collapse whitespace if both blocks contain HTML (start with `<`)
+                  // Don’t collapse if either contains plain text, as that would change meaning
+                  if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
+                    // Extract tag names from the HTML content
+                    const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                    const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
 
-                    // Don’t collapse between inline elements
-                    if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
-                      // Collapse whitespace respecting context rules
-                      let collapsedText = prevText;
+                    // Only collapse if both tags are not inline elements
+                    // Inline elements need whitespace preserved between them
+                    if (currentTagMatch && prevTagMatch) {
+                      const currentTag = options.name(currentTagMatch[1]);
+                      const prevTag = options.name(prevTagMatch[1]);
 
-                      // Apply `collapseWhitespace` with appropriate context
-                      if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
-                        // Not in pre or other no-collapse context
-                        if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
-                          // Preserve line breaks if option is enabled
-                          collapsedText = prevText.replace(/^[ \t\f]*[\n\r][ \t\f]*/, '\n');
-                        } else if (options.conservativeCollapse) {
-                          // Conservative mode: keep single space
-                          collapsedText = ' ';
-                        } else {
-                          // Aggressive mode: remove all whitespace
-                          collapsedText = '';
+                      // Don’t collapse between inline elements
+                      if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
+                        // Collapse whitespace respecting context rules
+                        let collapsedText = prevText;
+
+                        // Apply `collapseWhitespace` with appropriate context
+                        if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
+                          // Not in pre or other no-collapse context
+                          if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
+                            // Preserve line breaks if option is enabled
+                            collapsedText = prevText.replace(/^[ \t\f]*[\n\r][ \t\f]*/, '\n');
+                          } else if (options.conservativeCollapse) {
+                            // Conservative mode: keep single space
+                            collapsedText = ' ';
+                          } else {
+                            // Aggressive mode: remove all whitespace
+                            collapsedText = '';
+                          }
                         }
-                      }
 
-                      // Replace the whitespace in buffer
-                      buffer[buffer.length - 1] = collapsedText;
+                        // Replace the whitespace in buffer
+                        buffer[buffer.length - 1] = collapsedText;
+                      }
                     }
                   }
                 }
