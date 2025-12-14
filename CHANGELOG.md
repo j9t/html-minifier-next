@@ -4,6 +4,20 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.1] - 2025-12-14
+
+### Changed
+
+- Optimized whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
+  - Automatically removes whitespace between consecutive `<!-- htmlmin:ignore -->` block pairs containing block-level HTML elements when `collapseWhitespace` is enabled
+  - Preserves whitespace when blocks contain plain text or inline elements (e.g., `<span>`, `<b>`, `<a>`) to avoid changing semantic meaning
+  - Respects existing context rules (`conservativeCollapse`, `<pre>` elements, etc.)
+  - Improves compression efficiency for templates using multiple ignore blocks (e.g., Nunjucks, Jinja, ERB)
+
+### Internal
+
+- Ensured automated dependency updates for benchmarks (via Dependabot)
+
 ## [4.9.0] - 2025-12-13
 
 ### Added

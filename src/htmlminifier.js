@@ -1657,6 +1657,7 @@ async function minifyHTML(value, options, partialMarkup) {
   const ignoredMarkupChunks = [];
   const ignoredCustomMarkupChunks = [];
   let uidIgnore;
+  let uidIgnorePlaceholderPattern;
   let uidAttr;
   let uidPattern;
   // Create inline tags/text sets with custom elements
@@ -1690,6 +1691,7 @@ async function minifyHTML(value, options, partialMarkup) {
     if (!uidIgnore) {
       uidIgnore = uniqueId(value);
       const pattern = new RegExp('^' + uidIgnore + '([0-9]+)$');
+      uidIgnorePlaceholderPattern = new RegExp('^<!--' + uidIgnore + '(\\d+)-->$');
       if (options.ignoreCustomComments) {
         options.ignoreCustomComments = options.ignoreCustomComments.slice();
       } else {
@@ -2114,6 +2116,79 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalStartTag = '';
         optionalEndTag = '';
       }
+
+      // Optimize whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
+      if (options.collapseWhitespace && text && uidIgnorePlaceholderPattern) {
+        if (uidIgnorePlaceholderPattern.test(text)) {
+          // Check if previous buffer items are: [ignore-placeholder, whitespace-only text]
+          if (buffer.length >= 2) {
+            const prevText = buffer[buffer.length - 1];
+            const prevComment = buffer[buffer.length - 2];
+
+            // Check if previous item is whitespace-only and item before that is ignore-placeholder
+            if (prevText && /^\s+$/.test(prevText) &&
+                prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
+              // Extract the index from both placeholders to check their content
+              const currentMatch = text.match(uidIgnorePlaceholderPattern);
+              const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
+
+              if (currentMatch && prevMatch) {
+                const currentIndex = +currentMatch[1];
+                const prevIndex = +prevMatch[1];
+
+                // Defensive bounds check to ensure indices are valid
+                if (currentIndex < ignoredMarkupChunks.length && prevIndex < ignoredMarkupChunks.length) {
+                  const currentContent = ignoredMarkupChunks[currentIndex];
+                  const prevContent = ignoredMarkupChunks[prevIndex];
+
+                  // Only collapse whitespace if both blocks contain HTML (start with `<`)
+                  // Don’t collapse if either contains plain text, as that would change meaning
+                  // Note: This check will match HTML comments (`<!-- … -->`), but the tag-name
+                  // regex below requires starting with a letter, so comments are intentionally
+                  // excluded by the `currentTagMatch && prevTagMatch` guard
+                  if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
+                    // Extract tag names from the HTML content (excludes comments, processing instructions, etc.)
+                    const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                    const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+
+                    // Only collapse if both matched valid element tags (not comments/text)
+                    // and both tags are block-level (inline elements need whitespace preserved)
+                    if (currentTagMatch && prevTagMatch) {
+                      const currentTag = options.name(currentTagMatch[1]);
+                      const prevTag = options.name(prevTagMatch[1]);
+
+                      // Don’t collapse between inline elements
+                      if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
+                        // Collapse whitespace respecting context rules
+                        let collapsedText = prevText;
+
+                        // Apply `collapseWhitespace` with appropriate context
+                        if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
+                          // Not in pre or other no-collapse context
+                          if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
+                            // Preserve line break as single newline
+                            collapsedText = '\n';
+                          } else if (options.conservativeCollapse) {
+                            // Conservative mode: keep single space
+                            collapsedText = ' ';
+                          } else {
+                            // Aggressive mode: remove all whitespace
+                            collapsedText = '';
+                          }
+                        }
+
+                        // Replace the whitespace in buffer
+                        buffer[buffer.length - 1] = collapsedText;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       buffer.push(text);
     },
     doctype: function (doctype) {
