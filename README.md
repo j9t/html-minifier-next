@@ -4,7 +4,7 @@
 
 HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier**.
 
-The project was based on [HTML Minifier Terser](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy Zaytsev’s HTML Minifier](https://github.com/kangax/html-minifier). HMN offers additional features, but is backwards-compatible with both. The project was set up because as of 2025, both HTML Minifier Terser and HTML Minifier had been unmaintained for a few years. As the project seems maintainable [to me, [Jens](https://meiert.com/)]—even more so with community support—, it’s being [updated, extended, and documented](https://github.com/j9t/html-minifier-next/blob/main/CHANGELOG.md) further in this place.
+The project was based on [HTML Minifier Terser](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier](https://github.com/kangax/html-minifier). HMN offers additional features, but is backwards-compatible with both. The project was set up because as of 2025, both HTML Minifier Terser and HTML Minifier had been unmaintained for a few years. As the project seems maintainable [to me, [Jens](https://meiert.com/), an HTML optimizer]—even more so with community support—, it’s being [updated, extended, and documented](https://github.com/j9t/html-minifier-next/blob/main/CHANGELOG.md) further in this place.
 
 ## Installation
 
@@ -431,4 +431,4 @@ npm run benchmarks
 
 ## Acknowledgements
 
-With many thanks to all the previous authors of HTML Minifier, especially [Juriy Zaytsev](https://github.com/kangax), and to everyone who helped make this new edition better, particularly [Daniel Ruf](https://github.com/DanielRuf) and [Jonas Geiler](https://github.com/jonasgeiler).
+With many thanks to all the previous authors of HTML Minifier, especially [Juriy “kangax” Zaytsev](https://github.com/kangax), and to everyone who helped make this new edition better, particularly [Daniel Ruf](https://github.com/DanielRuf) and [Jonas Geiler](https://github.com/jonasgeiler).
