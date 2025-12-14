@@ -84,5 +84,5 @@
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "version": "4.9.1"
+  "version": "4.9.2"
 }

@@ -15,8 +15,6 @@
  * });
  */
 
-import { replaceAsync } from './utils.js';
-
 class CaseInsensitiveSet extends Set {
   has(str) {
     return super.has(str.toLowerCase());
@@ -184,7 +182,7 @@ export class HTMLParser {
           const endTagMatch = html.match(endTag);
           if (endTagMatch) {
             html = html.substring(endTagMatch[0].length);
-            await replaceAsync(endTagMatch[0], endTag, parseEndTag);
+            await parseEndTag(endTagMatch[0], endTagMatch[1]);
             prevTag = '/' + endTagMatch[1].toLowerCase();
             continue;
           }
@@ -235,21 +233,29 @@ export class HTMLParser {
         // Use pre-compiled regex for common tags (`script`, `style`, `noscript`) to avoid regex creation overhead
         const reStackedTag = preCompiledStackedTags[stackedTag] || reCache[stackedTag] || (reCache[stackedTag] = new RegExp('([\\s\\S]*?)</' + stackedTag + '[^>]*>', 'i'));
 
-        html = await replaceAsync(html, reStackedTag, async (_, text) => {
+        const m = reStackedTag.exec(html);
+        if (m) {
+          let text = m[1];
           if (stackedTag !== 'script' && stackedTag !== 'style' && stackedTag !== 'noscript') {
             text = text
               .replace(/<!--([\s\S]*?)-->/g, '$1')
               .replace(/<!\[CDATA\[([\s\S]*?)]]>/g, '$1');
           }
-
           if (handler.chars) {
             await handler.chars(text);
           }
-
-          return '';
-        });
-
-        await parseEndTag('</' + stackedTag + '>', stackedTag);
+          // Advance HTML past the matched special tag content and its closing tag
+          html = html.slice(m.index + m[0].length);
+          await parseEndTag('</' + stackedTag + '>', stackedTag);
+        } else {
+          // No closing tag found; to avoid infinite loop, break similarly to previous behavior
+          if (handler.continueOnParseError && handler.chars && html) {
+            await handler.chars(html[0], prevTag, '');
+            html = html.substring(1);
+          } else {
+            break;
+          }
+        }
       }
 
       if (html === last) {
