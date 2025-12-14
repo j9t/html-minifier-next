@@ -18,8 +18,6 @@ export default [
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: {
-        document: 'readonly',
-        window: 'readonly',
         ...globals.node
       }
     },
@@ -34,10 +32,8 @@ export default [
     files: ['demo/**/*.js'],
     languageOptions: {
       globals: {
-        LZString: 'readonly',
-        navigator: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly'
+        ...globals.browser,
+        LZString: 'readonly'
       }
     }
   }
