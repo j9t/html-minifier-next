@@ -2143,13 +2143,16 @@ async function minifyHTML(value, options, partialMarkup) {
 
                   // Only collapse whitespace if both blocks contain HTML (start with `<`)
                   // Don’t collapse if either contains plain text, as that would change meaning
+                  // Note: This check will match HTML comments (`<!-- … -->`), but the tag-name
+                  // regex below requires starting with a letter, so comments are intentionally
+                  // excluded by the `currentTagMatch && prevTagMatch` guard
                   if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
-                    // Extract tag names from the HTML content
+                    // Extract tag names from the HTML content (excludes comments, processing instructions, etc.)
                     const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
                     const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
 
-                    // Only collapse if both tags are not inline elements
-                    // Inline elements need whitespace preserved between them
+                    // Only collapse if both matched valid element tags (not comments/text)
+                    // and both tags are block-level (inline elements need whitespace preserved)
                     if (currentTagMatch && prevTagMatch) {
                       const currentTag = options.name(currentTagMatch[1]);
                       const prevTag = options.name(prevTagMatch[1]);
@@ -2163,8 +2166,8 @@ async function minifyHTML(value, options, partialMarkup) {
                         if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
                           // Not in pre or other no-collapse context
                           if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
-                            // Preserve line breaks if option is enabled
-                            collapsedText = prevText.replace(/^[ \t\f]*[\n\r][ \t\f]*/, '\n');
+                            // Preserve line break as single newline
+                            collapsedText = '\n';
                           } else if (options.conservativeCollapse) {
                             // Conservative mode: keep single space
                             collapsedText = ' ';
