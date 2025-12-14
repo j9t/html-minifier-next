@@ -4,6 +4,20 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.9.2] - 2025-12-14
+
+### Performance
+
+- Improved parser
+  - Compute `nextTag` only when required by whitespace-collapse features, avoiding unnecessary regex parsing on text nodes
+  - Add promise-aware handler calls (only `await` when a Promise is returned) to reduce overhead in synchronous pipelines
+  - Cache lowercased tag names on the stack to avoid repeated `.toLowerCase()` during comparisons
+- Improved minifier to skip entity decoding for text/attribute values that contain no `&`, avoiding needless work in the common case
+
+### Internal
+
+- Updated benchmark dependencies, extended samples, and re-ran benchmarks
+
 ## [4.9.1] - 2025-12-14
 
 ### Changed
