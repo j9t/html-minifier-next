@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Respects existing context rules (`conservativeCollapse`, `<pre>` elements, etc.)
   - Improves compression efficiency for templates using multiple ignore blocks (e.g., Nunjucks, Jinja, ERB)
 
+### Internal
+
+- Ensured automated dependency updates for benchmarks (via Dependabot)
+
 ## [4.9.0] - 2025-12-13
 
 ### Added
