@@ -3735,6 +3735,16 @@ describe('HTML', () => {
     input = '<!-- htmlmin:ignore --><div>foo</div><!-- htmlmin:ignore -->\n  <!-- htmlmin:ignore --><div>bar</div><!-- htmlmin:ignore -->';
     output = '<div>foo</div><div>bar</div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // `pre` elements should preserve whitespace (no trimming/collapsing inside pre)
+    input = '<pre><!-- htmlmin:ignore --><div>foo</div><!-- htmlmin:ignore -->\n  <!-- htmlmin:ignore --><div>bar</div><!-- htmlmin:ignore --></pre>';
+    output = '<pre><div>foo</div>\n  <div>bar</div></pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // `preserveLineBreaks` should keep newlines between blocks
+    input = '<!-- htmlmin:ignore --><div>foo</div><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --><div>bar</div><!-- htmlmin:ignore -->';
+    output = '<div>foo</div>\n<div>bar</div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, preserveLineBreaks: true }), output);
   });
 
   test('meta viewport', async () => {
