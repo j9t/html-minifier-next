@@ -3678,6 +3678,65 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), '+0');
   });
 
+  test('whitespace collapsing between consecutive htmlmin:ignore blocks (issue #145)', async () => {
+    let input, output;
+
+    // Simple consecutive ignore blocks with HTML elements
+    input = '<!-- htmlmin:ignore --><p>foo</p><!-- htmlmin:ignore --><p>bar</p>';
+    output = '<p>foo</p><p>bar</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Multiple consecutive ignore blocks with newlines
+    input = '<!-- htmlmin:ignore --><p>foo</p><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --><p>bar</p><!-- htmlmin:ignore -->\n<p>baz</p>';
+    output = '<p>foo</p><p>bar</p><p>baz</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Multiple ignore blocks with various whitespace (spaces, tabs, newlines)
+    input = '<!-- htmlmin:ignore --><p>foo</p><!-- htmlmin:ignore -->  \n\t  <!-- htmlmin:ignore --><p>bar</p><!-- htmlmin:ignore -->';
+    output = '<p>foo</p><p>bar</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Conservative collapse mode should keep single space
+    input = '<!-- htmlmin:ignore --><span>foo</span><!-- htmlmin:ignore -->   <!-- htmlmin:ignore --><span>bar</span><!-- htmlmin:ignore -->';
+    output = '<span>foo</span> <span>bar</span>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, conservativeCollapse: true }), output);
+
+    // Without `collapseWhitespace`, whitespace should remain
+    input = '<!-- htmlmin:ignore --><p>foo</p><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --><p>bar</p><!-- htmlmin:ignore -->';
+    output = '<p>foo</p>\n<p>bar</p>';
+    assert.strictEqual(await minify(input), output);
+
+    // Text content inside paragraph should preserve whitespace
+    input = '<p><!-- htmlmin:ignore -->text<!-- htmlmin:ignore -->\n  <!-- htmlmin:ignore -->more<!-- htmlmin:ignore --></p>';
+    output = '<p>text more</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Text content should preserve whitespace (not HTML)
+    input = '<!-- htmlmin:ignore -->a<!-- htmlmin:ignore --> <!-- htmlmin:ignore -->b<!-- htmlmin:ignore -->';
+    output = 'a b';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Mixed HTML and text—only collapse between HTML blocks
+    input = '<!-- htmlmin:ignore --><div>x</div><!-- htmlmin:ignore --> <!-- htmlmin:ignore -->text<!-- htmlmin:ignore -->';
+    output = '<div>x</div> text';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Inline elements should preserve whitespace
+    input = '<!-- htmlmin:ignore --><span>foo</span><!-- htmlmin:ignore --> <!-- htmlmin:ignore --><span>bar</span><!-- htmlmin:ignore -->';
+    output = '<span>foo</span> <span>bar</span>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Other inline elements should preserve whitespace
+    input = '<!-- htmlmin:ignore --><b>foo</b><!-- htmlmin:ignore --> <!-- htmlmin:ignore --><b>bar</b><!-- htmlmin:ignore --> <b>baz</b>';
+    output = '<b>foo</b> <b>bar</b> <b>baz</b>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Block elements should collapse whitespace
+    input = '<!-- htmlmin:ignore --><div>foo</div><!-- htmlmin:ignore -->\n  <!-- htmlmin:ignore --><div>bar</div><!-- htmlmin:ignore -->';
+    output = '<div>foo</div><div>bar</div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
   test('meta viewport', async () => {
     let input, output;
 
@@ -4418,7 +4477,7 @@ describe('HTML', () => {
     const longWhitespace = ' '.repeat(10000);
     const phpFragments = [/<%[\s\S]*?%>/g, /<\?[\s\S]*?\?>/g];
 
-    // Test case 1: Long whitespace before custom fragment
+    // Long whitespace before custom fragment
     const input1 = `<div>${longWhitespace}<?php echo "test"; ?></div>`;
     const startTime1 = Date.now();
     const result1 = await minify(input1, {
@@ -4431,7 +4490,7 @@ describe('HTML', () => {
     assert.ok((endTime1 - startTime1) < 2000);
     assert.ok(result1.includes('<?php echo "test"; ?>'));
 
-    // Test case 2: Multiple consecutive fragments with long whitespace
+    // Multiple consecutive fragments with long whitespace
     const input2 = `<div>${longWhitespace}<?php echo "test1"; ?>${longWhitespace}<?php echo "test2"; ?>${longWhitespace}</div>`;
     const startTime2 = Date.now();
     const result2 = await minify(input2, {
@@ -4610,7 +4669,7 @@ describe('HTML', () => {
   });
 
   test('tfoot element in nested table', async () => {
-    // Minimal test case for `tfoot` element breaking HTML structure during minification
+    // `tfoot` element breaking HTML structure during minification
     const input = '<table><tbody><tr><td><table><caption>Test</caption><tbody><tr><td>Test</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table></td></tr></tbody></table>';
 
     // The output should preserve the correct table structure with `tfoot` properly nested
@@ -4620,7 +4679,7 @@ describe('HTML', () => {
   });
 
   test('tbody element in nested table', async () => {
-    // Test case for `tbody` with `thead` in nested tables
+    // `tbody` with `thead` in nested tables
     const input = '<table><thead><tr><th>Outer Header</th></tr></thead><tbody><tr><td><table><thead><tr><th>Inner Header</th></tr></thead><tbody><tr><td>Test</td></tr></tbody></table></td></tr></tbody></table>';
 
     // The output should preserve the correct table structure with `thead`/`tbody` properly nested
