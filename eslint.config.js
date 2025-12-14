@@ -17,13 +17,10 @@ export default [
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: {
-        console: 'readonly',
-        process: 'readonly',
         Buffer: 'readonly',
-        __dirname: 'readonly',
-        __filename: 'readonly',
-        global: 'readonly',
+        console: 'readonly',
         document: 'readonly',
+        process: 'readonly',
         window: 'readonly'
       }
     },
@@ -38,10 +35,10 @@ export default [
     files: ['demo/**/*.js'],
     languageOptions: {
       globals: {
+        clearTimeout: 'readonly',
         LZString: 'readonly',
         navigator: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly'
+        setTimeout: 'readonly'
       }
     }
   }
