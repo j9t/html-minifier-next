@@ -2114,6 +2114,69 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalStartTag = '';
         optionalEndTag = '';
       }
+
+      // Optimize whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
+      if (options.collapseWhitespace && text && uidIgnore) {
+        const ignorePlaceholderPattern = new RegExp('^<!--' + uidIgnore + '\\d+-->$');
+        if (ignorePlaceholderPattern.test(text)) {
+          // Check if previous buffer items are: [ignore-placeholder, whitespace-only text]
+          if (buffer.length >= 2) {
+            const prevText = buffer[buffer.length - 1];
+            const prevComment = buffer[buffer.length - 2];
+
+            // Check if previous item is whitespace-only and item before that is ignore-placeholder
+            if (prevText && /^\s+$/.test(prevText) &&
+                prevComment && ignorePlaceholderPattern.test(prevComment)) {
+              // Extract the index from both placeholders to check their content
+              const currentMatch = text.match(new RegExp('^<!--' + uidIgnore + '(\\d+)-->$'));
+              const prevMatch = prevComment.match(new RegExp('^<!--' + uidIgnore + '(\\d+)-->$'));
+
+              if (currentMatch && prevMatch) {
+                const currentContent = ignoredMarkupChunks[+currentMatch[1]];
+                const prevContent = ignoredMarkupChunks[+prevMatch[1]];
+
+                // Only collapse whitespace if both blocks contain HTML (start with `<`)
+                // Don’t collapse if either contains plain text, as that would change meaning
+                if (currentContent && prevContent &&
+                    /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
+                  // Extract tag names from the HTML content
+                  const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                  const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+
+                  // Only collapse if both tags are not inline elements
+                  // Inline elements need whitespace preserved between them
+                  if (currentTagMatch && prevTagMatch) {
+                    const currentTag = options.name(currentTagMatch[1]);
+                    const prevTag = options.name(prevTagMatch[1]);
+
+                    // Don’t collapse between inline elements
+                    if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
+                      // Collapse whitespace respecting context rules
+                      let collapsedText = prevText;
+
+                      // Apply `collapseWhitespace` with appropriate context
+                      if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
+                        // Not in pre or other no-collapse context
+                        if (options.conservativeCollapse) {
+                          // Conservative mode: keep single space
+                          collapsedText = collapsedText.replace(/\s+/g, ' ');
+                        } else {
+                          // Aggressive mode: remove all whitespace
+                          collapsedText = '';
+                        }
+                      }
+
+                      // Replace the whitespace in buffer
+                      buffer[buffer.length - 1] = collapsedText;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       buffer.push(text);
     },
     doctype: function (doctype) {
