@@ -15,17 +15,17 @@
   },
   "description": "Super-configurable, well-tested, JavaScript-based HTML minifier (enhanced successor of HTML Minifier)",
   "devDependencies": {
-    "@commitlint/cli": "^20.1.0",
+    "@commitlint/cli": "^20.2.0",
     "@eslint/js": "^9.39.1",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^0.4.4",
     "eslint": "^9.39.1",
-    "rollup": "^4.53.2",
+    "rollup": "^4.53.3",
     "rollup-plugin-polyfill-node": "^0.13.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.2"
+    "vite": "^7.2.7"
   },
   "exports": {
     ".": {
