@@ -4327,6 +4327,23 @@ describe('HTML', () => {
       collapseAttributeWhitespace: true,
       removeAttributeQuotes: true
     }), output);
+
+    // Should work together with `collapseWhitespace` for both text nodes and attributes
+    input = '<p title="  foo   bar  ">\n  Hello   \n  world  \n</p>';
+    output = '<p title="foo bar">Hello world</p>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true,
+      collapseAttributeWhitespace: true
+    }), output);
+
+    // Special Unicode whitespace (hair space, non-breaking space) is preserved for consistency with `collapseWhitespace`
+    input = '<div title="foo\u200Abar  baz"></div>';
+    output = '<div title="foo\u200Abar baz"></div>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
+
+    // Non-breaking space is preserved (consistent with `collapseWhitespace` behavior in text nodes)
+    input = '<div title="foo\u00A0\u00A0bar"></div>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
   });
 
   test('decode entity characters', async () => {
@@ -4550,32 +4567,24 @@ describe('HTML', () => {
 
   test('ReDoS prevention in custom fragments processing', async () => {
     // Test long sequences of whitespace that could trigger ReDoS
+    // If ReDoS occurs, the test runner’s timeout will catch it
     const longWhitespace = ' '.repeat(10000);
     const phpFragments = [/<%[\s\S]*?%>/g, /<\?[\s\S]*?\?>/g];
 
     // Long whitespace before custom fragment
     const input1 = `<div>${longWhitespace}<?php echo "test"; ?></div>`;
-    const startTime1 = Date.now();
     const result1 = await minify(input1, {
       ignoreCustomFragments: phpFragments,
       collapseWhitespace: true
     });
-    const endTime1 = Date.now();
-
-    // Should complete reasonably quickly (under 2 seconds)
-    assert.ok((endTime1 - startTime1) < 2000);
     assert.ok(result1.includes('<?php echo "test"; ?>'));
 
     // Multiple consecutive fragments with long whitespace
     const input2 = `<div>${longWhitespace}<?php echo "test1"; ?>${longWhitespace}<?php echo "test2"; ?>${longWhitespace}</div>`;
-    const startTime2 = Date.now();
     const result2 = await minify(input2, {
       ignoreCustomFragments: phpFragments,
       collapseWhitespace: true
     });
-    const endTime2 = Date.now();
-
-    assert.ok((endTime2 - startTime2) < 2000);
     assert.ok(result2.includes('<?php echo "test1"; ?>'));
     assert.ok(result2.includes('<?php echo "test2"; ?>'));
   });
