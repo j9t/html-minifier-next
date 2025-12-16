@@ -2,20 +2,40 @@ class Sorter {
   sort(tokens, fromIndex = 0) {
     for (let i = 0, len = this.keys.length; i < len; i++) {
       const key = this.keys[i];
-      const token = key.slice(1);
+      const token = this.tokenMap.get(key);
 
-      let index = tokens.indexOf(token, fromIndex);
+      // Build position map for this token to avoid repeated `indexOf`
+      const positions = [];
+      for (let j = fromIndex; j < tokens.length; j++) {
+        if (tokens[j] === token) {
+          positions.push(j);
+        }
+      }
 
-      if (index !== -1) {
-        do {
-          if (index !== fromIndex) {
-            tokens.splice(index, 1);
-            tokens.splice(fromIndex, 0, token);
+      if (positions.length > 0) {
+        // Build new array with tokens in sorted order instead of splicing
+        const result = [];
+
+        // Add all instances of the current token first
+        for (let j = 0; j < positions.length; j++) {
+          result.push(token);
+        }
+
+        // Add other tokens, skipping positions where current token was
+        const posSet = new Set(positions);
+        for (let j = fromIndex; j < tokens.length; j++) {
+          if (!posSet.has(j)) {
+            result.push(tokens[j]);
           }
-          fromIndex++;
-        } while ((index = tokens.indexOf(token, fromIndex)) !== -1);
+        }
 
-        return this[key].sort(tokens, fromIndex);
+        // Copy sorted portion back to tokens array
+        for (let j = 0; j < result.length; j++) {
+          tokens[fromIndex + j] = result[j];
+        }
+
+        const newFromIndex = fromIndex + positions.length;
+        return this.sorterMap.get(key).sort(tokens, newFromIndex);
       }
     }
     return tokens;
@@ -23,44 +43,72 @@ class Sorter {
 }
 
 class TokenChain {
+  constructor() {
+    // Use Map instead of object properties for better performance
+    this.map = new Map();
+  }
+
   add(tokens) {
     tokens.forEach((token) => {
-      const key = '$' + token;
-      if (!this[key]) {
-        this[key] = [];
-        this[key].processed = 0;
+      if (!this.map.has(token)) {
+        this.map.set(token, { arrays: [], processed: 0 });
       }
-      this[key].push(tokens);
+      this.map.get(token).arrays.push(tokens);
     });
   }
 
   createSorter() {
     const sorter = new Sorter();
+    sorter.tokenMap = new Map();
+    sorter.sorterMap = new Map();
 
-    sorter.keys = Object.keys(this).sort((j, k) => {
-      const m = this[j].length;
-      const n = this[k].length;
-      return m < n ? 1 : m > n ? -1 : j < k ? -1 : j > k ? 1 : 0;
-    }).filter((key) => {
-      if (this[key].processed < this[key].length) {
-        const token = key.slice(1);
+    // Convert Map entries to array and sort
+    const entries = Array.from(this.map.entries()).sort((a, b) => {
+      const m = a[1].arrays.length;
+      const n = b[1].arrays.length;
+      return m < n ? 1 : m > n ? -1 : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+    });
+
+    sorter.keys = [];
+
+    entries.forEach(([token, data]) => {
+      if (data.processed < data.arrays.length) {
         const chain = new TokenChain();
 
-        this[key].forEach((tokens) => {
-          let index;
-          while ((index = tokens.indexOf(token)) !== -1) {
-            tokens.splice(index, 1);
+        data.arrays.forEach((tokens) => {
+          // Build new array without the current token instead of splicing
+          const filtered = [];
+          for (let i = 0; i < tokens.length; i++) {
+            if (tokens[i] !== token) {
+              filtered.push(tokens[i]);
+            } else {
+              // Increment processed count for each occurrence of token
+              const tokenData = this.map.get(tokens[i]);
+              if (tokenData) {
+                tokenData.processed++;
+              }
+            }
           }
-          tokens.forEach((token) => {
-            this['$' + token].processed++;
+
+          // Mark other tokens as processed
+          filtered.forEach((t) => {
+            const tData = this.map.get(t);
+            if (tData) {
+              tData.processed++;
+            }
           });
-          chain.add(tokens.slice(0));
+
+          if (filtered.length > 0) {
+            chain.add(filtered);
+          }
         });
-        sorter[key] = chain.createSorter();
-        return true;
+
+        sorter.keys.push(token);
+        sorter.tokenMap.set(token, token);
+        sorter.sorterMap.set(token, chain.createSorter());
       }
-      return false;
     });
+
     return sorter;
   }
 }
