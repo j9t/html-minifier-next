@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.0] - 2025-12-16
+
+### Performance
+
+- Improved parser and token chain handler to speed up processing of large documents and batch processing
+  - Implemented index-based parsing to eliminate string slicing overhead
+  - Added WeakMap cache for attribute regex compilation to reduce setup overhead when parsing multiple documents with the same handler
+  - Optimized line/column calculation to use single-pass loop instead of string splitting
+  - Replaced O(n²) algorithms in TokenChain with Map-based O(n) implementations
+  - Eliminated repeated `indexOf` and `splice` operations in token sorting by using position tracking and array rebuilding
+
 ## [4.9.2] - 2025-12-14
 
 ### Performance
