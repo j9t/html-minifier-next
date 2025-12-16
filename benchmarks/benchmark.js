@@ -308,14 +308,26 @@ function displayTable() {
 }
 
 async function processFiles() {
-  let index = 0;
-  const total = fileNames.length;
+  // Generator that yields file names to process
+  function* fileNameGenerator() {
+    for (const name of fileNames) {
+      yield name;
+    }
+  }
+
+  const generator = fileNameGenerator();
+
+  // Thread-safe (single-threaded JS) function to get next file name
+  // Returns undefined when all files have been assigned
+  function getNextFile() {
+    const next = generator.next();
+    return next.done ? undefined : next.value;
+  }
 
   async function worker() {
     while (true) {
-      const i = index++;
-      if (i >= total) break;
-      const name = fileNames[i];
+      const name = getNextFile();
+      if (name === undefined) break;
       try {
         await processFile(name);
       } catch (e) {
@@ -324,7 +336,7 @@ async function processFiles() {
     }
   }
 
-  const workers = Array.from({ length: Math.min(BENCH_CONCURRENCY, total) }, () => worker());
+  const workers = Array.from({ length: Math.min(BENCH_CONCURRENCY, fileNames.length) }, () => worker());
   await Promise.all(workers);
 }
 
