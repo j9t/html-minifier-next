@@ -1,8 +1,7 @@
 class Sorter {
   sort(tokens, fromIndex = 0) {
     for (let i = 0, len = this.keys.length; i < len; i++) {
-      const key = this.keys[i];
-      const token = this.tokenMap.get(key);
+      const token = this.keys[i];
 
       // Build position map for this token to avoid repeated `indexOf`
       const positions = [];
@@ -35,7 +34,7 @@ class Sorter {
         }
 
         const newFromIndex = fromIndex + positions.length;
-        return this.sorterMap.get(key).sort(tokens, newFromIndex);
+        return this.sorterMap.get(token).sort(tokens, newFromIndex);
       }
     }
     return tokens;
@@ -59,7 +58,6 @@ class TokenChain {
 
   createSorter() {
     const sorter = new Sorter();
-    sorter.tokenMap = new Map();
     sorter.sorterMap = new Map();
 
     // Convert Map entries to array and sort
@@ -98,7 +96,6 @@ class TokenChain {
         });
 
         sorter.keys.push(token);
-        sorter.tokenMap.set(token, token);
         sorter.sorterMap.set(token, chain.createSorter());
       }
     });
