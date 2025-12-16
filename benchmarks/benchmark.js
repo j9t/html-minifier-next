@@ -22,6 +22,10 @@ const { minify: minifyHTML } = minifyHTMLPkg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Ensure required directories exist for fresh runs
+await fs.mkdir(path.join(__dirname, 'generated'), { recursive: true });
+await fs.mkdir(path.join(__dirname, 'sources'), { recursive: true });
+
 const user_agent = 'html-minifier-next-benchmarks/0.0';
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
@@ -46,8 +50,13 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
   stream: process.stderr
 });
 
-// Timeout for forked processes (HMN and HM Terser)
+// Timeout for HTML Minifier runs (ms)
 const TEST_TIMEOUT = 30000;
+
+// Concurrency for site processing
+// Default to 1 (sequential) for accurate per-minifier performance comparison
+// Set `BENCH_CONCURRENCY=6` for faster parallel execution (may show CPU contention)
+const BENCH_CONCURRENCY = Math.max(1, parseInt(process.env.BENCH_CONCURRENCY || '1', 10) || 1);
 
 const table = new Table({
   head: ['File', 'Before', 'HTML Minifier Next', 'HTML Minifier Terser', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
@@ -114,6 +123,7 @@ async function readSize(filePath) {
 }
 
 async function gzipFile(inPath, outPath) {
+  await fs.mkdir(path.dirname(outPath), { recursive: true });
   await pipeline(
     createReadStream(inPath),
     zlib.createGzip({ level: zlib.constants.Z_BEST_COMPRESSION }),
@@ -122,6 +132,7 @@ async function gzipFile(inPath, outPath) {
 }
 
 async function brotliFile(inPath, outPath) {
+  await fs.mkdir(path.dirname(outPath), { recursive: true });
   await pipeline(
     createReadStream(inPath),
     zlib.createBrotliCompress(),
@@ -297,9 +308,24 @@ function displayTable() {
 }
 
 async function processFiles() {
-  for (const fileName of fileNames) {
-    await processFile(fileName);
+  let index = 0;
+  const total = fileNames.length;
+
+  async function worker() {
+    while (true) {
+      const i = index++;
+      if (i >= total) break;
+      const name = fileNames[i];
+      try {
+        await processFile(name);
+      } catch (e) {
+        benchmarkErrors.push(`Unhandled error processing ${name}: ${e?.message || e}`);
+      }
+    }
   }
+
+  const workers = Array.from({ length: Math.min(BENCH_CONCURRENCY, total) }, () => worker());
+  await Promise.all(workers);
 }
 
 async function processFile(fileName) {
@@ -861,6 +887,12 @@ async function processFile(fileName) {
   log(`Processing ${fileName}…`);
   log(`${fileName}: Downloaded, starting processing`);
   await processFileInternal(site);
+}
+
+// Log concurrency setting
+const actualConcurrency = Math.min(BENCH_CONCURRENCY, fileNames.length);
+if (VERBOSE || BENCH_CONCURRENCY > 1) {
+  console.error(`Running benchmarks with concurrency: ${actualConcurrency} (BENCH_CONCURRENCY=${BENCH_CONCURRENCY})`);
 }
 
 await processFiles();
