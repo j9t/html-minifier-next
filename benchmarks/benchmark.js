@@ -123,7 +123,6 @@ async function readSize(filePath) {
 }
 
 async function gzipFile(inPath, outPath) {
-  await fs.mkdir(path.dirname(outPath), { recursive: true });
   await pipeline(
     createReadStream(inPath),
     zlib.createGzip({ level: zlib.constants.Z_BEST_COMPRESSION }),
@@ -132,7 +131,6 @@ async function gzipFile(inPath, outPath) {
 }
 
 async function brotliFile(inPath, outPath) {
-  await fs.mkdir(path.dirname(outPath), { recursive: true });
   await pipeline(
     createReadStream(inPath),
     zlib.createBrotliCompress(),
