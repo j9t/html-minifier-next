@@ -3509,7 +3509,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), output);
   });
 
-  // @@ Fix minification error
+  // @@ Fix minification error; check test; also consider if and how `continueOnParseError` should affect this
   /* test('preventAttributesEscaping: choose safe quote when decoded value contains double quotes', async () => {
     // The value decodes to `{"299": "itsct"}` which contains double quotes;
     // with `preventAttributesEscaping`, this should not be escaped but instead be wrapped with single quotes
