@@ -21,6 +21,7 @@ export const presets = {
     removeStyleLinkTypeAttributes: true,
     useShortDoctype: true
   },
+  // @@ Add `collapseAttributeWhitespace: true` (also add to preset in demo)
   comprehensive: {
     caseSensitive: true,
     collapseBooleanAttributes: true,
