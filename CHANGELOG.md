@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Internal
 
-- Improved benchmark handling, tuned settings, and re-ran benchmarks
+- Improved benchmark handling and re-ran benchmarks
 
 ## [4.9.2] - 2025-12-14
 
