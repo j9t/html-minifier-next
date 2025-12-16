@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Replaced O(n²) algorithms in TokenChain with Map-based O(n) implementations
   - Eliminated repeated `indexOf` and `splice` operations in token sorting by using position tracking and array rebuilding
 
+### Internal
+
+- Improved benchmark handling and re-ran benchmarks
+
 ## [4.9.2] - 2025-12-14
 
 ### Performance
