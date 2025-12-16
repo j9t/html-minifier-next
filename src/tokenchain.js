@@ -64,7 +64,11 @@ class TokenChain {
     const entries = Array.from(this.map.entries()).sort((a, b) => {
       const m = a[1].arrays.length;
       const n = b[1].arrays.length;
-      return m < n ? 1 : m > n ? -1 : a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+      // Sort by length descending (larger first)
+      const lengthDiff = n - m;
+      if (lengthDiff !== 0) return lengthDiff;
+      // If lengths equal, sort by key ascending
+      return a[0].localeCompare(b[0]);
     });
 
     sorter.keys = [];
