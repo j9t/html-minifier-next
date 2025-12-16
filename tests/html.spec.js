@@ -2704,6 +2704,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/folder/' }), output);
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/folder/' } }), output);
 
+    input = '<a class="test"   href="https://example.com/foo/bar">Test</a>';
+    output = '<a class=test href=foo/bar>Test</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com', removeAttributeQuotes: true, collapseWhitespace: true }), output);
+
     input = '<link rel="canonical" href="https://example.com/">';
     assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), input);
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/' } }), input);
@@ -3504,6 +3508,16 @@ describe('HTML', () => {
     const output = '<div foo bar="" baz="" moo="1" loo="2" haa="3"></div>';
     assert.strictEqual(await minify(input), output);
   });
+
+  // @@ Fix minification error
+  /* test('preventAttributesEscaping: choose safe quote when decoded value contains double quotes', async () => {
+    // The value decodes to `{"299": "itsct"}` which contains double quotes;
+    // with `preventAttributesEscaping`, this should not be escaped but instead be wrapped with single quotes
+    const input = "<a data-rid-relay=\"{\"299\": \"itsct\"}\">x</a>";
+    const output = "<a data-rid-relay='{\"299\": \"itsct\"}'>x</a>";
+    const result = await minify(input, { preventAttributesEscaping: true });
+    assert.strictEqual(result, output);
+  }); */
 
   test('quoteCharacter is single quote', async () => {
     assert.strictEqual(await minify('<div class=\'bar\'>foo</div>', { quoteCharacter: '\'' }), '<div class=\'bar\'>foo</div>');
