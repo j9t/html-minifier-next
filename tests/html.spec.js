@@ -4263,6 +4263,72 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { sortClassName: true }), input);
   });
 
+  test('collapse attribute whitespace', async () => {
+    let input, output;
+
+    // Should not collapse by default (note: `class` attribute values always collapse, so test with other attributes)
+    input = '<article title="foo  bar" data-selector="teaser-object parent-image-label picture-article" data-external-selector="\n      teaser-object parent-image-label \n        \n    "></article>';
+    assert.strictEqual(await minify(input), input);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: false }), input);
+
+    // Should collapse with `collapseAttributeWhitespace: true`
+    output = '<article title="foo bar" data-selector="teaser-object parent-image-label picture-article" data-external-selector="teaser-object parent-image-label"></article>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
+
+    // Multiple spaces in `alt` attribute
+    input = '<img src="example" alt="Dieser Blick könnte Rückschlüsse auf Jane Austens Skepsis nahelegen, doch das Miniaturbild  ist  postum entstanden, Ende des neunzehnten Jahrhunderts.">';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    output = '<img src="example" alt="Dieser Blick könnte Rückschlüsse auf Jane Austens Skepsis nahelegen, doch das Miniaturbild ist postum entstanden, Ende des neunzehnten Jahrhunderts.">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
+
+    // Multiple spaces in `media` attribute
+    input = '<source media="(min-width:  768px)">';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+    output = '<source media="(min-width: 768px)">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, minifyCSS: true }), output);
+
+    // Leading and trailing whitespace
+    input = '<div title="  hello world  "></div>';
+    assert.strictEqual(await minify(input), input);
+    output = '<div title="hello world"></div>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
+
+    // Should work with `sortClassName` (correct alphabetical expectation)
+    input = '<article class="lg:border-grey-700 lg:dark:border-grey-700-dark mb-[40px] cursor-pointer sm:mx-[40px] lg:flex lg:flex-row lg:border-[1px] lg:border-solid" data-selector="teaser-object parent-image-label picture-article" data-external-selector="\n      teaser-object parent-image-label \n        \n    "></article>';
+    output = '<article class="cursor-pointer lg:border-[1px] lg:border-grey-700 lg:border-solid lg:dark:border-grey-700-dark lg:flex lg:flex-row mb-[40px] sm:mx-[40px]" data-selector="teaser-object parent-image-label picture-article" data-external-selector="teaser-object parent-image-label"></article>';
+    assert.strictEqual(await minify(input, {
+      collapseAttributeWhitespace: true,
+      sortClassName: true
+    }), output);
+
+    // Complex script/div example with whitespace
+    input = '<script>  avenga.snacks.init()</script><div id="personalisation" data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null">  <div data-snacks-3:filterslider="_tracking.inview { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'View\', label = \'Meine FAZ\' }, _tracking.click { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'Click\', label = \'Meine FAZ\' }, register_button { text = \'Kostenfrei aktivieren\'}, _load { type = auth, loggedin = false }, id = \'no-reload\', criteria { groupids [1] }, headline = \'Meine F.A.Z.\', introtext = \'Wählen Sie Ihre Lieblingsthemen und wir zeigen Ihnen an dieser Stelle passende Beiträge.\', count = 35, client_title = \'faznet\', _plugins [login-reload, [auth-track, { regtype = \'Filterslider\', regsubtype = \'faz.net Startseite\', logintype = \'Filterslider\', loginsubtype = \'faz.net Startseite\'}]], shape = square"></div></div>';
+    output = '<script>avenga.snacks.init()</script><div id="personalisation" data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null"><div data-snacks-3:filterslider="_tracking.inview { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'View\', label = \'Meine FAZ\' }, _tracking.click { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'Click\', label = \'Meine FAZ\' }, register_button { text = \'Kostenfrei aktivieren\'}, _load { type = auth, loggedin = false }, id = \'no-reload\', criteria { groupids [1] }, headline = \'Meine F.A.Z.\', introtext = \'Wählen Sie Ihre Lieblingsthemen und wir zeigen Ihnen an dieser Stelle passende Beiträge.\', count = 35, client_title = \'faznet\', _plugins [login-reload, [auth-track, { regtype = \'Filterslider\', regsubtype = \'faz.net Startseite\', logintype = \'Filterslider\', loginsubtype = \'faz.net Startseite\'}]], shape = square"></div></div>';
+    assert.strictEqual(await minify(input, {
+      collapseWhitespace: true,
+      minifyJS: true
+    }), output);
+
+    // Tabs and newlines should also be collapsed
+    input = '<div data-value="hello\t\tworld\n\ntest"></div>';
+    output = '<div data-value="hello world test"></div>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
+
+    // Should preserve single spaces
+    input = '<p class="foo bar baz"></p>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+
+    // Should work with `removeAttributeQuotes`
+    input = '<p class=  foo title="  hello  world  "></p>';
+    output = '<p class=foo title="hello world"></p>';
+    assert.strictEqual(await minify(input, {
+      collapseAttributeWhitespace: true,
+      removeAttributeQuotes: true
+    }), output);
+  });
+
   test('decode entity characters', async () => {
     let input, output;
 
