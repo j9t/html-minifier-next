@@ -412,7 +412,7 @@ export class HTMLParser {
       let pos;
       const needle = tagName.toLowerCase();
       for (pos = stack.length - 1; pos >= 0; pos--) {
-        const currentTag = stack[pos].tag.toLowerCase();
+        const currentTag = stack[pos].lowerTag;
         if (currentTag === needle) {
           return pos;
         }
@@ -466,7 +466,7 @@ export class HTMLParser {
         }
         if (tagName === 'col' && findTag('colgroup') < 0) {
           lastTag = 'colgroup';
-          stack.push({ tag: lastTag, attrs: [] });
+          stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
           if (handler.start) {
             await handler.start(lastTag, [], false, '');
           }
@@ -545,7 +545,7 @@ export class HTMLParser {
       });
 
       if (!unary) {
-        stack.push({ tag: tagName, attrs });
+        stack.push({ tag: tagName, lowerTag: tagName.toLowerCase(), attrs });
         lastTag = tagName;
         unarySlash = '';
       }
@@ -559,7 +559,7 @@ export class HTMLParser {
       let pos;
       const needle = tagName.toLowerCase();
       for (pos = stack.length - 1; pos >= 0; pos--) {
-        if (stack[pos].tag.toLowerCase() === needle) {
+        if (stack[pos].lowerTag === needle) {
           break;
         }
       }
