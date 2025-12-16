@@ -82,6 +82,9 @@ const preCompiledStackedTags = {
   'noscript': /([\s\S]*?)<\/noscript[^>]*>/i
 };
 
+// Cache for compiled attribute regexes per handler configuration
+const attrRegexCache = new WeakMap();
+
 function attrForHandler(handler) {
   let pattern = singleAttrIdentifier.source +
     '(?:\\s*(' + joinSingleAttrAssigns(handler) + ')' +
@@ -119,22 +122,47 @@ export class HTMLParser {
   }
 
   async parse() {
-    let html = this.html;
     const handler = this.handler;
+    const fullHtml = this.html;
+    const fullLength = fullHtml.length;
 
     const stack = []; let lastTag;
-    const attribute = attrForHandler(handler);
-    let last, prevTag = undefined, nextTag = undefined;
+    // Use cached attribute regex if available
+    let attribute = attrRegexCache.get(handler);
+    if (!attribute) {
+      attribute = attrForHandler(handler);
+      attrRegexCache.set(handler, attribute);
+    }
+    let prevTag = undefined, nextTag = undefined;
 
-    // Track position for better error messages
-    let position = 0;
-    const getLineColumn = (pos) => {
-      const lines = this.html.slice(0, pos).split('\n');
-      return { line: lines.length, column: lines[lines.length - 1].length + 1 };
+    // Index-based parsing
+    let pos = 0;
+    let lastPos;
+
+    // Helper to get remaining HTML from current position
+    const remaining = () => fullHtml.slice(pos);
+
+    // Helper to advance position
+    const advance = (n) => { pos += n; };
+
+    // Lazy line/column calculation—only compute on actual errors
+    const getLineColumn = (position) => {
+      let line = 1;
+      let column = 1;
+      for (let i = 0; i < position; i++) {
+        if (fullHtml[i] === '\n') {
+          line++;
+          column = 1;
+        } else {
+          column++;
+        }
+      }
+      return { line, column };
     };
 
-    while (html) {
-      last = html;
+    while (pos < fullLength) {
+      lastPos = pos;
+      const html = remaining();
       // Make sure we’re not in a `script` or `style` element
       if (!lastTag || !special.has(lastTag)) {
         let textEnd = html.indexOf('<');
@@ -147,7 +175,7 @@ export class HTMLParser {
               if (handler.comment) {
                 await handler.comment(html.substring(4, commentEnd));
               }
-              html = html.substring(commentEnd + 3);
+              advance(commentEnd + 3);
               prevTag = '';
               continue;
             }
@@ -161,7 +189,7 @@ export class HTMLParser {
               if (handler.comment) {
                 await handler.comment(html.substring(2, conditionalEnd + 1), true /* non-standard */);
               }
-              html = html.substring(conditionalEnd + 2);
+              advance(conditionalEnd + 2);
               prevTag = '';
               continue;
             }
@@ -173,7 +201,7 @@ export class HTMLParser {
             if (handler.doctype) {
               handler.doctype(doctypeMatch[0]);
             }
-            html = html.substring(doctypeMatch[0].length);
+            advance(doctypeMatch[0].length);
             prevTag = '';
             continue;
           }
@@ -181,7 +209,7 @@ export class HTMLParser {
           // End tag
           const endTagMatch = html.match(endTag);
           if (endTagMatch) {
-            html = html.substring(endTagMatch[0].length);
+            advance(endTagMatch[0].length);
             await parseEndTag(endTagMatch[0], endTagMatch[1]);
             prevTag = '/' + endTagMatch[1].toLowerCase();
             continue;
@@ -190,7 +218,7 @@ export class HTMLParser {
           // Start tag
           const startTagMatch = parseStartTag(html);
           if (startTagMatch) {
-            html = startTagMatch.rest;
+            advance(startTagMatch.advance);
             await handleStartTag(startTagMatch);
             prevTag = startTagMatch.tagName.toLowerCase();
             continue;
@@ -205,18 +233,19 @@ export class HTMLParser {
         let text;
         if (textEnd >= 0) {
           text = html.substring(0, textEnd);
-          html = html.substring(textEnd);
+          advance(textEnd);
         } else {
           text = html;
-          html = '';
+          advance(html.length);
         }
 
         // Next tag
-        let nextTagMatch = parseStartTag(html);
+        const nextHtml = remaining();
+        let nextTagMatch = parseStartTag(nextHtml);
         if (nextTagMatch) {
           nextTag = nextTagMatch.tagName;
         } else {
-          nextTagMatch = html.match(endTag);
+          nextTagMatch = nextHtml.match(endTag);
           if (nextTagMatch) {
             nextTag = '/' + nextTagMatch[1];
           } else {
@@ -245,41 +274,38 @@ export class HTMLParser {
             await handler.chars(text);
           }
           // Advance HTML past the matched special tag content and its closing tag
-          html = html.slice(m.index + m[0].length);
+          advance(m.index + m[0].length);
           await parseEndTag('</' + stackedTag + '>', stackedTag);
         } else {
           // No closing tag found; to avoid infinite loop, break similarly to previous behavior
           if (handler.continueOnParseError && handler.chars && html) {
             await handler.chars(html[0], prevTag, '');
-            html = html.substring(1);
+            advance(1);
           } else {
             break;
           }
         }
       }
 
-      if (html === last) {
+      if (pos === lastPos) {
         if (handler.continueOnParseError) {
           // Skip the problematic character and continue
           if (handler.chars) {
-            await handler.chars(html[0], prevTag, '');
+            await handler.chars(fullHtml[pos], prevTag, '');
           }
-          html = html.substring(1);
-          position++;
+          advance(1);
           prevTag = '';
           continue;
         }
-        const loc = getLineColumn(position);
-        // Include some context before the error position so the snippet contains
-        // the offending markup plus preceding characters (e.g. "invalid<tag").
+        const loc = getLineColumn(pos);
+        // Include some context before the error position so the snippet contains the offending markup plus preceding characters (e.g., “invalid<tag”)
         const CONTEXT_BEFORE = 50;
-        const startPos = Math.max(0, position - CONTEXT_BEFORE);
-        const snippet = this.html.slice(startPos, startPos + 200).replace(/\n/g, ' ');
+        const startPos = Math.max(0, pos - CONTEXT_BEFORE);
+        const snippet = fullHtml.slice(startPos, startPos + 200).replace(/\n/g, ' ');
         throw new Error(
-          `Parse error at line ${loc.line}, column ${loc.column}:\n${snippet}${this.html.length > startPos + 200 ? '…' : ''}`
+          `Parse error at line ${loc.line}, column ${loc.column}:\n${snippet}${fullHtml.length > startPos + 200 ? '…' : ''}`
         );
       }
-      position = this.html.length - html.length;
     }
 
     if (!handler.partialMarkup) {
@@ -292,9 +318,11 @@ export class HTMLParser {
       if (start) {
         const match = {
           tagName: start[1],
-          attrs: []
+          attrs: [],
+          advance: 0
         };
-        input = input.slice(start[0].length);
+        let consumed = start[0].length;
+        input = input.slice(consumed);
         let end, attr;
 
         // Safety limit: max length of input to check for attributes
@@ -344,7 +372,9 @@ export class HTMLParser {
                     } else {
                       attr[baseIndex + 3] = value; // Single-quoted value
                     }
-                    input = input.slice(fullAttr.length);
+                    const attrLen = fullAttr.length;
+                    input = input.slice(attrLen);
+                    consumed += attrLen;
                     match.attrs.push(attr);
                     continue;
                   }
@@ -361,7 +391,9 @@ export class HTMLParser {
             break;
           }
 
-          input = input.slice(attr[0].length);
+          const attrLen = attr[0].length;
+          input = input.slice(attrLen);
+          consumed += attrLen;
           match.attrs.push(attr);
         }
 
@@ -369,7 +401,8 @@ export class HTMLParser {
         end = input.match(startTagClose);
         if (end) {
           match.unarySlash = end[1];
-          match.rest = input.slice(end[0].length);
+          consumed += end[0].length;
+          match.advance = consumed;
           return match;
         }
       }
