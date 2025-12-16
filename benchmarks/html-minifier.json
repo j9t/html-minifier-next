@@ -22,7 +22,7 @@
   "noNewlinesBeforeTagClose": true,
   "partialMarkup": false,
   "preserveLineBreaks": false,
-  "preventAttributesEscaping": true,
+  "preventAttributesEscaping": false,
   "processConditionalComments": true,
   "processScripts": [
     "text/html",
@@ -38,8 +38,8 @@
   "removeScriptTypeAttributes": true,
   "removeStyleLinkTypeAttributes": true,
   "removeTagWhitespace": true,
-  "sortAttributes": true,
-  "sortClassName": true,
+  "sortAttributes": false,
+  "sortClassName": false,
   "trimCustomFragments": true,
   "useShortDoctype": true
 }
