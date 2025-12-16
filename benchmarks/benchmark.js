@@ -22,6 +22,10 @@ const { minify: minifyHTML } = minifyHTMLPkg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Ensure required directories exist for fresh runs
+await fs.mkdir(path.join(__dirname, 'generated'), { recursive: true });
+await fs.mkdir(path.join(__dirname, 'sources'), { recursive: true });
+
 const user_agent = 'html-minifier-next-benchmarks/0.0';
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
@@ -46,8 +50,13 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
   stream: process.stderr
 });
 
-// Timeout for forked processes (HMN and HM Terser)
+// Timeout for HTML Minifier runs (ms)
 const TEST_TIMEOUT = 30000;
+
+// Concurrency for site processing
+// Default to 1 (sequential) for accurate per-minifier performance comparison
+// Set `BENCH_CONCURRENCY=6` for faster parallel execution (may show CPU contention)
+const BENCH_CONCURRENCY = Math.max(1, parseInt(process.env.BENCH_CONCURRENCY || '1', 10) || 1);
 
 const table = new Table({
   head: ['File', 'Before', 'HTML Minifier Next', 'HTML Minifier Terser', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
@@ -297,9 +306,36 @@ function displayTable() {
 }
 
 async function processFiles() {
-  for (const fileName of fileNames) {
-    await processFile(fileName);
+  // Generator that yields file names to process
+  function* fileNameGenerator() {
+    for (const name of fileNames) {
+      yield name;
+    }
   }
+
+  const generator = fileNameGenerator();
+
+  // Thread-safe (single-threaded JS) function to get next file name
+  // Returns undefined when all files have been assigned
+  function getNextFile() {
+    const next = generator.next();
+    return next.done ? undefined : next.value;
+  }
+
+  async function worker() {
+    while (true) {
+      const name = getNextFile();
+      if (name === undefined) break;
+      try {
+        await processFile(name);
+      } catch (e) {
+        benchmarkErrors.push(`Unhandled error processing ${name}: ${e?.message || e}`);
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(BENCH_CONCURRENCY, fileNames.length) }, () => worker());
+  await Promise.all(workers);
 }
 
 async function processFile(fileName) {
@@ -861,6 +897,12 @@ async function processFile(fileName) {
   log(`Processing ${fileName}…`);
   log(`${fileName}: Downloaded, starting processing`);
   await processFileInternal(site);
+}
+
+// Log concurrency setting
+const actualConcurrency = Math.min(BENCH_CONCURRENCY, fileNames.length);
+if (VERBOSE || BENCH_CONCURRENCY > 1) {
+  console.error(`Running benchmarks with concurrency: ${actualConcurrency} (BENCH_CONCURRENCY=${BENCH_CONCURRENCY})`);
 }
 
 await processFiles();
