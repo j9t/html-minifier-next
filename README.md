@@ -112,6 +112,8 @@ HTML Minifier Next provides presets for common use cases. Presets are pre-config
 * `conservative`: Safe minification suitable for most projects. Includes whitespace collapsing, comment removal, and doctype normalization.
 * `comprehensive`: Aggressive minification for maximum file size reduction. Includes relevant conservative options plus attribute quote removal, optional tag removal, and more.
 
+To review the specific options set, [presets.js](https://github.com/j9t/html-minifier-next/blob/main/src/presets.js) lists them in an accessible manner.
+
 **Using presets:**
 
 ```bash
