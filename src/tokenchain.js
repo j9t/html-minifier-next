@@ -81,16 +81,10 @@ class TokenChain {
           for (let i = 0; i < tokens.length; i++) {
             if (tokens[i] !== token) {
               filtered.push(tokens[i]);
-            } else {
-              // Increment processed count for each occurrence of token
-              const tokenData = this.map.get(tokens[i]);
-              if (tokenData) {
-                tokenData.processed++;
-              }
             }
           }
 
-          // Mark other tokens as processed
+          // Mark remaining tokens as processed
           filtered.forEach((t) => {
             const tData = this.map.get(t);
             if (tData) {
