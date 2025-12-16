@@ -755,8 +755,9 @@ function isSrcset(attrName, tag) {
 
 async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
   // Apply early whitespace normalization if enabled
+  // Preserves special spaces (non-breaking space, hair space, etc.) for consistency with `collapseWhitespace`
   if (options.collapseAttributeWhitespace) {
-    attrValue = attrValue.replace(/\s+/g, ' ').trim();
+    attrValue = attrValue.replace(/[ \n\r\t\f]+/g, ' ').replace(/^[ \n\r\t\f]+|[ \n\r\t\f]+$/g, '');
   }
 
   if (isEventAttribute(attrName, options)) {
