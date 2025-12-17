@@ -1574,7 +1574,7 @@ function uniqueId(value) {
 
 const specialContentTags = new Set(['script', 'style']);
 
-async function createSortFns(value, options, uidIgnore, uidAttr) {
+async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupChunks) {
   const attrChains = options.sortAttributes && Object.create(null);
   const classChain = options.sortClassName && new TokenChain();
 
@@ -1589,6 +1589,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
   }
 
   function shouldSkipUIDs(token) {
+    // Filter out any HTML comment tokens (UID placeholders)
+    // These are temporary markers created by `htmlmin:ignore` and `ignoreCustomFragments`
+    if (token.startsWith('<!--') && token.endsWith('-->')) {
+      return false;
+    }
     return shouldSkipUID(token, uidIgnore) && shouldSkipUID(token, uidAttr);
   }
 
@@ -1600,12 +1605,14 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
           if (!attrChains[tag]) {
             attrChains[tag] = new TokenChain();
           }
-          attrChains[tag].add(attrNames(attrs).filter(shouldSkipUIDs));
+          const attrNamesList = attrNames(attrs).filter(shouldSkipUIDs);
+          attrChains[tag].add(attrNamesList);
         }
         for (let i = 0, len = attrs.length; i < len; i++) {
           const attr = attrs[i];
           if (classChain && attr.value && options.name(attr.name) === 'class') {
-            classChain.add(trimWhitespace(attr.value).split(/[ \t\n\f\r]+/).filter(shouldSkipUIDs));
+            const classes = trimWhitespace(attr.value).split(/[ \t\n\f\r]+/).filter(shouldSkipUIDs);
+            classChain.add(classes);
           } else if (options.processScripts && attr.name.toLowerCase() === 'type') {
             currentTag = tag;
             currentType = attr.value;
@@ -1625,33 +1632,91 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
         }
       },
       // We never need `nextTag` information in this scan
-      wantsNextTag: false
+      wantsNextTag: false,
+      // Continue on parse errors during analysis pass
+      continueOnParseError: options.continueOnParseError
     });
 
-    await parser.parse();
+    try {
+      await parser.parse();
+    } catch (e) {
+      // If parsing fails during analysis pass, just skip it—we’ll still have
+      // partial frequency data from what we could parse
+      if (!options.continueOnParseError) {
+        throw e;
+      }
+    }
   }
 
-  const log = options.log;
-  options.log = identity;
-  options.sortAttributes = false;
-  options.sortClassName = false;
-  const firstPassOutput = await minifyHTML(value, options);
-  await scan(firstPassOutput);
-  options.log = log;
+  // For the first pass, create a copy of options and disable aggressive minification.
+  // Keep attribute transformations (like `removeStyleLinkTypeAttributes`) for accurate analysis.
+  // This is safe because `createSortFns` is called before UID markers are added.
+  const firstPassOptions = Object.assign({}, options, {
+    // Disable sorting for the analysis pass
+    sortAttributes: false,
+    sortClassName: false,
+    // Disable aggressive minification that doesn’t affect attribute analysis
+    collapseWhitespace: false,
+    removeAttributeQuotes: false,
+    removeTagWhitespace: false,
+    decodeEntities: false,
+    processScripts: false,
+    // Keep `ignoreCustomFragments` to handle template syntax correctly
+    // This is safe because `createSortFns` is now called before UID markers are added
+    // Continue on parse errors during analysis (e.g., template syntax)
+    continueOnParseError: true,
+    log: identity
+  });
+
+  // Override options temporarily so `scan()` uses `continueOnParseError`
+  const originalContinueOnParseError = options.continueOnParseError;
+  options.continueOnParseError = true;
+
+  try {
+      // Expand UID tokens back to original content for frequency analysis
+    let expandedValue = value;
+    if (uidIgnore && ignoredMarkupChunks) {
+      // Create a global pattern for replacing UID tokens anywhere in the string
+      const uidReplacePattern = new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g');
+      expandedValue = value.replace(uidReplacePattern, function (match, index) {
+        return ignoredMarkupChunks[+index] || '';
+      });
+    }
+
+    // First pass minification applies attribute transformations
+    // like removeStyleLinkTypeAttributes for accurate frequency analysis
+    const firstPassOutput = await minifyHTML(expandedValue, firstPassOptions);
+
+    // For frequency analysis, we need to remove custom fragments temporarily
+    // because HTML comments in opening tags prevent proper attribute parsing.
+    // We remove them with a space to preserve attribute boundaries.
+    let scanValue = firstPassOutput;
+    if (options.ignoreCustomFragments && options.ignoreCustomFragments.length > 0) {
+      const customFragments = options.ignoreCustomFragments.map(re => re.source);
+      const customFragmentPattern = new RegExp('(' + customFragments.join('|') + ')', 'g');
+      scanValue = firstPassOutput.replace(customFragmentPattern, ' ');
+    }
+
+      await scan(scanValue);
+  } finally {
+    // Restore original option
+    options.continueOnParseError = originalContinueOnParseError;
+  }
   if (attrChains) {
     const attrSorters = Object.create(null);
     for (const tag in attrChains) {
       attrSorters[tag] = attrChains[tag].createSorter();
     }
-    options.sortAttributes = function (tag, attrs) {
+      options.sortAttributes = function (tag, attrs) {
       const sorter = attrSorters[tag];
       if (sorter) {
         const attrMap = Object.create(null);
         const names = attrNames(attrs);
-        names.forEach(function (name, index) {
+              names.forEach(function (name, index) {
           (attrMap[name] || (attrMap[name] = [])).push(attrs[index]);
         });
-        sorter.sort(names).forEach(function (name, index) {
+        const sorted = sorter.sort(names);
+              sorted.forEach(function (name, index) {
           attrs[index] = attrMap[name].shift();
         });
       }
@@ -1659,8 +1724,22 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
   }
   if (classChain) {
     const sorter = classChain.createSorter();
-    options.sortClassName = function (value) {
-      return sorter.sort(value.split(/[ \n\f\r]+/)).join(' ');
+      options.sortClassName = function (value) {
+      // Expand UID tokens back to original content before sorting
+      let expandedValue = value;
+      if (uidIgnore && ignoredMarkupChunks) {
+        // Create a global pattern for replacing UID tokens anywhere in the string
+        const uidReplacePattern = new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g');
+        expandedValue = value.replace(uidReplacePattern, function (match, index) {
+          return ignoredMarkupChunks[+index] || '';
+        });
+      }
+
+      const classes = expandedValue.split(/[ \n\f\r]+/).filter(function(cls) {
+        return cls !== '';
+      });
+      const sorted = sorter.sort(classes);
+      return sorted.join(' ');
     };
   }
 }
@@ -1741,6 +1820,13 @@ async function minifyHTML(value, options, partialMarkup) {
     return token;
   });
 
+  // Create sort functions after `htmlmin:ignore` processing but before custom fragment UID markers
+  // This allows proper frequency analysis with access to ignored content via UID tokens
+  if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
+    (options.sortClassName && typeof options.sortClassName !== 'function')) {
+    await createSortFns(value, options, uidIgnore, null, ignoredMarkupChunks);
+  }
+
   const customFragments = options.ignoreCustomFragments.map(function (re) {
     return re.source;
   });
@@ -1797,11 +1883,6 @@ async function minifyHTML(value, options, partialMarkup) {
       ignoredCustomMarkupChunks.push(/^(\s*)[\s\S]*?(\s*)$/.exec(match));
       return '\t' + token + '\t';
     });
-  }
-
-  if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
-    (options.sortClassName && typeof options.sortClassName !== 'function')) {
-    await createSortFns(value, options, uidIgnore, uidAttr);
   }
 
   function _canCollapseWhitespace(tag, attrs) {
