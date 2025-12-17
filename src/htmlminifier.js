@@ -5,36 +5,6 @@ import TokenChain from './tokenchain.js';
 import { replaceAsync } from './utils.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-// Simple LRU cache for memoization
-class LRUCache {
-  constructor(maxSize = 100) {
-    this.maxSize = maxSize;
-    this.cache = new Map();
-  }
-
-  get(key) {
-    if (!this.cache.has(key)) return undefined;
-    // Move to end (most recent)
-    const value = this.cache.get(key);
-    this.cache.delete(key);
-    this.cache.set(key, value);
-    return value;
-  }
-
-  set(key, value) {
-    // Delete if exists to reorder
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    }
-    this.cache.set(key, value);
-    // Evict oldest if over size
-    if (this.cache.size > this.maxSize) {
-      const firstKey = this.cache.keys().next().value;
-      this.cache.delete(firstKey);
-    }
-  }
-}
-
 // Lazy-load heavy dependencies only when needed
 
 let lightningCSSPromise;
@@ -493,7 +463,7 @@ const cssMinifyCache = new LRU(200);
 
 const trimWhitespace = str => {
   if (!str) return str;
-  // Fast path: if no whitespace at start or end, return early
+  // Fast path: If no whitespace at start or end, return early
   if (!/^[ \n\r\t\f]/.test(str) && !/[ \n\r\t\f]$/.test(str)) {
     return str;
   }
@@ -502,7 +472,7 @@ const trimWhitespace = str => {
 
 function collapseWhitespaceAll(str) {
   if (!str) return str;
-  // Fast path: if there are no common whitespace characters, return early
+  // Fast path: If there are no common whitespace characters, return early
   if (!/[ \n\r\t\f\xA0]/.test(str)) {
     return str;
   }
@@ -1257,7 +1227,7 @@ async function normalizeAttr(attr, attrs, tag, options) {
   let attrValue = attr.value;
 
   if (options.decodeEntities && attrValue) {
-    // Fast path: only decode when entities are present
+    // Fast path: Only decode when entities are present
     if (attrValue.indexOf('&') !== -1) {
       attrValue = decodeHTMLStrict(attrValue);
     }
@@ -1457,7 +1427,7 @@ const processOptions = (inputOptions) => {
       const lightningCssOptions = typeof option === 'object' ? option : {};
 
       options.minifyCSS = async function (text, type) {
-        // Fast path: nothing to minify
+        // Fast path: Nothing to minify
         if (!text || !text.trim()) {
           return text;
         }
@@ -1549,7 +1519,7 @@ const processOptions = (inputOptions) => {
 
         let jsKey;
         try {
-          // Fast path: avoid invoking Terser for empty/whitespace-only content
+          // Fast path: Avoid invoking Terser for empty/whitespace-only content
           if (!code || !code.trim()) {
             return '';
           }
@@ -1802,9 +1772,14 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   if (classChain) {
     const sorter = classChain.createSorter();
     // Memoize `sortClassName` results—class lists often repeat in templates
-    const classNameCache = new LRUCache(100);
+    const classNameCache = new LRU(200);
 
     options.sortClassName = function (value) {
+      // Fast path: Single class (no spaces) needs no sorting
+      if (value.indexOf(' ') === -1) {
+        return value;
+      }
+
       // Check cache first
       const cached = classNameCache.get(value);
       if (cached !== undefined) {
@@ -1870,7 +1845,7 @@ async function minifyHTML(value, options, partialMarkup) {
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
   const normalizedCustomElements = customElementsArr.map(name => options.name(name));
-  // Fast path: reuse base Sets if no custom elements
+  // Fast path: Reuse base Sets if no custom elements
   const inlineTextSet = normalizedCustomElements.length
     ? new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements])
     : inlineElementsToKeepWhitespaceWithin;
