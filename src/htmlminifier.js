@@ -1669,11 +1669,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
 
     try {
       await parser.parse();
-    } catch (e) {
+    } catch (err) {
       // If parsing fails during analysis pass, just skip it—we’ll still have
       // partial frequency data from what we could parse
       if (!options.continueOnParseError) {
-        throw e;
+        throw err;
       }
     }
   }
