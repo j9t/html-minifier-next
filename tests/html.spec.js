@@ -3581,7 +3581,7 @@ describe('HTML', () => {
     assert.ok(result1.includes('&#34;') || result1.includes('&#39;'),
       'Should escape quotes when both types are present');
     assert.ok(!result1.includes('" and') || !result1.includes('\' and'),
-      'Should not have unescaped quotes inside attribute value');
+      'Should not leave both quote types unescaped');
 
     // Test choosing quote with fewer occurrences (fewer single quotes—use single quotes as delimiter)
     const input2 = '<p data-text="This has &#34;many&#34; &#34;double&#34; quotes and one &#39;single&#39;">Text</p>';
