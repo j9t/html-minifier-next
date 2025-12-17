@@ -1611,7 +1611,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         for (let i = 0, len = attrs.length; i < len; i++) {
           const attr = attrs[i];
           if (classChain && attr.value && options.name(attr.name) === 'class') {
-            const classes = trimWhitespace(attr.value).split(/[ \t\n\f\r]+/).filter(shouldSkipUIDs);
+            const classes = trimWhitespace(attr.value).split(whitespaceSplitPatternScan).filter(shouldSkipUIDs);
             classChain.add(classes);
           } else if (options.processScripts && attr.name.toLowerCase() === 'type') {
             currentTag = tag;
@@ -1672,15 +1672,15 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   const originalContinueOnParseError = options.continueOnParseError;
   options.continueOnParseError = true;
 
-  // Create UID replacement pattern once for reuse (performance optimization)
+  // Pre-compile regex patterns for reuse (performance optimization)
   const uidReplacePattern = uidIgnore && ignoredMarkupChunks
     ? new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g')
     : null;
-
-  // Pre-compile custom fragment pattern once (performance optimization)
   const customFragmentPattern = options.ignoreCustomFragments && options.ignoreCustomFragments.length > 0
     ? new RegExp('(' + options.ignoreCustomFragments.map(re => re.source).join('|') + ')', 'g')
     : null;
+  const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
+  const whitespaceSplitPatternSort = /[ \n\f\r]+/;
 
   try {
     // Expand UID tokens back to original content for frequency analysis
@@ -1744,7 +1744,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         uidReplacePattern.lastIndex = 0;
       }
 
-      const classes = expandedValue.split(/[ \n\f\r]+/).filter(function(cls) {
+      const classes = expandedValue.split(whitespaceSplitPatternSort).filter(function(cls) {
         return cls !== '';
       });
       const sorted = sorter.sort(classes);
