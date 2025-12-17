@@ -1676,7 +1676,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
 
   // For the first pass, create a copy of options and disable aggressive minification.
   // Keep attribute transformations (like `removeStyleLinkTypeAttributes`) for accurate analysis.
-  // This is safe because `createSortFns` is called before UID markers are added.
+  // This is safe because `createSortFns` is called before custom fragment UID markers (uidAttr) are added.
+  // Note: `htmlmin:ignore` UID markers (uidIgnore) already exist and are expanded for analysis.
   const firstPassOptions = Object.assign({}, options, {
     // Disable sorting for the analysis pass
     sortAttributes: false,
@@ -1694,7 +1695,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     log: identity
   });
 
-  // Override options temporarily so `scan()` uses `continueOnParseError`
+  // Temporarily enable `continueOnParseError` for the `scan()` function call below.
+  // Note: `firstPassOptions` already has `continueOnParseError: true` for the minifyHTML call.
   const originalContinueOnParseError = options.continueOnParseError;
   options.continueOnParseError = true;
 
