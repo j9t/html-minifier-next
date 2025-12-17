@@ -3569,6 +3569,67 @@ describe('HTML', () => {
     assert.ok(result.includes('{"289":"itsct"}'), 'Should preserve JSON data in attribute');
   });
 
+  test('preventAttributesEscaping: both quote types present forces escaping', async () => {
+    // When an attribute value contains both single and double quotes,
+    // `preventAttributesEscaping` is ignored to ensure valid HTML output.
+    // The quote type with fewer occurrences is chosen and the other is escaped.
+
+    // Test with `decodeEntities`: entities decoded, then escaping forced
+    const input1 = '<div title="He said &#34;hello&#34; and she said &#39;hi&#39;">Text</div>';
+    const result1 = await minify(input1, { preventAttributesEscaping: true, decodeEntities: true });
+    // Should escape double quotes (or single quotes) to make valid HTML
+    assert.ok(result1.includes('&#34;') || result1.includes('&#39;'),
+      'Should escape quotes when both types are present');
+    assert.ok(!result1.includes('" and') || !result1.includes('\' and'),
+      'Should not have unescaped quotes inside attribute value');
+
+    // Test choosing quote with fewer occurrences (fewer single quotes—use single quotes as delimiter)
+    const input2 = '<p data-text="This has &#34;many&#34; &#34;double&#34; quotes and one &#39;single&#39;">Text</p>';
+    const result2 = await minify(input2, { preventAttributesEscaping: true, decodeEntities: true });
+    // Should use single quotes as delimiter (fewer occurrences) and escape the single quote in value
+    assert.ok(result2.includes("data-text='"), 'Should use single quotes as delimiter');
+    assert.ok(result2.includes('&#39;'), 'Should escape single quotes in value');
+    // Double quotes don’t need escaping when attribute is delimited with single quotes
+    assert.ok(result2.includes('"many"'), 'Double quotes are valid inside single-quoted attribute');
+
+    // Test with explicit `quoteCharacter`
+    const input3 = '<span data-x="Has &#34;double&#34; and &#39;single&#39;">Text</span>';
+    const result3 = await minify(input3, {
+      preventAttributesEscaping: true,
+      decodeEntities: true,
+      quoteCharacter: '"'
+    });
+    assert.ok(result3.includes('&#34;'), 'Should escape double quotes even with explicit quoteCharacter');
+    assert.ok(!result3.includes('" and'), 'Should not have unescaped quotes inside attribute value');
+
+    // Test with `removeAttributeQuotes` (should not remove quotes when both types present)
+    const input4 = '<div data-msg="Text with &#34;double&#34; and &#39;single&#39; quotes">Content</div>';
+    const result4 = await minify(input4, {
+      preventAttributesEscaping: true,
+      decodeEntities: true,
+      removeAttributeQuotes: true
+    });
+    // Quotes must remain because value contains spaces and special chars
+    assert.ok(result4.includes('data-msg='), 'Should have data-msg attribute');
+    assert.ok(result4.match(/data-msg=["']/), 'Should keep quotes on attribute with complex value');
+    assert.ok(result4.includes('&#34;') || result4.includes('&#39;'), 'Should escape quotes');
+
+    // Test with `quoteCharacter` and `removeAttributeQuotes` together
+    const input5 = '<a href="test.html" data-safe="value" data-both="Has &#34;quotes&#34; and &#39;apostrophes&#39;">Link</a>';
+    const result5 = await minify(input5, {
+      preventAttributesEscaping: true,
+      decodeEntities: true,
+      removeAttributeQuotes: true,
+      quoteCharacter: '\''
+    });
+    // Simple values can have quotes removed
+    assert.ok(result5.includes('href=test.html') || result5.includes("href='test.html'"), 'href should be processed');
+    assert.ok(result5.includes('data-safe=value') || result5.includes("data-safe='value'"), 'data-safe should be processed');
+    // Complex value with both quotes must keep quotes and escape
+    assert.ok(result5.match(/data-both=["']/), 'data-both must keep quotes');
+    assert.ok(result5.includes('&#34;') || result5.includes('&#39;'), 'Should escape quotes in data-both');
+  });
+
   test('quoteCharacter is single quote', async () => {
     assert.strictEqual(await minify('<div class=\'bar\'>foo</div>', { quoteCharacter: '\'' }), '<div class=\'bar\'>foo</div>');
     assert.strictEqual(await minify('<div class="bar">foo</div>', { quoteCharacter: '\'' }), '<div class=\'bar\'>foo</div>');
