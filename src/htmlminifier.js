@@ -1705,7 +1705,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       scanValue = firstPassOutput.replace(customFragmentPattern, ' ');
     }
 
-      await scan(scanValue);
+    await scan(scanValue);
   } finally {
     // Restore original option
     options.continueOnParseError = originalContinueOnParseError;
