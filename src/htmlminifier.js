@@ -1293,19 +1293,40 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       }
     } else {
       // `preventAttributesEscaping` mode: choose safe quotes but don’t escape
-      if (typeof options.quoteCharacter === 'undefined') {
-        // Check if current quote character is safe
-        const hasDoubleQuote = attrValue.indexOf('"') !== -1;
-        const hasSingleQuote = attrValue.indexOf("'") !== -1;
+      // EXCEPT when both quote types are present—then escape to prevent invalid HTML
+      const hasDoubleQuote = attrValue.indexOf('"') !== -1;
+      const hasSingleQuote = attrValue.indexOf("'") !== -1;
 
-        // If current quote is safe, keep it; otherwise switch to safe one
+      if (hasDoubleQuote && hasSingleQuote) {
+        // Both quote types present: `preventAttributesEscaping` is ignored to ensure valid HTML
+        // Choose the quote type with fewer occurrences and escape the other
+        if (typeof options.quoteCharacter === 'undefined') {
+          let apos = 0, quot = 0;
+          for (let i = 0; i < attrValue.length; i++) {
+            if (attrValue[i] === "'") apos++;
+            else if (attrValue[i] === '"') quot++;
+          }
+          attrQuote = apos < quot ? '\'' : '"';
+        } else {
+          attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
+        }
+        if (attrQuote === '"') {
+          attrValue = attrValue.replace(/"/g, '&#34;');
+        } else {
+          attrValue = attrValue.replace(/'/g, '&#39;');
+        }
+      } else if (typeof options.quoteCharacter === 'undefined') {
+        // Single or no quote type: Choose safe quote delimiter
         if (attrQuote === '"' && hasDoubleQuote && !hasSingleQuote) {
           attrQuote = "'";
         } else if (attrQuote === "'" && hasSingleQuote && !hasDoubleQuote) {
           attrQuote = '"';
         } else if (attrQuote !== '"' && attrQuote !== "'") {
-          // If no quote character set, choose the safer one
-          attrQuote = hasSingleQuote && !hasDoubleQuote ? '"' : (hasDoubleQuote && !hasSingleQuote ? "'" : attrQuote);
+          // If no quote character set, choose the safer one (but preserve empty string if no quotes needed)
+          if (hasSingleQuote || hasDoubleQuote) {
+            attrQuote = hasSingleQuote && !hasDoubleQuote ? '"' : (hasDoubleQuote && !hasSingleQuote ? "'" : '"');
+          }
+          // Else: Leave `attrQuote` as-is (may be empty string for attribute values that don’t need quotes)
         }
       } else {
         attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
