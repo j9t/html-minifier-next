@@ -1,6 +1,7 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { minify } from '../src/htmlminifier.js';
 
 describe('HTML', () => {
@@ -4891,13 +4892,14 @@ describe('HTML', () => {
   });
 
   // Check if FAZ.html exists and conditionally skip test if not available
-  const fazExists = fs.existsSync('benchmarks/sources/FAZ.html');
+  const fazPath = fileURLToPath(new URL('../benchmarks/sources/FAZ.html', import.meta.url));
+  const fazExists = fs.existsSync(fazPath);
 
   (fazExists ? test : test.skip)('sortAttributes with actual FAZ.html content', async () => {
     // Test with real FAZ.html file to ensure it minifies successfully
     // This is the ultimate test—if this passes, FAZ works
     const fsPromises = await import('fs/promises');
-    const fazHtml = await fsPromises.readFile('benchmarks/sources/FAZ.html', 'utf8');
+    const fazHtml = await fsPromises.readFile(fazPath, 'utf8');
 
     const benchmarkConfig = {
       caseSensitive: false,

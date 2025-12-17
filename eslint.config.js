@@ -21,6 +21,7 @@ export default [
         console: 'readonly',
         document: 'readonly',
         process: 'readonly',
+        URL: 'readonly',
         window: 'readonly'
       }
     },
