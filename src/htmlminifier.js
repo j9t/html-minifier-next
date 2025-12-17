@@ -840,7 +840,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     return options.minifyCSS(attrValue, 'media');
   } else if (tag === 'iframe' && attrName === 'srcdoc') {
     // Recursively minify HTML content within srcdoc attribute
-    // Fast-path: skip if nothing would change
+    // Fast-path: Skip if nothing would change
     if (!shouldMinifyInnerHTML(options)) {
       return attrValue;
     }
@@ -1672,15 +1672,25 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   const originalContinueOnParseError = options.continueOnParseError;
   options.continueOnParseError = true;
 
+  // Create UID replacement pattern once for reuse (performance optimization)
+  const uidReplacePattern = uidIgnore && ignoredMarkupChunks
+    ? new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g')
+    : null;
+
+  // Pre-compile custom fragment pattern once (performance optimization)
+  const customFragmentPattern = options.ignoreCustomFragments && options.ignoreCustomFragments.length > 0
+    ? new RegExp('(' + options.ignoreCustomFragments.map(re => re.source).join('|') + ')', 'g')
+    : null;
+
   try {
-      // Expand UID tokens back to original content for frequency analysis
+    // Expand UID tokens back to original content for frequency analysis
     let expandedValue = value;
-    if (uidIgnore && ignoredMarkupChunks) {
-      // Create a global pattern for replacing UID tokens anywhere in the string
-      const uidReplacePattern = new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g');
+    if (uidReplacePattern) {
       expandedValue = value.replace(uidReplacePattern, function (match, index) {
         return ignoredMarkupChunks[+index] || '';
       });
+      // Reset `lastIndex` for pattern reuse
+      uidReplacePattern.lastIndex = 0;
     }
 
     // First pass minification applies attribute transformations
@@ -1691,9 +1701,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // because HTML comments in opening tags prevent proper attribute parsing.
     // We remove them with a space to preserve attribute boundaries.
     let scanValue = firstPassOutput;
-    if (options.ignoreCustomFragments && options.ignoreCustomFragments.length > 0) {
-      const customFragments = options.ignoreCustomFragments.map(re => re.source);
-      const customFragmentPattern = new RegExp('(' + customFragments.join('|') + ')', 'g');
+    if (customFragmentPattern) {
       scanValue = firstPassOutput.replace(customFragmentPattern, ' ');
     }
 
@@ -1726,13 +1734,14 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     const sorter = classChain.createSorter();
       options.sortClassName = function (value) {
       // Expand UID tokens back to original content before sorting
+      // Fast path: Skip if no HTML comments (UID markers) present
       let expandedValue = value;
-      if (uidIgnore && ignoredMarkupChunks) {
-        // Create a global pattern for replacing UID tokens anywhere in the string
-        const uidReplacePattern = new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g');
+      if (uidReplacePattern && value.indexOf('<!--') !== -1) {
         expandedValue = value.replace(uidReplacePattern, function (match, index) {
           return ignoredMarkupChunks[+index] || '';
         });
+        // Reset `lastIndex` for pattern reuse
+        uidReplacePattern.lastIndex = 0;
       }
 
       const classes = expandedValue.split(/[ \n\f\r]+/).filter(function(cls) {
