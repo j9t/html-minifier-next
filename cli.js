@@ -304,7 +304,6 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
   }
 
   // Defer reading files—multi-file mode will process per-file later
-  content = undefined;
 
   // Load and normalize config if `--config-file` was specified
   if (programOptions.configFile) {
