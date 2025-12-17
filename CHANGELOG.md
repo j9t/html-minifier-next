@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Optimized `sortAttributes` and `sortClassName` by pre-compiling regex patterns and reusing them instead of creating new patterns on every call
 
+### Internal
+
+- Tightened HTML Minifier benchmarks settings (in the spirit of all minifiers using the most aggressive—but valid—settings)
+
 ## [4.11.0] - 2025-12-17
 
 ### Added
