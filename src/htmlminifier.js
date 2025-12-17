@@ -840,7 +840,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     return options.minifyCSS(attrValue, 'media');
   } else if (tag === 'iframe' && attrName === 'srcdoc') {
     // Recursively minify HTML content within srcdoc attribute
-    // Fast-path: skip if nothing would change
+    // Fast-path: Skip if nothing would change
     if (!shouldMinifyInnerHTML(options)) {
       return attrValue;
     }
@@ -1272,7 +1272,9 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
 
   if (typeof attrValue !== 'undefined' && (!options.removeAttributeQuotes ||
     ~attrValue.indexOf(uidAttr) || !canRemoveAttributeQuotes(attrValue))) {
+    // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
+      // Normal mode: choose quotes and escape
       if (typeof options.quoteCharacter === 'undefined') {
         // Count quotes in a single pass instead of two regex operations
         let apos = 0, quot = 0;
@@ -1288,6 +1290,50 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
         attrValue = attrValue.replace(/"/g, '&#34;');
       } else {
         attrValue = attrValue.replace(/'/g, '&#39;');
+      }
+    } else {
+      // `preventAttributesEscaping` mode: choose safe quotes but don’t escape
+      // EXCEPT when both quote types are present—then escape to prevent invalid HTML
+      const hasDoubleQuote = attrValue.indexOf('"') !== -1;
+      const hasSingleQuote = attrValue.indexOf("'") !== -1;
+
+      if (hasDoubleQuote && hasSingleQuote) {
+        // Both quote types present: `preventAttributesEscaping` is ignored to ensure valid HTML
+        // Choose the quote type with fewer occurrences and escape the other
+        if (typeof options.quoteCharacter === 'undefined') {
+          let apos = 0, quot = 0;
+          for (let i = 0; i < attrValue.length; i++) {
+            if (attrValue[i] === "'") apos++;
+            else if (attrValue[i] === '"') quot++;
+          }
+          attrQuote = apos < quot ? '\'' : '"';
+        } else {
+          attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
+        }
+        if (attrQuote === '"') {
+          attrValue = attrValue.replace(/"/g, '&#34;');
+        } else {
+          attrValue = attrValue.replace(/'/g, '&#39;');
+        }
+      } else if (typeof options.quoteCharacter === 'undefined') {
+        // Single or no quote type: Choose safe quote delimiter
+        if (attrQuote === '"' && hasDoubleQuote && !hasSingleQuote) {
+          attrQuote = "'";
+        } else if (attrQuote === "'" && hasSingleQuote && !hasDoubleQuote) {
+          attrQuote = '"';
+        } else if (attrQuote !== '"' && attrQuote !== "'" && attrQuote !== '') {
+          // `attrQuote` is invalid/undefined (not `"`, `'`, or empty string)
+          // Set a safe default based on the value’s content
+          if (hasSingleQuote && !hasDoubleQuote) {
+            attrQuote = '"'; // Value has single quotes, use double quotes as delimiter
+          } else if (hasDoubleQuote && !hasSingleQuote) {
+            attrQuote = "'"; // Value has double quotes, use single quotes as delimiter
+          } else {
+            attrQuote = '"'; // No quotes in value, default to double quotes
+          }
+        }
+      } else {
+        attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
       }
     }
     emittedAttrValue = attrQuote + attrValue + attrQuote;
@@ -1553,7 +1599,7 @@ function uniqueId(value) {
 
 const specialContentTags = new Set(['script', 'style']);
 
-async function createSortFns(value, options, uidIgnore, uidAttr) {
+async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupChunks) {
   const attrChains = options.sortAttributes && Object.create(null);
   const classChain = options.sortClassName && new TokenChain();
 
@@ -1567,9 +1613,19 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
     return !uid || token.indexOf(uid) === -1;
   }
 
-  function shouldSkipUIDs(token) {
+  function shouldKeepToken(token) {
+    // Filter out any HTML comment tokens (UID placeholders)
+    // These are temporary markers created by `htmlmin:ignore` and `ignoreCustomFragments`
+    if (token.startsWith('<!--') && token.endsWith('-->')) {
+      return false;
+    }
     return shouldSkipUID(token, uidIgnore) && shouldSkipUID(token, uidAttr);
   }
+
+  // Pre-compile regex patterns for reuse (performance optimization)
+  // These must be declared before scan() since scan uses them
+  const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
+  const whitespaceSplitPatternSort = /[ \n\f\r]+/;
 
   async function scan(input) {
     let currentTag, currentType;
@@ -1579,12 +1635,14 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
           if (!attrChains[tag]) {
             attrChains[tag] = new TokenChain();
           }
-          attrChains[tag].add(attrNames(attrs).filter(shouldSkipUIDs));
+          const attrNamesList = attrNames(attrs).filter(shouldKeepToken);
+          attrChains[tag].add(attrNamesList);
         }
         for (let i = 0, len = attrs.length; i < len; i++) {
           const attr = attrs[i];
           if (classChain && attr.value && options.name(attr.name) === 'class') {
-            classChain.add(trimWhitespace(attr.value).split(/[ \t\n\f\r]+/).filter(shouldSkipUIDs));
+            const classes = trimWhitespace(attr.value).split(whitespaceSplitPatternScan).filter(shouldKeepToken);
+            classChain.add(classes);
           } else if (options.processScripts && attr.name.toLowerCase() === 'type') {
             currentTag = tag;
             currentType = attr.value;
@@ -1604,19 +1662,84 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
         }
       },
       // We never need `nextTag` information in this scan
-      wantsNextTag: false
+      wantsNextTag: false,
+      // Continue on parse errors during analysis pass
+      continueOnParseError: options.continueOnParseError
     });
 
-    await parser.parse();
+    try {
+      await parser.parse();
+    } catch (e) {
+      // If parsing fails during analysis pass, just skip it—we’ll still have
+      // partial frequency data from what we could parse
+      if (!options.continueOnParseError) {
+        throw e;
+      }
+    }
   }
 
-  const log = options.log;
-  options.log = identity;
-  options.sortAttributes = false;
-  options.sortClassName = false;
-  const firstPassOutput = await minifyHTML(value, options);
-  await scan(firstPassOutput);
-  options.log = log;
+  // For the first pass, create a copy of options and disable aggressive minification.
+  // Keep attribute transformations (like `removeStyleLinkTypeAttributes`) for accurate analysis.
+  // This is safe because `createSortFns` is called before custom fragment UID markers (uidAttr) are added.
+  // Note: `htmlmin:ignore` UID markers (uidIgnore) already exist and are expanded for analysis.
+  const firstPassOptions = Object.assign({}, options, {
+    // Disable sorting for the analysis pass
+    sortAttributes: false,
+    sortClassName: false,
+    // Disable aggressive minification that doesn’t affect attribute analysis
+    collapseWhitespace: false,
+    removeAttributeQuotes: false,
+    removeTagWhitespace: false,
+    decodeEntities: false,
+    processScripts: false,
+    // Keep `ignoreCustomFragments` to handle template syntax correctly
+    // This is safe because `createSortFns` is now called before UID markers are added
+    // Continue on parse errors during analysis (e.g., template syntax)
+    continueOnParseError: true,
+    log: identity
+  });
+
+  // Temporarily enable `continueOnParseError` for the `scan()` function call below.
+  // Note: `firstPassOptions` already has `continueOnParseError: true` for the minifyHTML call.
+  const originalContinueOnParseError = options.continueOnParseError;
+  options.continueOnParseError = true;
+
+  // Pre-compile regex patterns for UID replacement and custom fragments
+  const uidReplacePattern = uidIgnore && ignoredMarkupChunks
+    ? new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g')
+    : null;
+  const customFragmentPattern = options.ignoreCustomFragments && options.ignoreCustomFragments.length > 0
+    ? new RegExp('(' + options.ignoreCustomFragments.map(re => re.source).join('|') + ')', 'g')
+    : null;
+
+  try {
+    // Expand UID tokens back to original content for frequency analysis
+    let expandedValue = value;
+    if (uidReplacePattern) {
+      expandedValue = value.replace(uidReplacePattern, function (match, index) {
+        return ignoredMarkupChunks[+index] || '';
+      });
+      // Reset `lastIndex` for pattern reuse
+      uidReplacePattern.lastIndex = 0;
+    }
+
+    // First pass minification applies attribute transformations
+    // like removeStyleLinkTypeAttributes for accurate frequency analysis
+    const firstPassOutput = await minifyHTML(expandedValue, firstPassOptions);
+
+    // For frequency analysis, we need to remove custom fragments temporarily
+    // because HTML comments in opening tags prevent proper attribute parsing.
+    // We remove them with a space to preserve attribute boundaries.
+    let scanValue = firstPassOutput;
+    if (customFragmentPattern) {
+      scanValue = firstPassOutput.replace(customFragmentPattern, ' ');
+    }
+
+    await scan(scanValue);
+  } finally {
+    // Restore original option
+    options.continueOnParseError = originalContinueOnParseError;
+  }
   if (attrChains) {
     const attrSorters = Object.create(null);
     for (const tag in attrChains) {
@@ -1630,7 +1753,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
         names.forEach(function (name, index) {
           (attrMap[name] || (attrMap[name] = [])).push(attrs[index]);
         });
-        sorter.sort(names).forEach(function (name, index) {
+        const sorted = sorter.sort(names);
+        sorted.forEach(function (name, index) {
           attrs[index] = attrMap[name].shift();
         });
       }
@@ -1639,7 +1763,21 @@ async function createSortFns(value, options, uidIgnore, uidAttr) {
   if (classChain) {
     const sorter = classChain.createSorter();
     options.sortClassName = function (value) {
-      return sorter.sort(value.split(/[ \n\f\r]+/)).join(' ');
+      // Expand UID tokens back to original content before sorting
+      // Fast path: Skip if no HTML comments (UID markers) present
+      let expandedValue = value;
+      if (uidReplacePattern && value.indexOf('<!--') !== -1) {
+        expandedValue = value.replace(uidReplacePattern, function (match, index) {
+          return ignoredMarkupChunks[+index] || '';
+        });
+        // Reset `lastIndex` for pattern reuse
+        uidReplacePattern.lastIndex = 0;
+      }
+      const classes = expandedValue.split(whitespaceSplitPatternSort).filter(function(cls) {
+        return cls !== '';
+      });
+      const sorted = sorter.sort(classes);
+      return sorted.join(' ');
     };
   }
 }
@@ -1720,6 +1858,13 @@ async function minifyHTML(value, options, partialMarkup) {
     return token;
   });
 
+  // Create sort functions after `htmlmin:ignore` processing but before custom fragment UID markers
+  // This allows proper frequency analysis with access to ignored content via UID tokens
+  if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
+    (options.sortClassName && typeof options.sortClassName !== 'function')) {
+    await createSortFns(value, options, uidIgnore, null, ignoredMarkupChunks);
+  }
+
   const customFragments = options.ignoreCustomFragments.map(function (re) {
     return re.source;
   });
@@ -1776,11 +1921,6 @@ async function minifyHTML(value, options, partialMarkup) {
       ignoredCustomMarkupChunks.push(/^(\s*)[\s\S]*?(\s*)$/.exec(match));
       return '\t' + token + '\t';
     });
-  }
-
-  if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
-    (options.sortClassName && typeof options.sortClassName !== 'function')) {
-    await createSortFns(value, options, uidIgnore, uidAttr);
   }
 
   function _canCollapseWhitespace(tag, attrs) {

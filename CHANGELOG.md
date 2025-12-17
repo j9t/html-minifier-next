@@ -4,6 +4,22 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.11.1] - 2025-12-17
+
+### Fixed
+
+- Fixed `sortAttributes` and `sortClassName` causing HTML corruption when used with `htmlmin:ignore` comments or `ignoreCustomFragments` (template syntax)
+- Prevented invalid HTML output when using `decodeEntities: true` with `preventAttributesEscaping: true` for attributes containing quotes (e.g., JSON data)
+- Fixed `preventAttributesEscaping` potentially producing invalid HTML when value contains both quote types; now forces escaping to ensure valid output (setting is ignored when necessary)
+
+### Performance
+
+- Optimized `sortAttributes` and `sortClassName` by pre-compiling regex patterns and reusing them instead of creating new patterns on every call
+
+### Internal
+
+- Tightened HTML Minifier benchmarks settings (in the spirit of all minifiers using the most aggressive—but valid—settings)
+
 ## [4.11.0] - 2025-12-17
 
 ### Added

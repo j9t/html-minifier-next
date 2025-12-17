@@ -236,34 +236,34 @@ How does HTML Minifier Next compare to other minifiers? (All with the most aggre
 | Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)](https://socket.dev/npm/package/html-minifier-terser) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **49** | 50 | 51 | 52 | 51 | 54 | 52 |
-| [Apple](https://www.apple.com/) | 260 | **203** | 204 | 231 | 235 | 236 | 238 | 238 |
-| [BBC](https://www.bbc.co.uk/) | 720 | **655** | 665 | 677 | 677 | 678 | 714 | n/a |
-| [CERN](https://home.cern/) | 156 | **87** | **87** | 95 | 95 | 95 | 97 | 100 |
-| [CSS-Tricks](https://css-tricks.com/) | 163 | 122 | **120** | 128 | 143 | 144 | 149 | 145 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6341** | **6341** | 6561 | 6444 | 6567 | 6614 | n/a |
+| [Apple](https://www.apple.com/) | 266 | **206** | n/a | 236 | 239 | 240 | 242 | 243 |
+| [BBC](https://www.bbc.co.uk/) | 697 | **634** | n/a | 655 | 655 | 656 | 691 | n/a |
+| [CERN](https://home.cern/) | 156 | **87** | n/a | 95 | 95 | 95 | 97 | 100 |
+| [CSS-Tricks](https://css-tricks.com/) | 163 | **122** | n/a | 128 | 143 | 144 | 149 | 145 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6342** | **6342** | 6561 | 6444 | 6567 | 6614 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 60 | 70 | 70 | 71 | 75 | 73 |
-| [EFF](https://www.eff.org/) | 56 | **48** | **48** | 50 | 49 | 49 | 51 | 51 |
+| [EFF](https://www.eff.org/) | 55 | **47** | n/a | 50 | 48 | 49 | 50 | 50 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1562 | 1455 | 1460 | **1400** | 1487 | 1498 | 1509 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1604 | 1494 | 1499 | **1437** | 1527 | 1539 | 1550 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 152 | **121** | 122 | 125 | 125 | 125 | 132 | 126 |
-| [Frontend Dogma](https://frontenddogma.com/) | 222 | **213** | 215 | 236 | 221 | 222 | 241 | 222 |
+| [Frontend Dogma](https://frontenddogma.com/) | 223 | **213** | 215 | 236 | 221 | 223 | 241 | 222 |
 | [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | **17** | **17** | 18 | 18 |
-| [Ground News](https://ground.news/) | 2339 | **2052** | 2056 | 2151 | 2179 | 2182 | 2326 | n/a |
-| [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | **147** | 153 | **147** | 149 | 155 | 149 |
+| [Ground News](https://ground.news/) | 1481 | **1259** | n/a | 1361 | 1386 | 1392 | 1468 | n/a |
+| [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | n/a | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 50 | **33** | **33** | 36 | 36 | 36 | 37 | 36 |
-| [Leanpub](https://leanpub.com/) | 1204 | **997** | **997** | 1004 | 1003 | 1001 | 1198 | n/a |
-| [Mastodon](https://mastodon.social/explore) | 37 | **27** | **27** | 32 | 34 | 35 | 35 | 35 |
-| [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | **62** | 64 | 65 | 65 | 68 | 68 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 222 | **195** | 196 | 202 | 200 | 200 | 202 | 203 |
-| [Nielsen Norman Group](https://www.nngroup.com/) | 84 | 71 | 71 | **53** | 71 | 73 | 74 | 73 |
+| [Leanpub](https://leanpub.com/) | 1521 | **1287** | **1287** | 1294 | 1293 | 1290 | 1516 | n/a |
+| [Mastodon](https://mastodon.social/explore) | 37 | **27** | n/a | 32 | 34 | 35 | 35 | 35 |
+| [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | n/a | 64 | 65 | 65 | 68 | 68 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 222 | **195** | **195** | 202 | 200 | 200 | 202 | 203 |
+| [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 74 | 74 | **55** | 74 | 75 | 77 | 76 |
 | [SitePoint](https://www.sitepoint.com/) | 485 | **354** | **354** | 425 | 459 | 464 | 481 | n/a |
 | [TetraLogical](https://tetralogical.com/) | 44 | 38 | 38 | **35** | 38 | 38 | 39 | 39 |
-| [TPGi](https://www.tpgi.com/) | 175 | **159** | 161 | 160 | 164 | 165 | 172 | 171 |
-| [United Nations](https://www.un.org/en/) | 151 | **112** | 114 | 121 | 125 | 124 | 130 | 123 |
+| [TPGi](https://www.tpgi.com/) | 175 | **159** | n/a | 160 | 164 | 166 | 172 | 171 |
+| [United Nations](https://www.un.org/en/) | 150 | **112** | 113 | 120 | 124 | 124 | 129 | 122 |
 | [W3C](https://www.w3.org/) | 50 | **36** | **36** | 38 | 38 | 38 | 40 | 38 |
-| **Average processing time** |  | 302 ms (26/26) | 356 ms (26/26) | 178 ms (26/26) | 59 ms (26/26) | **16 ms (26/26)** | 329 ms (26/26) | 1468 ms (20/26) |
+| **Average processing time** |  | 478 ms (26/26) | 735 ms (16/26) | 174 ms (26/26) | 57 ms (26/26) | **17 ms (26/26)** | 318 ms (26/26) | 1536 ms (20/26) |
 
-(Last updated: Dec 16, 2025)
+(Last updated: Dec 17, 2025)
 <!-- End auto-generated -->
 
 ## Examples
