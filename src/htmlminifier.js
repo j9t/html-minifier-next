@@ -1272,7 +1272,9 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
 
   if (typeof attrValue !== 'undefined' && (!options.removeAttributeQuotes ||
     ~attrValue.indexOf(uidAttr) || !canRemoveAttributeQuotes(attrValue))) {
+    // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
+      // Normal mode: choose quotes and escape
       if (typeof options.quoteCharacter === 'undefined') {
         // Count quotes in a single pass instead of two regex operations
         let apos = 0, quot = 0;
@@ -1288,6 +1290,25 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
         attrValue = attrValue.replace(/"/g, '&#34;');
       } else {
         attrValue = attrValue.replace(/'/g, '&#39;');
+      }
+    } else {
+      // `preventAttributesEscaping` mode: choose safe quotes but don’t escape
+      if (typeof options.quoteCharacter === 'undefined') {
+        // Check if current quote character is safe
+        const hasDoubleQuote = attrValue.indexOf('"') !== -1;
+        const hasSingleQuote = attrValue.indexOf("'") !== -1;
+
+        // If current quote is safe, keep it; otherwise switch to safe one
+        if (attrQuote === '"' && hasDoubleQuote && !hasSingleQuote) {
+          attrQuote = "'";
+        } else if (attrQuote === "'" && hasSingleQuote && !hasDoubleQuote) {
+          attrQuote = '"';
+        } else if (attrQuote !== '"' && attrQuote !== "'") {
+          // If no quote character set, choose the safer one
+          attrQuote = hasSingleQuote && !hasDoubleQuote ? '"' : (hasDoubleQuote && !hasSingleQuote ? "'" : attrQuote);
+        }
+      } else {
+        attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
       }
     }
     emittedAttrValue = attrQuote + attrValue + attrQuote;
