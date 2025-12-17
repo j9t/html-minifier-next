@@ -1321,12 +1321,16 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
           attrQuote = "'";
         } else if (attrQuote === "'" && hasSingleQuote && !hasDoubleQuote) {
           attrQuote = '"';
-        } else if (attrQuote !== '"' && attrQuote !== "'") {
-          // If no quote character set, choose the safer one (but preserve empty string if no quotes needed)
-          if (hasSingleQuote || hasDoubleQuote) {
-            attrQuote = hasSingleQuote && !hasDoubleQuote ? '"' : (hasDoubleQuote && !hasSingleQuote ? "'" : '"');
+        } else if (attrQuote !== '"' && attrQuote !== "'" && attrQuote !== '') {
+          // `attrQuote` is invalid/undefined (not `"`, `'`, or empty string)
+          // Set a safe default based on the value’s content
+          if (hasSingleQuote && !hasDoubleQuote) {
+            attrQuote = '"'; // Value has single quotes, use double quotes as delimiter
+          } else if (hasDoubleQuote && !hasSingleQuote) {
+            attrQuote = "'"; // Value has double quotes, use single quotes as delimiter
+          } else {
+            attrQuote = '"'; // No quotes in value, default to double quotes
           }
-          // Else: Leave `attrQuote` as-is (may be empty string for attribute values that don’t need quotes)
         }
       } else {
         attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
@@ -1609,7 +1613,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     return !uid || token.indexOf(uid) === -1;
   }
 
-  function shouldSkipUIDs(token) {
+  function shouldKeepToken(token) {
     // Filter out any HTML comment tokens (UID placeholders)
     // These are temporary markers created by `htmlmin:ignore` and `ignoreCustomFragments`
     if (token.startsWith('<!--') && token.endsWith('-->')) {
@@ -1631,13 +1635,13 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
           if (!attrChains[tag]) {
             attrChains[tag] = new TokenChain();
           }
-          const attrNamesList = attrNames(attrs).filter(shouldSkipUIDs);
+          const attrNamesList = attrNames(attrs).filter(shouldKeepToken);
           attrChains[tag].add(attrNamesList);
         }
         for (let i = 0, len = attrs.length; i < len; i++) {
           const attr = attrs[i];
           if (classChain && attr.value && options.name(attr.name) === 'class') {
-            const classes = trimWhitespace(attr.value).split(whitespaceSplitPatternScan).filter(shouldSkipUIDs);
+            const classes = trimWhitespace(attr.value).split(whitespaceSplitPatternScan).filter(shouldKeepToken);
             classChain.add(classes);
           } else if (options.processScripts && attr.name.toLowerCase() === 'type') {
             currentTag = tag;
