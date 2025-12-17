@@ -1,5 +1,6 @@
 {
   "caseSensitive": false,
+  "collapseAttributeWhitespace": true,
   "collapseBooleanAttributes": true,
   "collapseInlineTagWhitespace": true,
   "collapseWhitespace": true,

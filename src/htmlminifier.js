@@ -61,6 +61,14 @@ async function getTerser() {
  *
  *  Default: `false`
  *
+ *  @prop {boolean} [collapseAttributeWhitespace]
+ *  Collapse multiple whitespace characters within attribute values into a
+ *  single space. Also trims leading and trailing whitespace from attribute
+ *  values. Applied as an early normalization step before special attribute
+ *  handlers (CSS minification, class sorting, etc.) run.
+ *
+ *  Default: `false`
+ *
  * @prop {boolean} [collapseBooleanAttributes]
  *  Collapse boolean attributes to their name only (for example
  *  `disabled="disabled"` → `disabled`).
@@ -746,6 +754,12 @@ function isSrcset(attrName, tag) {
 }
 
 async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
+  // Apply early whitespace normalization if enabled
+  // Preserves special spaces (non-breaking space, hair space, etc.) for consistency with `collapseWhitespace`
+  if (options.collapseAttributeWhitespace) {
+    attrValue = attrValue.replace(/[ \n\r\t\f]+/g, ' ').replace(/^[ \n\r\t\f]+|[ \n\r\t\f]+$/g, '');
+  }
+
   if (isEventAttribute(attrName, options)) {
     attrValue = trimWhitespace(attrValue).replace(/^javascript:\s*/i, '');
     return options.minifyJS(attrValue, true);

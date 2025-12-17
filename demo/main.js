@@ -9,6 +9,12 @@ const defaultOptions = [
     helpText: 'Treat attributes in case-sensitive manner (useful for custom HTML elements)'
   },
   {
+    id: 'collapseAttributeWhitespace',
+    type: 'checkbox',
+    label: 'Collapse attribute whitespace',
+    helpText: 'Trim and collapse whitespace characters within attribute values'
+  },
+  {
     id: 'collapseBooleanAttributes',
     type: 'checkbox',
     label: 'Collapse boolean attributes',
@@ -33,7 +39,7 @@ const defaultOptions = [
     id: 'conservativeCollapse',
     type: 'checkbox',
     label: 'Conservative collapse',
-    helpText: `Always collapse to 1 space (never remove it entirely)—use with <code>collapseWhitespace</code>`
+    helpText: `Always collapse to one space (never remove it entirely)—use with <code>collapseWhitespace</code>`
   },
   {
     id: 'decodeEntities',

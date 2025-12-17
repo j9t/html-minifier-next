@@ -22,6 +22,7 @@ export const presets = {
     useShortDoctype: true
   },
   comprehensive: {
+    // @@ Add `collapseAttributeWhitespace: true` (also add to preset in demo)
     caseSensitive: true,
     collapseBooleanAttributes: true,
     collapseInlineTagWhitespace: true,
