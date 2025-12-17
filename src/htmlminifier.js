@@ -1618,6 +1618,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     return shouldSkipUID(token, uidIgnore) && shouldSkipUID(token, uidAttr);
   }
 
+  // Pre-compile regex patterns for reuse (performance optimization)
+  // These must be declared before scan() since scan uses them
+  const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
+  const whitespaceSplitPatternSort = /[ \n\f\r]+/;
+
   async function scan(input) {
     let currentTag, currentType;
     const parser = new HTMLParser(input, {
@@ -1693,15 +1698,13 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   const originalContinueOnParseError = options.continueOnParseError;
   options.continueOnParseError = true;
 
-  // Pre-compile regex patterns for reuse (performance optimization)
+  // Pre-compile regex patterns for UID replacement and custom fragments
   const uidReplacePattern = uidIgnore && ignoredMarkupChunks
     ? new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g')
     : null;
   const customFragmentPattern = options.ignoreCustomFragments && options.ignoreCustomFragments.length > 0
     ? new RegExp('(' + options.ignoreCustomFragments.map(re => re.source).join('|') + ')', 'g')
     : null;
-  const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
-  const whitespaceSplitPatternSort = /[ \n\f\r]+/;
 
   try {
     // Expand UID tokens back to original content for frequency analysis
