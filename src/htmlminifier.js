@@ -1715,16 +1715,16 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     for (const tag in attrChains) {
       attrSorters[tag] = attrChains[tag].createSorter();
     }
-      options.sortAttributes = function (tag, attrs) {
+    options.sortAttributes = function (tag, attrs) {
       const sorter = attrSorters[tag];
       if (sorter) {
         const attrMap = Object.create(null);
         const names = attrNames(attrs);
-              names.forEach(function (name, index) {
+        names.forEach(function (name, index) {
           (attrMap[name] || (attrMap[name] = [])).push(attrs[index]);
         });
         const sorted = sorter.sort(names);
-              sorted.forEach(function (name, index) {
+        sorted.forEach(function (name, index) {
           attrs[index] = attrMap[name].shift();
         });
       }
@@ -1732,7 +1732,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
   if (classChain) {
     const sorter = classChain.createSorter();
-      options.sortClassName = function (value) {
+    options.sortClassName = function (value) {
       // Expand UID tokens back to original content before sorting
       // Fast path: Skip if no HTML comments (UID markers) present
       let expandedValue = value;
@@ -1743,7 +1743,6 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         // Reset `lastIndex` for pattern reuse
         uidReplacePattern.lastIndex = 0;
       }
-
       const classes = expandedValue.split(whitespaceSplitPatternSort).filter(function(cls) {
         return cls !== '';
       });
