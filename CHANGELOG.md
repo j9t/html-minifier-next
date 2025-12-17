@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added lazy-loading for minifier module to reduce CLI cold-start overhead
 - Optimized URL minification with fast-path guards and cached RelateURL instances
 - Added LRU memoization for class name sorting
-- Fine-tuned class cache
+- Consolidated and fine-tuned cache
 
 ### Internal
 
