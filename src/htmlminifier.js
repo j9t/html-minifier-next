@@ -463,7 +463,7 @@ const cssMinifyCache = new LRU(200);
 
 const trimWhitespace = str => {
   if (!str) return str;
-  // Fast path: if no whitespace at start or end, return early
+  // Fast path: If no whitespace at start or end, return early
   if (!/^[ \n\r\t\f]/.test(str) && !/[ \n\r\t\f]$/.test(str)) {
     return str;
   }
@@ -472,7 +472,7 @@ const trimWhitespace = str => {
 
 function collapseWhitespaceAll(str) {
   if (!str) return str;
-  // Fast path: if there are no common whitespace characters, return early
+  // Fast path: If there are no common whitespace characters, return early
   if (!/[ \n\r\t\f\xA0]/.test(str)) {
     return str;
   }
@@ -1227,7 +1227,7 @@ async function normalizeAttr(attr, attrs, tag, options) {
   let attrValue = attr.value;
 
   if (options.decodeEntities && attrValue) {
-    // Fast path: only decode when entities are present
+    // Fast path: Only decode when entities are present
     if (attrValue.indexOf('&') !== -1) {
       attrValue = decodeHTMLStrict(attrValue);
     }
@@ -1427,7 +1427,7 @@ const processOptions = (inputOptions) => {
       const lightningCssOptions = typeof option === 'object' ? option : {};
 
       options.minifyCSS = async function (text, type) {
-        // Fast path: nothing to minify
+        // Fast path: Nothing to minify
         if (!text || !text.trim()) {
           return text;
         }
@@ -1519,7 +1519,7 @@ const processOptions = (inputOptions) => {
 
         let jsKey;
         try {
-          // Fast path: avoid invoking Terser for empty/whitespace-only content
+          // Fast path: Avoid invoking Terser for empty/whitespace-only content
           if (!code || !code.trim()) {
             return '';
           }
@@ -1571,9 +1571,18 @@ const processOptions = (inputOptions) => {
         relateUrlOptions = {};
       }
 
+      // Cache RelateURL instance for reuse (expensive to create)
+      const relateUrlInstance = new RelateURL(relateUrlOptions.site || '', relateUrlOptions);
+
       options.minifyURLs = function (text) {
+        // Fast-path: Skip if text doesn’t look like a URL that needs processing
+        // Only process if contains URL-like characters (`/`, `:`, `#`, `?`) or spaces that need encoding
+        if (!/[/:?#\s]/.test(text)) {
+          return text;
+        }
+
         try {
-          return RelateURL.relate(text, relateUrlOptions);
+          return relateUrlInstance.relate(text);
         } catch (err) {
           if (!options.continueOnMinifyError) {
             throw err;
@@ -1669,11 +1678,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
 
     try {
       await parser.parse();
-    } catch (e) {
+    } catch (err) {
       // If parsing fails during analysis pass, just skip it—we’ll still have
       // partial frequency data from what we could parse
       if (!options.continueOnParseError) {
-        throw e;
+        throw err;
       }
     }
   }
@@ -1762,7 +1771,21 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
   if (classChain) {
     const sorter = classChain.createSorter();
+    // Memoize `sortClassName` results—class lists often repeat in templates
+    const classNameCache = new LRU(200);
+
     options.sortClassName = function (value) {
+      // Fast path: Single class (no spaces) needs no sorting
+      if (value.indexOf(' ') === -1) {
+        return value;
+      }
+
+      // Check cache first
+      const cached = classNameCache.get(value);
+      if (cached !== undefined) {
+        return cached;
+      }
+
       // Expand UID tokens back to original content before sorting
       // Fast path: Skip if no HTML comments (UID markers) present
       let expandedValue = value;
@@ -1777,7 +1800,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         return cls !== '';
       });
       const sorted = sorter.sort(classes);
-      return sorted.join(' ');
+      const result = sorted.join(' ');
+
+      // Cache the result
+      classNameCache.set(value, result);
+      return result;
     };
   }
 }
@@ -1818,7 +1845,7 @@ async function minifyHTML(value, options, partialMarkup) {
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
   const normalizedCustomElements = customElementsArr.map(name => options.name(name));
-  // Fast path: reuse base Sets if no custom elements
+  // Fast path: Reuse base Sets if no custom elements
   const inlineTextSet = normalizedCustomElements.length
     ? new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements])
     : inlineElementsToKeepWhitespaceWithin;

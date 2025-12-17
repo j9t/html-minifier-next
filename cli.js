@@ -28,10 +28,12 @@
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
+import os from 'os';
 import { createRequire } from 'module';
 import { camelCase, paramCase } from 'change-case';
 import { Command } from 'commander';
-import { minify } from './src/htmlminifier.js';
+// Lazy-load HMN to reduce CLI cold-start overhead
+// import { minify } from './src/htmlminifier.js';
 import { getPreset, getPresetNames } from './src/presets.js';
 
 const require = createRequire(import.meta.url);
@@ -182,6 +184,15 @@ program.option('-o --output <file>', 'Specify output file (reads from file argum
 program.option('-v --verbose', 'Show detailed processing information');
 program.option('-d --dry', 'Dry run: process and report statistics without writing output');
 
+// Lazy import wrapper for HMN
+let minifyFnPromise;
+async function getMinify() {
+  if (!minifyFnPromise) {
+    minifyFnPromise = import('./src/htmlminifier.js').then(m => m.minify);
+  }
+  return minifyFnPromise;
+}
+
 function readFile(file) {
   try {
     return fs.readFileSync(file, { encoding: 'utf8' });
@@ -270,12 +281,29 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
 (async () => {
   let content;
   let filesProvided = false;
+  let capturedFiles = [];
   await program.arguments('[files...]').action(function (files) {
-    content = files.map(readFile).join('');
+    capturedFiles = files;
     filesProvided = files.length > 0;
+    // Defer reading files until after we check for consumed filenames
   }).parseAsync(process.argv);
 
   const programOptions = program.opts();
+
+  // Check if any `parseJSON` options consumed a filename as their value
+  // If so, treat the option as boolean true and add the filename back to the files list
+  const jsonOptionKeys = ['minifyCss', 'minifyJs', 'minifyUrls'];
+  for (const key of jsonOptionKeys) {
+    const value = programOptions[key];
+    if (typeof value === 'string' && /\.(html?|php|xml|svg|xhtml|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
+      // The option consumed a filename - inject it back
+      programOptions[key] = true;
+      capturedFiles.push(value);
+      filesProvided = true;
+    }
+  }
+
+  // Defer reading files—multi-file mode will process per-file later
 
   // Load and normalize config if `--config-file` was specified
   if (programOptions.configFile) {
@@ -344,6 +372,7 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
 
     let minified;
     try {
+      const minify = await getMinify();
       minified = await minify(data, createOptions());
     } catch (err) {
       fatal('Minification error on ' + inputFile + '\n' + err.message);
@@ -472,6 +501,54 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     process.stderr.write('\r\x1b[K'); // Clear the line
   }
 
+  // Utility: concurrency runner
+  async function runWithConcurrency(items, limit, worker) {
+    const results = new Array(items.length);
+    let next = 0;
+    let active = 0;
+    return new Promise((resolve, reject) => {
+      const launch = () => {
+        while (active < limit && next < items.length) {
+          const current = next++;
+          active++;
+          Promise.resolve(worker(items[current], current))
+            .then((res) => {
+              results[current] = res;
+              active--;
+              launch();
+            })
+            .catch(reject);
+        }
+        if (next >= items.length && active === 0) {
+          resolve(results);
+        }
+      };
+      launch();
+    });
+  }
+
+  async function collectFiles(dir, extensions, skipRootAbs, ignorePatterns, baseDir) {
+    const out = [];
+    const entries = await fs.promises.readdir(dir).catch(() => []);
+    for (const name of entries) {
+      const filePath = path.join(dir, name);
+      if (skipRootAbs) {
+        const real = await fs.promises.realpath(filePath).catch(() => undefined);
+        if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) continue;
+      }
+      const lst = await fs.promises.lstat(filePath).catch(() => null);
+      if (!lst || lst.isSymbolicLink()) continue;
+      if (lst.isDirectory()) {
+        if (shouldIgnoreDirectory(filePath, ignorePatterns, baseDir)) continue;
+        const sub = await collectFiles(filePath, extensions, skipRootAbs, ignorePatterns, baseDir);
+        out.push(...sub);
+      } else if (shouldProcessFile(name, extensions)) {
+        out.push(filePath);
+      }
+    }
+    return out;
+  }
+
   async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs, progress = null, ignorePatterns = [], baseDir = null) {
     // If first call provided a string, normalize once; otherwise assume pre-parsed array
     if (typeof extensions === 'string') {
@@ -483,61 +560,27 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       baseDir = inputDir;
     }
 
-    const files = await fs.promises.readdir(inputDir).catch(err => {
-      fatal('Cannot read directory ' + inputDir + '\n' + err.message);
+    // Collect all files first for bounded parallel processing
+    const list = await collectFiles(inputDir, extensions, skipRootAbs, ignorePatterns, baseDir);
+    const allStats = new Array(list.length);
+    const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
+    await runWithConcurrency(list, concurrency, async (inputFile, idx) => {
+      const rel = path.relative(inputDir, inputFile);
+      const outFile = path.join(outputDir, rel);
+      const outDir = path.dirname(outFile);
+      if (!isDryRun) {
+        await fs.promises.mkdir(outDir, { recursive: true }).catch(err => {
+          fatal('Cannot create directory ' + outDir + '\n' + err.message);
+        });
+      }
+      const stats = await processFile(inputFile, outFile, isDryRun, isVerbose);
+      allStats[idx] = stats;
+      if (progress) {
+        progress.current++;
+        updateProgress(progress.current, progress.total);
+      }
     });
-
-    const allStats = [];
-
-    for (const file of files) {
-      const inputFile = path.join(inputDir, file);
-      const outputFile = path.join(outputDir, file);
-
-      // Skip anything inside the output root to avoid reprocessing
-      if (skipRootAbs) {
-        const real = await fs.promises.realpath(inputFile).catch(() => undefined);
-        if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) {
-          continue;
-        }
-      }
-
-      const lst = await fs.promises.lstat(inputFile).catch(err => {
-        fatal('Cannot read ' + inputFile + '\n' + err.message);
-      });
-
-      if (lst.isSymbolicLink()) {
-        continue;
-      }
-
-      if (lst.isDirectory()) {
-        // Skip ignored directories
-        if (shouldIgnoreDirectory(inputFile, ignorePatterns, baseDir)) {
-          continue;
-        }
-        const dirStats = await processDirectory(inputFile, outputFile, extensions, isDryRun, isVerbose, skipRootAbs, progress, ignorePatterns, baseDir);
-        if (dirStats) {
-          allStats.push(...dirStats);
-        }
-      } else if (shouldProcessFile(file, extensions)) {
-        if (!isDryRun) {
-          await fs.promises.mkdir(outputDir, { recursive: true }).catch(err => {
-            fatal('Cannot create directory ' + outputDir + '\n' + err.message);
-          });
-        }
-        const fileStats = await processFile(inputFile, outputFile, isDryRun, isVerbose);
-        if (fileStats) {
-          allStats.push(fileStats);
-        }
-
-        // Update progress after processing
-        if (progress) {
-          progress.current++;
-          updateProgress(progress.current, progress.total);
-        }
-      }
-    }
-
-    return allStats;
+    return allStats.filter(Boolean);
   }
 
   const writeMinify = async () => {
@@ -551,6 +594,7 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     let minified;
 
     try {
+      const minify = await getMinify();
       minified = await minify(content, minifierOptions);
     } catch (err) {
       fatal('Minification error:\n' + err.message);
@@ -576,17 +620,12 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     }
 
     if (programOptions.output) {
-      await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true }).catch((e) => {
-        fatal('Cannot create directory ' + path.dirname(programOptions.output) + '\n' + e.message);
-      });
-      await new Promise((resolve, reject) => {
-        const fileStream = fs.createWriteStream(programOptions.output)
-          .on('error', reject)
-          .on('finish', resolve);
-        fileStream.end(minified);
-        }).catch((e) => {
-        fatal('Cannot write ' + programOptions.output + '\n' + e.message);
-      });
+      try {
+        await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
+        await fs.promises.writeFile(programOptions.output, minified, { encoding: 'utf8' });
+      } catch (err) {
+        fatal('Cannot write ' + programOptions.output + '\n' + err.message);
+      }
       return;
     }
 
@@ -646,6 +685,16 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       // Parse ignore patterns
       const ignorePatterns = parseIgnorePatterns(resolvedIgnoreDir);
 
+      // Validate that the input directory exists and is readable
+      try {
+        const stat = await fs.promises.stat(inputDir);
+        if (!stat.isDirectory()) {
+          fatal(inputDir + ' is not a directory');
+        }
+      } catch (err) {
+        fatal('Cannot read directory ' + inputDir + '\n' + err.message);
+      }
+
       // Resolve base directory for consistent path comparisons
       const inputDirResolved = await fs.promises.realpath(inputDir).catch(() => inputDir);
 
@@ -688,12 +737,72 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       }
     })();
   } else if (filesProvided) { // Minifying one or more files specified on the CMD line
-    writeMinify();
+    // Process each file independently, then concatenate outputs to preserve current behavior
+    const minifierOptions = createOptions();
+    // Show config info if verbose/dry
+    if (programOptions.verbose || programOptions.dry) {
+      getActiveOptionsDisplay(minifierOptions);
+    }
+
+    const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
+    const inputs = capturedFiles.slice();
+
+    // Read originals and minify in parallel with bounded concurrency
+    const originals = new Array(inputs.length);
+    const outputs = new Array(inputs.length);
+
+    await runWithConcurrency(inputs, concurrency, async (file, idx) => {
+      const data = await fs.promises.readFile(file, 'utf8').catch(err => fatal('Cannot read ' + file + '\n' + err.message));
+      const minify = await getMinify();
+      let out;
+      try {
+        out = await minify(data, minifierOptions);
+      } catch (err) {
+        fatal('Minification error on ' + file + '\n' + err.message);
+      }
+      originals[idx] = data;
+      outputs[idx] = out;
+    });
+
+    const originalCombined = originals.join('');
+    const minifiedCombined = outputs.join('');
+
+    const stats = calculateStats(originalCombined, minifiedCombined);
+
+    if (programOptions.dry) {
+      const inputSource = capturedFiles.join(', ');
+      const outputDest = programOptions.output || 'STDOUT';
+      console.error(`[DRY RUN] Would minify: ${inputSource} → ${outputDest}`);
+      console.error(`  Original: ${stats.originalSize.toLocaleString()} bytes`);
+      console.error(`  Minified: ${stats.minifiedSize.toLocaleString()} bytes`);
+      console.error(`  Saved: ${stats.sign}${Math.abs(stats.saved).toLocaleString()} bytes (${stats.percentage}%)`);
+      process.exit(0);
+    }
+
+    if (programOptions.verbose) {
+      const inputSource = capturedFiles.join(', ');
+      console.error(`  ✓ ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+    }
+
+    if (programOptions.output) {
+      try {
+        await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
+        await fs.promises.writeFile(programOptions.output, minifiedCombined, 'utf8');
+      } catch (err) {
+        fatal('Cannot write ' + programOptions.output + '\n' + err.message);
+      }
+    } else {
+      process.stdout.write(minifiedCombined);
+    }
+    process.exit(0);
   } else { // Minifying input coming from STDIN
     content = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', function (data) {
       content += data;
-    }).on('end', writeMinify);
+    }).on('end', async function() {
+      await writeMinify();
+      process.exit(0);
+    });
   }
 })();

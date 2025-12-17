@@ -85,7 +85,7 @@ const preCompiledStackedTags = {
 // Cache for compiled attribute regexes per handler configuration
 const attrRegexCache = new WeakMap();
 
-function attrForHandler(handler) {
+function buildAttrRegex(handler) {
   let pattern = singleAttrIdentifier.source +
     '(?:\\s*(' + joinSingleAttrAssigns(handler) + ')' +
     '[ \\t\\n\\f\\r]*(?:' + singleAttrValues.join('|') + '))?';
@@ -102,6 +102,14 @@ function attrForHandler(handler) {
     pattern = '(?:' + attrClauses.join('|') + ')';
   }
   return new RegExp('^\\s*' + pattern);
+}
+
+function getAttrRegexForHandler(handler) {
+  let cached = attrRegexCache.get(handler);
+  if (cached) return cached;
+  const compiled = buildAttrRegex(handler);
+  attrRegexCache.set(handler, compiled);
+  return compiled;
 }
 
 function joinSingleAttrAssigns(handler) {
@@ -127,12 +135,8 @@ export class HTMLParser {
     const fullLength = fullHtml.length;
 
     const stack = []; let lastTag;
-    // Use cached attribute regex if available
-    let attribute = attrRegexCache.get(handler);
-    if (!attribute) {
-      attribute = attrForHandler(handler);
-      attrRegexCache.set(handler, attribute);
-    }
+    // Use cached attribute regex for this handler configuration
+    const attribute = getAttrRegexForHandler(handler);
     let prevTag = undefined, nextTag = undefined;
 
     // Index-based parsing

@@ -328,8 +328,8 @@ async function processFiles() {
       if (name === undefined) break;
       try {
         await processFile(name);
-      } catch (e) {
-        benchmarkErrors.push(`Unhandled error processing ${name}: ${e?.message || e}`);
+      } catch (err) {
+        benchmarkErrors.push(`Unhandled error processing ${name}: ${err?.message || err}`);
       }
     }
   }
