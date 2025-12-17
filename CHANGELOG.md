@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+- Fixed `sortAttributes` and `sortClassName` causing HTML corruption when used with `htmlmin:ignore` comments or `ignoreCustomFragments` (template syntax)
 - Prevented invalid HTML output when using `decodeEntities: true` with `preventAttributesEscaping: true` for attributes containing quotes (e.g., JSON data)
 
 ## [4.11.0] - 2025-12-17
