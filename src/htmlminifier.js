@@ -5,6 +5,36 @@ import TokenChain from './tokenchain.js';
 import { replaceAsync } from './utils.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
+// Simple LRU cache for memoization
+class LRUCache {
+  constructor(maxSize = 100) {
+    this.maxSize = maxSize;
+    this.cache = new Map();
+  }
+
+  get(key) {
+    if (!this.cache.has(key)) return undefined;
+    // Move to end (most recent)
+    const value = this.cache.get(key);
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  set(key, value) {
+    // Delete if exists to reorder
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+    this.cache.set(key, value);
+    // Evict oldest if over size
+    if (this.cache.size > this.maxSize) {
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+    }
+  }
+}
+
 // Lazy-load heavy dependencies only when needed
 
 let lightningCSSPromise;
@@ -1571,9 +1601,18 @@ const processOptions = (inputOptions) => {
         relateUrlOptions = {};
       }
 
+      // Cache RelateURL instance for reuse (expensive to create)
+      const relateUrlInstance = new RelateURL(relateUrlOptions.site || '', relateUrlOptions);
+
       options.minifyURLs = function (text) {
+        // Fast-path: Skip if text doesn’t look like a URL that needs processing
+        // Only process if contains URL-like characters (`/`, `:`, `#`, `?`) or spaces that need encoding
+        if (!/[/:?#\s]/.test(text)) {
+          return text;
+        }
+
         try {
-          return RelateURL.relate(text, relateUrlOptions);
+          return relateUrlInstance.relate(text);
         } catch (err) {
           if (!options.continueOnMinifyError) {
             throw err;
@@ -1762,7 +1801,16 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
   if (classChain) {
     const sorter = classChain.createSorter();
+    // Memoize `sortClassName` results—class lists often repeat in templates
+    const classNameCache = new LRUCache(100);
+
     options.sortClassName = function (value) {
+      // Check cache first
+      const cached = classNameCache.get(value);
+      if (cached !== undefined) {
+        return cached;
+      }
+
       // Expand UID tokens back to original content before sorting
       // Fast path: Skip if no HTML comments (UID markers) present
       let expandedValue = value;
@@ -1777,7 +1825,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         return cls !== '';
       });
       const sorted = sorter.sort(classes);
-      return sorted.join(' ');
+      const result = sorted.join(' ');
+
+      // Cache the result
+      classNameCache.set(value, result);
+      return result;
     };
   }
 }
