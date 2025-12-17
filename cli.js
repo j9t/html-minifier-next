@@ -270,12 +270,30 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
 (async () => {
   let content;
   let filesProvided = false;
+  let capturedFiles = [];
   await program.arguments('[files...]').action(function (files) {
-    content = files.map(readFile).join('');
+    capturedFiles = files;
     filesProvided = files.length > 0;
+    // Defer reading files until after we check for consumed filenames
   }).parseAsync(process.argv);
 
   const programOptions = program.opts();
+
+  // Check if any `parseJSON` options consumed a filename as their value
+  // If so, treat the option as boolean true and add the filename back to the files list
+  const jsonOptionKeys = ['minifyCss', 'minifyJs', 'minifyUrls'];
+  for (const key of jsonOptionKeys) {
+    const value = programOptions[key];
+    if (typeof value === 'string' && /\.(html?|php|xml|svg|xhtml|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
+      // The option consumed a filename - inject it back
+      programOptions[key] = true;
+      capturedFiles.push(value);
+      filesProvided = true;
+    }
+  }
+
+  // Now read all files once
+  content = capturedFiles.map(readFile).join('');
 
   // Load and normalize config if `--config-file` was specified
   if (programOptions.configFile) {
@@ -576,17 +594,12 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     }
 
     if (programOptions.output) {
-      await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true }).catch((e) => {
-        fatal('Cannot create directory ' + path.dirname(programOptions.output) + '\n' + e.message);
-      });
-      await new Promise((resolve, reject) => {
-        const fileStream = fs.createWriteStream(programOptions.output)
-          .on('error', reject)
-          .on('finish', resolve);
-        fileStream.end(minified);
-        }).catch((e) => {
-        fatal('Cannot write ' + programOptions.output + '\n' + e.message);
-      });
+      try {
+        await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
+        await fs.promises.writeFile(programOptions.output, minified, { encoding: 'utf8' });
+      } catch (err) {
+        fatal('Cannot write ' + programOptions.output + '\n' + err.message);
+      }
       return;
     }
 
@@ -688,12 +701,16 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       }
     })();
   } else if (filesProvided) { // Minifying one or more files specified on the CMD line
-    writeMinify();
+    await writeMinify();
+    process.exit(0);
   } else { // Minifying input coming from STDIN
     content = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', function (data) {
       content += data;
-    }).on('end', writeMinify);
+    }).on('end', async function() {
+      await writeMinify();
+      process.exit(0);
+    });
   }
 })();
