@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added LRU memoization for class name sorting
 - Fine-tuned class cache
 
+### Internal
+
+- Adjusted HTML Minifier benchmarks settings (`sort*` settings do not change minification outcome itself) and re-ran benchmarks
+
 ## [4.11.1] - 2025-12-17
 
 ### Fixed
