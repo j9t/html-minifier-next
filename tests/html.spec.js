@@ -1213,6 +1213,18 @@ describe('HTML', () => {
     input = '<script type="importmap">{"imports":{}}</script>';
     output = '<script type="importmap">{"imports":{}}</script>';
     assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+
+    input = '<script type="application/problem+json">{"status":404}</script>';
+    output = '<script type="application/problem+json">{"status":404}</script>';
+    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+
+    input = '<script type="application/merge-patch+json">{"title":"New"}</script>';
+    output = '<script type="application/merge-patch+json">{"title":"New"}</script>';
+    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+
+    input = '<script type="application/json-patch+json">[{"op":"add"}]</script>';
+    output = '<script type="application/json-patch+json">[{"op":"add"}]</script>';
+    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
   });
 
   test('removing type="text/css" attributes', async () => {
@@ -3195,6 +3207,12 @@ describe('HTML', () => {
   test('JSON script minification for application/json-patch+json', async () => {
     const input = '<script type="application/json-patch+json">[\n  {\n    "op": "replace",\n    "path": "/title",\n    "value": "New"\n  }\n]</script>';
     const output = '<script type="application/json-patch+json">[{"op":"replace","path":"/title","value":"New"}]</script>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
+  test('JSON script minification for application/merge-patch+json (invalid/malformed)', async () => {
+    const input = '<script type="application/merge-patch+json">{"title": invalid value}\n</script>';
+    const output = '<script type="application/merge-patch+json">{"title": invalid value}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
