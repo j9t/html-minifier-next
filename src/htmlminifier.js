@@ -910,6 +910,9 @@ const jsonScriptTypes = new Set([
   'application/ld+json',
   'application/manifest+json',
   'application/vnd.geo+json',
+  'application/problem+json',
+  'application/merge-patch+json',
+  'application/json-patch+json',
   'importmap',
   'speculationrules',
 ]);

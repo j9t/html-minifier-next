@@ -343,9 +343,11 @@ html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 
 If you have chunks of markup you would like preserved, you can wrap them with `<!-- htmlmin:ignore -->`.
 
-### Minifying JSON-LD
+### Minifying JSON content
 
-You can minify `script` elements with JSON-LD by setting `{ processScripts: ['application/ld+json'] }`. Note that this minification is rudimentary; it’s mainly useful for removing newlines and excessive whitespace.
+JSON script types are minified automatically without configuration, including `application/json`, `application/ld+json`, `application/manifest+json`, `application/vnd.geo+json`, `application/problem+json`, `application/merge-patch+json`, `application/json-patch+json`, `importmap`, and `speculationrules`. Malformed JSON is preserved by default (with `continueOnMinifyError: true`).
+
+Note: The `processScripts` option is only for script types containing HTML templates (e.g., `text/ng-template`, `text/x-handlebars-template`), not for JSON.
 
 ### Preserving SVG and MathML elements
 

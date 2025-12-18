@@ -4,6 +4,21 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.2] - 2025-12-18
+
+### Added
+
+- Added automatic minification support for additional JSON MIME types:
+  - `application/problem+json` (RFC 7807 error responses)
+  - `application/merge-patch+json` (RFC 7396 merge patches)
+  - `application/json-patch+json` (RFC 6902 JSON patches)
+
+### Fixed
+
+- Fixed misleading documentation about JSON-LD minification
+  - Clarified that JSON script types are minified automatically without configuration
+  - Documented that `processScripts` is only for HTML template script types, not JSON
+
 ## [4.12.1] - 2025-12-18
 
 ### Fixed
@@ -102,7 +117,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Added `--ignore-dir` option to exclude directories from processing when using `--input-dir`
   - Accepts comma-separated directory patterns (e.g., `--ignore-dir=libs,vendor,node_modules`)
-  - Supports both directory name matching (e.g., `libs` matches any directory named "libs") and relative path matching (e.g., `static/libs` matches only that specific path)
+  - Supports both directory name matching (e.g., `libs` matches any directory named “libs”) and relative path matching (e.g., `static/libs` matches only that specific path)
   - Available in CLI and config files (`ignoreDir` property)
   - Config file supports both string (`"ignoreDir": "libs,vendor"`) and array (`"ignoreDir": ["libs", "vendor"]`) formats
   - CLI arguments override config file settings
