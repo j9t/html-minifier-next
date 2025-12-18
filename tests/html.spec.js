@@ -3180,6 +3180,36 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
+  test('JSON script minification for application/webmanifest', async () => {
+    const input = '<script type="application/webmanifest">{\n  "name": "PWA App",\n  "short_name": "App",\n  "start_url": "/"\n}</script>';
+    const output = '<script type="application/webmanifest">{"name":"PWA App","short_name":"App","start_url":"/"}</script>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
+  test('JSON script minification for application/feed+json', async () => {
+    const input = '<script type="application/feed+json">{\n  "version": "https://jsonfeed.org/version/1",\n  "title": "Feed"\n}</script>';
+    const output = '<script type="application/feed+json">{"version":"https://jsonfeed.org/version/1","title":"Feed"}</script>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
+  test('JSON script minification for application/problem+json', async () => {
+    const input = '<script type="application/problem+json">{\n  "type": "about:blank",\n  "status": 404\n}</script>';
+    const output = '<script type="application/problem+json">{"type":"about:blank","status":404}</script>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
+  test('JSON script minification for application/merge-patch+json', async () => {
+    const input = '<script type="application/merge-patch+json">{\n  "title": "New Title"\n}</script>';
+    const output = '<script type="application/merge-patch+json">{"title":"New Title"}</script>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
+  test('JSON script minification for application/json-patch+json', async () => {
+    const input = '<script type="application/json-patch+json">[\n  {\n    "op": "replace",\n    "path": "/title",\n    "value": "New"\n  }\n]</script>';
+    const output = '<script type="application/json-patch+json">[{"op":"replace","path":"/title","value":"New"}]</script>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
   test('JSON script minification for error handling', async () => {
     // Malformed JSON should be preserved with default `continueOnMinifyError: true`
     let input = '<script type="application/ld+json">{"foo:  "bar"}</script>';
