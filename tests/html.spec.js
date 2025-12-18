@@ -2304,6 +2304,11 @@ describe('HTML', () => {
     const mathOutput = '<div><math><mrow><mi>x</mi></mrow><mspace width="1em"/><mrow><mi>y</mi></mrow></math></div>';
     assert.strictEqual(await minify(mathInput, { collapseWhitespace: true, keepClosingSlash: false }), mathOutput);
 
+    // MathML case-sensitivity: Mixed-case elements and attributes should be preserved even with `caseSensitive: false`
+    const mathCaseInput = '<math><mRow><mI mathvariant="bold">x</mI></mRow></math>';
+    const mathCaseOutput = '<math><mRow><mI mathvariant="bold">x</mI></mRow></math>';
+    assert.strictEqual(await minify(mathCaseInput, { caseSensitive: false, collapseWhitespace: true }), mathCaseOutput);
+
     // Nested SVG elements should all preserve slashes
     const nestedInput = '<svg><g><path d="M 0 0"/><g><circle cx="5" cy="5" r="2"/></g></g></svg>';
     const nestedOutput = '<svg><g><path d="M 0 0"/><g><circle cx="5" cy="5" r="2"/></g></g></svg>';
