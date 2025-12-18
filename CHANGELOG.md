@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.1] - 2025-12-18
+
+### Fixed
+
+- Fixed MathML self-closing elements losing their closing slashes
+  - MathML elements now receive the same treatment as SVG elements, preserving case-sensitivity and self-closing slashes
+
 ## [4.12.0] - 2025-12-17
 
 ### Fixed
@@ -527,7 +534,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 ### Fixed
 
-- Fixed issue with `<tfoot>` and `<tbody>` elements breaking HTML structure in nested tables, by ensuring table element closing only occurs within the current table scope (addresses kangax/html-minifier#1163)
+- Fixed issue with `<tfoot>` and `<tbody>` elements breaking HTML structure in nested tables, by ensuring table element closing only occurs within the current table scope
 
 ## [2.1.4] - 2025-09-20
 
