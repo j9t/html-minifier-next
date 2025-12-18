@@ -347,9 +347,9 @@ If you have chunks of markup you would like preserved, you can wrap them with `<
 
 You can minify `script` elements with JSON-LD by setting `{ processScripts: ['application/ld+json'] }`. Note that this minification is rudimentary; it’s mainly useful for removing newlines and excessive whitespace.
 
-### Preserving SVG elements
+### Preserving SVG and MathML elements
 
-SVG elements are automatically recognized, and when they are minified, both case-sensitivity and closing-slashes are preserved, regardless of the minification settings used for the rest of the file.
+SVG and MathML elements are automatically recognized as foreign elements, and when they are minified, both case-sensitivity and self-closing slashes are preserved, regardless of the minification settings used for the rest of the file. This ensures valid output for these namespaced elements.
 
 ### Working with invalid or partial markup
 
