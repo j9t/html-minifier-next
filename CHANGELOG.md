@@ -9,8 +9,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 - Added automatic minification support for additional JSON MIME types:
-  - `application/webmanifest` (PWA manifests)
-  - `application/feed+json` (JSON Feed format)
   - `application/problem+json` (RFC 7807 error responses)
   - `application/merge-patch+json` (RFC 7396 merge patches)
   - `application/json-patch+json` (RFC 6902 JSON patches)
@@ -19,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Fixed misleading documentation about JSON-LD minification
   - Clarified that JSON script types are minified automatically without configuration
-  - Documented that `processScripts` is for HTML templates, not JSON
+  - Documented that `processScripts` is only for HTML template script types, not JSON
 
 ## [4.12.1] - 2025-12-18
 
