@@ -345,9 +345,9 @@ If you have chunks of markup you would like preserved, you can wrap them with `<
 
 ### Minifying JSON content
 
-JSON script types are minified automatically, including `application/json`, `application/ld+json`, `application/manifest+json`, `application/webmanifest`, `application/feed+json`, `application/problem+json`, `application/merge-patch+json`, `application/json-patch+json`, `importmap`, and `speculationrules`. Malformed JSON is preserved by default (with `continueOnMinifyError: true`).
+JSON script types are minified automatically without configuration, including `application/json`, `application/ld+json`, `application/manifest+json`, `application/webmanifest`, `application/feed+json`, `application/problem+json`, `application/merge-patch+json`, `application/json-patch+json`, `importmap`, and `speculationrules`. Malformed JSON is preserved by default (with `continueOnMinifyError: true`).
 
-The `processScripts` option is for script types containing HTML templates (e.g., `text/ng-template`, `text/x-handlebars-template`).
+Note: The `processScripts` option is only for script types containing HTML templates (e.g., `text/ng-template`, `text/x-handlebars-template`), not for JSON.
 
 ### Preserving SVG and MathML elements
 
