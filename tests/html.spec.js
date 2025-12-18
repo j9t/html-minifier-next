@@ -2293,6 +2293,33 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
+  test('SVG and MathML self-closing elements (kangax/html-minifier issue #1156)', async () => {
+    // SVG self-closing elements should preserve their slashes even when `keepClosingSlash` is false
+    const svgInput = '<div><img src="test.jpg"/><svg><path d="M 0 0"/><circle cx="5" cy="5" r="2"/></svg><br/></div>';
+    const svgOutput = '<div><img src="test.jpg"><svg><path d="M 0 0"/><circle cx="5" cy="5" r="2"/></svg><br></div>';
+    assert.strictEqual(await minify(svgInput, { collapseWhitespace: true, keepClosingSlash: false }), svgOutput);
+
+    // MathML self-closing elements should preserve their slashes even when `keepClosingSlash` is false
+    const mathInput = '<div><math><mrow><mi>x</mi></mrow><mspace width="1em"/><mrow><mi>y</mi></mrow></math></div>';
+    const mathOutput = '<div><math><mrow><mi>x</mi></mrow><mspace width="1em"/><mrow><mi>y</mi></mrow></math></div>';
+    assert.strictEqual(await minify(mathInput, { collapseWhitespace: true, keepClosingSlash: false }), mathOutput);
+
+    // MathML case-sensitivity: Mixed-case elements and attributes should be preserved even with `caseSensitive: false`
+    const mathCaseInput = '<math><mRow><mI mathvariant="bold">x</mI></mRow></math>';
+    const mathCaseOutput = '<math><mRow><mI mathvariant="bold">x</mI></mRow></math>';
+    assert.strictEqual(await minify(mathCaseInput, { caseSensitive: false, collapseWhitespace: true }), mathCaseOutput);
+
+    // Nested SVG elements should all preserve slashes
+    const nestedInput = '<svg><g><path d="M 0 0"/><g><circle cx="5" cy="5" r="2"/></g></g></svg>';
+    const nestedOutput = '<svg><g><path d="M 0 0"/><g><circle cx="5" cy="5" r="2"/></g></g></svg>';
+    assert.strictEqual(await minify(nestedInput, { collapseWhitespace: true }), nestedOutput);
+
+    // Various SVG void elements
+    const variousInput = '<svg><line x1="0" y1="0" x2="1" y2="1"/><rect x="0" y="0" width="10" height="10"/><use href="#x"/></svg>';
+    const variousOutput = '<svg><line x1="0" y1="0" x2="1" y2="1"/><rect x="0" y="0" width="10" height="10"/><use href="#x"/></svg>';
+    assert.strictEqual(await minify(variousInput, { collapseWhitespace: true }), variousOutput);
+  });
+
   test('nested quotes', async () => {
     const input = '<div data=\'{"test":"\\"test\\""}\'></div>';
     assert.strictEqual(await minify(input), input);
