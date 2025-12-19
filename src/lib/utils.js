@@ -68,7 +68,7 @@ function identityAsync(value) {
  * @param {Function} asyncFn - Async function to process each match
  * @returns {Promise<string>} Processed string
  */
-export async function replaceAsync(str, regex, asyncFn) {
+async function replaceAsync(str, regex, asyncFn) {
   const promises = [];
 
   str.replace(regex, (match, ...args) => {
@@ -87,3 +87,4 @@ export { LRU };
 export { uniqueId };
 export { identity };
 export { identityAsync };
+export { replaceAsync };
