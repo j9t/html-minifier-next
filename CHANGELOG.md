@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Internal
 
 - Refactored `htmlminifier.js` into modular architecture (`src/lib/*`)
+  - Refactored comments for brevity and consistency
 
 ## [4.12.2] - 2025-12-18
 

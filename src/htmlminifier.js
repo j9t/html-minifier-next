@@ -1,10 +1,12 @@
+// Imports
+
 import { decodeHTML } from 'entities';
 import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-// Import from lib modules
 import { LRU, identity, uniqueId } from './lib/utils.js';
+
 import {
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
@@ -18,6 +20,7 @@ import {
   trailingTags,
   pInlineTags
 } from './lib/constants.js';
+
 import {
   trimWhitespace,
   collapseWhitespaceAll,
@@ -26,6 +29,7 @@ import {
   canCollapseWhitespace,
   canTrimWhitespace
 } from './lib/whitespace.js';
+
 import {
   isConditionalComment,
   isIgnoredComment,
@@ -34,6 +38,7 @@ import {
   normalizeAttr,
   buildAttr
 } from './lib/attributes.js';
+
 import {
   canRemoveParentTag,
   isStartTagMandatory,
@@ -42,11 +47,13 @@ import {
   parseRemoveEmptyElementsExcept,
   shouldPreserveEmptyElement
 } from './lib/elements.js';
+
 import {
   cleanConditionalComment,
   hasJsonScriptType,
   processScript
 } from './lib/content.js';
+
 import { processOptions } from './lib/options.js';
 
 // Lazy-load heavy dependencies only when needed
@@ -68,6 +75,7 @@ async function getTerser() {
 }
 
 // Minification caches
+
 const cssMinifyCache = new LRU(200);
 const jsMinifyCache = new LRU(200);
 
@@ -524,8 +532,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     try {
       await parser.parse();
     } catch (err) {
-      // If parsing fails during analysis pass, just skip it—we’ll still have
-      // partial frequency data from what we could parse
+      // If parsing fails during analysis pass, just skip it—we’ll still have partial frequency data from what we could parse
       if (!options.continueOnParseError) {
         throw err;
       }
@@ -534,7 +541,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
 
   // For the first pass, create a copy of options and disable aggressive minification.
   // Keep attribute transformations (like `removeStyleLinkTypeAttributes`) for accurate analysis.
-  // This is safe because `createSortFns` is called before custom fragment UID markers (uidAttr) are added.
+  // This is safe because `createSortFns` is called before custom fragment UID markers (`uidAttr`) are added.
   // Note: `htmlmin:ignore` UID markers (uidIgnore) already exist and are expanded for analysis.
   const firstPassOptions = Object.assign({}, options, {
     // Disable sorting for the analysis pass
@@ -577,8 +584,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       uidReplacePattern.lastIndex = 0;
     }
 
-    // First pass minification applies attribute transformations
-    // like removeStyleLinkTypeAttributes for accurate frequency analysis
+    // First pass minification applies attribute transformations like `removeStyleLinkTypeAttributes` for accurate frequency analysis
     const firstPassOutput = await minifyHTML(expandedValue, firstPassOptions);
 
     // For frequency analysis, we need to remove custom fragments temporarily
@@ -709,10 +715,8 @@ async function minifyHTML(value, options, partialMarkup) {
     removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
   }
 
-  // Temporarily replace ignored chunks with comments,
-  // so that we don’t have to worry what’s there.
-  // For all we care there might be
-  // completely-horribly-broken-alien-non-html-emoj-cthulhu-filled content
+  // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there.
+  // For all we care there might be completely-horribly-broken-alien-non-html-emoj-cthulhu-filled content
   value = value.replace(/<!-- htmlmin:ignore -->([\s\S]*?)<!-- htmlmin:ignore -->/g, function (match, group1) {
     if (!uidIgnore) {
       uidIgnore = uniqueId(value);
@@ -995,7 +999,7 @@ async function minifyHTML(value, options, partialMarkup) {
         }
 
         if (!preserve) {
-          // Remove last “element” from buffer
+          // Remove last element from buffer
           removeStartTag();
           optionalStartTag = '';
           optionalEndTag = '';

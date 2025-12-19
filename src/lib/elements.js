@@ -1,10 +1,4 @@
-// ============================================================================
-// ELEMENTS - Tag/element rules and removal logic
-// ============================================================================
-
-// ----------------------------------------------------------------------------
-// IMPORTS
-// ----------------------------------------------------------------------------
+// Imports
 
 import {
   headerTags,
@@ -19,9 +13,7 @@ import {
 } from './constants.js';
 import { hasAttrName } from './attributes.js';
 
-// ----------------------------------------------------------------------------
-// TAG OMISSION RULES
-// ----------------------------------------------------------------------------
+// Tag omission rules
 
 function canRemoveParentTag(optionalStartTag, tag) {
   switch (optionalStartTag) {
@@ -85,9 +77,7 @@ function canRemovePrecedingTag(optionalEndTag, tag) {
   return false;
 }
 
-// ----------------------------------------------------------------------------
-// ELEMENT REMOVAL LOGIC
-// ----------------------------------------------------------------------------
+// Element removal logic
 
 function canRemoveElement(tag, attrs) {
   switch (tag) {
@@ -134,12 +124,12 @@ function parseElementSpec(str, options) {
     return null;
   }
 
-  // Simple tag name: “td”
+  // Simple tag name: `td`
   if (!/[<>]/.test(trimmed)) {
     return { tag: options.name(trimmed), attrs: null };
   }
 
-  // HTML-like markup: “<span aria-hidden='true'>” or “<td></td>”
+  // HTML-like markup: `<span aria-hidden='true'>` or `<td></td>`
   // Extract opening tag using regex
   const match = trimmed.match(/^<([a-zA-Z][\w:-]*)((?:\s+[^>]*)?)>/);
   if (!match) {
@@ -236,9 +226,7 @@ function shouldPreserveEmptyElement(tag, attrs, preserveList) {
   return false;
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// Exports
 
 export {
   // Tag omission

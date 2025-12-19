@@ -1,10 +1,4 @@
-// ============================================================================
-// OPTIONS - Options processing and normalization
-// ============================================================================
-
-// ----------------------------------------------------------------------------
-// IMPORTS
-// ----------------------------------------------------------------------------
+// Imports
 
 import RelateURL from 'relateurl';
 import { stableStringify, identity, identityAsync, replaceAsync } from './utils.js';
@@ -12,12 +6,7 @@ import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 
-// IMPORTANT: You'll need to import getLightningCSS and getTerser from htmlminifier.js
-// OR move those lazy-loading functions here
-
-// ----------------------------------------------------------------------------
-// HELPER FUNCTIONS
-// ----------------------------------------------------------------------------
+// Helper functions
 
 function shouldMinifyInnerHTML(options) {
   return Boolean(
@@ -30,9 +19,7 @@ function shouldMinifyInnerHTML(options) {
   );
 }
 
-// ----------------------------------------------------------------------------
-// MAIN OPTIONS PROCESSOR
-// ----------------------------------------------------------------------------
+// Main options processor
 
 /**
  * @param {Partial<MinifierOptions>} inputOptions - User-provided options
@@ -108,7 +95,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, cssMinifyCac
             }
           }
         );
-        // Cache key: wrapped content, type, options signature
+        // Cache key: Wrapped content, type, options signature
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
         // For large inputs, use length and content fingerprint (first/last 50 chars) to prevent collisions
@@ -257,9 +244,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, cssMinifyCac
   return options;
 };
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// Exports
 
 export {
   shouldMinifyInnerHTML,

@@ -6,7 +6,8 @@
  */
 
 /*
- * // Use like so:
+ * Use like so:
+ *
  * HTMLParser(htmlString, {
  *     start: function(tag, attrs, unary) {},
  *     end: function(tag) {},
@@ -25,11 +26,11 @@ class CaseInsensitiveSet extends Set {
 const singleAttrIdentifier = /([^\s"'<>/=]+)/;
 const singleAttrAssigns = [/=/];
 const singleAttrValues = [
-  // attr value double quotes
+  // Attr value double quotes
   /"([^"]*)"+/.source,
-  // attr value, single quotes
+  // Attr value, single quotes
   /'([^']*)'+/.source,
-  // attr value, no quotes
+  // Attr value, no quotes
   /([^ \t\n\f\r"'`=<>]+)/.source
 ];
 // https://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-QName
@@ -58,18 +59,17 @@ const empty = new CaseInsensitiveSet(['area', 'base', 'basefont', 'br', 'col', '
 // Inline elements
 const inline = new CaseInsensitiveSet(['a', 'abbr', 'acronym', 'applet', 'b', 'basefont', 'bdo', 'big', 'br', 'button', 'cite', 'code', 'del', 'dfn', 'em', 'font', 'i', 'iframe', 'img', 'input', 'ins', 'kbd', 'label', 'map', 'noscript', 'object', 'q', 's', 'samp', 'script', 'select', 'selectedcontent', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'svg', 'textarea', 'tt', 'u', 'var']);
 
-// Elements that you can, intentionally, leave open
-// (and which close themselves)
+// Elements that you can, intentionally, leave open (and which close themselves)
 const closeSelf = new CaseInsensitiveSet(['colgroup', 'dd', 'dt', 'li', 'option', 'p', 'td', 'tfoot', 'th', 'thead', 'tr', 'source']);
 
-// Attributes that have their values filled in disabled='disabled'
+// Attributes that have their values filled in `disabled='disabled'`
 const fillAttrs = new CaseInsensitiveSet(['checked', 'compact', 'declare', 'defer', 'disabled', 'ismap', 'multiple', 'nohref', 'noresize', 'noshade', 'nowrap', 'readonly', 'selected']);
 
 // Special elements (can contain anything)
 const special = new CaseInsensitiveSet(['script', 'style']);
 
-// HTML elements https://html.spec.whatwg.org/multipage/indices.html#elements-3
-// Phrasing Content https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
+// HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
+// Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
 const nonPhrasing = new CaseInsensitiveSet(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'col', 'colgroup', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'menuitem', 'meta', 'ol', 'optgroup', 'option', 'param', 'rp', 'rt', 'source', 'style', 'summary', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul']);
 
 const reCache = {};
@@ -191,7 +191,7 @@ export class HTMLParser {
 
             if (conditionalEnd >= 0) {
               if (handler.comment) {
-                await handler.comment(html.substring(2, conditionalEnd + 1), true /* non-standard */);
+                await handler.comment(html.substring(2, conditionalEnd + 1), true /* Non-standard */);
               }
               advance(conditionalEnd + 2);
               prevTag = '';
@@ -368,7 +368,7 @@ export class HTMLParser {
                     attr = [];
                     attr[0] = fullAttr;
                     attr[baseIndex] = manualMatch[1]; // Attribute name
-                    attr[baseIndex + 1] = '='; // customAssign (falls back to “=” for huge attributes)
+                    attr[baseIndex + 1] = '='; // `customAssign` (falls back to “=” for huge attributes)
                     const value = input.slice(manualMatch[0].length + 1, closeQuote);
                     // Place value at correct index based on quote type
                     if (quoteChar === '"') {

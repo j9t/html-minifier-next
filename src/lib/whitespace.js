@@ -1,10 +1,4 @@
-// ============================================================================
-// WHITESPACE - Whitespace collapsing and trimming logic
-// ============================================================================
-
-// ----------------------------------------------------------------------------
-// IMPORTS
-// ----------------------------------------------------------------------------
+// Imports
 
 import {
   RE_WS_START,
@@ -17,9 +11,7 @@ import {
   inlineElementsToKeepWhitespace
 } from './constants.js';
 
-// ----------------------------------------------------------------------------
-// Section: trimWhitespace function
-// ----------------------------------------------------------------------------
+// Trim whitespace
 
 const trimWhitespace = str => {
   if (!str) return str;
@@ -30,9 +22,7 @@ const trimWhitespace = str => {
   return str.replace(RE_WS_START, '').replace(RE_WS_END, '');
 };
 
-// ----------------------------------------------------------------------------
-// Section: collapseWhitespaceAll function
-// ----------------------------------------------------------------------------
+// Collapse all whitespace
 
 function collapseWhitespaceAll(str) {
   if (!str) return str;
@@ -46,9 +36,7 @@ function collapseWhitespaceAll(str) {
   });
 }
 
-// ----------------------------------------------------------------------------
-// Section: collapseWhitespace function
-// ----------------------------------------------------------------------------
+// Collapse whitespace with options
 
 function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   let lineBreakBefore = ''; let lineBreakAfter = '';
@@ -66,7 +54,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   }
 
   if (trimLeft) {
-    // Non-breaking space is specifically handled inside the replacer function here:
+    // Non-breaking space is specifically handled inside the replacer function
     str = str.replace(/^[ \n\r\t\f\xA0]+/, function (spaces) {
       const conservative = !lineBreakBefore && options.conservativeCollapse;
       if (conservative && spaces === '\t') {
@@ -77,7 +65,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   }
 
   if (trimRight) {
-    // Non-breaking space is specifically handled inside the replacer function here:
+    // Non-breaking space is specifically handled inside the replacer function
     str = str.replace(/[ \n\r\t\f\xA0]+$/, function (spaces) {
       const conservative = !lineBreakAfter && options.conservativeCollapse;
       if (conservative && spaces === '\t') {
@@ -95,9 +83,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   return lineBreakBefore + str + lineBreakAfter;
 }
 
-// ----------------------------------------------------------------------------
-// Section: collapseWhitespaceSmart function
-// ----------------------------------------------------------------------------
+// Collapse whitespace smartly based on surrounding tags
 
 function collapseWhitespaceSmart(str, prevTag, nextTag, options, inlineElements, inlineTextSet) {
   let trimLeft = prevTag && !inlineElementsToKeepWhitespace.has(prevTag);
@@ -111,9 +97,7 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, options, inlineElements,
   return collapseWhitespace(str, options, trimLeft, trimRight, prevTag && nextTag);
 }
 
-// ----------------------------------------------------------------------------
-// Section: canCollapseWhitespace and canTrimWhitespace predicates
-// ----------------------------------------------------------------------------
+// Collapse/trim whitespace for given tag
 
 function canCollapseWhitespace(tag) {
   return !/^(?:script|style|pre|textarea)$/.test(tag);
@@ -123,9 +107,7 @@ function canTrimWhitespace(tag) {
   return !/^(?:pre|textarea)$/.test(tag);
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// Exports
 
 export {
   trimWhitespace,

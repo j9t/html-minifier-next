@@ -1,12 +1,5 @@
-// ============================================================================
-// CONSTANTS - RegExp patterns, Sets, and constant values
-// ============================================================================
+// RegExp patterns (to avoid repeated allocations in hot paths)
 
-// ----------------------------------------------------------------------------
-// Section: Hoisted, reusable RegExp patterns
-// ----------------------------------------------------------------------------
-
-// Hoisted, reusable RegExp patterns and tiny helpers to avoid repeated allocations in hot paths
 const RE_WS_START = /^[ \n\r\t\f]+/;
 const RE_WS_END = /[ \n\r\t\f]+$/;
 const RE_ALL_WS_NBSP = /[ \n\r\t\f\xA0]+/g;
@@ -20,20 +13,18 @@ const RE_CAN_REMOVE_ATTR_QUOTES = /^[^ \t\n\f\r"'`=<>]+$/;
 const RE_TRAILING_SEMICOLON = /;$/;
 const RE_AMP_ENTITY = /&(#?[0-9a-zA-Z]+;)/g;
 
-// ----------------------------------------------------------------------------
-// Section: Inline element Sets for whitespace handling
-// ----------------------------------------------------------------------------
+// Inline element Sets for whitespace handling
 
 // Non-empty elements that will maintain whitespace around them
 const inlineElementsToKeepWhitespaceAround = new Set(['a', 'abbr', 'acronym', 'b', 'bdi', 'bdo', 'big', 'button', 'cite', 'code', 'del', 'dfn', 'em', 'font', 'i', 'img', 'input', 'ins', 'kbd', 'label', 'mark', 'math', 'meter', 'nobr', 'object', 'output', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'select', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'svg', 'textarea', 'time', 'tt', 'u', 'var', 'wbr']);
+
 // Non-empty elements that will maintain whitespace within them
 const inlineElementsToKeepWhitespaceWithin = new Set(['a', 'abbr', 'acronym', 'b', 'big', 'del', 'em', 'font', 'i', 'ins', 'kbd', 'mark', 'nobr', 's', 'samp', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'time', 'tt', 'u', 'var']);
+
 // Elements that will always maintain whitespace around them
 const inlineElementsToKeepWhitespace = new Set(['comment', 'img', 'input', 'wbr']);
 
-// ----------------------------------------------------------------------------
-// Section: Default attribute values
-// ----------------------------------------------------------------------------
+// Default attribute values
 
 // Default attribute values (could apply to any element)
 const generalDefaults = {
@@ -66,9 +57,7 @@ const tagDefaults = {
   track: { kind: 'subtitles' }
 };
 
-// ----------------------------------------------------------------------------
-// Section: Script MIME types
-// ----------------------------------------------------------------------------
+// Script MIME types
 
 // https://mathiasbynens.be/demo/javascript-mime-type
 // https://developer.mozilla.org/en/docs/Web/HTML/Element/script#attr-type
@@ -86,23 +75,17 @@ const keepScriptsMimetypes = new Set([
   'module'
 ]);
 
-// ----------------------------------------------------------------------------
-// Section: Boolean attribute Sets
-// ----------------------------------------------------------------------------
+// Boolean attribute Sets
 
 const isSimpleBoolean = new Set(['allowfullscreen', 'async', 'autofocus', 'autoplay', 'checked', 'compact', 'controls', 'declare', 'default', 'defaultchecked', 'defaultmuted', 'defaultselected', 'defer', 'disabled', 'enabled', 'formnovalidate', 'hidden', 'indeterminate', 'inert', 'ismap', 'itemscope', 'loop', 'multiple', 'muted', 'nohref', 'noresize', 'noshade', 'novalidate', 'nowrap', 'open', 'pauseonexit', 'readonly', 'required', 'reversed', 'scoped', 'seamless', 'selected', 'sortable', 'truespeed', 'typemustmatch', 'visible']);
 
 const isBooleanValue = new Set(['true', 'false']);
 
-// ----------------------------------------------------------------------------
-// Section: Srcset tags
-// ----------------------------------------------------------------------------
+// `srcset` tags
 
 const srcsetTags = new Set(['img', 'source']);
 
-// ----------------------------------------------------------------------------
-// Section: JSON script types
-// ----------------------------------------------------------------------------
+// JSON script types
 
 const jsonScriptTypes = new Set([
   'application/json',
@@ -116,9 +99,7 @@ const jsonScriptTypes = new Set([
   'speculationrules',
 ]);
 
-// ----------------------------------------------------------------------------
-// Section: Tag omission rules and element Sets
-// ----------------------------------------------------------------------------
+// Tag omission rules and element Sets
 
 // Tag omission rules from https://html.spec.whatwg.org/multipage/syntax.html#optional-tags with the following extensions:
 // - retain `<body>` if followed by `<noscript>`
@@ -159,23 +140,17 @@ const trailingTags = new Set(['dt', 'thead']);
 
 const htmlTags = new Set(['a', 'abbr', 'acronym', 'address', 'applet', 'area', 'article', 'aside', 'audio', 'b', 'base', 'basefont', 'bdi', 'bdo', 'bgsound', 'big', 'blink', 'blockquote', 'body', 'br', 'button', 'canvas', 'caption', 'center', 'cite', 'code', 'col', 'colgroup', 'command', 'content', 'data', 'datalist', 'dd', 'del', 'details', 'dfn', 'dialog', 'dir', 'div', 'dl', 'dt', 'element', 'em', 'embed', 'fieldset', 'figcaption', 'figure', 'font', 'footer', 'form', 'frame', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'i', 'iframe', 'image', 'img', 'input', 'ins', 'isindex', 'kbd', 'keygen', 'label', 'legend', 'li', 'link', 'listing', 'main', 'map', 'mark', 'marquee', 'menu', 'menuitem', 'meta', 'meter', 'multicol', 'nav', 'nobr', 'noembed', 'noframes', 'noscript', 'object', 'ol', 'optgroup', 'option', 'output', 'p', 'param', 'picture', 'plaintext', 'pre', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'script', 'search', 'section', 'select', 'selectedcontent', 'shadow', 'small', 'source', 'spacer', 'span', 'strike', 'strong', 'style', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'template', 'textarea', 'tfoot', 'th', 'thead', 'time', 'title', 'tr', 'track', 'tt', 'u', 'ul', 'var', 'video', 'wbr', 'xmp']);
 
-// ----------------------------------------------------------------------------
-// Section: Empty attribute regex
-// ----------------------------------------------------------------------------
+// Empty attribute regex
 
 const reEmptyAttribute = new RegExp(
   '^(?:class|id|style|title|lang|dir|on(?:focus|blur|change|click|dblclick|mouse(' +
   '?:down|up|over|move|out)|key(?:press|down|up)))$');
 
-// ----------------------------------------------------------------------------
-// Section: Special content tags
-// ----------------------------------------------------------------------------
+// Special content elements
 
 const specialContentTags = new Set(['script', 'style']);
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// Exports
 
 export {
   // RegExp patterns

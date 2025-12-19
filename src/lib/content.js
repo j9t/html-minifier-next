@@ -1,10 +1,4 @@
-// ============================================================================
-// CONTENT - Script and style content processing
-// ============================================================================
-
-// ----------------------------------------------------------------------------
-// IMPORTS
-// ----------------------------------------------------------------------------
+// Imports
 
 import {
   jsonScriptTypes
@@ -12,9 +6,7 @@ import {
 import { replaceAsync } from './utils.js';
 import { trimWhitespace } from './whitespace.js';
 
-// ----------------------------------------------------------------------------
-// CSS PROCESSING
-// ----------------------------------------------------------------------------
+// CSS processing
 
 // Wrap CSS declarations for inline styles and media queries
 // This ensures proper context for CSS minification
@@ -51,9 +43,7 @@ async function cleanConditionalComment(comment, options, minifyHTML) {
     : comment;
 }
 
-// ----------------------------------------------------------------------------
-// SCRIPT PROCESSING
-// ----------------------------------------------------------------------------
+// Script processing
 
 function minifyJson(text, options) {
   try {
@@ -100,9 +90,7 @@ async function processScript(text, options, currentAttrs, minifyHTML) {
   return text;
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// Exports
 
 export {
   // CSS

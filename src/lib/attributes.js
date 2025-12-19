@@ -1,10 +1,4 @@
-// ============================================================================
-// ATTRIBUTES - Attribute validation, cleaning, and processing
-// ============================================================================
-
-// ----------------------------------------------------------------------------
-// IMPORTS
-// ----------------------------------------------------------------------------
+// Imports
 
 import { decodeHTMLStrict } from 'entities';
 import {
@@ -24,9 +18,7 @@ import {
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
 
-// ----------------------------------------------------------------------------
-// VALIDATORS - Functions that check attribute properties
-// ----------------------------------------------------------------------------
+// Validators
 
 function isConditionalComment(text) {
   return RE_CONDITIONAL_COMMENT.test(text);
@@ -225,10 +217,7 @@ function hasAttrName(name, attrs) {
   return false;
 }
 
-
-// ----------------------------------------------------------------------------
-// CLEANERS - Functions that clean/transform attribute values
-// ----------------------------------------------------------------------------
+// Cleaners
 
 async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
   // Apply early whitespace normalization if enabled
@@ -301,9 +290,9 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     }))).join(', ');
   } else if (isMetaViewport(tag, attrs) && attrName === 'content') {
     attrValue = attrValue.replace(/\s+/g, '').replace(/[0-9]+\.[0-9]+/g, function (numString) {
-      // “0.90000” → “0.9”
-      // “1.0” → “1”
-      // “1.0001” → “1.0001” (unchanged)
+      // 0.90000 → 0.9
+      // 1.0 → 1
+      // 1.0001 → 1.0001 (unchanged)
       return (+numString).toString();
     });
   } else if (isContentSecurityPolicy(tag, attrs) && attrName.toLowerCase() === 'content') {
@@ -316,7 +305,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     attrValue = trimWhitespace(attrValue);
     return options.minifyCSS(attrValue, 'media');
   } else if (tag === 'iframe' && attrName === 'srcdoc') {
-    // Recursively minify HTML content within srcdoc attribute
+    // Recursively minify HTML content within `srcdoc` attribute
     // Fast-path: Skip if nothing would change
     if (!shouldMinifyInnerHTML(options)) {
       return attrValue;
@@ -397,7 +386,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       }
     } else {
       // `preventAttributesEscaping` mode: choose safe quotes but don’t escape
-      // EXCEPT when both quote types are present—then escape to prevent invalid HTML
+      // except when both quote types are present—then escape to prevent invalid HTML
       const hasDoubleQuote = attrValue.indexOf('"') !== -1;
       const hasSingleQuote = attrValue.indexOf("'") !== -1;
 
@@ -465,9 +454,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   return attr.customOpen + attrFragment + attr.customClose;
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// Exports
 
 export {
   // Validators

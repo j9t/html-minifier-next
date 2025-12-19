@@ -1,12 +1,5 @@
-// ============================================================================
-// UTILS - Core utility functions and classes
-// ============================================================================
+// Stringify for options signatures (sorted keys, shallow, nested objects)
 
-// ----------------------------------------------------------------------------
-// Section: Tiny stable stringify for options signatures
-// ----------------------------------------------------------------------------
-
-// Tiny stable stringify for options signatures (sorted keys, shallow, nested objects)
 function stableStringify(obj) {
   if (obj == null || typeof obj !== 'object') return JSON.stringify(obj);
   if (Array.isArray(obj)) return '[' + obj.map(stableStringify).join(',') + ']';
@@ -19,11 +12,8 @@ function stableStringify(obj) {
   return out + '}';
 }
 
-// ----------------------------------------------------------------------------
-// Section: Minimal LRU cache for strings and promises
-// ----------------------------------------------------------------------------
+// LRU cache for strings and promises
 
-// Minimal LRU cache for strings and promises
 class LRU {
   constructor(limit = 200) {
     this.limit = limit;
@@ -48,9 +38,7 @@ class LRU {
   delete(key) { this.map.delete(key); }
 }
 
-// ----------------------------------------------------------------------------
-// Section: function uniqueId(value)
-// ----------------------------------------------------------------------------
+// Unique ID generator
 
 function uniqueId(value) {
   let id;
@@ -60,9 +48,7 @@ function uniqueId(value) {
   return id;
 }
 
-// ----------------------------------------------------------------------------
-// Section: identity functions
-// ----------------------------------------------------------------------------
+// Identity functions
 
 function identity(value) {
   return value;
@@ -72,9 +58,7 @@ function identityAsync(value) {
   return Promise.resolve(value);
 }
 
-// ----------------------------------------------------------------------------
-// Section: replaceAsync function
-// ----------------------------------------------------------------------------
+// Replace async helper
 
 /**
  * Asynchronously replace matches in a string
@@ -95,9 +79,7 @@ export async function replaceAsync(str, regex, asyncFn) {
   return str.replace(regex, () => data.shift());
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
+// Exports
 
 export { stableStringify };
 export { LRU };
