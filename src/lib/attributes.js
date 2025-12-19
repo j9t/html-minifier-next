@@ -386,7 +386,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   let emittedAttrValue;
 
   if (typeof attrValue !== 'undefined' && (!options.removeAttributeQuotes ||
-    ~attrValue.indexOf(uidAttr) || !canRemoveAttributeQuotes(attrValue))) {
+    attrValue.indexOf(uidAttr) !== -1 || !canRemoveAttributeQuotes(attrValue))) {
     // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
       // Normal mode: choose quotes and escape
