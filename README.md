@@ -237,33 +237,33 @@ How does HTML Minifier Next compare to other minifiers? (All with the most aggre
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **49** | 50 | 51 | 52 | 51 | 54 | 52 |
 | [Apple](https://www.apple.com/) | 266 | **207** | **207** | 236 | 239 | 240 | 242 | 243 |
-| [BBC](https://www.bbc.co.uk/) | 739 | **675** | 685 | 695 | 695 | 697 | 733 | n/a |
-| [CERN](https://home.cern/) | 156 | **87** | **87** | 95 | 95 | 95 | 97 | 100 |
-| [CSS-Tricks](https://css-tricks.com/) | 161 | 121 | **119** | 127 | 142 | 142 | 147 | 144 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7238 | **6341** | **6341** | 6561 | 6444 | 6567 | 6614 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 748 | **681** | 691 | 704 | 704 | 706 | 742 | n/a |
+| [CERN](https://home.cern/) | 152 | 85 | **84** | 91 | 91 | 91 | 93 | 96 |
+| [CSS-Tricks](https://css-tricks.com/) | 162 | 121 | **120** | 127 | 143 | 143 | 148 | 145 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6352** | **6352** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 60 | 70 | 70 | 71 | 75 | 73 |
-| [EFF](https://www.eff.org/) | 55 | **47** | **47** | 50 | 48 | 49 | 50 | 50 |
+| [EFF](https://www.eff.org/) | 55 | **47** | **47** | 49 | 48 | 49 | 50 | 50 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1543 | 1436 | 1441 | **1383** | 1468 | 1479 | 1490 | n/a |
-| [French Tech](https://lafrenchtech.gouv.fr/) | 152 | **121** | 122 | 125 | 125 | 125 | 132 | 126 |
-| [Frontend Dogma](https://frontenddogma.com/) | 223 | **213** | 215 | 236 | 221 | 223 | 241 | 222 |
+| [FAZ](https://www.faz.net/aktuell/) | 1566 | 1459 | 1464 | **1404** | 1490 | 1502 | 1513 | n/a |
+| [French Tech](https://lafrenchtech.gouv.fr/) | 152 | **122** | **122** | 126 | 125 | 125 | 132 | 127 |
+| [Frontend Dogma](https://frontenddogma.com/) | 223 | **214** | 216 | 237 | 222 | 223 | 242 | 223 |
 | [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | **17** | **17** | 18 | 18 |
-| [Ground News](https://ground.news/) | 1437 | **1222** | 1225 | 1320 | 1346 | 1353 | 1424 | n/a |
+| [Ground News](https://ground.news/) | 2165 | **1895** | 1898 | 1994 | 2020 | 2022 | 2151 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | **147** | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 50 | **34** | **34** | 36 | 36 | 36 | 37 | 37 |
-| [Leanpub](https://leanpub.com/) | 1288 | **1092** | **1092** | 1099 | 1097 | 1094 | 1283 | n/a |
-| [Mastodon](https://mastodon.social/explore) | 37 | **27** | **27** | 32 | 34 | 35 | 35 | 35 |
-| [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | **62** | 64 | 65 | 65 | 68 | 68 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 223 | **196** | **196** | 203 | 201 | 200 | 202 | 203 |
-| [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 74 | 74 | **55** | 74 | 75 | 77 | 76 |
-| [SitePoint](https://www.sitepoint.com/) | 485 | **354** | **354** | 425 | 459 | 464 | 481 | n/a |
-| [TetraLogical](https://tetralogical.com/) | 44 | 38 | 38 | **35** | 38 | 38 | 39 | 39 |
+| [Leanpub](https://leanpub.com/) | 1548 | **1298** | **1298** | 1305 | 1304 | 1300 | 1543 | n/a |
+| [Mastodon](https://mastodon.social/explore) | 37 | **28** | **28** | 32 | 35 | 35 | 36 | 36 |
+| [MDN](https://developer.mozilla.org/en-US/) | 106 | **60** | **60** | 62 | 63 | 64 | 66 | 66 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 222 | **195** | **195** | 202 | 200 | 200 | 201 | 202 |
+| [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 73 | 74 | **55** | 74 | 75 | 76 | 76 |
+| [SitePoint](https://www.sitepoint.com/) | 493 | **362** | **362** | 434 | 467 | 472 | 490 | n/a |
+| [TetraLogical](https://tetralogical.com/) | 44 | 38 | 38 | **35** | 38 | 39 | 39 | 39 |
 | [TPGi](https://www.tpgi.com/) | 175 | **160** | 161 | **160** | 164 | 166 | 172 | 172 |
-| [United Nations](https://www.un.org/en/) | 150 | **112** | 113 | 120 | 124 | 124 | 129 | 122 |
-| [W3C](https://www.w3.org/) | 50 | **35** | 36 | 38 | 38 | 38 | 40 | 38 |
-| **Average processing time** |  | 306 ms (26/26) | 364 ms (26/26) | 162 ms (26/26) | 55 ms (26/26) | **16 ms (26/26)** | 316 ms (26/26) | 1439 ms (20/26) |
+| [United Nations](https://www.un.org/en/) | 152 | **113** | 115 | 122 | 125 | 125 | 131 | 124 |
+| [W3C](https://www.w3.org/) | 50 | **36** | **36** | 39 | 38 | 38 | 41 | 39 |
+| **Average processing time** |  | 319 ms (26/26) | 371 ms (26/26) | 177 ms (26/26) | 60 ms (26/26) | **16 ms (26/26)** | 320 ms (26/26) | 1487 ms (20/26) |
 
-(Last updated: Dec 17, 2025)
+(Last updated: Dec 19, 2025)
 <!-- End auto-generated -->
 
 ## Examples
