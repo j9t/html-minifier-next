@@ -317,6 +317,26 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
   return attrValue;
 }
 
+/**
+ * Choose appropriate quote character for an attribute value
+ * @param {string} attrValue - The attribute value
+ * @param {Object} options - Minifier options
+ * @returns {string} The chosen quote character (`"` or `'`)
+ */
+function chooseAttributeQuote(attrValue, options) {
+  if (typeof options.quoteCharacter !== 'undefined') {
+    return options.quoteCharacter === '\'' ? '\'' : '"';
+  }
+
+  // Count quotes in a single pass
+  let apos = 0, quot = 0;
+  for (let i = 0; i < attrValue.length; i++) {
+    if (attrValue[i] === "'") apos++;
+    else if (attrValue[i] === '"') quot++;
+  }
+  return apos < quot ? '\'' : '"';
+}
+
 async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   const attrName = options.name(attr.name);
   let attrValue = attr.value;
@@ -370,24 +390,14 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
       // Normal mode: choose quotes and escape
-      if (typeof options.quoteCharacter === 'undefined') {
-        // Count quotes in a single pass instead of two regex operations
-        let apos = 0, quot = 0;
-        for (let i = 0; i < attrValue.length; i++) {
-          if (attrValue[i] === "'") apos++;
-          else if (attrValue[i] === '"') quot++;
-        }
-        attrQuote = apos < quot ? '\'' : '"';
-      } else {
-        attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
-      }
+      attrQuote = chooseAttributeQuote(attrValue, options);
       if (attrQuote === '"') {
         attrValue = attrValue.replace(/"/g, '&#34;');
       } else {
         attrValue = attrValue.replace(/'/g, '&#39;');
       }
     } else {
-      // `preventAttributesEscaping` mode: choose safe quotes but don’t escape
+      // `preventAttributesEscaping` mode: choose safe quotes but don't escape
       // except when both quote types are present—then escape to prevent invalid HTML
       const hasDoubleQuote = attrValue.indexOf('"') !== -1;
       const hasSingleQuote = attrValue.indexOf("'") !== -1;
@@ -395,16 +405,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       if (hasDoubleQuote && hasSingleQuote) {
         // Both quote types present: `preventAttributesEscaping` is ignored to ensure valid HTML
         // Choose the quote type with fewer occurrences and escape the other
-        if (typeof options.quoteCharacter === 'undefined') {
-          let apos = 0, quot = 0;
-          for (let i = 0; i < attrValue.length; i++) {
-            if (attrValue[i] === "'") apos++;
-            else if (attrValue[i] === '"') quot++;
-          }
-          attrQuote = apos < quot ? '\'' : '"';
-        } else {
-          attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
-        }
+        attrQuote = chooseAttributeQuote(attrValue, options);
         if (attrQuote === '"') {
           attrValue = attrValue.replace(/"/g, '&#34;');
         } else {
