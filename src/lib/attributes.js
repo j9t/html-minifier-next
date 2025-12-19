@@ -402,30 +402,28 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       const hasDoubleQuote = attrValue.indexOf('"') !== -1;
       const hasSingleQuote = attrValue.indexOf("'") !== -1;
 
+      // Both quote types present: Escaping is required to guarantee valid HTML delimiter matching
       if (hasDoubleQuote && hasSingleQuote) {
-        // Both quote types present: `preventAttributesEscaping` is ignored to ensure valid HTML
-        // Choose the quote type with fewer occurrences and escape the other
         attrQuote = chooseAttributeQuote(attrValue, options);
         if (attrQuote === '"') {
           attrValue = attrValue.replace(/"/g, '&#34;');
         } else {
           attrValue = attrValue.replace(/'/g, '&#39;');
         }
+      // Auto quote selection: Prefer the opposite quote type when value contains one quote type, default to double quotes when none present
       } else if (typeof options.quoteCharacter === 'undefined') {
-        // Single or no quote type: Choose safe quote delimiter
         if (attrQuote === '"' && hasDoubleQuote && !hasSingleQuote) {
           attrQuote = "'";
         } else if (attrQuote === "'" && hasSingleQuote && !hasDoubleQuote) {
           attrQuote = '"';
+        // Fallback for invalid/unsupported attrQuote values (not `"`, `'`, or empty string): Choose safe default based on value content
         } else if (attrQuote !== '"' && attrQuote !== "'" && attrQuote !== '') {
-          // `attrQuote` is invalid/undefined (not `"`, `'`, or empty string)
-          // Set a safe default based on the value’s content
           if (hasSingleQuote && !hasDoubleQuote) {
-            attrQuote = '"'; // Value has single quotes, use double quotes as delimiter
+            attrQuote = '"';
           } else if (hasDoubleQuote && !hasSingleQuote) {
-            attrQuote = "'"; // Value has double quotes, use single quotes as delimiter
+            attrQuote = "'";
           } else {
-            attrQuote = '"'; // No quotes in value, default to double quotes
+            attrQuote = '"';
           }
         }
       } else {
