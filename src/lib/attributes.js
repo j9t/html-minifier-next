@@ -267,7 +267,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     return attrValue;
   } else if (isSrcset(attrName, tag)) {
     // https://html.spec.whatwg.org/multipage/embedded-content.html#attr-img-srcset
-    attrValue = (await Promise.all(trimWhitespace(attrValue).split(/\s+,\s*|\s*,\s+/).map(async function (candidate) {
+    attrValue = (await Promise.all(trimWhitespace(attrValue).split(/\s*,\s*/).map(async function (candidate) {
       let url = candidate;
       let descriptor = '';
       const match = candidate.match(/\s+([1-9][0-9]*w|[0-9]+(?:\.[0-9]+)?x)$/);
