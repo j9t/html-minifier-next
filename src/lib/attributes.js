@@ -184,6 +184,7 @@ function isMetaViewport(tag, attrs) {
       return true;
     }
   }
+  return false;
 }
 
 function isContentSecurityPolicy(tag, attrs) {
@@ -195,6 +196,7 @@ function isContentSecurityPolicy(tag, attrs) {
       return true;
     }
   }
+  return false;
 }
 
 function canDeleteEmptyAttribute(tag, attrName, attrValue, options) {
