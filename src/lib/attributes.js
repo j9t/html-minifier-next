@@ -230,7 +230,15 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
 
   if (isEventAttribute(attrName, options)) {
     attrValue = trimWhitespace(attrValue).replace(/^javascript:\s*/i, '');
-    return options.minifyJS(attrValue, true);
+    try {
+      return await options.minifyJS(attrValue, true);
+    } catch (err) {
+      if (!options.continueOnMinifyError) {
+        throw err;
+      }
+      options.log && options.log(err);
+      return attrValue;
+    }
   } else if (attrName === 'class') {
     attrValue = trimWhitespace(attrValue);
     if (options.sortClassName) {
@@ -262,7 +270,14 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
       if (attrValue.endsWith(';') && !/&#?[0-9a-zA-Z]+;$/.test(attrValue)) {
         attrValue = attrValue.replace(/\s*;$/, ';');
       }
-      attrValue = await options.minifyCSS(attrValue, 'inline');
+      try {
+        attrValue = await options.minifyCSS(attrValue, 'inline');
+      } catch (err) {
+        if (!options.continueOnMinifyError) {
+          throw err;
+        }
+        options.log && options.log(err);
+      }
     }
     return attrValue;
   } else if (isSrcset(attrName, tag)) {
@@ -305,7 +320,15 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     attrValue = trimWhitespace(attrValue.replace(/\s*;\s*/g, ';'));
   } else if (isMediaQuery(tag, attrs, attrName)) {
     attrValue = trimWhitespace(attrValue);
-    return options.minifyCSS(attrValue, 'media');
+    try {
+      return await options.minifyCSS(attrValue, 'media');
+    } catch (err) {
+      if (!options.continueOnMinifyError) {
+        throw err;
+      }
+      options.log && options.log(err);
+      return attrValue;
+    }
   } else if (tag === 'iframe' && attrName === 'srcdoc') {
     // Recursively minify HTML content within `srcdoc` attribute
     // Fast-path: Skip if nothing would change
