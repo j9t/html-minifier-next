@@ -444,7 +444,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   }
 
   if (typeof attrValue === 'undefined' || (options.collapseBooleanAttributes &&
-    isBooleanAttribute(attrName.toLowerCase(), attrValue.toLowerCase()))) {
+    isBooleanAttribute(attrName.toLowerCase(), (attrValue || '').toLowerCase()))) {
     attrFragment = attrName;
     if (!isLast) {
       attrFragment += ' ';
