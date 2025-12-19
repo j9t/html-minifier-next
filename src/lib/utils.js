@@ -20,12 +20,13 @@ class LRU {
     this.map = new Map();
   }
   get(key) {
-    const v = this.map.get(key);
-    if (v !== undefined) {
+    if (this.map.has(key)) {
+      const v = this.map.get(key);
       this.map.delete(key);
       this.map.set(key, v);
+      return v;
     }
-    return v;
+    return undefined;
   }
   set(key, value) {
     if (this.map.has(key)) this.map.delete(key);
