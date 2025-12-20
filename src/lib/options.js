@@ -232,7 +232,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
                 mangle: true,
                 ...swcOptions, // User options override defaults
               });
-              return result.code;
+              return result.code.replace(RE_TRAILING_SEMICOLON, '');
             }
             throw new Error(`Unknown JS minifier engine: ${useEngine}`);
           })();
