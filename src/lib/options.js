@@ -175,6 +175,16 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       // SWC options (when engine is `swc`)
       const swcOptions = engine === 'swc' ? engineOptions : {};
 
+      // Pre-compute option signatures once for performance (avoid repeated stringification)
+      const terserSig = stableStringify({
+        ...terserOptions,
+        cont: !!options.continueOnMinifyError
+      });
+      const swcSig = stableStringify({
+        ...swcOptions,
+        cont: !!options.continueOnMinifyError
+      });
+
       options.minifyJS = async function (text, inline) {
         const start = text.match(/^\s*<!--.*/);
         const code = start ? text.slice(start[0].length).replace(/\n\s*-->\s*$/, '') : text;
@@ -190,23 +200,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
 
         let jsKey;
         try {
-          // Build cache key including engine
-          const optsSig = useEngine === 'terser'
-            ? stableStringify({
-              compress: terserOptions.compress,
-              mangle: terserOptions.mangle,
-              ecma: terserOptions.ecma,
-              toplevel: terserOptions.toplevel,
-              module: terserOptions.module,
-              keep_fnames: terserOptions.keep_fnames,
-              format: terserOptions.format,
-              cont: !!options.continueOnMinifyError,
-            })
-            : stableStringify({
-              compress: swcOptions.compress,
-              mangle: swcOptions.mangle,
-              cont: !!options.continueOnMinifyError,
-            });
+          // Select pre-computed signature based on engine
+          const optsSig = useEngine === 'terser' ? terserSig : swcSig;
 
           // For large inputs, use length and content fingerprint to prevent collisions
           jsKey = (code.length > 2048 ? (code.length + '|' + code.slice(0, 50) + code.slice(-50) + '|') : (code + '|'))
