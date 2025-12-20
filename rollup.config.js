@@ -34,7 +34,7 @@ const browserBundlePlugins = [
 
 const config = defineConfig([
   // ESM bundle for browser demo (GitHub Pages)
-  // Bundles all dependencies except lightningcss (which requires Node.js native bindings)
+  // Bundles all dependencies except those requiring Node.js native bindings
   // Used by: demo/main.js
   {
     input: 'src/htmlminifier.js',
@@ -43,7 +43,7 @@ const config = defineConfig([
       format: 'es',
       inlineDynamicImports: true
     },
-    external: ['lightningcss'],
+    external: ['lightningcss', '@swc/core'],
     plugins: browserBundlePlugins,
     onwarn
   },
@@ -58,7 +58,7 @@ const config = defineConfig([
       exports: 'named',
       inlineDynamicImports: true
     },
-    external: ['lightningcss', 'terser', 'entities', 'relateurl'],
+    external: ['lightningcss', 'terser', 'entities', 'relateurl', '@swc/core'],
     onwarn
   }
 ]);
