@@ -228,9 +228,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
               const swc = await getSwc();
               // `swc.minify()` takes compress and mangle directly as options
               const result = await swc.minify(code, {
-                compress: swcOptions.compress !== undefined ? swcOptions.compress : true,
-                mangle: swcOptions.mangle !== undefined ? swcOptions.mangle : true,
-                ...swcOptions,
+                compress: true,
+                mangle: true,
+                ...swcOptions, // User options override defaults
               });
               return result.code;
             }
