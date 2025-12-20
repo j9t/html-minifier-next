@@ -220,9 +220,16 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
           const inFlight = (async () => {
             // Dispatch to appropriate minifier
             if (useEngine === 'terser') {
-              terserOptions.parse.bare_returns = inline;
+              // Create a copy to avoid mutating shared `terserOptions` (race condition)
+              const terserCallOptions = {
+                ...terserOptions,
+                parse: {
+                  ...terserOptions.parse,
+                  bare_returns: inline
+                }
+              };
               const terser = await getTerser();
-              const result = await terser(code, terserOptions);
+              const result = await terser(code, terserCallOptions);
               return result.code.replace(RE_TRAILING_SEMICOLON, '');
             } else if (useEngine === 'swc') {
               const swc = await getSwc();
