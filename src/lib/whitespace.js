@@ -30,9 +30,15 @@ function collapseWhitespaceAll(str) {
   if (!/[ \n\r\t\f\xA0]/.test(str)) {
     return str;
   }
-  // Non-breaking space is specifically handled inside the replacer function here:
+  // No-break space is specifically handled inside the replacer function here:
   return str.replace(RE_ALL_WS_NBSP, function (spaces) {
-    return spaces === '\t' ? '\t' : spaces.replace(RE_NBSP_LEADING_GROUP, '$1 ');
+    // Preserve standalone tabs
+    if (spaces === '\t') return '\t';
+    // Fast path: No no-break space, common case—just collapse to single space
+    // This avoids the nested regex for the majority of cases
+    if (spaces.indexOf('\xA0') === -1) return ' ';
+    // For no-break space handling, use the original regex approach
+    return spaces.replace(RE_NBSP_LEADING_GROUP, '$1 ');
   });
 }
 
@@ -42,6 +48,16 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   let lineBreakBefore = ''; let lineBreakAfter = '';
 
   if (!str) return str;
+
+  // Fast path: Nothing to do
+  if (!trimLeft && !trimRight && !collapseAll && !options.preserveLineBreaks) {
+    return str;
+  }
+
+  // Fast path: No whitespace at all
+  if (!/[ \n\r\t\f\xA0]/.test(str)) {
+    return str;
+  }
 
   if (options.preserveLineBreaks) {
     str = str.replace(/^[ \n\r\t\f]*?[\n\r][ \n\r\t\f]*/, function () {
@@ -80,6 +96,10 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
     str = collapseWhitespaceAll(str);
   }
 
+  // Avoid string concatenation when no line breaks (common case)
+  if (!lineBreakBefore && !lineBreakAfter) return str;
+  if (!lineBreakBefore) return str + lineBreakAfter;
+  if (!lineBreakAfter) return lineBreakBefore + str;
   return lineBreakBefore + str + lineBreakAfter;
 }
 

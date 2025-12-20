@@ -60,7 +60,7 @@ class TokenChain {
     const sorter = new Sorter();
     sorter.sorterMap = new Map();
 
-    // Convert Map entries to array and sort
+    // Convert Map entries to array and sort by frequency (descending) then alphabetically
     const entries = Array.from(this.map.entries()).sort((a, b) => {
       const m = a[1].arrays.length;
       const n = b[1].arrays.length;

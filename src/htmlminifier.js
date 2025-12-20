@@ -605,16 +605,30 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     for (const tag in attrChains) {
       attrSorters[tag] = attrChains[tag].createSorter();
     }
+    // Memoize sorted attribute orders—attribute sets often repeat in templates
+    const attrOrderCache = new LRU(200);
+
     options.sortAttributes = function (tag, attrs) {
       const sorter = attrSorters[tag];
       if (sorter) {
-        const attrMap = Object.create(null);
         const names = attrNames(attrs);
+
+        // Create order-independent cache key from tag and sorted attribute names
+        const cacheKey = tag + ':' + names.slice().sort().join(',');
+        let sortedNames = attrOrderCache.get(cacheKey);
+
+        if (sortedNames === undefined) {
+          // Only sort if not in cache—need to clone names since sort mutates in place
+          sortedNames = sorter.sort(names.slice());
+          attrOrderCache.set(cacheKey, sortedNames);
+        }
+
+        // Apply the sorted order to attrs
+        const attrMap = Object.create(null);
         names.forEach(function (name, index) {
           (attrMap[name] || (attrMap[name] = [])).push(attrs[index]);
         });
-        const sorted = sorter.sort(names);
-        sorted.forEach(function (name, index) {
+        sortedNames.forEach(function (name, index) {
           attrs[index] = attrMap[name].shift();
         });
       }
