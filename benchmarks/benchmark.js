@@ -171,7 +171,7 @@ function generateMarkdownTable() {
   const headers = [
     'Site',
     'Original Size (KB)',
-    '[HTML Minifier Next](https://github.com/j9t/html-minifier-next)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next)',
+    '[HTML Minifier Next](https://github.com/j9t/html-minifier-next) (with [SWC](https://swc.rs/))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next)',
     '[HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)](https://socket.dev/npm/package/html-minifier-terser)',
     '[htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano)',
     '[@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html)',
@@ -442,7 +442,7 @@ async function processFile(fileName) {
     async function testHTMLMinifierTerser() {
       const info = infos.minifierterser;
       info.startTime = Date.now();
-      const configPath = path.join(__dirname, 'html-minifier.json');
+      const configPath = path.join(__dirname, 'html-minifier-terser.json');
       // Pass site URL via CLI (not config) since each test uses a different base URL
       const args = [filePath, '-c', configPath, '--minify-urls', site, '-o', info.filePath];
 
