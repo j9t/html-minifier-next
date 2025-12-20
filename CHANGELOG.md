@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Performance
 
 - Improved `sortAttributes` performance with LRU caching
+- Optimized `collapseWhitespace` with fast-path checks
 
 ## [4.12.3] - 2025-12-19
 
