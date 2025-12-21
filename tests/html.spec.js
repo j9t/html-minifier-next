@@ -1107,6 +1107,7 @@ describe('HTML', () => {
     const input = '<!DOCTYPE html>\n' +
       '<html dir=ltr>\n' +
       '\t<title>Attribute Value Defaults</title>\n' +
+      '\t<link rel=stylesheet href=example.css media=all>\n' +
       '\t<style media=all></style>\n' +
       '\t<form autocorrect=on>\n' +
       '\t\t<button type=submit>Example</button>\n' +
@@ -1127,6 +1128,7 @@ describe('HTML', () => {
     const expected = '<!DOCTYPE html>\n' +
       '<html>\n' +
       '\t<title>Attribute Value Defaults</title>\n' +
+      '\t<link rel=stylesheet href=example.css>\n' +
       '\t<style></style>\n' +
       '\t<form>\n' +
       '\t\t<button>Example</button>\n' +
@@ -1151,6 +1153,57 @@ describe('HTML', () => {
     const input = '<html dir=ltr>';
     const output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, removeRedundantAttributes: true }), output);
+  });
+
+  test('media="all" attribute removal and CSS minification', async () => {
+    // Regression test for issue where `media="all"` was corrupted to `media="a{top:0}"` when `minifyCSS` was enabled
+    const input = '<html><head>' +
+      '<link rel="stylesheet" href="style.css" media="all">' +
+      '<meta name="theme-color" content="#fff" media="all">' +
+      '<style media="all">a { top: 0 }</style>' +
+      '</head><body>' +
+      '<video><source src="video.mp4" media="all"></video>' +
+      '</body></html>';
+    const expected = '<html><head>' +
+      '<link rel=stylesheet href=style.css>' +
+      '<meta name=theme-color content=#fff>' +
+      '<style>a{top:0}</style>' +
+      '</head><body>' +
+      '<video><source src=video.mp4></video>' +
+      '</body></html>';
+    assert.strictEqual(
+      await minify(input, {
+        removeRedundantAttributes: true,
+        removeAttributeQuotes: true,
+        minifyCSS: true
+      }),
+      expected
+    );
+  });
+
+  test('media types vs. media queries minification', async () => {
+    // Simple media types (`all`, `screen`, `print`) should not be minified
+    // Only actual media queries with features should be minified
+    let input, output;
+
+    // Simple media types—no minification
+    input = '<link rel="stylesheet" href="a.css" media="screen">';
+    output = '<link rel=stylesheet href=a.css media=screen>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, minifyCSS: true }), output);
+
+    input = '<style media="print">body{margin:0}</style>';
+    output = '<style media=print>body{margin:0}</style>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, minifyCSS: true }), output);
+
+    // Actual media queries—should be minified
+    // Note: Lightning CSS converts `min-width` to modern range syntax (`width>=`)
+    input = '<link rel="stylesheet" href="a.css" media="(min-width: 768px)">';
+    output = '<link rel=stylesheet href=a.css media="(width>=768px)">';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, minifyCSS: true }), output);
+
+    input = '<style media="screen and (min-width: 768px)">body{margin:0}</style>';
+    output = '<style media="screen and (width>=768px)">body{margin:0}</style>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, minifyCSS: true }), output);
   });
 
   test('removing redundant attributes (&lt;… = "javascript: …" …>)', async () => {
@@ -3101,7 +3154,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeComments: true, processScripts: ['text/ng-template'] }), output);
   });
 
-  test('processScripts matching semantics (raw value) vs JSON detection (normalized value)', async () => {
+  test('processScripts matching semantics (raw value) vs. JSON detection (normalized value)', async () => {
     // processScripts should match against RAW value (case-sensitive, exact match)
     let input = '<script type="Text/NG-Template"><div> test </div></script>';
     // Must match exact case
