@@ -34,7 +34,7 @@
   "removeRedundantAttributes": true,
   "removeScriptTypeAttributes": true,
   "removeStyleLinkTypeAttributes": true,
-  "removeTagWhitespace": true,
+  "removeTagWhitespace": false,
   "sortAttributes": false,
   "sortClassName": false,
   "trimCustomFragments": true,
