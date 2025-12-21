@@ -3119,6 +3119,40 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
   });
 
+  test('preserve whitespace around inline text elements with collapseInlineTagWhitespace', async () => {
+    let input, output;
+
+    // Links should preserve surrounding whitespace
+    input = '<p>This is <a href="test.html">a link</a> in text.</p>';
+    output = '<p>This is <a href=test.html>a link</a> in text.</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true, removeAttributeQuotes: true }), output);
+
+    // Multiple links with spaces
+    input = '<p>Code Responsibly von den <a href="https://webkrauts.de/">Webkrauts</a> und <a href="https://meiert.com/de/">Jens Oliver Meiert</a>.</p>';
+    output = '<p>Code Responsibly von den <a href=https://webkrauts.de/>Webkrauts</a> und <a href=https://meiert.com/de/>Jens Oliver Meiert</a>.</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true, removeAttributeQuotes: true }), output);
+
+    // `strong`, `em`, and other inline text elements
+    input = '<p>This is <strong>important</strong> and <em>emphasized</em> text.</p>';
+    output = '<p>This is <strong>important</strong> and <em>emphasized</em> text.</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Nested inline text elements
+    input = '<p>This has <span>a <strong>nested</strong> structure</span> here.</p>';
+    output = '<p>This has <span>a <strong>nested</strong> structure</span> here.</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Multiple inline text elements: `abbr`, `b`, `i`, `u`, `s`, `small`
+    input = '<p>Text with <abbr>abbr</abbr> and <b>bold</b> and <i>italic</i> and <u>underline</u> and <s>strike</s> and <small>small</small> elements.</p>';
+    output = '<p>Text with <abbr>abbr</abbr> and <b>bold</b> and <i>italic</i> and <u>underline</u> and <s>strike</s> and <small>small</small> elements.</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Test with “comprehensive” preset
+    input = '<div>That’s not <a href="../">the whole story</a>!</div>';
+    output = '<div>That’s not <a href=../>the whole story</a>!</div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true, removeAttributeQuotes: true }), output);
+  });
+
   test('ignoring custom comments', async () => {
     let input;
 
