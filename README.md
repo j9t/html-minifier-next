@@ -14,7 +14,7 @@ From npm for use as a command line app:
 npm i -g html-minifier-next
 ```
 
-Or use directly with npx (no installation required):
+Directly with npx (no installation required):
 
 ```shell
 npx html-minifier-next --help
