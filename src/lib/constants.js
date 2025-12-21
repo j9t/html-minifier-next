@@ -48,10 +48,13 @@ const tagDefaults = {
     colorspace: 'limited-srgb',
     type: 'text'
   },
+  link: { media: 'all' },
   marquee: {
     behavior: 'scroll',
     direction: 'left'
   },
+  meta: { media: 'all' },
+  source: { media: 'all' },
   style: { media: 'all' },
   textarea: { wrap: 'soft' },
   track: { kind: 'subtitles' }
