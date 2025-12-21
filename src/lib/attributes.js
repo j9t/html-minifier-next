@@ -320,6 +320,11 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     attrValue = trimWhitespace(attrValue.replace(/\s*;\s*/g, ';'));
   } else if (isMediaQuery(tag, attrs, attrName)) {
     attrValue = trimWhitespace(attrValue);
+    // Only minify actual media queries (those with features in parentheses)
+    // Skip simple media types like `all`, `screen`, `print` which are already minimal
+    if (!/[()]/.test(attrValue)) {
+      return attrValue;
+    }
     try {
       return await options.minifyCSS(attrValue, 'media');
     } catch (err) {
