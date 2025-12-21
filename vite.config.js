@@ -16,13 +16,16 @@ const config = defineConfig({
     alias: {
       // Replace Lightning CSS with inline stub for browser builds
       // Lightning CSS requires Node.js native bindings and cannot run in-browser
-      'lightningcss': '\0virtual:lightningcss-stub'
+      'lightningcss': '\0virtual:lightningcss-stub',
+      // Replace SWC with inline stub for browser builds
+      // SWC requires Node.js native bindings and cannot run in-browser
+      '@swc/core': '\0virtual:swc-stub'
     }
   },
   plugins: [{
-    name: 'lightningcss-stub',
+    name: 'native-stub',
     resolveId(id) {
-      if (id === '\0virtual:lightningcss-stub') {
+      if (id === '\0virtual:lightningcss-stub' || id === '\0virtual:swc-stub') {
         return id;
       }
     },
@@ -30,6 +33,11 @@ const config = defineConfig({
       if (id === '\0virtual:lightningcss-stub') {
         return `export function transform() {
   throw new Error('Lightning CSS is not available in browser environments. CSS minification is disabled in the demo.');
+}`;
+      }
+      if (id === '\0virtual:swc-stub') {
+        return `export function minify() {
+  throw new Error('SWC is not available in browser environments. JavaScript minification requires Terser in the demo.');
 }`;
       }
     }
