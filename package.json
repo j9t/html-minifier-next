@@ -21,6 +21,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^0.4.4",
+    "@swc/core": "^1.15.7",
     "eslint": "^9.39.1",
     "rollup": "^4.53.3",
     "rollup-plugin-polyfill-node": "^0.13.0",
@@ -69,6 +70,14 @@
   "module": "./src/htmlminifier.js",
   "types": "./dist/types/htmlminifier.d.ts",
   "name": "html-minifier-next",
+  "peerDependencies": {
+    "@swc/core": "^1.15.7"
+  },
+  "peerDependenciesMeta": {
+    "@swc/core": {
+      "optional": true
+    }
+  },
   "repository": "https://github.com/j9t/html-minifier-next.git",
   "scripts": {
     "prebuild": "node --eval='require(`fs`).rmSync(`dist`,{recursive:true,force:true})'",
@@ -84,5 +93,5 @@
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "version": "4.13.0"
+  "version": "4.14.0"
 }

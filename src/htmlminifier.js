@@ -74,6 +74,21 @@ async function getTerser() {
   return terserPromise;
 }
 
+let swcPromise;
+async function getSwc() {
+  if (!swcPromise) {
+    swcPromise = import('@swc/core')
+      .then(m => m.default || m)
+      .catch(() => {
+        throw new Error(
+          'The swc minifier requires @swc/core to be installed.\n' +
+          'Install it with: npm install @swc/core'
+        );
+      });
+  }
+  return swcPromise;
+}
+
 // Minification caches
 
 const cssMinifyCache = new LRU(200);
@@ -268,10 +283,14 @@ const jsMinifyCache = new LRU(200);
  *
  *  Default: `false`
  *
- * @prop {boolean | import("terser").MinifyOptions | ((text: string, inline?: boolean) => Promise<string> | string)} [minifyJS]
+ * @prop {boolean | import("terser").MinifyOptions | {engine?: 'terser' | 'swc', [key: string]: any} | ((text: string, inline?: boolean) => Promise<string> | string)} [minifyJS]
  *  When true, enables JS minification for `<script>` contents and
- *  event handler attributes. If an object is provided, it is passed to
- *  [terser](https://www.npmjs.com/package/terser) as minify options.
+ *  event handler attributes. If an object is provided, it can include:
+ *  - `engine`: The minifier to use (`terser` or `swc`). Default: `terser`.
+ *    Note: Inline event handlers (e.g., `onclick="…"`) always use Terser
+ *    regardless of engine setting, as swc doesn’t support bare return statements.
+ *  - Engine-specific options (e.g., Terser options if `engine: 'terser'`,
+ *    SWC options if `engine: 'swc'`).
  *  If a function is provided, it will be used to perform
  *  custom JS minification. If disabled, JS is not minified.
  *
@@ -1341,6 +1360,7 @@ export const minify = async function (value, options) {
   options = processOptions(options || {}, {
     getLightningCSS,
     getTerser,
+    getSwc,
     cssMinifyCache,
     jsMinifyCache
   });

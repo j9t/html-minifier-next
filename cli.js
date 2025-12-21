@@ -141,7 +141,7 @@ const mainOptions = {
   maxInputLength: ['Maximum input length to prevent ReDoS attacks', parseValidInt('maxInputLength')],
   maxLineLength: ['Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points', parseValidInt('maxLineLength')],
   minifyCSS: ['Minify CSS in “style” elements and “style” attributes (uses Lightning CSS)', parseJSON],
-  minifyJS: ['Minify JavaScript in “script” elements and event attributes (uses Terser)', parseJSON],
+  minifyJS: ['Minify JavaScript in “script” elements and event attributes (uses Terser or SWC; pass “{"engine": "swc"}” for SWC)', parseJSON],
   minifyURLs: ['Minify URLs in various attributes (uses relateurl)', parseJSON],
   noNewlinesBeforeTagClose: 'Never add a newline before a tag that closes an element',
   partialMarkup: 'Treat input as a partial HTML fragment, preserving stray end tags and unclosed tags',

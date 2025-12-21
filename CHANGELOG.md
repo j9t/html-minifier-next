@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.0] - 2025-12-21
+
+### Added
+
+- Added support for [SWC](https://swc.rs/) as an alternative JavaScript minifier engine
+  - New `engine` field in `minifyJS` option allows choosing between `'terser'` (default) or `'swc'`
+  - Fully backwards compatible—defaults to Terser when `engine` is not specified
+  - Hybrid strategy automatically uses Terser for inline event handlers (which require bare return statements) and SWC for script blocks
+  - `@swc/core` is an optional peer dependency—install separately to use: `npm i @swc/core`
+
 ## [4.13.0] - 2025-12-20
 
 ### Performance

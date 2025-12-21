@@ -161,7 +161,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `maxInputLength`<br>`--max-input-length` | Maximum input length to prevent ReDoS attacks (disabled by default) | `undefined` |
 | `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and `style` attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
-| `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://github.com/terser/terser)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
+| `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://github.com/terser/terser) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes (uses [relateurl](https://github.com/stevenvachon/relateurl)) | `false` (could be `String`, `Object`, `Function(text)`, `async Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
@@ -189,7 +189,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 Minifier options like `sortAttributes` and `sortClassName` won’t impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for gzip and Brotli used over HTTP.
 
-### CSS minification with Lightning CSS
+### CSS minification
 
 When `minifyCSS` is set to `true`, HTML Minifier Next uses [Lightning CSS](https://lightningcss.dev/) to minify CSS in `<style>` elements and `style` attributes. Lightning CSS provides excellent minification by default.
 
@@ -228,40 +228,98 @@ const result = await minify(html, {
 });
 ```
 
+### JavaScript minification
+
+When `minifyJS` is set to `true`, HTML Minifier Next uses [Terser](https://github.com/terser/terser) by default to minify JavaScript in `<script>` elements and event attributes.
+
+You can choose between different JS minifiers using the `engine` field:
+
+```js
+const result = await minify(html, {
+  minifyJS: {
+    engine: 'swc', // Use swc for faster minification
+    // SWC-specific options here
+  }
+});
+```
+
+**Available engines:**
+
+* `terser` (default): The standard JavaScript minifier with excellent compression
+* [`swc`](https://swc.rs/): Rust-based minifier that’s significantly faster than Terser (requires separate installation)
+
+**To use swc**, install it as a dependency:
+
+```bash
+npm i @swc/core
+```
+
+**Important:** Inline event handlers (e.g., `onclick="return false"`) always use Terser regardless of the `engine` setting, as SWC doesn’t support bare return statements. This is handled automatically—you don’t need to do anything special.
+
+You can pass engine-specific configuration options:
+
+```js
+// Using Terser with custom options
+const result = await minify(html, {
+  minifyJS: {
+    compress: {
+      drop_console: true  // Remove console.log statements
+    }
+  }
+});
+
+// Using SWC for faster minification
+const result = await minify(html, {
+  minifyJS: {
+    engine: 'swc'
+  }
+});
+```
+
+For advanced usage, you can also pass a function:
+
+```js
+const result = await minify(html, {
+  minifyJS: function(text, inline) {
+    // `text`: JavaScript string to minify
+    // `inline`: `true` for event handlers (e.g., `onclick`), `false` for `<script>` elements
+    return yourCustomMinifier(text);
+  }
+});
+```
+
 ## Minification comparison
 
 How does HTML Minifier Next compare to other minifiers? (All with the most aggressive settings—though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized)—and against some large documents.—Minimize does not minify CSS or JS.)
 
 <!-- Auto-generated benchmarks, don’t edit -->
-| Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)](https://socket.dev/npm/package/html-minifier-terser) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
+| Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next) ([config](https://github.com/j9t/html-minifier-next/blob/main/benchmarks/html-minifier.json))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)](https://socket.dev/npm/package/html-minifier-terser) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 59 | **49** | 50 | 51 | 52 | 51 | 54 | 52 |
+| [A List Apart](https://alistapart.com/) | 59 | **50** | **50** | 51 | 52 | 51 | 54 | 52 |
 | [Apple](https://www.apple.com/) | 266 | **207** | **207** | 236 | 239 | 240 | 242 | 243 |
-| [BBC](https://www.bbc.co.uk/) | 740 | **672** | 682 | 694 | 695 | 696 | 733 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 701 | **636** | 646 | 658 | 659 | 660 | 695 | n/a |
 | [CERN](https://home.cern/) | 152 | 85 | **84** | 91 | 91 | 91 | 93 | 96 |
 | [CSS-Tricks](https://css-tricks.com/) | 162 | 121 | **120** | 127 | 143 | 143 | 148 | 145 |
 | [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6352** | **6352** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 60 | 70 | 70 | 71 | 75 | 73 |
-| [EFF](https://www.eff.org/) | 55 | **47** | **47** | 49 | 48 | 49 | 50 | 50 |
+| [EFF](https://www.eff.org/) | 55 | **45** | 46 | 49 | 48 | 48 | 50 | 50 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1595 | 1486 | 1491 | **1429** | 1518 | 1530 | 1541 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1603 | 1494 | 1499 | **1437** | 1526 | 1538 | 1549 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 152 | **122** | **122** | 126 | 125 | 125 | 132 | 127 |
-| [Frontend Dogma](https://frontenddogma.com/) | 224 | **214** | 216 | 237 | 222 | 224 | 242 | 223 |
-| [Google](https://www.google.com/) | 18 | **17** | **17** | **17** | **17** | **17** | 18 | 18 |
-| [Ground News](https://ground.news/) | 1682 | **1444** | 1447 | 1548 | 1573 | 1578 | 1669 | n/a |
+| [Frontend Dogma](https://frontenddogma.com/) | 224 | **214** | 216 | 237 | 222 | 224 | 243 | 223 |
+| [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 17 | 18 | 18 |
+| [Ground News](https://ground.news/) | 1713 | **1476** | 1477 | 1577 | 1602 | 1607 | 1699 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | **147** | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 50 | **34** | **34** | 36 | 36 | 36 | 37 | 37 |
-| [Leanpub](https://leanpub.com/) | 1551 | **1301** | **1301** | 1308 | 1306 | 1303 | 1545 | n/a |
 | [Mastodon](https://mastodon.social/explore) | 37 | **28** | **28** | 32 | 35 | 35 | 36 | 36 |
 | [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | **62** | 64 | 65 | 65 | 68 | 68 |
 | [Middle East Eye](https://www.middleeasteye.net/) | 222 | **195** | **195** | 202 | 200 | 200 | 202 | 203 |
 | [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 74 | 74 | **55** | 74 | 75 | 77 | 76 |
 | [SitePoint](https://www.sitepoint.com/) | 501 | **370** | **370** | 442 | 475 | 480 | 498 | n/a |
 | [TetraLogical](https://tetralogical.com/) | 44 | 38 | 38 | **35** | 38 | 39 | 39 | 39 |
-| [TPGi](https://www.tpgi.com/) | 175 | **160** | 161 | **160** | 164 | 166 | 172 | 172 |
-| [United Nations](https://www.un.org/en/) | 152 | **113** | 114 | 121 | 125 | 125 | 131 | 124 |
+| [TPGi](https://www.tpgi.com/) | 175 | **159** | 161 | 160 | 164 | 166 | 172 | 172 |
 | [W3C](https://www.w3.org/) | 50 | **36** | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 305 ms (26/26) | 361 ms (26/26) | 175 ms (26/26) | 57 ms (26/26) | **17 ms (26/26)** | 313 ms (26/26) | 1442 ms (20/26) |
+| **Average processing time** |  | 256 ms (24/24) | 352 ms (24/24) | 167 ms (24/24) | 54 ms (24/24) | **15 ms (24/24)** | 339 ms (24/24) | 3288 ms (19/24) |
 
 (Last updated: Dec 20, 2025)
 <!-- End auto-generated -->

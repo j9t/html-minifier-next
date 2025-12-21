@@ -2,6 +2,7 @@
   "type": "module",
   "dependencies": {
     "@minify-html/node": "^0.18.1",
+    "@swc/core": "^1.15.7",
     "@swc/html": "^1.15.4",
     "cli-table3": "^0.6.5",
     "cssnano": "^7.1.2",

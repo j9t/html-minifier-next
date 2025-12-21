@@ -26,11 +26,12 @@ function shouldMinifyInnerHTML(options) {
  * @param {Object} deps - Dependencies from htmlminifier.js
  * @param {Function} deps.getLightningCSS - Function to lazily load lightningcss
  * @param {Function} deps.getTerser - Function to lazily load terser
+ * @param {Function} deps.getSwc - Function to lazily load @swc/core
  * @param {LRU} deps.cssMinifyCache - CSS minification cache
  * @param {LRU} deps.jsMinifyCache - JS minification cache
  * @returns {MinifierOptions} Normalized options with defaults applied
  */
-const processOptions = (inputOptions, { getLightningCSS, getTerser, cssMinifyCache, jsMinifyCache } = {}) => {
+const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssMinifyCache, jsMinifyCache } = {}) => {
   const options = {
     name: function (name) {
       return name.toLowerCase();
@@ -150,47 +151,94 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, cssMinifyCac
         return;
       }
 
-      const terserOptions = typeof option === 'object' ? option : {};
+      // Parse configuration
+      const config = typeof option === 'object' ? option : {};
+      const engine = (config.engine || 'terser').toLowerCase();
 
+      // Validate engine
+      const supportedEngines = ['terser', 'swc'];
+      if (!supportedEngines.includes(engine)) {
+        throw new Error(`Unsupported JS minifier engine: "${engine}". Supported engines: ${supportedEngines.join(', ')}`);
+      }
+
+      // Extract engine-specific options (excluding `engine` field itself)
+      const engineOptions = { ...config };
+      delete engineOptions.engine;
+
+      // Terser options (needed for inline JS and when engine is `terser`)
+      const terserOptions = engine === 'terser' ? engineOptions : {};
       terserOptions.parse = {
         ...terserOptions.parse,
         bare_returns: false
       };
 
+      // SWC options (when engine is `swc`)
+      const swcOptions = engine === 'swc' ? engineOptions : {};
+
+      // Pre-compute option signatures once for performance (avoid repeated stringification)
+      const terserSig = stableStringify({
+        ...terserOptions,
+        cont: !!options.continueOnMinifyError
+      });
+      const swcSig = stableStringify({
+        ...swcOptions,
+        cont: !!options.continueOnMinifyError
+      });
+
       options.minifyJS = async function (text, inline) {
         const start = text.match(/^\s*<!--.*/);
         const code = start ? text.slice(start[0].length).replace(/\n\s*-->\s*$/, '') : text;
 
-        terserOptions.parse.bare_returns = inline;
+        // Fast path: Avoid invoking minifier for empty/whitespace-only content
+        if (!code || !code.trim()) {
+          return '';
+        }
+
+        // Hybrid strategy: Always use Terser for inline JS (needs bare returns support)
+        // Use user’s chosen engine for script blocks
+        const useEngine = inline ? 'terser' : engine;
 
         let jsKey;
         try {
-          // Fast path: Avoid invoking Terser for empty/whitespace-only content
-          if (!code || !code.trim()) {
-            return '';
-          }
-          // Cache key: content, inline, options signature (subset)
-          const terserSig = stableStringify({
-            compress: terserOptions.compress,
-            mangle: terserOptions.mangle,
-            ecma: terserOptions.ecma,
-            toplevel: terserOptions.toplevel,
-            module: terserOptions.module,
-            keep_fnames: terserOptions.keep_fnames,
-            format: terserOptions.format,
-            cont: !!options.continueOnMinifyError,
-          });
-          // For large inputs, use length and content fingerprint (first/last 50 chars) to prevent collisions
-          jsKey = (code.length > 2048 ? (code.length + '|' + code.slice(0, 50) + code.slice(-50) + '|') : (code + '|')) + (inline ? '1' : '0') + '|' + terserSig;
+          // Select pre-computed signature based on engine
+          const optsSig = useEngine === 'terser' ? terserSig : swcSig;
+
+          // For large inputs, use length and content fingerprint to prevent collisions
+          jsKey = (code.length > 2048 ? (code.length + '|' + code.slice(0, 50) + code.slice(-50) + '|') : (code + '|'))
+            + (inline ? '1' : '0') + '|' + useEngine + '|' + optsSig;
+
           const cached = jsMinifyCache.get(jsKey);
           if (cached) {
             return await cached;
           }
+
           const inFlight = (async () => {
-            const terser = await getTerser();
-            const result = await terser(code, terserOptions);
-            return result.code.replace(RE_TRAILING_SEMICOLON, '');
+            // Dispatch to appropriate minifier
+            if (useEngine === 'terser') {
+              // Create a copy to avoid mutating shared `terserOptions` (race condition)
+              const terserCallOptions = {
+                ...terserOptions,
+                parse: {
+                  ...terserOptions.parse,
+                  bare_returns: inline
+                }
+              };
+              const terser = await getTerser();
+              const result = await terser(code, terserCallOptions);
+              return result.code.replace(RE_TRAILING_SEMICOLON, '');
+            } else if (useEngine === 'swc') {
+              const swc = await getSwc();
+              // `swc.minify()` takes compress and mangle directly as options
+              const result = await swc.minify(code, {
+                compress: true,
+                mangle: true,
+                ...swcOptions, // User options override defaults
+              });
+              return result.code.replace(RE_TRAILING_SEMICOLON, '');
+            }
+            throw new Error(`Unknown JS minifier engine: ${useEngine}`);
           })();
+
           jsMinifyCache.set(jsKey, inFlight);
           const resolved = await inFlight;
           jsMinifyCache.set(jsKey, resolved);
