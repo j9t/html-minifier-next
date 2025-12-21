@@ -272,6 +272,11 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
       }
       try {
         attrValue = await options.minifyCSS(attrValue, 'inline');
+        // After minification, check if CSS consists entirely of invalid properties (no values)
+        // E.g., `color:` or `margin:;padding:` should be treated as empty
+        if (attrValue && /^(?:[a-z-]+:\s*;?\s*)+$/i.test(attrValue)) {
+          attrValue = '';
+        }
       } catch (err) {
         if (!options.continueOnMinifyError) {
           throw err;
@@ -320,6 +325,11 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     attrValue = trimWhitespace(attrValue.replace(/\s*;\s*/g, ';'));
   } else if (isMediaQuery(tag, attrs, attrName)) {
     attrValue = trimWhitespace(attrValue);
+    // Only minify actual media queries (those with features in parentheses)
+    // Skip simple media types like `all`, `screen`, `print` which are already minimal
+    if (!/[()]/.test(attrValue)) {
+      return attrValue;
+    }
     try {
       return await options.minifyCSS(attrValue, 'media');
     } catch (err) {

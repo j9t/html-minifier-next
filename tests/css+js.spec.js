@@ -81,6 +81,40 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
+  test('invalid/empty CSS in style attributes', async () => {
+    // Regression test for issue where invalid CSS like `color: ` was minified to `color:` instead of being removed
+    let input, output;
+
+    // Properties with no value should be detected as empty
+    input = '<div style="color: ">Test</div>';
+    output = '<div style="">Test</div>';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+
+    input = '<div style="margin:">Test</div>';
+    output = '<div style="">Test</div>';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+
+    // With `removeEmptyAttributes`, empty styles should be removed entirely
+    input = '<div style="color: ">Test</div>';
+    output = '<div>Test</div>';
+    assert.strictEqual(await minify(input, { minifyCSS: true, removeEmptyAttributes: true }), output);
+
+    // Multiple invalid properties
+    input = '<div style="color:;margin:;padding:">Test</div>';
+    output = '<div>Test</div>';
+    assert.strictEqual(await minify(input, { minifyCSS: true, removeEmptyAttributes: true }), output);
+
+    // Mix of valid and invalid—Lightning CSS preserves as-is (conservative behavior)
+    input = '<div style="color: ; background: red">Test</div>';
+    output = '<div style="color: ;background:red">Test</div>';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+
+    // Lightning CSS adds default for background shorthand—should be kept
+    input = '<div style="background: ">Test</div>';
+    output = '<div style="background:0 0">Test</div>';
+    assert.strictEqual(await minify(input, { minifyCSS: true }), output);
+  });
+
   test('CSS minification error handling', async () => {
     // Test invalid CSS syntax—should attempt to minify or preserve original
     let input = '<style>body { color: #invalid!!! }</style>';
