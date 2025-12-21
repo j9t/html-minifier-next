@@ -8,7 +8,8 @@ import {
   RE_NBSP_LEAD_GROUP,
   RE_NBSP_TRAILING_GROUP,
   RE_NBSP_TRAILING_STRIP,
-  inlineElementsToKeepWhitespace
+  inlineElementsToKeepWhitespace,
+  inlineElementsToKeepWhitespaceWithin
 } from './constants.js';
 
 // Trim whitespace
@@ -110,9 +111,23 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, options, inlineElements,
   if (trimLeft && !options.collapseInlineTagWhitespace) {
     trimLeft = prevTag.charAt(0) === '/' ? !inlineElements.has(prevTag.slice(1)) : !inlineTextSet.has(prevTag);
   }
+  // When `collapseInlineTagWhitespace` is enabled, still preserve whitespace around inline text elements
+  if (trimLeft && options.collapseInlineTagWhitespace) {
+    const tagName = prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag;
+    if (inlineElementsToKeepWhitespaceWithin.has(tagName)) {
+      trimLeft = false;
+    }
+  }
   let trimRight = nextTag && !inlineElementsToKeepWhitespace.has(nextTag);
   if (trimRight && !options.collapseInlineTagWhitespace) {
     trimRight = nextTag.charAt(0) === '/' ? !inlineTextSet.has(nextTag.slice(1)) : !inlineElements.has(nextTag);
+  }
+  // When `collapseInlineTagWhitespace` is enabled, still preserve whitespace around inline text elements
+  if (trimRight && options.collapseInlineTagWhitespace) {
+    const tagName = nextTag.charAt(0) === '/' ? nextTag.slice(1) : nextTag;
+    if (inlineElementsToKeepWhitespaceWithin.has(tagName)) {
+      trimRight = false;
+    }
   }
   return collapseWhitespace(str, options, trimLeft, trimRight, prevTag && nextTag);
 }
