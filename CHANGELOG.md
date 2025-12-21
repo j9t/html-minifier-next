@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.14.1] - 2025-12-21
+
+### Fixed
+
+- Fixed `media="all"` corruption bug where attribute value was transformed to `media="a{top:0}"` when `minifyCSS` was enabled
+- Added `media: 'all'` as default for `<link>`, `<meta>`, and `<source>` elements (HTML spec compliance)
+- Improved `media` attribute handling to skip CSS minification for simple media types (`all`, `screen`, `print`), only minifying actual media queries
+
 ## [4.14.0] - 2025-12-21
 
 ### Added
