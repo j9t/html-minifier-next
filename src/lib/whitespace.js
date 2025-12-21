@@ -104,7 +104,20 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   return lineBreakBefore + str + lineBreakAfter;
 }
 
-// Collapse whitespace smartly based on surrounding tags
+/**
+ * Decide and apply whitespace trimming/collapse based on surrounding tag context.
+ *
+ * Determines whether to trim whitespace on the left and/or right of `str` using the surrounding
+ * `prevTag` and `nextTag`, considers `options.collapseInlineTagWhitespace` and the provided sets
+ * of inline elements, then delegates to collapseWhitespace with the computed flags.
+ *
+ * @param {string} str - Input string whose whitespace should be processed.
+ * @param {string|undefined} prevTag - The previous tag token (may start with '/' for a closing tag) or undefined.
+ * @param {string|undefined} nextTag - The next tag token (may start with '/' for a closing tag) or undefined.
+ * @param {Object} options - Behavior flags that affect trimming and collapsing (reads `collapseInlineTagWhitespace`).
+ * @param {Set<string>} inlineElements - Set of inline element tag names used to decide trimming around tags.
+ * @param {Set<string>} inlineTextSet - Set of inline text element tag names used to decide trimming around tags.
+ * @returns {string} The input string with whitespace collapsed/trimmed according to surrounding tags and options.
 
 function collapseWhitespaceSmart(str, prevTag, nextTag, options, inlineElements, inlineTextSet) {
   let trimLeft = prevTag && !inlineElementsToKeepWhitespace.has(prevTag);
