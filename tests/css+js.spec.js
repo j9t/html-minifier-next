@@ -317,7 +317,7 @@ describe('CSS and JS', () => {
   test('minifyJS: SWC engine for script blocks', async () => {
     const input = '<script>function myFunction() { var x = 1; return x; }</script>';
 
-    // swc should minify the code (exact output may differ from terser)
+    // SWC should minify the code (exact output may differ from Terser)
     const result = await minify(input, { minifyJS: { engine: 'swc' } });
     assert.ok(result.startsWith('<script>'), 'Should start with script tag');
     assert.ok(result.endsWith('</script>'), 'Should end with script tag');
@@ -328,8 +328,8 @@ describe('CSS and JS', () => {
   test('minifyJS: Hybrid behavior—inline handlers always use Terser', async () => {
     const input = '<button onclick="return false;">Click</button>';
 
-    // Even with swc engine, inline handlers should use terser
-    // This is because swc doesn't support bare return statements
+    // Even with SWC engine, inline handlers should use Terser
+    // This is because SCW doesn’t support bare return statements
     const result = await minify(input, { minifyJS: { engine: 'swc' } });
     assert.ok(result.includes('onclick'), 'onclick attribute should be preserved');
     assert.ok(result.includes('return'), 'Return statement should work (via Terser)');
@@ -341,7 +341,7 @@ describe('CSS and JS', () => {
       <button onclick="var result = calculate(); alert(result); return false;">Test</button>
     `;
 
-    // Script block uses swc, inline handler uses terser
+    // Script block uses SWC, inline handler uses Terser
     const result = await minify(input, {
       minifyJS: { engine: 'swc' },
       collapseWhitespace: true
@@ -393,8 +393,8 @@ describe('CSS and JS', () => {
 
     assert.ok(result.startsWith('<script>'), 'Should start with script tag');
     assert.ok(result.length < input.length, 'Should be minified');
-    // swc may or may not remove the unused variable depending on optimization level
-    // Just check that it's shorter (minified)
+    // SWC may or may not remove the unused variable depending on optimization level
+    // Just check that it’s shorter (minified)
   });
 
   test('minifyJS: SWC case-insensitivity', async () => {
@@ -408,8 +408,4 @@ describe('CSS and JS', () => {
     assert.strictEqual(result1, result2, 'Case variations should produce same result');
     assert.strictEqual(result2, result3, 'Case variations should produce same result');
   });
-
-  // Note: If @swc/core is not installed (optional peer dependency),
-  // using engine: 'swc' will throw a helpful error message directing
-  // users to install it with: npm install @swc/core
 });
