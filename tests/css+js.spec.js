@@ -329,7 +329,7 @@ describe('CSS and JS', () => {
     const input = '<button onclick="return false;">Click</button>';
 
     // Even with SWC engine, inline handlers should use Terser
-    // This is because SCW doesn’t support bare return statements
+    // This is because SWC doesn’t support bare return statements
     const result = await minify(input, { minifyJS: { engine: 'swc' } });
     assert.ok(result.includes('onclick'), 'onclick attribute should be preserved');
     assert.ok(result.includes('return'), 'Return statement should work (via Terser)');

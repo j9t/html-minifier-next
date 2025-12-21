@@ -2556,7 +2556,7 @@ describe('HTML', () => {
     output = '<button onclick=\'if(valid)return!0;alert("Invalid")\'>Submit</button>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
 
-    // Conditional bare return with SWC engine
+    // Conditional bare return when `minifyJS.engine = 'swc'` (hybrid path keeps event handlers on Terser)
     input = '<button onclick="if (valid) return true; alert(\'Invalid\');">Submit</button>';
     output = '<button onclick=\'if(valid)return!0;alert("Invalid")\'>Submit</button>';
     assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' } }), output);
