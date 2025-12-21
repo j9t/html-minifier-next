@@ -237,7 +237,7 @@ You can choose between different JS minifiers using the `engine` field:
 ```js
 const result = await minify(html, {
   minifyJS: {
-    engine: 'swc', // Use swc for faster minification
+    engine: 'swc', // Use SWC for faster minification
     // SWC-specific options here
   }
 });
@@ -248,11 +248,13 @@ const result = await minify(html, {
 * `terser` (default): The standard JavaScript minifier with excellent compression
 * [`swc`](https://swc.rs/): Rust-based minifier that’s significantly faster than Terser (requires separate installation)
 
-**To use swc**, install it as a dependency:
+**To use SWC**, install it as a dependency:
 
 ```bash
 npm i @swc/core
 ```
+
+(Build-only users may want to install it as a dev dependency: `npm i -D @swc/core`.)
 
 **Important:** Inline event handlers (e.g., `onclick="return false"`) always use Terser regardless of the `engine` setting, as SWC doesn’t support bare return statements. This is handled automatically—you don’t need to do anything special.
 
