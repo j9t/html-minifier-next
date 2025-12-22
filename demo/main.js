@@ -89,6 +89,13 @@ const defaultOptions = [
     checked: true
   },
   {
+    id: 'minifySVG',
+    type: 'checkbox',
+    label: 'Minify SVG',
+    helpText: 'Minify SVG elements and attributes (numeric precision, default attributes, colors)',
+    checked: true
+  },
+  {
     id: 'minifyURLs',
     type: 'checkbox',
     label: 'Minify URLs',
