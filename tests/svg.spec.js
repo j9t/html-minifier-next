@@ -10,8 +10,9 @@ describe('SVG', () => {
     assert.strictEqual(output, '<svg><path d="M 0 0 L 10.5 20.3"/></svg>');
 
     // Custom precision
-    const output2 = await minify(input, { minifySVG: { precision: 2 }, collapseWhitespace: true });
-    assert.strictEqual(output2, '<svg><path d="M 0 0 L 10.5 20.3"/></svg>');
+    const input2 = '<svg><path d="M 10.556 20.667"/></svg>';
+    const output2 = await minify(input2, { minifySVG: { precision: 2 }, collapseWhitespace: true });
+    assert.strictEqual(output2, '<svg><path d="M 10.56 20.67"/></svg>');
 
     // Path with various numeric formats
     const complexPath = '<svg><path d="M 1.234567 2.345678 C 3.456789 4.567890 5.678901 6.789012 7.890123 8.901234"/></svg>';
