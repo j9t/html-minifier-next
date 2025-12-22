@@ -168,6 +168,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and `style` attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://github.com/terser/terser) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
+| `minifySVG`<br>`--minify-svg` | Minify SVG elements and attributes (numeric precision, default attributes, colors) | `false` (could be `true`, `Object`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes (uses [relateurl](https://github.com/stevenvachon/relateurl)) | `false` (could be `String`, `Object`, `Function(text)`, `async Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
@@ -295,6 +296,59 @@ const result = await minify(html, {
   }
 });
 ```
+
+### SVG minification
+
+When `minifySVG` is set to `true`, HTML Minifier Next applies SVG-specific optimizations to SVG elements and their attributes. These optimizations are lightweight, fast, and safe:
+
+```js
+const result = await minify(html, {
+  minifySVG: true // Enable with default settings
+});
+```
+
+What gets optimized:
+
+1. Numeric precision reduction: Coordinates and path data are rounded to 3 decimal places by default
+   - `<path d="M 0.00000000 0.00000000"/>` → `<path d="M 0 0"/>`
+   - `<circle cx="10.500000" cy="20.300000" r="5.000"/>` → `<circle cx="10.5" cy="20.3" r="5"/>`
+
+2. Whitespace removal: Excess whitespace in numeric attribute values is removed
+   - `transform="translate( 10 , 20 )"` → `transform="translate(10,20)"`
+   - `points="100, 10  40,  198"` → `points="100,10 40,198"`
+
+3. Color minification: Hex colors are shortened and RGB values converted to hex
+   - `fill="#000000"` → `fill="#000"`
+   - `fill="rgb(255,255,255)"` → `fill="#fff"`
+
+4. Default attribute removal: Well-documented SVG default attributes are removed
+   - `fill-opacity="1"` → removed
+   - `stroke-linecap="butt"` → removed
+
+You can customize the optimization behavior by providing an options object:
+
+```js
+const result = await minify(html, {
+  minifySVG: {
+    precision: 2,           // Use 2 decimal places instead of 3
+    removeDefaults: true,   // Remove default attributes (default: true)
+    minifyColors: true      // Minify color values (default: true)
+  }
+});
+```
+
+Available options:
+
+* `precision`: Number of decimal places for coordinates and path data (default: `3`)
+* `removeDefaults`: Remove attributes with default values (default: `true`)
+* `minifyColors`: Minify color values with hex shortening and RGB-to-hex conversion (default: `true`)
+
+**Important:**
+
+* SVG minification only applies within `<svg>` elements
+* Case sensitivity and self-closing slashes are automatically preserved in SVG (regardless of global settings)
+* For maximum compression, use `minifySVG` together with `collapseWhitespace` and other options
+* This is a lightweight, built-in implementation; for more aggressive SVG optimization, consider using [SVGO](https://github.com/svg/svgo) as a separate build step
 
 ## Minification comparison
 
