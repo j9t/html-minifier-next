@@ -165,8 +165,8 @@ describe('SVG', () => {
     // Scientific notation
     const input3 = '<svg><path d="M 1e-5 2e-3"/></svg>';
     const output3 = await minify(input3, { minifySVG: true, collapseWhitespace: true });
-    // Should handle scientific notation gracefully
-    assert.ok(output3.includes('<svg><path d="'));
+    // 1e-5 (0.00001) rounds to 0.000 → "0", 2e-3 (0.002) rounds to 0.002
+    assert.strictEqual(output3, '<svg><path d="M 0 0.002"/></svg>');
   });
 
   test('Color minification disabled', async () => {
