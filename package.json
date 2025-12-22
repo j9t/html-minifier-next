@@ -93,5 +93,5 @@
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "version": "4.14.3"
+  "version": "4.15.0"
 }
