@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added comprehensive test suite with 13 SVG-specific test cases
 - Added detailed SVG minification documentation to README
 
+### Fixed
+
+- Fixed web demo reset option
+
 ## [4.14.3] - 2025-12-21
 
 ### Fixed
