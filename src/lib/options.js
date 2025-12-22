@@ -5,6 +5,7 @@ import { stableStringify, identity, identityAsync, replaceAsync } from './utils.
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
+import { getSVGMinifierOptions } from './svg.js';
 
 // Helper functions
 
@@ -15,7 +16,8 @@ function shouldMinifyInnerHTML(options) {
     options.removeOptionalTags ||
     options.minifyJS !== identity ||
     options.minifyCSS !== identityAsync ||
-    options.minifyURLs !== identity
+    options.minifyURLs !== identity ||
+    options.minifySVG
   );
 }
 
@@ -52,7 +54,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
     log: identity,
     minifyCSS: identityAsync,
     minifyJS: identity,
-    minifyURLs: identity
+    minifyURLs: identity,
+    minifySVG: null
   };
 
   Object.keys(inputOptions).forEach(function (key) {
@@ -285,6 +288,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
           return text;
         }
       };
+    } else if (key === 'minifySVG') {
+      // Process SVG minification options
+      // Unlike minifyCSS/minifyJS, this is a simple options object, not a function
+      // The actual minification is applied inline during attribute processing
+      options.minifySVG = getSVGMinifierOptions(option);
     } else {
       options[key] = option;
     }
