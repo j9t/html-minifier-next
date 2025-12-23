@@ -5145,6 +5145,7 @@ describe('HTML', () => {
       useShortDoctype: true,
       keepClosingSlash: false,
       removeAttributeQuotes: true,
+      removeComments: true, // Enable comment removal to test ignoreCustomComments
       // These would be strings in JSON, not RegExp objects
       ignoreCustomFragments: [
         '<#[\\s\\S]*?#>',
@@ -5168,24 +5169,52 @@ describe('HTML', () => {
 
     // Should preserve PHP fragment
     assert.ok(resultWithFragments.includes('<?php echo "test"; ?>'));
+
+    // Test with custom comments that should be preserved (matching `ignoreCustomComments` patterns)
+    const htmlWithComments = `<!DOCTYPE html><html><head>
+      <!--! Important comment -->
+      <!-- # Config comment -->
+      <!--  # Indented config comment -->
+      <!-- Regular comment (should be removed) -->
+    </head><body>test</body></html>`;
+    const resultWithComments = await minify(htmlWithComments, jsonConfig);
+
+    // Should preserve comments matching `ignoreCustomComments` patterns
+    assert.ok(resultWithComments.includes('<!--! Important comment -->'), 'Should preserve comment starting with !');
+    assert.ok(resultWithComments.includes('<!-- # Config comment -->'), 'Should preserve comment starting with # (with space)');
+    assert.ok(resultWithComments.includes('<!--  # Indented config comment -->'), 'Should preserve comment starting with whitespace + #');
+    assert.ok(!resultWithComments.includes('<!-- Regular comment (should be removed) -->'), 'Should remove regular comments');
   });
 
   test('RegExp option conversion edge cases', async () => {
-    // Test that various regex-related options handle string-to-RegExp conversion correctly
+    // Test that string-based RegExp options produce the same results as RegExp-based options
+    // This verifies the string-to-RegExp conversion is working correctly
 
-    const html = '<div ng-click="foo()">test</div>';
+    const html = '<div ng-click="alert(1 + 2)">test</div>';
 
-    const config = {
+    // Baseline: Without `customEventAttributes`, `ng-click` should not be minified
+    const baseline = await minify(html, { minifyJS: true });
+    assert.strictEqual(baseline, '<div ng-click="alert(1 + 2)">test</div>');
+
+    // With string-based customEventAttributes, ng-click SHOULD be minified
+    const configWithStrings = {
       minifyJS: true,
       // String patterns that should be converted to RegExp
-      customEventAttributes: ['ng-click', 'ng-change'],
-      customAttrCollapse: 'ng-class'
+      customEventAttributes: ['^ng-', '^data-ng-']
     };
 
-    const result = await minify(html, config);
+    const resultWithStrings = await minify(html, configWithStrings);
+    // Should minify the `ng-click` attribute value (1 + 2 becomes 3)
+    assert.strictEqual(resultWithStrings, '<div ng-click="alert(3)">test</div>');
 
-    // Should successfully process without throwing errors
-    assert.ok(result.includes('test'));
+    // Verify parity: RegExp-based config should produce identical output
+    const configWithRegExp = {
+      minifyJS: true,
+      customEventAttributes: [/^ng-/, /^data-ng-/]
+    };
+
+    const resultWithRegExp = await minify(html, configWithRegExp);
+    assert.strictEqual(resultWithRegExp, resultWithStrings, 'String and RegExp configs should produce identical results');
   });
 
   test('customAttrSurround with nested string regex patterns', async () => {
@@ -5215,8 +5244,7 @@ describe('HTML', () => {
     // Test with brackets
     const html2 = '<div [class="test"]>content</div>';
     const result2 = await minify(html2, jsonConfig);
-    assert.ok(result2.includes('['));
-    assert.ok(result2.includes('class'));
+    assert.strictEqual(result2, '<div [class=test]>content</div>');
   });
 
   test('customAttrSurround with complex template patterns', async () => {
