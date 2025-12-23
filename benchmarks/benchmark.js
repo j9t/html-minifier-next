@@ -50,7 +50,7 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
   stream: process.stderr
 });
 
-// Timeout for HTML Minifier runs (ms)
+// Timeout for htmlnano worker process (ms)
 const TEST_TIMEOUT = 30000;
 
 // Concurrency for site processing
@@ -406,6 +406,9 @@ async function processFile(fileName) {
 
     // htmlnano, https://htmlnano.netlify.app/presets
     // (Run in separate process for crash isolation from Terser errors)
+    // @@ Once Terser stability improves, consider using direct library call for better performance:
+    //       const result = await htmlnano.process(data, {}, htmlnano.presets.max);
+    //       This would eliminate ~50-100ms fork overhead and match other minifiers’ methodology.
     async function testhtmlnano() {
       const info = infos.htmlnano;
       info.startTime = Date.now();
