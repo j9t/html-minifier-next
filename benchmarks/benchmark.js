@@ -1,21 +1,21 @@
 #!/usr/bin/env node
 
+import { createReadStream, createWriteStream } from 'fs';
 import fs from 'fs/promises';
-import zlib from 'zlib';
 import https from 'https';
 import path from 'path';
-import { fork } from 'child_process';
-import { fileURLToPath } from 'url';
 import { pipeline } from 'stream/promises';
-import { createReadStream, createWriteStream } from 'fs';
+import { fileURLToPath } from 'url';
 import { styleText } from 'node:util';
+import zlib from 'zlib';
 import lzma from 'lzma';
-import Minimize from 'minimize';
 import Progress from 'progress';
 import Table from 'cli-table3';
+import { minify as minifyHMN } from '../src/htmlminifier.js';
+import htmlnano from 'htmlnano';
 import { minify as minifySWC } from '@swc/html';
 import minifyHTMLPkg from '@minify-html/node';
-import { minify as minifyHMN } from '../src/htmlminifier.js';
+import Minimize from 'minimize';
 
 const { minify: minifyHTML } = minifyHTMLPkg;
 
@@ -49,9 +49,6 @@ const progress = new Progress(':current/:total [:bar] :percent :etas :fileName',
   clear: !VERBOSE,
   stream: process.stderr
 });
-
-// Timeout for htmlnano worker process (ms)
-const TEST_TIMEOUT = 30000;
 
 // Concurrency for site processing
 // Default to 1 (sequential) for accurate per-minifier performance comparison
@@ -405,55 +402,33 @@ async function processFile(fileName) {
     }
 
     // htmlnano, https://htmlnano.netlify.app/presets
-    // (Run in separate process for crash isolation from Terser errors)
-    // @@ Once Terser stability improves, consider using direct library call for better performance:
-    //       const result = await htmlnano.process(data, {}, htmlnano.presets.max);
-    //       This would eliminate ~50-100ms fork overhead and match other minifiers’ methodology.
     async function testhtmlnano() {
       const info = infos.htmlnano;
+
+      // Temporary workaround for Terser crashes—remove when htmlnano/Terser stability improves
+      // URLs that cause Terser crashes in htmlnano (add more as needed)
+      const SKIP_URLS = [
+        'https://vivaldi.com/'
+      ];
+
+      if (SKIP_URLS.includes(site)) {
+        benchmarkErrors.push(`htmlnano skipped for ${fileName} (known Terser crash)`);
+        resetSizes(info);
+        return;
+      }
+      // End workaround
+
+      const data = await readText(filePath);
       info.startTime = Date.now();
 
-      return new Promise((resolve) => {
-        const child = fork(path.join(__dirname, 'htmlnano.js'), [filePath, info.filePath], {
-          silent: true // Suppress stderr to avoid Terser stack traces
-        });
-        let timeoutId;
-
-        // Set timeout for htmlnano process
-        timeoutId = setTimeout(() => {
-          child.kill('SIGTERM');
-          benchmarkErrors.push(`htmlnano timed out after ${TEST_TIMEOUT / 1000} seconds for ${fileName}`);
-          resetSizes(info);
-          resolve();
-        }, TEST_TIMEOUT);
-
-        child.on('exit', async function (code, signal) {
-          clearTimeout(timeoutId);
-
-          if (code !== 0) {
-            benchmarkErrors.push(`htmlnano failed with exit code ${code}${signal ? ` (signal: ${signal})` : ''} for ${fileName}`);
-            resetSizes(info);
-            resolve();
-            return;
-          }
-
-          try {
-            await readSizes(info);
-            resolve();
-          } catch (err) {
-            benchmarkErrors.push(`Failed to read sizes after htmlnano processing ${fileName}: ${err.message}`);
-            resetSizes(info);
-            resolve();
-          }
-        });
-
-        child.on('error', function (error) {
-          clearTimeout(timeoutId);
-          benchmarkErrors.push(`htmlnano process error for ${fileName}: ${error.message}`);
-          resetSizes(info);
-          resolve();
-        });
-      });
+      try {
+        const result = await htmlnano.process(data, {}, htmlnano.presets.max);
+        await writeText(info.filePath, result.html);
+        await readSizes(info);
+      } catch (err) {
+        benchmarkErrors.push(`htmlnano failed for ${fileName}: ${err.message}`);
+        resetSizes(info);
+      }
     }
 
     // @swc/html, https://swc.rs/docs/usage/html

@@ -359,40 +359,40 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **50** | 51 | 52 | 51 | 54 | 52 |
 | [Apple](https://www.apple.com/) | 266 | **206** | 236 | 239 | 240 | 242 | 243 |
-| [BBC](https://www.bbc.co.uk/) | 643 | **584** | 603 | 604 | 605 | 638 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 635 | **577** | 595 | 596 | 597 | 629 | n/a |
 | [CERN](https://home.cern/) | 152 | **83** | 91 | 91 | 91 | 93 | 96 |
-| [CSS-Tricks](https://css-tricks.com/) | 162 | **119** | 127 | 143 | 143 | 148 | 144 |
+| [CSS-Tricks](https://css-tricks.com/) | 162 | **119** | 127 | 142 | 143 | 148 | 144 |
 | [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6401** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 70 | 70 | 71 | 75 | 73 |
-| [EFF](https://www.eff.org/) | 55 | **46** | 49 | 48 | 49 | 50 | 50 |
+| [EFF](https://www.eff.org/) | 54 | **45** | 49 | 47 | 48 | 49 | 49 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1564 | 1457 | **1404** | 1489 | 1500 | 1511 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1569 | 1457 | **1405** | 1493 | 1504 | 1515 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 153 | **122** | 126 | 126 | 126 | 132 | 127 |
 | [Frontend Dogma](https://frontenddogma.com/) | 225 | **217** | 238 | 223 | 225 | 243 | 224 |
-| [Google](https://www.google.com/) | 76 | **71** | n/a | 72 | 73 | 75 | 75 |
-| [Ground News](https://ground.news/) | 2373 | **2089** | 2185 | 2211 | 2213 | 2360 | n/a |
+| [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 18 | 18 |
+| [Ground News](https://ground.news/) | 2362 | **2084** | 2175 | 2200 | 2202 | 2349 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 50 | **33** | 36 | 36 | 36 | 37 | 36 |
-| [Leanpub](https://leanpub.com/) | 229 | **199** | 214 | 213 | 214 | 224 | 226 |
+| [Leanpub](https://leanpub.com/) | 229 | **200** | 214 | 214 | 215 | 225 | 227 |
 | [Mastodon](https://mastodon.social/explore) | 37 | **28** | 32 | 35 | 35 | 36 | 36 |
 | [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | 64 | 65 | 65 | 68 | 68 |
 | [Middle East Eye](https://www.middleeasteye.net/) | 223 | **196** | 203 | 201 | 200 | 202 | 203 |
 | [Mistral AI](https://mistral.ai/) | 360 | **319** | 323 | 326 | 327 | 357 | n/a |
 | [Mozilla](https://www.mozilla.org/) | 45 | **31** | 34 | 34 | 34 | 35 | 35 |
 | [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 68 | **55** | 74 | 75 | 77 | 76 |
-| [SitePoint](https://www.sitepoint.com/) | 491 | **360** | 431 | 465 | 470 | 488 | n/a |
+| [SitePoint](https://www.sitepoint.com/) | 488 | **357** | 428 | 461 | 466 | 484 | n/a |
 | [Startup-Verband](https://startupverband.de/) | 42 | **29** | 30 | 30 | 30 | 31 | 30 |
 | [TetraLogical](https://tetralogical.com/) | 44 | 39 | **35** | 38 | 39 | 39 | 39 |
 | [TPGi](https://www.tpgi.com/) | 175 | **159** | 160 | 164 | 166 | 172 | 172 |
-| [United Nations](https://www.un.org/en/) | 151 | **112** | 121 | 125 | 125 | 130 | 123 |
+| [United Nations](https://www.un.org/en/) | 152 | **112** | 122 | 125 | 125 | 131 | 124 |
 | [Vivaldi](https://vivaldi.com/) | 92 | **74** | n/a | 79 | 81 | 83 | 81 |
 | [W3C](https://www.w3.org/) | 50 | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 121 ms (30/30) | 648 ms (28/30) | 50 ms (30/30) | **14 ms (30/30)** | 275 ms (30/30) | 1409 ms (24/30) |
+| **Average processing time** |  | 118 ms (30/30) | 142 ms (29/30) | 48 ms (30/30) | **13 ms (30/30)** | 272 ms (30/30) | 1277 ms (24/30) |
 
 (Last updated: Dec 23, 2025)
 <!-- End auto-generated -->
 
-Notes: htmlnano runs in an isolated process for crash protection, adding ~50–100ms overhead per test. Minimize does not minify CSS and JS. [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to issues around whitespace collapsing and removal of code using modern CSS features, issues which appeared to distort the data.
+Notes: Minimize does not minify CSS and JS. [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to issues around whitespace collapsing and removal of code using modern CSS features, issues which appeared to distort the data.
 
 ## Examples
 
