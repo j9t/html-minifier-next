@@ -5215,6 +5215,16 @@ describe('HTML', () => {
 
     const resultWithRegExp = await minify(html, configWithRegExp);
     assert.strictEqual(resultWithRegExp, resultWithStrings, 'String and RegExp configs should produce identical results');
+
+    // Test the `^data-ng-` pattern variant
+    const html2 = '<div data-ng-click="alert(1 + 2)">test</div>';
+
+    const resultWithStrings2 = await minify(html2, configWithStrings);
+    // Should minify the `data-ng-click` attribute value (1 + 2 becomes 3)
+    assert.strictEqual(resultWithStrings2, '<div data-ng-click="alert(3)">test</div>');
+
+    const resultWithRegExp2 = await minify(html2, configWithRegExp);
+    assert.strictEqual(resultWithRegExp2, resultWithStrings2, 'String and RegExp configs should produce identical results for data-ng-click');
   });
 
   test('customAttrSurround with nested string regex patterns', async () => {
