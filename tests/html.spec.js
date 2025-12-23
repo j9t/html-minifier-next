@@ -1962,6 +1962,16 @@ describe('HTML', () => {
     input = '<md-list-item ui-sref=".app-config"><md-icon md-font-icon="mdi-settings"></md-icon><p translate>Configure</p></md-list-item>';
     output = '<md-list-item ui-sref=".app-config"><md-icon md-font-icon="mdi-settings"></md-icon><p translate>Configure</md-list-item>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Optional tags should work inside custom elements
+    input = '<my-card><p>First paragraph</p><p>Second paragraph</p></my-card>';
+    output = '<my-card><p>First paragraph<p>Second paragraph</my-card>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // List items inside custom elements
+    input = '<my-list><ul><li>Item 1</li><li>Item 2</li></ul></my-list>';
+    output = '<my-list><ul><li>Item 1<li>Item 2</ul></my-list>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
   });
 
   test('removing optional tags in tables', async () => {
@@ -3148,10 +3158,15 @@ describe('HTML', () => {
     output = '<p>Text with <abbr>abbr</abbr> and <b>bold</b> and <i>italic</i> and <u>underline</u> and <s>strike</s> and <small>small</small> elements.</p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
 
-    // Test with “comprehensive” preset
-    input = '<div>That’s not <a href="../">the whole story</a>!</div>';
-    output = '<div>That’s not <a href=../>the whole story</a>!</div>';
+    // Test with "comprehensive" preset
+    input = "<div>That's not <a href=\"../\">the whole story</a>!</div>";
+    output = "<div>That's not <a href=../>the whole story</a>!</div>";
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true, removeAttributeQuotes: true }), output);
+
+    // Whitespace should be preserved inside custom elements
+    input = '<my-button><span>Click</span> here</my-button>';
+    output = '<my-button><span>Click</span> here</my-button>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
   });
 
   test('ignoring custom comments', async () => {
