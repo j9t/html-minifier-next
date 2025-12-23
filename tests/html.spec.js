@@ -1960,7 +1960,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
     input = '<md-list-item ui-sref=".app-config"><md-icon md-font-icon="mdi-settings"></md-icon><p translate>Configure</p></md-list-item>';
-    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+    output = '<md-list-item ui-sref=".app-config"><md-icon md-font-icon="mdi-settings"></md-icon><p translate>Configure</md-list-item>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
   });
 
   test('removing optional tags in tables', async () => {

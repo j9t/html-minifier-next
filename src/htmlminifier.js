@@ -1028,7 +1028,7 @@ async function minifyHTML(value, options, partialMarkup) {
         // `</head>` may be omitted if not followed by space or comment
         // `</p>` may be omitted if no more content in non-`</a>` parent
         // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
-        if (htmlTags.has(tag) && optionalEndTag && !trailingTags.has(optionalEndTag) && (optionalEndTag !== 'p' || !pInlineTags.has(tag))) {
+        if (tag && optionalEndTag && !trailingTags.has(optionalEndTag) && (optionalEndTag !== 'p' || !pInlineTags.has(tag))) {
           removeEndTag();
         }
         optionalEndTag = optionalEndTags.has(tag) ? tag : '';
@@ -1206,8 +1206,7 @@ async function minifyHTML(value, options, partialMarkup) {
             const prevComment = buffer[buffer.length - 2];
 
             // Check if previous item is whitespace-only and item before that is ignore-placeholder
-            if (prevText && /^\s+$/.test(prevText) &&
-                prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
+            if (prevText && /^\s+$/.test(prevText) && prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
               // Extract the index from both placeholders to check their content
               const currentMatch = text.match(uidIgnorePlaceholderPattern);
               const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
