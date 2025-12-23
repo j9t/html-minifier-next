@@ -58,6 +58,18 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
     minifySVG: null
   };
 
+  // Helper to convert string patterns to RegExp (for JSON config support)
+  const parseRegExp = (value) => {
+    if (typeof value === 'string') {
+      return new RegExp(value.replace(/^\/(.*)\/$/, '$1'));
+    }
+    return value; // Already a RegExp or other type
+  };
+
+  const parseRegExpArray = (arr) => {
+    return Array.isArray(arr) ? arr.map(parseRegExp) : arr;
+  };
+
   Object.keys(inputOptions).forEach(function (key) {
     const option = inputOptions[key];
 
@@ -293,6 +305,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       // Unlike minifyCSS/minifyJS, this is a simple options object, not a function
       // The actual minification is applied inline during attribute processing
       options.minifySVG = getSVGMinifierOptions(option);
+    } else if (key === 'customAttrCollapse') {
+      // Single RegExp pattern
+      options[key] = parseRegExp(option);
+    } else if (['customAttrAssign', 'customAttrSurround', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
+      // Array of RegExp patterns
+      options[key] = parseRegExpArray(option);
     } else {
       options[key] = option;
     }
