@@ -5189,16 +5189,44 @@ describe('HTML', () => {
   });
 
   test('customAttrSurround with nested string regex patterns', async () => {
-    // Test that `customAttrSurround` handles nested arrays with string patterns
-    // Structure: `[[openPattern, closePattern], …]`
+    // Regression test: verify JSON config with string pairs (not RegExp objects)
+    // are correctly converted for `customAttrSurround`’s nested array structure
+    const html = '<input (data-attr="value")>';
 
+    const jsonConfig = {
+      collapseWhitespace: true,
+      removeAttributeQuotes: true,
+      // String patterns (as from JSON config), not RegExp objects
+      customAttrSurround: [
+        ['\\(', '\\)'],     // Parentheses wrapper
+        ['\\[', '\\]']      // Brackets wrapper
+      ]
+    };
+
+    const result = await minify(html, jsonConfig);
+
+    // Should successfully parse without throwing
+    assert.ok(result);
+    // Should preserve the wrapped attribute
+    assert.ok(result.includes('('));
+    assert.ok(result.includes('data-attr'));
+    assert.strictEqual(result, '<input (data-attr=value)>');
+
+    // Test with brackets
+    const html2 = '<div [class="test"]>content</div>';
+    const result2 = await minify(html2, jsonConfig);
+    assert.ok(result2.includes('['));
+    assert.ok(result2.includes('class'));
+  });
+
+  test('customAttrSurround with complex template patterns', async () => {
+    // Test with real-world Handlebars/template patterns
     const html = '<input {{#if value}}checked="checked"{{/if}}>';
 
     const jsonConfig = {
       collapseWhitespace: true,
       removeAttributeQuotes: true,
       collapseBooleanAttributes: true,
-      // Nested array with string patterns (as would come from JSON config)
       customAttrSurround: [
         ['\\{\\{#if\\s+\\w+\\}\\}', '\\{\\{\\/if\\}\\}'],
         ['\\{\\{#unless\\s+\\w+\\}\\}', '\\{\\{\\/unless\\}\\}']
@@ -5206,8 +5234,6 @@ describe('HTML', () => {
     };
 
     const result = await minify(html, jsonConfig);
-
-    // Should preserve the custom attribute syntax and collapse boolean attribute
     assert.strictEqual(result, '<input {{#if value}}checked{{/if}}>');
 
     // Test with unless
