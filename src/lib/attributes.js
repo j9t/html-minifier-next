@@ -17,6 +17,7 @@ import {
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
+import { minifySVGAttributeValue, shouldRemoveSVGAttribute } from './svg.js';
 
 // Validators
 
@@ -346,6 +347,17 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
       return attrValue;
     }
     return minifyHTMLSelf(attrValue, options, true);
+  } else if (options.insideSVG && options.minifySVG) {
+    // Apply SVG-specific attribute minification when inside SVG elements
+    try {
+      return minifySVGAttributeValue(attrName, attrValue, options.minifySVG);
+    } catch (err) {
+      if (!options.continueOnMinifyError) {
+        throw err;
+      }
+      options.log && options.log(err);
+      return attrValue;
+    }
   }
   return attrValue;
 }
@@ -386,7 +398,9 @@ async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
     (options.removeScriptTypeAttributes && tag === 'script' &&
       attrName === 'type' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue)) ||
     (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
-      attrName === 'type' && isStyleLinkTypeAttribute(attrValue))) {
+      attrName === 'type' && isStyleLinkTypeAttribute(attrValue)) ||
+    (options.insideSVG && options.minifySVG &&
+      shouldRemoveSVGAttribute(attrName, attrValue, options.minifySVG))) {
     return;
   }
 

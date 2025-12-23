@@ -4,6 +4,25 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.15.0] - 2025-12-23
+
+### Added
+
+- Added `minifySVG` option for lightweight SVG-specific optimizations
+  - Numeric precision reduction: Rounds coordinates and path data to configurable decimal places (default: 3)
+  - Whitespace removal: Removes excess whitespace in numeric attribute values (`transform`, `points`, `viewBox`, etc.)
+  - Color minification: Shortens hex colors (`#000000` → `#000`) and converts RGB to hex (`rgb(255,255,255)` → `#fff`)
+  - Default attribute removal: Safely removes well-documented SVG default attributes (e.g., `fill-opacity="1"`, `stroke-linecap="butt"`)
+  - Configurable via object: `{ precision: 3, removeDefaults: true, minifyColors: true }`
+  - Available in CLI via `--minify-svg` flag
+  - Enabled by default in `comprehensive` preset
+- Added comprehensive test suite with 13 SVG-specific test cases
+- Added detailed SVG minification documentation to README
+
+### Fixed
+
+- Fixed web demo reset option
+
 ## [4.14.3] - 2025-12-21
 
 ### Fixed

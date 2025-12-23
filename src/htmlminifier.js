@@ -305,6 +305,16 @@ const jsMinifyCache = new LRU(200);
  *
  *  Default: `false`
  *
+ * @prop {boolean | {precision?: number, removeDefaults?: boolean, minifyColors?: boolean}} [minifySVG]
+ *  When true, enables SVG-specific optimizations for SVG elements and attributes.
+ *  If an object is provided, it can include:
+ *  - `precision`: Number of decimal places for numeric values (coordinates, path data, etc.). Default: `3`
+ *  - `removeDefaults`: Remove attributes with default values (e.g., `fill="black"`). Default: `true`
+ *  - `minifyColors`: Minify color values (hex shortening, rgb to hex conversion). Default: `true`
+ *  If disabled, SVG content is minified using standard HTML rules only.
+ *
+ *  Default: `false`
+ *
  * @prop {(name: string) => string} [name]
  *  Function used to normalise tag/attribute names. By default, this lowercases
  *  names, unless `caseSensitive` is enabled.
@@ -899,6 +909,7 @@ async function minifyHTML(value, options, partialMarkup) {
         options.caseSensitive = true;
         options.keepClosingSlash = true;
         options.name = identity;
+        options.insideSVG = lowerTag === 'svg';
       }
       tag = options.name(tag);
       currentTag = tag;

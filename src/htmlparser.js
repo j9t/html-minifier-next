@@ -185,7 +185,7 @@ export class HTMLParser {
             }
           }
 
-          // https://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
+          // https://web.archive.org/web/20241201212701/https://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
           if (/^<!\[/.test(html)) {
             const conditionalEnd = html.indexOf(']>');
 

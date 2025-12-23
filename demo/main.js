@@ -85,8 +85,13 @@ const defaultOptions = [
     id: 'minifyJS',
     type: 'checkbox',
     label: 'Minify JavaScript',
-    helpText: 'Minify JavaScript in <code>script</code> elements and event attributes (uses Terser)',
-    checked: true
+    helpText: 'Minify JavaScript in <code>script</code> elements and event attributes (uses Terser)'
+  },
+  {
+    id: 'minifySVG',
+    type: 'checkbox',
+    label: 'Minify SVG',
+    helpText: 'Minify SVG elements and attributes (numeric precision, default attributes, colors)'
   },
   {
     id: 'minifyURLs',
@@ -123,8 +128,7 @@ const defaultOptions = [
     id: 'processConditionalComments',
     type: 'checkbox',
     label: 'Process conditional comments',
-    helpText: 'Process contents of conditional comments through minifier',
-    checked: true
+    helpText: 'Process contents of conditional comments through minifier'
   },
   {
     id: 'processScripts',
@@ -144,8 +148,7 @@ const defaultOptions = [
     id: 'removeAttributeQuotes',
     type: 'checkbox',
     label: 'Remove attribute quotes',
-    helpText: 'Remove quotes around attributes when possible',
-    checked: true
+    helpText: 'Remove quotes around attributes when possible'
   },
   {
     id: 'removeComments',
@@ -158,8 +161,7 @@ const defaultOptions = [
     id: 'removeEmptyAttributes',
     type: 'checkbox',
     label: 'Remove empty attributes',
-    helpText: 'Remove all attributes with whitespace-only values',
-    checked: true
+    helpText: 'Remove all attributes with whitespace-only values'
   },
   {
     id: 'removeEmptyElements',
@@ -179,15 +181,13 @@ const defaultOptions = [
     id: 'removeOptionalTags',
     type: 'checkbox',
     label: 'Remove optional tags',
-    helpText: 'Remove optional tags',
-    checked: true
+    helpText: 'Remove optional tags'
   },
   {
     id: 'removeRedundantAttributes',
     type: 'checkbox',
     label: 'Remove redundant attributes',
-    helpText: 'Remove attributes when value matches default',
-    checked: true
+    helpText: 'Remove attributes when value matches default'
   },
   {
     id: 'removeScriptTypeAttributes',
@@ -228,8 +228,7 @@ const defaultOptions = [
     id: 'trimCustomFragments',
     type: 'checkbox',
     label: 'Trim whitespace around custom fragments',
-    helpText: 'Trim whitespace around custom fragments (PHP, JSP/ASP tags)',
-    checked: true
+    helpText: 'Trim whitespace around custom fragments (PHP, JSP/ASP tags)'
   },
   {
     id: 'useShortDoctype',
@@ -534,7 +533,24 @@ const minifierData = () => ({
   },
 
   resetOptions() {
-    this.options = sillyClone(defaultOptions);
+    // Reset each option to its default value (similar to `applyPreset`)
+    this.options = this.options.map((option) => {
+      const defaultOption = defaultOptions.find(d => d.id === option.id);
+      if (!defaultOption) return option;
+
+      if (option.type === 'checkbox') {
+        return {
+          ...option,
+          checked: defaultOption.checked || false
+        };
+      } else {
+        return {
+          ...option,
+          value: defaultOption.value || ''
+        };
+      }
+    });
+
     this.output = '';
     this.stats = { result: '', text: '' };
     this.share = '';

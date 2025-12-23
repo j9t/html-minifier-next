@@ -168,6 +168,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and `style` attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://github.com/terser/terser) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
+| `minifySVG`<br>`--minify-svg` | Minify SVG elements and attributes (numeric precision, default attributes, colors) | `false` (could be `true`, `Object`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes (uses [relateurl](https://github.com/stevenvachon/relateurl)) | `false` (could be `String`, `Object`, `Function(text)`, `async Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
@@ -296,42 +297,95 @@ const result = await minify(html, {
 });
 ```
 
+### SVG minification
+
+When `minifySVG` is set to `true`, HTML Minifier Next applies SVG-specific optimizations to SVG elements and their attributes. These optimizations are lightweight, fast, and safe:
+
+```js
+const result = await minify(html, {
+  minifySVG: true // Enable with default settings
+});
+```
+
+What gets optimized:
+
+1. Numeric precision reduction: Coordinates and path data are rounded to 3 decimal places by default
+   - `<path d="M 0.00000000 0.00000000"/>` → `<path d="M 0 0"/>`
+   - `<circle cx="10.500000" cy="20.300000" r="5.000"/>` → `<circle cx="10.5" cy="20.3" r="5"/>`
+
+2. Whitespace removal: Excess whitespace in numeric attribute values is removed
+   - `transform="translate( 10 , 20 )"` → `transform="translate(10,20)"`
+   - `points="100, 10  40,  198"` → `points="100,10 40,198"`
+
+3. Color minification: Hex colors are shortened and RGB values converted to hex
+   - `fill="#000000"` → `fill="#000"`
+   - `fill="rgb(255,255,255)"` → `fill="#fff"`
+
+4. Default attribute removal: Well-documented SVG default attributes are removed
+   - `fill-opacity="1"` → removed
+   - `stroke-linecap="butt"` → removed
+
+You can customize the optimization behavior by providing an options object:
+
+```js
+const result = await minify(html, {
+  minifySVG: {
+    precision: 2,           // Use 2 decimal places instead of 3
+    removeDefaults: true,   // Remove default attributes (default: true)
+    minifyColors: true      // Minify color values (default: true)
+  }
+});
+```
+
+Available options:
+
+* `precision`: Number of decimal places for coordinates and path data (default: `3`)
+* `removeDefaults`: Remove attributes with default values (default: `true`)
+* `minifyColors`: Minify color values with hex shortening and RGB-to-hex conversion (default: `true`)
+
+**Important:**
+
+* SVG minification only applies within `<svg>` elements
+* Case sensitivity and self-closing slashes are automatically preserved in SVG (regardless of global settings)
+* For maximum compression, use `minifySVG` together with `collapseWhitespace` and other options
+* This is a lightweight, built-in implementation; for more aggressive SVG optimization, consider using [SVGO](https://github.com/svg/svgo) as a separate build step
+
 ## Minification comparison
 
-How does HTML Minifier Next compare to other minifiers? (All with the most aggressive settings—though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized)—and against some large documents.—Minimize does not minify CSS or JS.)
+How does HTML Minifier Next compare to other minifiers? (All minification with the most aggressive settings—though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized)—and against some large documents. Note that HTML Minifier Terser cannot currently—Dec 2025—handle modern CSS syntax like CSS nesting and removes such code, which can make it appear more effective than it is. Minimize does not minify CSS and JS.)
 
 <!-- Auto-generated benchmarks, don’t edit -->
 | Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next) ([config](https://github.com/j9t/html-minifier-next/blob/main/benchmarks/html-minifier.json))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)](https://socket.dev/npm/package/html-minifier-terser) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **50** | **50** | 51 | 52 | 51 | 54 | 52 |
-| [Apple](https://www.apple.com/) | 266 | **207** | **207** | 236 | 239 | 240 | 242 | 243 |
-| [BBC](https://www.bbc.co.uk/) | 727 | **661** | 671 | 683 | 683 | 685 | 721 | n/a |
-| [CERN](https://home.cern/) | 152 | **83** | 84 | 91 | 91 | 91 | 93 | 96 |
-| [CSS-Tricks](https://css-tricks.com/) | 162 | 122 | **120** | 127 | 143 | 143 | 148 | 145 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6354** | **6354** | 6573 | 6455 | 6578 | 6626 | n/a |
+| [Apple](https://www.apple.com/) | 266 | **206** | 207 | 236 | 239 | 240 | 242 | 243 |
+| [BBC](https://www.bbc.co.uk/) | 647 | **587** | 598 | 607 | 607 | 608 | 641 | n/a |
+| [CERN](https://home.cern/) | 152 | **83** | 84 | 91 | 91 | 92 | 93 | 96 |
+| [CSS-Tricks](https://css-tricks.com/) | 162 | **119** | 120 | 127 | 143 | 143 | 148 | 145 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7250 | 6402 | **6354** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 60 | 70 | 70 | 71 | 75 | 73 |
-| [EFF](https://www.eff.org/) | 55 | **45** | 47 | 49 | 48 | 48 | 50 | 50 |
+| [EFF](https://www.eff.org/) | 55 | **46** | 47 | 49 | 48 | 49 | 50 | 50 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1591 | 1486 | 1491 | **1427** | 1515 | 1526 | 1538 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1559 | 1451 | 1460 | **1398** | 1484 | 1495 | 1506 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 152 | **122** | **122** | 126 | 125 | 125 | 132 | 127 |
-| [Frontend Dogma](https://frontenddogma.com/) | 224 | **214** | 216 | 237 | 222 | 224 | 243 | 224 |
+| [Frontend Dogma](https://frontenddogma.com/) | 225 | **217** | **217** | 238 | 223 | 225 | 243 | 224 |
 | [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 17 | 18 | 18 |
-| [Ground News](https://ground.news/) | 2358 | **2076** | 2077 | 2173 | 2198 | 2202 | 2345 | n/a |
-| [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | **147** | **147** | 153 | **147** | 149 | 155 | 149 |
+| [Ground News](https://ground.news/) | 2104 | **1841** | 1843 | 1936 | 1959 | 1964 | 2091 | n/a |
+| [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | **147** | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 50 | **34** | **34** | 36 | 36 | 36 | 37 | 37 |
-| [Leanpub](https://leanpub.com/) | 222 | 192 | **191** | 207 | 207 | 207 | 217 | 219 |
+| [Leanpub](https://leanpub.com/) | 229 | 200 | **198** | 214 | 214 | 215 | 225 | 227 |
 | [Mastodon](https://mastodon.social/explore) | 37 | **28** | **28** | 32 | 35 | 35 | 36 | 36 |
-| [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | **62** | 64 | 65 | 65 | 68 | 68 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 222 | **196** | **196** | 202 | 200 | 200 | 202 | 203 |
-| [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 74 | 74 | **55** | 74 | 75 | 77 | 76 |
+| [MDN](https://developer.mozilla.org/en-US/) | 108 | **62** | **62** | 64 | 64 | 65 | 67 | 67 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 221 | **195** | **195** | 201 | 199 | 199 | 201 | 202 |
+| [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 68 | 74 | **55** | 74 | 75 | 77 | 76 |
 | [SitePoint](https://www.sitepoint.com/) | 491 | **360** | **360** | 431 | 465 | 470 | 488 | n/a |
-| [TetraLogical](https://tetralogical.com/) | 44 | 38 | 38 | **35** | 38 | 39 | 39 | 39 |
+| [TetraLogical](https://tetralogical.com/) | 44 | 39 | 38 | **35** | 38 | 39 | 39 | 39 |
 | [TPGi](https://www.tpgi.com/) | 175 | **159** | 161 | 160 | 164 | 166 | 172 | 172 |
-| [United Nations](https://www.un.org/en/) | 152 | **113** | 114 | 121 | 125 | 125 | 131 | 124 |
+| [United Nations](https://www.un.org/en/) | 152 | **113** | 115 | 122 | 125 | 125 | 131 | 124 |
 | [W3C](https://www.w3.org/) | 50 | **36** | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 259 ms (26/26) | 375 ms (26/26) | 164 ms (26/26) | 54 ms (26/26) | **16 ms (26/26)** | 327 ms (26/26) | 1497 ms (21/26) |
+| **Average processing time** |  | 246 ms (26/26) | 343 ms (26/26) | 154 ms (26/26) | 54 ms (26/26) | **15 ms (26/26)** | 312 ms (26/26) | 1379 ms (21/26) |
 
-(Last updated: Dec 21, 2025)
+(Last updated: Dec 22, 2025)
 <!-- End auto-generated -->
 
 ## Examples

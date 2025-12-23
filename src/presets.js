@@ -30,6 +30,7 @@ export const presets = {
     decodeEntities: true,
     minifyCSS: true,
     minifyJS: true,
+    minifySVG: true,
     minifyURLs: true,
     noNewlinesBeforeTagClose: true,
     processConditionalComments: true,
