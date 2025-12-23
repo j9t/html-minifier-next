@@ -59,10 +59,10 @@ const TEST_TIMEOUT = 30000;
 const BENCH_CONCURRENCY = Math.max(1, parseInt(process.env.BENCH_CONCURRENCY || '1', 10) || 1);
 
 const table = new Table({
-  head: ['File', 'Before', 'HTML Minifier Next', 'HTML Minifier Terser', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
+  head: ['File', 'Before', 'HTML Minifier Next', 'htmlnano', '@swc/html', 'minify-html', 'Minimize', 'htmlcompressor.com', 'Savings', 'Time'],
   colWidths: [fileNames.reduce(function (length, fileName) {
     return Math.max(length, fileName.length);
-  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 25, 20]
+  }, 0) + 2, 25, 25, 25, 25, 25, 25, 25, 25, 20]
 });
 
 function toKb(size, precision) {
@@ -150,7 +150,6 @@ function promiseLzma(data) {
 const rows = {};
 const totalTimes = {
   minifier: 0,
-  minifierterser: 0,
   htmlnano: 0,
   swchtml: 0,
   minifyhtml: 0,
@@ -159,7 +158,6 @@ const totalTimes = {
 };
 const successCounts = {
   minifier: 0,
-  minifierterser: 0,
   htmlnano: 0,
   swchtml: 0,
   minifyhtml: 0,
@@ -172,7 +170,6 @@ function generateMarkdownTable() {
     'Site',
     'Original Size (KB)',
     '[HTML Minifier Next](https://github.com/j9t/html-minifier-next) ([config](https://github.com/j9t/html-minifier-next/blob/main/benchmarks/html-minifier.json))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next)',
-    '[HTML Minifier Terser](https://github.com/terser/html-minifier-terser)<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-terser)](https://socket.dev/npm/package/html-minifier-terser)',
     '[htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano)',
     '[@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html)',
     '[minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node)',
@@ -232,7 +229,7 @@ function generateMarkdownTable() {
 
   // Add average processing time row
   const timeRow = ['**Average processing time**', ''];
-  const minifierNames = ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'];
+  const minifierNames = ['minifier', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'];
 
   // Count only sites that were actually processed (not skipped due to download failure)
   const processedSites = fileNames.filter(name => rows[name] && rows[name].report).length;
@@ -282,7 +279,7 @@ function displayTable() {
 
   // Add average processing time row
   const timeRow = ['Average processing time', ''];
-  const minifierNames = ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'];
+  const minifierNames = ['minifier', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'];
 
   // Count only sites that were actually processed (not skipped due to download failure)
   const processedSites = fileNames.filter(name => rows[name]).length;
@@ -349,7 +346,7 @@ async function processFile(fileName) {
       brFilePath: path.join('./generated/', fileName + '.html.br')
     };
     const infos = {};
-    ['minifier', 'minifierterser', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
+    ['minifier', 'htmlnano', 'swchtml', 'minifyhtml', 'minimize', 'compressor'].forEach(function (name) {
       infos[name] = {
         filePath: path.join('./generated/', fileName + '.' + name + '.html'),
         gzFilePath: path.join('./generated/', fileName + '.' + name + '.html.gz'),
@@ -432,55 +429,6 @@ async function processFile(fileName) {
         child.on('error', function (error) {
           clearTimeout(timeoutId);
           benchmarkErrors.push(`HTML Minifier CLI process error for ${fileName}: ${error.message}`);
-          resetSizes(info);
-          resolve();
-        });
-      });
-    }
-
-    // HTML Minifier Terser (run in separate process for timeout support)
-    async function testHTMLMinifierTerser() {
-      const info = infos.minifierterser;
-      info.startTime = Date.now();
-      const configPath = path.join(__dirname, 'html-minifier-terser.json');
-      // Pass site URL via CLI (not config) since each test uses a different base URL
-      const args = [filePath, '-c', configPath, '--minify-urls', site, '-o', info.filePath];
-
-      return new Promise((resolve) => {
-        const child = fork(path.join(__dirname, 'node_modules/html-minifier-terser/cli.js'), args);
-        let timeoutId;
-
-        // Set timeout for CLI process
-        timeoutId = setTimeout(() => {
-          child.kill('SIGTERM');
-          benchmarkErrors.push(`HTML Minifier Terser timed out after ${TEST_TIMEOUT / 1000} seconds for ${fileName}`);
-          resetSizes(info);
-          resolve();
-        }, TEST_TIMEOUT);
-
-        child.on('exit', async function (code, signal) {
-          clearTimeout(timeoutId);
-
-          if (code !== 0) {
-            benchmarkErrors.push(`HTML Minifier Terser failed with exit code ${code}${signal ? ` (signal: ${signal})` : ''} for ${fileName}`);
-            resetSizes(info);
-            resolve();
-            return;
-          }
-
-          try {
-            await readSizes(info);
-            resolve();
-          } catch (err) {
-            benchmarkErrors.push(`Failed to read sizes after HTML Minifier Terser processing ${fileName}: ${err.message}`);
-            resetSizes(info);
-            resolve();
-          }
-        });
-
-        child.on('error', function (error) {
-          clearTimeout(timeoutId);
-          benchmarkErrors.push(`HTML Minifier Terser process error for ${fileName}: ${error.message}`);
           resetSizes(info);
           resolve();
         });
@@ -713,9 +661,6 @@ async function processFile(fileName) {
 
     log(`${fileName}: Running HTML Minifier Next`);
     await testHTMLMinifier();
-
-    log(`${fileName}: Running HTML Minifier Terser`);
-    await testHTMLMinifierTerser();
 
     log(`${fileName}: Running htmlnano`);
     await testhtmlnano();
