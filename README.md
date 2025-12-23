@@ -392,7 +392,7 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 (Last updated: Dec 23, 2025)
 <!-- End auto-generated -->
 
-Notes: Minimize does not minify CSS and JS. [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to issues around whitespace collapsing and removal of code using modern CSS features, issues which appeared to distort the data.
+Notes: htmlnano runs in an isolated process for crash protection, adding ~50-100ms overhead per site. Minimize does not minify CSS and JS. [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to issues around whitespace collapsing and removal of code using modern CSS features, issues which appeared to distort the data.
 
 ## Examples
 
