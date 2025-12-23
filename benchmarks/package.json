@@ -3,11 +3,11 @@
   "dependencies": {
     "@minify-html/node": "^0.18.1",
     "@swc/core": "^1.15.7",
-    "@swc/html": "^1.15.4",
+    "@swc/html": "^1.15.7",
     "cli-table3": "^0.6.5",
     "cssnano": "^7.1.2",
     "html-minifier-terser": "^7.2.0",
-    "htmlnano": "^2.1.5",
+    "htmlnano": "^3.0.0",
     "lzma": "^2.3.2",
     "minimize": "^2.2.0",
     "progress": "^2.0.3",
