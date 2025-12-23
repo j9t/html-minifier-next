@@ -352,7 +352,7 @@ Available options:
 
 ## Minification comparison
 
-How does HTML Minifier Next compare to other minifiers? (All minification with the most aggressive settings—though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized)—and against a wide range of pages. Note that HTML Minifier Terser may handle whitespace too aggressively and doesn’t currently—Dec 2025—support modern CSS syntax like CSS nesting. Minimize does not minify CSS and JS.)
+How does HTML Minifier Next compare to other minifiers? (All minification with the most aggressive settings—though without [hyper-optimization](https://meiert.com/blog/the-ways-of-writing-html/#toc-hyper-optimized)—and against a wide range of pages.)
 
 <!-- Auto-generated benchmarks, don’t edit -->
 | Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next) ([config](https://github.com/j9t/html-minifier-next/blob/main/benchmarks/html-minifier.json))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
@@ -366,11 +366,11 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | [EDRi](https://edri.org/) | 80 | **59** | 70 | 70 | 71 | 75 | 73 |
 | [EFF](https://www.eff.org/) | 55 | **46** | 49 | 48 | 49 | 50 | 50 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1561 | 1454 | **1401** | 1486 | 1497 | 1508 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1564 | 1457 | **1404** | 1489 | 1500 | 1511 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 153 | **122** | 126 | 126 | 126 | 132 | 127 |
 | [Frontend Dogma](https://frontenddogma.com/) | 225 | **217** | 238 | 223 | 225 | 243 | 224 |
-| [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 18 | 18 |
-| [Ground News](https://ground.news/) | 2345 | **2063** | 2158 | 2185 | 2187 | 2333 | n/a |
+| [Google](https://www.google.com/) | 76 | **71** | n/a | 72 | 73 | 75 | 75 |
+| [Ground News](https://ground.news/) | 2373 | **2089** | 2185 | 2211 | 2213 | 2360 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 50 | **33** | 36 | 36 | 36 | 37 | 36 |
 | [Leanpub](https://leanpub.com/) | 229 | **199** | 214 | 213 | 214 | 224 | 226 |
@@ -387,12 +387,12 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | [United Nations](https://www.un.org/en/) | 151 | **112** | 121 | 125 | 125 | 130 | 123 |
 | [Vivaldi](https://vivaldi.com/) | 92 | **74** | n/a | 79 | 81 | 83 | 81 |
 | [W3C](https://www.w3.org/) | 50 | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 126 ms (30/30) | 673 ms (29/30) | 51 ms (30/30) | **14 ms (30/30)** | 276 ms (30/30) | 1430 ms (24/30) |
+| **Average processing time** |  | 121 ms (30/30) | 648 ms (28/30) | 50 ms (30/30) | **14 ms (30/30)** | 275 ms (30/30) | 1409 ms (24/30) |
 
 (Last updated: Dec 23, 2025)
 <!-- End auto-generated -->
 
-Note: [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to bugs and support limitations (like erroneous whitespace collapsing and removal of code using modern CSS features, issues that were addressed in HMN) that look like more effective minification but instead negatively impact output quality.
+Notes: Minimize does not minify CSS and JS. [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to issues around whitespace collapsing and removal of code using modern CSS features, issues which appeared to distort the data.
 
 ## Examples
 
