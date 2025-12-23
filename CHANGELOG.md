@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 - Fixed optional end tag removal to work correctly with custom elements (e.g., `</p>` can now be removed before closing custom element tags like `</md-list-item>`)
+- Added test coverage for custom elements to ensure optional tag removal and whitespace handling work correctly within web components
 
 ## [4.15.0] - 2025-12-23
 

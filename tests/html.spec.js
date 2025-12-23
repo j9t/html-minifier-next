@@ -3167,6 +3167,11 @@ describe('HTML', () => {
     input = '<my-button><span>Click</span> here</my-button>';
     output = '<my-button><span>Click</span> here</my-button>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Whitespace collapsing inside custom elements
+    input = '<user-card  class="active"  >\n  <h2>Name</h2>\n  <p>Bio with <strong>bold</strong> text</p>  \n</user-card>';
+    output = '<user-card class=active><h2>Name</h2><p>Bio with <strong>bold</strong> text</p></user-card>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, removeAttributeQuotes: true }), output);
   });
 
   test('ignoring custom comments', async () => {
