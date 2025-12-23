@@ -3158,9 +3158,9 @@ describe('HTML', () => {
     output = '<p>Text with <abbr>abbr</abbr> and <b>bold</b> and <i>italic</i> and <u>underline</u> and <s>strike</s> and <small>small</small> elements.</p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
 
-    // Test with "comprehensive" preset
-    input = "<div>That's not <a href=\"../\">the whole story</a>!</div>";
-    output = "<div>That's not <a href=../>the whole story</a>!</div>";
+    // Test with “comprehensive” preset
+    input = '<div>That’s not <a href="../">the whole story</a>!</div>';
+    output = '<div>That’s not <a href=../>the whole story</a>!</div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true, removeAttributeQuotes: true }), output);
 
     // Whitespace should be preserved inside custom elements
