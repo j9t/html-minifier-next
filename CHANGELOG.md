@@ -4,6 +4,25 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.15.2] - 2025-12-23
+
+### Fixed
+
+- Fixed library not converting string regex patterns from JSON config files to RegExp objects
+  - When using the library directly (not CLI) with JSON configs containing regex patterns as strings (e.g., `"ignoreCustomFragments": ["<#[\\s\\S]*?#>"]`), patterns were not being converted to RegExp objects, causing broken minification
+  - The CLI worked correctly because `normalizeConfig()` performed this conversion, but the library’s `processOptions()` did not
+  - Affected options: `ignoreCustomFragments`, `ignoreCustomComments`, `customAttrAssign`, `customAttrSurround`, `customEventAttributes`, `customAttrCollapse`
+  - Added automatic string-to-RegExp conversion in `processOptions()` for consistent behavior between CLI and library
+  - Added regression tests for JSON config with string regex patterns
+
+### Internal
+
+- Updated benchmarks
+  - Removed HTML Minifier Terser from comparison due to bugs and limitations that distort the results
+  - Refactored benchmark execution to isolate crashes and ensure fair timing measurements
+  - Added additional samples sites
+  - Re-ran benchmarks
+
 ## [4.15.1] - 2025-12-23
 
 ### Fixed
