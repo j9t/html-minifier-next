@@ -5187,4 +5187,32 @@ describe('HTML', () => {
     // Should successfully process without throwing errors
     assert.ok(result.includes('test'));
   });
+
+  test('customAttrSurround with nested string regex patterns', async () => {
+    // Test that `customAttrSurround` handles nested arrays with string patterns
+    // Structure: `[[openPattern, closePattern], …]`
+
+    const html = '<input {{#if value}}checked="checked"{{/if}}>';
+
+    const jsonConfig = {
+      collapseWhitespace: true,
+      removeAttributeQuotes: true,
+      collapseBooleanAttributes: true,
+      // Nested array with string patterns (as would come from JSON config)
+      customAttrSurround: [
+        ['\\{\\{#if\\s+\\w+\\}\\}', '\\{\\{\\/if\\}\\}'],
+        ['\\{\\{#unless\\s+\\w+\\}\\}', '\\{\\{\\/unless\\}\\}']
+      ]
+    };
+
+    const result = await minify(html, jsonConfig);
+
+    // Should preserve the custom attribute syntax and collapse boolean attribute
+    assert.strictEqual(result, '<input {{#if value}}checked{{/if}}>');
+
+    // Test with unless
+    const html2 = '<div {{#unless hidden}}class="visible"{{/unless}}>content</div>';
+    const result2 = await minify(html2, jsonConfig);
+    assert.strictEqual(result2, '<div {{#unless hidden}}class=visible{{/unless}}>content</div>');
+  });
 });

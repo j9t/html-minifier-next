@@ -70,6 +70,19 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
     return Array.isArray(arr) ? arr.map(parseRegExp) : arr;
   };
 
+  // Helper for nested arrays (e.g., `customAttrSurround: [[start, end], …]`)
+  const parseNestedRegExpArray = (arr) => {
+    if (!Array.isArray(arr)) return arr;
+    return arr.map(item => {
+      // If item is an array (a pair), recursively convert each element
+      if (Array.isArray(item)) {
+        return item.map(parseRegExp);
+      }
+      // Otherwise, convert single item
+      return parseRegExp(item);
+    });
+  };
+
   Object.keys(inputOptions).forEach(function (key) {
     const option = inputOptions[key];
 
@@ -308,7 +321,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
     } else if (key === 'customAttrCollapse') {
       // Single RegExp pattern
       options[key] = parseRegExp(option);
-    } else if (['customAttrAssign', 'customAttrSurround', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
+    } else if (key === 'customAttrSurround') {
+      // Nested array of RegExp pairs: `[[openRegExp, closeRegExp], …]`
+      options[key] = parseNestedRegExpArray(option);
+    } else if (['customAttrAssign', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
       // Array of RegExp patterns
       options[key] = parseRegExpArray(option);
     } else {
