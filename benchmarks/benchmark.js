@@ -13,9 +13,9 @@ import lzma from 'lzma';
 import Minimize from 'minimize';
 import Progress from 'progress';
 import Table from 'cli-table3';
-import htmlnano from 'htmlnano';
 import { minify as minifySWC } from '@swc/html';
 import minifyHTMLPkg from '@minify-html/node';
+import { minify as minifyHMN } from '../src/htmlminifier.js';
 
 const { minify: minifyHTML } = minifyHTMLPkg;
 
@@ -388,20 +388,38 @@ async function processFile(fileName) {
 
     // HTML Minifier Next
     async function testHTMLMinifier() {
+      const data = await readText(filePath);
       const info = infos.minifier;
       info.startTime = Date.now();
-      const configPath = path.join(__dirname, 'html-minifier.json');
-      // Pass site URL via CLI (not config) since each test uses a different base URL
-      const args = [filePath, '-c', configPath, '--minify-urls', site, '-o', info.filePath];
+
+      try {
+        // Load config and add site-specific minifyURLs
+        const config = { ...minifierConfig, minifyURLs: site };
+        const result = await minifyHMN(data, config);
+        await writeText(info.filePath, result);
+        await readSizes(info);
+      } catch (err) {
+        benchmarkErrors.push(`HTML Minifier Next failed for ${fileName}: ${err.message}`);
+        resetSizes(info);
+      }
+    }
+
+    // htmlnano, https://htmlnano.netlify.app/presets
+    // (Run in separate process for crash isolation from Terser errors)
+    async function testhtmlnano() {
+      const info = infos.htmlnano;
+      info.startTime = Date.now();
 
       return new Promise((resolve) => {
-        const child = fork(path.join(__dirname, '../cli.js'), args);
+        const child = fork(path.join(__dirname, 'htmlnano.js'), [filePath, info.filePath], {
+          silent: true // Suppress stderr to avoid Terser stack traces
+        });
         let timeoutId;
 
-        // Set timeout for CLI process
+        // Set timeout for htmlnano process
         timeoutId = setTimeout(() => {
           child.kill('SIGTERM');
-          benchmarkErrors.push(`HTML Minifier CLI timed out after ${TEST_TIMEOUT / 1000} seconds for ${fileName}`);
+          benchmarkErrors.push(`htmlnano timed out after ${TEST_TIMEOUT / 1000} seconds for ${fileName}`);
           resetSizes(info);
           resolve();
         }, TEST_TIMEOUT);
@@ -410,7 +428,7 @@ async function processFile(fileName) {
           clearTimeout(timeoutId);
 
           if (code !== 0) {
-            benchmarkErrors.push(`HTML Minifier CLI failed with exit code ${code}${signal ? ` (signal: ${signal})` : ''} for ${fileName}`);
+            benchmarkErrors.push(`htmlnano failed with exit code ${code}${signal ? ` (signal: ${signal})` : ''} for ${fileName}`);
             resetSizes(info);
             resolve();
             return;
@@ -420,7 +438,7 @@ async function processFile(fileName) {
             await readSizes(info);
             resolve();
           } catch (err) {
-            benchmarkErrors.push(`Failed to read sizes after HTML Minifier processing ${fileName}: ${err.message}`);
+            benchmarkErrors.push(`Failed to read sizes after htmlnano processing ${fileName}: ${err.message}`);
             resetSizes(info);
             resolve();
           }
@@ -428,27 +446,11 @@ async function processFile(fileName) {
 
         child.on('error', function (error) {
           clearTimeout(timeoutId);
-          benchmarkErrors.push(`HTML Minifier CLI process error for ${fileName}: ${error.message}`);
+          benchmarkErrors.push(`htmlnano process error for ${fileName}: ${error.message}`);
           resetSizes(info);
           resolve();
         });
       });
-    }
-
-    // htmlnano, https://htmlnano.netlify.app/presets
-    async function testhtmlnano() {
-      const data = await readText(filePath);
-      const info = infos.htmlnano;
-      info.startTime = Date.now();
-
-      try {
-        const result = await htmlnano.process(data, {}, htmlnano.presets.max);
-        await writeText(info.filePath, result.html);
-        await readSizes(info);
-      } catch (err) {
-        benchmarkErrors.push(`htmlnano failed for ${fileName}: ${err.message}`);
-        resetSizes(info);
-      }
     }
 
     // @swc/html, https://swc.rs/docs/usage/html
