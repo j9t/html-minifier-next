@@ -5,7 +5,8 @@ import htmlnano from 'htmlnano';
 
 // Catch uncaught exceptions (e.g., Terser parsing errors) and exit gracefully
 process.on('uncaughtException', (err) => {
-  // Silently exit with error code—parent process will log the failure
+  // Log error to stderr for debugging (stdout is reserved for JSON timing)
+  console.error('htmlnano worker uncaught exception:', err.stack || err);
   process.exit(1);
 });
 
@@ -30,5 +31,7 @@ try {
 
   process.exit(0);
 } catch (err) {
+  // Log error to stderr for debugging (stdout is reserved for JSON timing)
+  console.error('htmlnano worker error:', err.stack || err);
   process.exit(1);
 }
