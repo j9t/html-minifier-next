@@ -359,33 +359,33 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **50** | **50** | 51 | 52 | 51 | 54 | 52 |
 | [Apple](https://www.apple.com/) | 266 | **206** | 207 | 236 | 239 | 240 | 242 | 243 |
-| [BBC](https://www.bbc.co.uk/) | 647 | **587** | 598 | 607 | 607 | 608 | 641 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 645 | **587** | 597 | 606 | 606 | 607 | 640 | n/a |
 | [CERN](https://home.cern/) | 152 | **83** | 84 | 91 | 91 | 92 | 93 | 96 |
-| [CSS-Tricks](https://css-tricks.com/) | 162 | **119** | 120 | 127 | 143 | 143 | 148 | 145 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7250 | 6402 | **6354** | 6573 | 6455 | 6578 | 6626 | n/a |
+| [CSS-Tricks](https://css-tricks.com/) | 162 | **119** | 120 | 127 | 143 | 143 | 148 | 144 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7250 | 6401 | **6354** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 60 | 70 | 70 | 71 | 75 | 73 |
-| [EFF](https://www.eff.org/) | 55 | **46** | 47 | 49 | 48 | 49 | 50 | 50 |
+| [EFF](https://www.eff.org/) | 55 | **46** | 47 | 49 | 48 | 48 | 50 | 50 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1559 | 1451 | 1460 | **1398** | 1484 | 1495 | 1506 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1575 | 1467 | 1476 | **1413** | 1500 | 1511 | 1522 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 152 | **122** | **122** | 126 | 125 | 125 | 132 | 127 |
 | [Frontend Dogma](https://frontenddogma.com/) | 225 | **217** | **217** | 238 | 223 | 225 | 243 | 224 |
 | [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 17 | 18 | 18 |
-| [Ground News](https://ground.news/) | 2104 | **1841** | 1843 | 1936 | 1959 | 1964 | 2091 | n/a |
+| [Ground News](https://ground.news/) | 2106 | **1837** | 1838 | 1934 | 1962 | 1967 | 2093 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | **147** | 153 | **147** | 149 | 155 | 149 |
-| [Igalia](https://www.igalia.com/) | 50 | **34** | **34** | 36 | 36 | 36 | 37 | 37 |
-| [Leanpub](https://leanpub.com/) | 229 | 200 | **198** | 214 | 214 | 215 | 225 | 227 |
+| [Igalia](https://www.igalia.com/) | 50 | **33** | **33** | 36 | 36 | 36 | 37 | 36 |
+| [Leanpub](https://leanpub.com/) | 225 | 196 | **194** | 210 | 210 | 211 | 221 | 223 |
 | [Mastodon](https://mastodon.social/explore) | 37 | **28** | **28** | 32 | 35 | 35 | 36 | 36 |
-| [MDN](https://developer.mozilla.org/en-US/) | 108 | **62** | **62** | 64 | 64 | 65 | 67 | 67 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 221 | **195** | **195** | 201 | 199 | 199 | 201 | 202 |
+| [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | **62** | 64 | 65 | 65 | 68 | 68 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 223 | **196** | **196** | 202 | 201 | 200 | 202 | 203 |
 | [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 68 | 74 | **55** | 74 | 75 | 77 | 76 |
 | [SitePoint](https://www.sitepoint.com/) | 491 | **360** | **360** | 431 | 465 | 470 | 488 | n/a |
 | [TetraLogical](https://tetralogical.com/) | 44 | 39 | 38 | **35** | 38 | 39 | 39 | 39 |
 | [TPGi](https://www.tpgi.com/) | 175 | **159** | 161 | 160 | 164 | 166 | 172 | 172 |
-| [United Nations](https://www.un.org/en/) | 152 | **113** | 115 | 122 | 125 | 125 | 131 | 124 |
+| [United Nations](https://www.un.org/en/) | 152 | **113** | 115 | 121 | 125 | 125 | 131 | 124 |
 | [W3C](https://www.w3.org/) | 50 | **36** | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 246 ms (26/26) | 343 ms (26/26) | 154 ms (26/26) | 54 ms (26/26) | **15 ms (26/26)** | 312 ms (26/26) | 1379 ms (21/26) |
+| **Average processing time** |  | 267 ms (26/26) | 359 ms (26/26) | 160 ms (26/26) | 54 ms (26/26) | **16 ms (26/26)** | 313 ms (26/26) | 1572 ms (21/26) |
 
-(Last updated: Dec 22, 2025)
+(Last updated: Dec 23, 2025)
 <!-- End auto-generated -->
 
 ## Examples
