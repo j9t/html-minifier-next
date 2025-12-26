@@ -400,7 +400,7 @@ async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
     (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
       attrName === 'type' && isStyleLinkTypeAttribute(attrValue)) ||
     (options.insideSVG && options.minifySVG &&
-      shouldRemoveSVGAttribute(attrName, attrValue, options.minifySVG))) {
+      shouldRemoveSVGAttribute(tag, attrName, attrValue, options.minifySVG))) {
     return;
   }
 
