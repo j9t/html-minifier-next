@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Path data space optimization: Removes unnecessary spaces in path commands (`M 10 20 L 30 40` → `M10 20L30 40`)
   - Performance: Added LRU caching for numeric values, improving minification speed on SVG-heavy documents
 
+### Internal
+
+- Renamed numbered tests to make them more maintainable
+
 ## [4.15.2] - 2025-12-23
 
 ### Fixed
