@@ -362,16 +362,18 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | [BBC](https://www.bbc.co.uk/) | 674 | **613** | 633 | 633 | 634 | 669 | n/a |
 | [CERN](https://home.cern/) | 152 | **83** | 91 | 91 | 91 | 93 | 96 |
 | [CSS-Tricks](https://css-tricks.com/) | 162 | **119** | 127 | 143 | 143 | 148 | 144 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6401** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 70 | 70 | 71 | 75 | 73 |
 | [EFF](https://www.eff.org/) | 54 | **45** | 48 | 47 | 48 | 49 | 49 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | 32 | 32 | 32 | 32 | 32 |
 | [FAZ](https://www.faz.net/aktuell/) | 1572 | 1461 | **1408** | 1496 | 1507 | 1518 | n/a |
+| [French Tech](https://lafrenchtech.gouv.fr/) | 153 | **122** | 126 | 126 | 126 | 132 | 127 |
 | [Frontend Dogma](https://frontenddogma.com/) | 225 | **217** | 238 | 224 | 225 | 244 | 225 |
-| [Google](https://www.google.com/) | 76 | **71** | n/a | **71** | 73 | 75 | 75 |
-| [Ground News](https://ground.news/) | 2924 | **2601** | 2694 | 2722 | 2723 | 2910 | n/a |
+| [Google](https://www.google.com/) | 76 | **71** | n/a | 72 | 73 | 76 | 75 |
+| [Ground News](https://ground.news/) | 2973 | **2644** | 2740 | 2768 | 2769 | 2959 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 50 | **33** | 36 | 36 | 36 | 37 | 36 |
-| [Leanpub](https://leanpub.com/) | 231 | **202** | 216 | 216 | 217 | 227 | 229 |
+| [Leanpub](https://leanpub.com/) | 233 | **203** | 218 | 218 | 218 | 228 | 230 |
 | [Mastodon](https://mastodon.social/explore) | 37 | **28** | 32 | 35 | 35 | 36 | 36 |
 | [MDN](https://developer.mozilla.org/en-US/) | 106 | **60** | 62 | 63 | 63 | 66 | 66 |
 | [Middle East Eye](https://www.middleeasteye.net/) | 223 | **196** | 203 | 201 | 201 | 202 | 203 |
@@ -385,7 +387,7 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | [United Nations](https://www.un.org/en/) | 151 | **112** | 121 | 125 | 125 | 130 | 123 |
 | [Vivaldi](https://vivaldi.com/) | 92 | **74** | n/a | 79 | 81 | 83 | 81 |
 | [W3C](https://www.w3.org/) | 50 | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 49 ms (28/28) | 133 ms (26/28) | 36 ms (28/28) | **7 ms (28/28)** | 57 ms (28/28) | 1430 ms (23/28) |
+| **Average processing time** |  | 122 ms (30/30) | 152 ms (28/30) | 53 ms (30/30) | **14 ms (30/30)** | 272 ms (30/30) | 1304 ms (24/30) |
 
 (Last updated: Dec 26, 2025)
 <!-- End auto-generated -->
