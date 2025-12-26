@@ -346,17 +346,23 @@ describe('SVG', () => {
     const identityTransforms = [
       'translate(0)',
       'translate(0,0)',
+      'translate(0 0)', // space-separated
       'scale(1)',
       'scale(1,1)',
+      'scale(1 1)', // space-separated
       'rotate(0)',
       'skewX(0)',
       'skewY(0)',
       'matrix(1,0,0,1,0,0)',
-      'translate( 0 , 0 )',  // with whitespace
+      'matrix(1 0 0 1 0 0)', // space-separated
+      'translate( 0 , 0 )', // with whitespace
       'translate(0.0, 0.00)', // decimal variants
+      'translate(0.0 0.00)', // decimal with spaces
       'scale(1.00)',
+      'scale(1.0 1.0)', // decimal with spaces
       'rotate(0.000)',
-      'matrix(1.0,0.0,0.0,1.0,0.0,0.0)'
+      'matrix(1.0,0.0,0.0,1.0,0.0,0.0)',
+      'matrix(1.0 0.0 0.0 1.0 0.0 0.0)' // decimal with spaces
     ];
 
     for (const transform of identityTransforms) {
@@ -383,10 +389,11 @@ describe('SVG', () => {
       { input: 'M 10 10 A 5 5 0 0 1 20 20', expected: 'M10 10A5 5 0 0 1 20 20', desc: 'arc commands' }
     ];
 
-    for (const { input, expected } of pathTests) {
+    for (const { input, expected, desc } of pathTests) {
       assert.strictEqual(
         await minify(`<svg><path d="${input}"/></svg>`, { minifySVG: true, collapseWhitespace: true }),
-        `<svg><path d="${expected}"/></svg>`
+        `<svg><path d="${expected}"/></svg>`,
+        `Path space optimization failed for ${desc}: input="${input}"`
       );
     }
   });

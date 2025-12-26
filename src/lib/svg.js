@@ -280,20 +280,23 @@ function isIdentityTransform(transform) {
   const trimmed = transform.trim();
 
   // Check for common identity transforms
-  // `translate(0)`, `translate(0,0)` (matches 0, 0.0, 0.00, etc.)
-  if (/^translate\s*\(\s*0(?:\.0+)?\s*(?:,\s*0(?:\.0+)?\s*)?\)$/i.test(trimmed)) return true;
+  // Separator pattern: accepts comma with optional spaces or one or more spaces
+  const sep = '(?:\\s*,\\s*|\\s+)';
 
-  // `scale(1)`, `scale(1,1)` (matches 1, 1.0, 1.00, etc.)
-  if (/^scale\s*\(\s*1(?:\.0+)?\s*(?:,\s*1(?:\.0+)?\s*)?\)$/i.test(trimmed)) return true;
+  // `translate(0)`, `translate(0,0)`, `translate(0 0)` (matches 0, 0.0, 0.00, etc.)
+  if (new RegExp(`^translate\\s*\\(\\s*0(?:\\.0+)?\\s*(?:${sep}0(?:\\.0+)?\\s*)?\\)$`, 'i').test(trimmed)) return true;
 
-  // `rotate(0)` (matches 0, 0.0, 0.00, etc.)
-  if (/^rotate\s*\(\s*0(?:\.0+)?\s*(?:,\s*[^)]+)?\)$/i.test(trimmed)) return true;
+  // `scale(1)`, `scale(1,1)`, `scale(1 1)` (matches 1, 1.0, 1.00, etc.)
+  if (new RegExp(`^scale\\s*\\(\\s*1(?:\\.0+)?\\s*(?:${sep}1(?:\\.0+)?\\s*)?\\)$`, 'i').test(trimmed)) return true;
+
+  // `rotate(0)`, `rotate(0 cx cy)`, `rotate(0, cx, cy)` (matches 0, 0.0, 0.00, etc.)
+  if (new RegExp(`^rotate\\s*\\(\\s*0(?:\\.0+)?\\s*(?:${sep}[^)]+)?\\)$`, 'i').test(trimmed)) return true;
 
   // `skewX(0)`, `skewY(0)` (matches 0, 0.0, 0.00, etc.)
   if (/^skew[XY]\s*\(\s*0(?:\.0+)?\s*\)$/i.test(trimmed)) return true;
 
-  // `matrix(1,0,0,1,0,0)`—identity matrix (matches 1.0/0.0 variants)
-  if (/^matrix\s*\(\s*1(?:\.0+)?\s*,\s*0(?:\.0+)?\s*,\s*0(?:\.0+)?\s*,\s*1(?:\.0+)?\s*,\s*0(?:\.0+)?\s*,\s*0(?:\.0+)?\s*\)$/i.test(trimmed)) return true;
+  // `matrix(1,0,0,1,0,0)`, `matrix(1 0 0 1 0 0)`—identity matrix (matches 1.0/0.0 variants)
+  if (new RegExp(`^matrix\\s*\\(\\s*1(?:\\.0+)?\\s*${sep}0(?:\\.0+)?\\s*${sep}0(?:\\.0+)?\\s*${sep}1(?:\\.0+)?\\s*${sep}0(?:\\.0+)?\\s*${sep}0(?:\\.0+)?\\s*\\)$`, 'i').test(trimmed)) return true;
 
   return false;
 }
