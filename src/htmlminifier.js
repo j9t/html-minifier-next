@@ -91,8 +91,8 @@ async function getSwc() {
 
 // Minification caches
 
-const cssMinifyCache = new LRU(200);
-const jsMinifyCache = new LRU(200);
+const cssMinifyCache = new LRU(500);
+const jsMinifyCache = new LRU(500);
 
 // Type definitions
 
@@ -635,7 +635,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       attrSorters[tag] = attrChains[tag].createSorter();
     }
     // Memoize sorted attribute orders—attribute sets often repeat in templates
-    const attrOrderCache = new LRU(200);
+    const attrOrderCache = new LRU(500);
 
     options.sortAttributes = function (tag, attrs) {
       const sorter = attrSorters[tag];
@@ -666,7 +666,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   if (classChain) {
     const sorter = classChain.createSorter();
     // Memoize `sortClassName` results—class lists often repeat in templates
-    const classNameCache = new LRU(200);
+    const classNameCache = new LRU(500);
 
     options.sortClassName = function (value) {
       // Fast path: Single class (no spaces) needs no sorting
