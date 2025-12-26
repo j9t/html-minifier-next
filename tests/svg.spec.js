@@ -378,6 +378,32 @@ describe('SVG', () => {
       await minify('<svg><rect transform="translate(10,20)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
       '<svg><rect transform="translate(10,20)"/></svg>'
     );
+
+    // Identity rotate with valid center coordinates should be removed
+    assert.strictEqual(
+      await minify('<svg><rect transform="rotate(0, 10, 20)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect/></svg>',
+      'Failed to remove identity rotate(0, cx, cy)'
+    );
+
+    assert.strictEqual(
+      await minify('<svg><rect transform="rotate(0 10 20)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect/></svg>',
+      'Failed to remove identity rotate(0 cx cy) with spaces'
+    );
+
+    assert.strictEqual(
+      await minify('<svg><rect transform="rotate(0.0, 5.5, -10.25)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect/></svg>',
+      'Failed to remove identity rotate with decimal center coordinates'
+    );
+
+    // Invalid rotate transforms should be preserved (not removed)
+    assert.strictEqual(
+      await minify('<svg><rect transform="rotate(0, invalid)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect transform="rotate(0,invalid)"/></svg>',
+      'Invalid rotate transform should be preserved (with whitespace collapsed)'
+    );
   });
 
   test('Path data space optimization', async () => {

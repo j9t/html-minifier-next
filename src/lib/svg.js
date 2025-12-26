@@ -133,7 +133,7 @@ function minifyPathData(pathData, precision = 3) {
   });
 
   // Remove unnecessary spaces around path commands
-  // Safe to remove space after command letter when followed by a number or minus sign
+  // Safe to remove space after a command letter when it’s followed by a number (which may be negative)
   // M 10 20 → M10 20, L -5 -3 → L-5-3
   result = result.replace(/([MLHVCSQTAZmlhvcsqtaz])\s+(?=-?\d)/g, '$1');
 
@@ -196,7 +196,7 @@ function minifyColor(color) {
 
   // Shorten 6-digit hex to 3-digit when possible
   // #aabbcc → #abc, #000000 → #000
-  const hexMatch = lower.match(/^#([0-9a-f]{6})$/i);
+  const hexMatch = lower.match(/^#([0-9a-f]{6})$/);
   if (hexMatch) {
     const hex = hexMatch[1];
     if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
@@ -209,14 +209,14 @@ function minifyColor(color) {
   }
 
   // Match 3-digit hex colors
-  const hex3Match = lower.match(/^#[0-9a-f]{3}$/i);
+  const hex3Match = lower.match(/^#[0-9a-f]{3}$/);
   if (hex3Match) {
     // Check if there’s a shorter named color
     return NAMED_COLORS[lower] || lower;
   }
 
   // Convert rgb(255,255,255) to hex
-  const rgbMatch = lower.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+  const rgbMatch = lower.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
   if (rgbMatch) {
     const r = parseInt(rgbMatch[1], 10);
     const g = parseInt(rgbMatch[2], 10);
@@ -269,6 +269,26 @@ const COLOR_ATTRS = new Set([
   'lighting-color'
 ]);
 
+// Pre-compiled regexes for identity transform detection (compiled once at module load)
+// Separator pattern: Accepts comma with optional spaces or one or more spaces
+const SEP = '(?:\\s*,\\s*|\\s+)';
+
+// `translate(0)`, `translate(0,0)`, `translate(0 0)` (matches 0, 0.0, 0.00, etc.)
+const IDENTITY_TRANSLATE_RE = new RegExp(`^translate\\s*\\(\\s*0(?:\\.0+)?\\s*(?:${SEP}0(?:\\.0+)?\\s*)?\\)$`, 'i');
+
+// `scale(1)`, `scale(1,1)`, `scale(1 1)` (matches 1, 1.0, 1.00, etc.)
+const IDENTITY_SCALE_RE = new RegExp(`^scale\\s*\\(\\s*1(?:\\.0+)?\\s*(?:${SEP}1(?:\\.0+)?\\s*)?\\)$`, 'i');
+
+// `rotate(0)`, `rotate(0 cx cy)`, `rotate(0, cx, cy)` (matches 0, 0.0, 0.00, etc.)
+// Note: `cx` and `cy` must be valid numbers if present
+const IDENTITY_ROTATE_RE = new RegExp(`^rotate\\s*\\(\\s*0(?:\\.0+)?\\s*(?:${SEP}-?\\d+(?:\\.\\d+)?${SEP}-?\\d+(?:\\.\\d+)?)?\\s*\\)$`, 'i');
+
+// `skewX(0)`, `skewY(0)` (matches 0, 0.0, 0.00, etc.)
+const IDENTITY_SKEW_RE = /^skew[XY]\s*\(\s*0(?:\.0+)?\s*\)$/i;
+
+// `matrix(1,0,0,1,0,0)`, `matrix(1 0 0 1 0 0)`—identity matrix (matches 1.0/0.0 variants)
+const IDENTITY_MATRIX_RE = new RegExp(`^matrix\\s*\\(\\s*1(?:\\.0+)?\\s*${SEP}0(?:\\.0+)?\\s*${SEP}0(?:\\.0+)?\\s*${SEP}1(?:\\.0+)?\\s*${SEP}0(?:\\.0+)?\\s*${SEP}0(?:\\.0+)?\\s*\\)$`, 'i');
+
 /**
  * Check if a transform attribute has no effect (identity transform)
  * @param {string} transform - Transform attribute value
@@ -279,26 +299,12 @@ function isIdentityTransform(transform) {
 
   const trimmed = transform.trim();
 
-  // Check for common identity transforms
-  // Separator pattern: accepts comma with optional spaces or one or more spaces
-  const sep = '(?:\\s*,\\s*|\\s+)';
-
-  // `translate(0)`, `translate(0,0)`, `translate(0 0)` (matches 0, 0.0, 0.00, etc.)
-  if (new RegExp(`^translate\\s*\\(\\s*0(?:\\.0+)?\\s*(?:${sep}0(?:\\.0+)?\\s*)?\\)$`, 'i').test(trimmed)) return true;
-
-  // `scale(1)`, `scale(1,1)`, `scale(1 1)` (matches 1, 1.0, 1.00, etc.)
-  if (new RegExp(`^scale\\s*\\(\\s*1(?:\\.0+)?\\s*(?:${sep}1(?:\\.0+)?\\s*)?\\)$`, 'i').test(trimmed)) return true;
-
-  // `rotate(0)`, `rotate(0 cx cy)`, `rotate(0, cx, cy)` (matches 0, 0.0, 0.00, etc.)
-  if (new RegExp(`^rotate\\s*\\(\\s*0(?:\\.0+)?\\s*(?:${sep}[^)]+)?\\)$`, 'i').test(trimmed)) return true;
-
-  // `skewX(0)`, `skewY(0)` (matches 0, 0.0, 0.00, etc.)
-  if (/^skew[XY]\s*\(\s*0(?:\.0+)?\s*\)$/i.test(trimmed)) return true;
-
-  // `matrix(1,0,0,1,0,0)`, `matrix(1 0 0 1 0 0)`—identity matrix (matches 1.0/0.0 variants)
-  if (new RegExp(`^matrix\\s*\\(\\s*1(?:\\.0+)?\\s*${sep}0(?:\\.0+)?\\s*${sep}0(?:\\.0+)?\\s*${sep}1(?:\\.0+)?\\s*${sep}0(?:\\.0+)?\\s*${sep}0(?:\\.0+)?\\s*\\)$`, 'i').test(trimmed)) return true;
-
-  return false;
+  // Check for common identity transforms using pre-compiled regexes
+  return IDENTITY_TRANSLATE_RE.test(trimmed) ||
+         IDENTITY_SCALE_RE.test(trimmed) ||
+         IDENTITY_ROTATE_RE.test(trimmed) ||
+         IDENTITY_SKEW_RE.test(trimmed) ||
+         IDENTITY_MATRIX_RE.test(trimmed);
 }
 
 /**
