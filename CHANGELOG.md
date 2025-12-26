@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.16.0] - 2025-12-26
+
+### Added
+
+- Enhanced `minifySVG` with additional optimizations
+  - Named color conversion: Converts hex colors to CSS named colors when shorter (`#808080` → `gray`, `#008080` → `teal`, etc.)
+  - Identity transform removal: Removes transforms with no effect (`translate(0)`, `scale(1)`, `rotate(0)`, etc.)
+  - Extended default attributes: Added 9 more removable SVG defaults (`clip-path="none"`, `marker-start="none"`, `filter="none"`, etc.)
+  - Path data space optimization: Removes unnecessary spaces in path commands (`M 10 20 L 30 40` → `M10 20L30 40`)
+  - Performance: Added LRU caching for numeric values, improving minification speed on SVG-heavy documents
+
 ## [4.15.2] - 2025-12-23
 
 ### Fixed
