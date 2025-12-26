@@ -3,37 +3,29 @@ class Sorter {
     for (let i = 0, len = this.keys.length; i < len; i++) {
       const token = this.keys[i];
 
-      // Build position map for this token to avoid repeated `indexOf`
-      const positions = [];
+      // Single pass: Count matches and collect non-matches
+      let matchCount = 0;
+      const others = [];
+
       for (let j = fromIndex; j < tokens.length; j++) {
         if (tokens[j] === token) {
-          positions.push(j);
+          matchCount++;
+        } else {
+          others.push(tokens[j]);
         }
       }
 
-      if (positions.length > 0) {
-        // Build new array with tokens in sorted order instead of splicing
-        const result = [];
-
-        // Add all instances of the current token first
-        for (let j = 0; j < positions.length; j++) {
-          result.push(token);
+      if (matchCount > 0) {
+        // Rebuild: `matchCount` instances of token first, then others
+        let writeIdx = fromIndex;
+        for (let j = 0; j < matchCount; j++) {
+          tokens[writeIdx++] = token;
+        }
+        for (let j = 0; j < others.length; j++) {
+          tokens[writeIdx++] = others[j];
         }
 
-        // Add other tokens, skipping positions where current token was
-        const posSet = new Set(positions);
-        for (let j = fromIndex; j < tokens.length; j++) {
-          if (!posSet.has(j)) {
-            result.push(tokens[j]);
-          }
-        }
-
-        // Copy sorted portion back to tokens array
-        for (let j = 0; j < result.length; j++) {
-          tokens[fromIndex + j] = result[j];
-        }
-
-        const newFromIndex = fromIndex + positions.length;
+        const newFromIndex = fromIndex + matchCount;
         return this.sorterMap.get(token).sort(tokens, newFromIndex);
       }
     }

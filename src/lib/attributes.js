@@ -226,7 +226,15 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
   // Apply early whitespace normalization if enabled
   // Preserves special spaces (non-breaking space, hair space, etc.) for consistency with `collapseWhitespace`
   if (options.collapseAttributeWhitespace) {
-    attrValue = attrValue.replace(/[ \n\r\t\f]+/g, ' ').replace(/^[ \n\r\t\f]+|[ \n\r\t\f]+$/g, '');
+    // Single-pass: Trim leading/trailing whitespace and collapse internal whitespace to single space
+    attrValue = attrValue.replace(/^[ \n\r\t\f]+|[ \n\r\t\f]+$|[ \n\r\t\f]+/g, function(match, offset, str) {
+      // Leading whitespace (`offset === 0`)
+      if (offset === 0) return '';
+      // Trailing whitespace (match ends at string end)
+      if (offset + match.length === str.length) return '';
+      // Internal whitespace
+      return ' ';
+    });
   }
 
   if (isEventAttribute(attrName, options)) {
