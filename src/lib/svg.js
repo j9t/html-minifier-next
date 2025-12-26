@@ -4,8 +4,32 @@
  * - Numeric precision reduction for coordinates and path data
  * - Whitespace removal in attribute values (numeric sequences)
  * - Default attribute removal (safe, well-documented defaults)
- * - Color minification (hex shortening, rgb() to hex)
+ * - Color minification (hex shortening, rgb() to hex, named colors)
+ * - Identity transform removal
+ * - Path data space optimization
  */
+
+import { LRU } from './utils.js';
+
+// Cache for minified numbers
+const numberCache = new LRU(100);
+
+/**
+ * Named colors that are shorter than their hex equivalents
+ * Only includes cases where using the name saves bytes
+ */
+const NAMED_COLORS = {
+  '#f00': 'red',        // #f00 (4) → red (3), saves 1
+  '#c0c0c0': 'silver',  // #c0c0c0 (7) → silver (6), saves 1
+  '#808080': 'gray',    // #808080 (7) → gray (4), saves 3
+  '#800000': 'maroon',  // #800000 (7) → maroon (6), saves 1
+  '#808000': 'olive',   // #808000 (7) → olive (5), saves 2
+  '#008000': 'green',   // #008000 (7) → green (5), saves 2
+  '#800080': 'purple',  // #800080 (7) → purple (6), saves 1
+  '#008080': 'teal',    // #008080 (7) → teal (4), saves 3
+  '#000080': 'navy',    // #000080 (7) → navy (4), saves 3
+  '#ffa500': 'orange'   // #ffa500 (7) → orange (6), saves 1
+};
 
 /**
  * Default SVG attribute values that can be safely removed
@@ -39,7 +63,22 @@ const SVG_DEFAULT_ATTRS = {
   opacity: value => value === '1',
   visibility: value => value === 'visible',
   display: value => value === 'inline',
-  overflow: value => value === 'visible'
+  overflow: value => value === 'visible',
+
+  // Clipping and masking defaults
+  'clip-rule': value => value === 'nonzero',
+  'clip-path': value => value === 'none',
+  mask: value => value === 'none',
+
+  // Marker defaults
+  'marker-start': value => value === 'none',
+  'marker-mid': value => value === 'none',
+  'marker-end': value => value === 'none',
+
+  // Filter and color defaults
+  filter: value => value === 'none',
+  'color-interpolation': value => value === 'sRGB',
+  'color-interpolation-filters': value => value === 'linearRGB'
 };
 
 /**
@@ -49,6 +88,14 @@ const SVG_DEFAULT_ATTRS = {
  * @returns {string} Minified numeric string
  */
 function minifyNumber(num, precision = 3) {
+  // Fast path for common values
+  if (num === '0' || num === '1') return num;
+
+  // Check cache
+  const cacheKey = `${num}:${precision}`;
+  const cached = numberCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
   const parsed = parseFloat(num);
 
   // Handle special cases
@@ -60,11 +107,13 @@ function minifyNumber(num, precision = 3) {
   const fixed = parsed.toFixed(precision);
   const trimmed = fixed.replace(/\.?0+$/, '');
 
-  return trimmed || '0';
+  const result = trimmed || '0';
+  numberCache.set(cacheKey, result);
+  return result;
 }
 
 /**
- * Minify SVG path data by reducing numeric precision
+ * Minify SVG path data by reducing numeric precision and removing unnecessary spaces
  * @param {string} pathData - SVG path data string
  * @param {number} precision - Decimal precision for coordinates
  * @returns {string} Minified path data
@@ -72,11 +121,25 @@ function minifyNumber(num, precision = 3) {
 function minifyPathData(pathData, precision = 3) {
   if (!pathData || typeof pathData !== 'string') return pathData;
 
-  // Match numbers (including scientific notation and negative values)
-  // Regex: optional minus, digits, optional decimal point and more digits, optional exponent
-  return pathData.replace(/-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g, (match) => {
+  // First, minify all numbers
+  let result = pathData.replace(/-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g, (match) => {
     return minifyNumber(match, precision);
   });
+
+  // Remove unnecessary spaces around path commands
+  // Safe to remove space after command letter when followed by a number or minus sign
+  // M 10 20 → M10 20, L -5 -3 → L-5-3
+  result = result.replace(/([MLHVCSQTAZmlhvcsqtaz])\s+(?=-?\d)/g, '$1');
+
+  // Safe to remove space before command letter when preceded by a number
+  // 0 L → 0L, 20 M → 20M
+  result = result.replace(/(\d)\s+([MLHVCSQTAZmlhvcsqtaz])/g, '$1$2');
+
+  // Safe to remove space before negative number when preceded by a number
+  // 10 -20 → 10-20 (numbers are separated by the minus sign)
+  result = result.replace(/(\d)\s+(-\d)/g, '$1$2');
+
+  return result;
 }
 
 /**
@@ -105,7 +168,7 @@ function minifyAttributeWhitespace(value) {
 }
 
 /**
- * Minify color values (hex shortening, rgb to hex conversion)
+ * Minify color values (hex shortening, rgb to hex conversion, named colors)
  * @param {string} color - Color value to minify
  * @returns {string} Minified color value
  */
@@ -113,6 +176,7 @@ function minifyColor(color) {
   if (!color || typeof color !== 'string') return color;
 
   const trimmed = color.trim().toLowerCase();
+  let result = trimmed;
 
   // Shorten 6-digit hex to 3-digit when possible
   // #aabbcc → #abc, #000000 → #000
@@ -120,7 +184,9 @@ function minifyColor(color) {
   if (hexMatch) {
     const hex = hexMatch[1];
     if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
-      return '#' + hex[0] + hex[2] + hex[4];
+      result = '#' + hex[0] + hex[2] + hex[4];
+    } else {
+      result = trimmed; // Keep 6-digit hex if can't shorten
     }
   }
 
@@ -140,13 +206,20 @@ function minifyColor(color) {
 
       // Try to shorten if possible
       if (hexColor[1] === hexColor[2] && hexColor[3] === hexColor[4] && hexColor[5] === hexColor[6]) {
-        return '#' + hexColor[1] + hexColor[3] + hexColor[5];
+        result = '#' + hexColor[1] + hexColor[3] + hexColor[5];
+      } else {
+        result = hexColor;
       }
-      return hexColor;
     }
   }
 
-  return color;
+  // Try to use named color if shorter
+  const namedColor = NAMED_COLORS[result];
+  if (namedColor) {
+    return namedColor;
+  }
+
+  return result;
 }
 
 // Attributes that contain numeric sequences or path data
@@ -175,6 +248,35 @@ const COLOR_ATTRS = new Set([
   'flood-color',
   'lighting-color'
 ]);
+
+/**
+ * Check if a transform attribute has no effect (identity transform)
+ * @param {string} transform - Transform attribute value
+ * @returns {boolean} True if transform is an identity (has no effect)
+ */
+function isIdentityTransform(transform) {
+  if (!transform || typeof transform !== 'string') return false;
+
+  const trimmed = transform.trim();
+
+  // Check for common identity transforms
+  // `translate(0)`, `translate(0,0)`
+  if (/^translate\s*\(\s*0\s*(?:,\s*0\s*)?\)$/i.test(trimmed)) return true;
+
+  // `scale(1)`, `scale(1,1)`
+  if (/^scale\s*\(\s*1\s*(?:,\s*1\s*)?\)$/i.test(trimmed)) return true;
+
+  // `rotate(0)`
+  if (/^rotate\s*\(\s*0\s*(?:,\s*[^)]+)?\)$/i.test(trimmed)) return true;
+
+  // `skewX(0)`, `skewY(0)`
+  if (/^skew[XY]\s*\(\s*0\s*\)$/i.test(trimmed)) return true;
+
+  // `matrix(1,0,0,1,0,0)`—identity matrix
+  if (/^matrix\s*\(\s*1\s*,\s*0\s*,\s*0\s*,\s*1\s*,\s*0\s*,\s*0\s*\)$/i.test(trimmed)) return true;
+
+  return false;
+}
 
 /**
  * Check if an attribute should be removed based on default value
@@ -242,6 +344,11 @@ export function shouldRemoveSVGAttribute(name, value, options = {}) {
   const { removeDefaults = true } = options;
 
   if (!removeDefaults) return false;
+
+  // Check for identity transforms
+  if (name === 'transform' && isIdentityTransform(value)) {
+    return true;
+  }
 
   return isDefaultAttribute(name, value);
 }
