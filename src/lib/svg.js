@@ -88,10 +88,16 @@ const SVG_DEFAULT_ATTRS = {
  * @returns {string} Minified numeric string
  */
 function minifyNumber(num, precision = 3) {
-  // Fast path for common values
+  // Fast path for common values (avoids parsing and caching)
   if (num === '0' || num === '1') return num;
+  // Common decimal variants that tools export
+  if (num === '0.0' || num === '0.00' || num === '0.000') return '0';
+  if (num === '1.0' || num === '1.00' || num === '1.000') return '1';
 
   // Check cache
+  // (Note: uses input string as key, so “0.0000” and “0.00000” create separate entries.
+  // This is intentional to avoid parsing overhead.
+  // Real-world SVG files from export tools typically use consistent formats.)
   const cacheKey = `${num}:${precision}`;
   const cached = numberCache.get(cacheKey);
   if (cached !== undefined) return cached;
