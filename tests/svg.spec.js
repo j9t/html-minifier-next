@@ -318,6 +318,30 @@ describe('SVG', () => {
     );
   });
 
+  test('Overflow attribute safety', async () => {
+    // `overflow="visible"` should not be removed from root `<svg>` element
+    assert.strictEqual(
+      await minify('<svg overflow="visible"><rect/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg overflow="visible"><rect/></svg>'
+    );
+
+    // `overflow="visible"` should be removed from nested SVG elements
+    assert.strictEqual(
+      await minify('<svg><rect overflow="visible"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect/></svg>'
+    );
+
+    assert.strictEqual(
+      await minify('<svg><g overflow="visible"><circle cx="5" cy="5" r="5"/></g></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><g><circle cx="5" cy="5" r="5"/></g></svg>'
+    );
+
+    assert.strictEqual(
+      await minify('<svg><path d="M0 0" overflow="visible"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><path d="M0 0"/></svg>'
+    );
+  });
+
   test('Identity transform removal', async () => {
     const identityTransforms = [
       'translate(0)',

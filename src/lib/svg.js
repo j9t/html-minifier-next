@@ -63,7 +63,7 @@ const SVG_DEFAULT_ATTRS = {
   opacity: value => value === '1',
   visibility: value => value === 'visible',
   display: value => value === 'inline',
-  overflow: value => value === 'visible',
+  // Note: Overflow handled especially in `isDefaultAttribute` (not safe for root `<svg>`)
 
   // Clipping and masking defaults
   'clip-rule': value => value === 'nonzero',
@@ -300,11 +300,18 @@ function isIdentityTransform(transform) {
 
 /**
  * Check if an attribute should be removed based on default value
+ * @param {string} tag - Element tag name (e.g., `svg`, `rect`, `path`)
  * @param {string} name - Attribute name
  * @param {string} value - Attribute value
  * @returns {boolean} True if attribute can be removed
  */
-function isDefaultAttribute(name, value) {
+function isDefaultAttribute(tag, name, value) {
+  // Special case: `overflow="visible"` is unsafe for root `<svg>` element
+  // Root SVG may need explicit `overflow="visible"` to show clipped content
+  if (name === 'overflow' && value === 'visible') {
+    return tag !== 'svg'; // Only remove for non-root SVG elements
+  }
+
   const checker = SVG_DEFAULT_ATTRS[name];
   if (!checker) return false;
 
@@ -355,12 +362,13 @@ export function minifySVGAttributeValue(name, value, options = {}) {
 
 /**
  * Check if an SVG attribute can be removed
+ * @param {string} tag - Element tag name (e.g., `svg`, `rect`, `path`)
  * @param {string} name - Attribute name
  * @param {string} value - Attribute value
  * @param {Object} options - Minification options
  * @returns {boolean} True if attribute should be removed
  */
-export function shouldRemoveSVGAttribute(name, value, options = {}) {
+export function shouldRemoveSVGAttribute(tag, name, value, options = {}) {
   const { removeDefaults = true } = options;
 
   if (!removeDefaults) return false;
@@ -370,7 +378,7 @@ export function shouldRemoveSVGAttribute(name, value, options = {}) {
     return true;
   }
 
-  return isDefaultAttribute(name, value);
+  return isDefaultAttribute(tag, name, value);
 }
 
 /**
