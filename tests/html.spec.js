@@ -3753,56 +3753,57 @@ describe('HTML', () => {
     // The quote type with fewer occurrences is chosen and the other is escaped.
 
     // Test with `decodeEntities`: entities decoded, then escaping forced
-    const input1 = '<div title="He said &#34;hello&#34; and she said &#39;hi&#39;">Text</div>';
-    const result1 = await minify(input1, { preventAttributesEscaping: true, decodeEntities: true });
+    let result = await minify('<div title="He said &#34;hello&#34; and she said &#39;hi&#39;">Text</div>', {
+      preventAttributesEscaping: true,
+      decodeEntities: true
+    });
     // When both quote types are present, at least one must be escaped to ensure valid HTML
-    assert.ok(result1.includes('&#34;') || result1.includes('&#39;'),
+    assert.ok(result.includes('&#34;') || result.includes('&#39;'),
       'Should escape quotes when both types are present');
 
     // Test choosing quote with fewer occurrences (fewer single quotes—use single quotes as delimiter)
-    const input2 = '<p data-text="This has &#34;many&#34; &#34;double&#34; quotes and one &#39;single&#39;">Text</p>';
-    const result2 = await minify(input2, { preventAttributesEscaping: true, decodeEntities: true });
+    result = await minify('<p data-text="This has &#34;many&#34; &#34;double&#34; quotes and one &#39;single&#39;">Text</p>', {
+      preventAttributesEscaping: true,
+      decodeEntities: true
+    });
     // Should use single quotes as delimiter (fewer occurrences) and escape the single quote in value
-    assert.ok(result2.includes("data-text='"), 'Should use single quotes as delimiter');
-    assert.ok(result2.includes('&#39;'), 'Should escape single quotes in value');
+    assert.ok(result.includes("data-text='"), 'Should use single quotes as delimiter');
+    assert.ok(result.includes('&#39;'), 'Should escape single quotes in value');
     // Double quotes don’t need escaping when attribute is delimited with single quotes
-    assert.ok(result2.includes('"many"'), 'Double quotes are valid inside single-quoted attribute');
+    assert.ok(result.includes('"many"'), 'Double quotes are valid inside single-quoted attribute');
 
     // Test with explicit `quoteCharacter`
-    const input3 = '<span data-x="Has &#34;double&#34; and &#39;single&#39;">Text</span>';
-    const result3 = await minify(input3, {
+    result = await minify('<span data-x="Has &#34;double&#34; and &#39;single&#39;">Text</span>', {
       preventAttributesEscaping: true,
       decodeEntities: true,
       quoteCharacter: '"'
     });
-    assert.ok(result3.includes('&#34;'), 'Should escape double quotes even with explicit quoteCharacter');
+    assert.ok(result.includes('&#34;'), 'Should escape double quotes even with explicit quoteCharacter');
 
     // Test with `removeAttributeQuotes` (should not remove quotes when both types present)
-    const input4 = '<div data-msg="Text with &#34;double&#34; and &#39;single&#39; quotes">Content</div>';
-    const result4 = await minify(input4, {
+    result = await minify('<div data-msg="Text with &#34;double&#34; and &#39;single&#39; quotes">Content</div>', {
       preventAttributesEscaping: true,
       decodeEntities: true,
       removeAttributeQuotes: true
     });
     // Quotes must remain because value contains spaces and special chars
-    assert.ok(result4.includes('data-msg='), 'Should have data-msg attribute');
-    assert.ok(result4.match(/data-msg=["']/), 'Should keep quotes on attribute with complex value');
-    assert.ok(result4.includes('&#34;') || result4.includes('&#39;'), 'Should escape quotes');
+    assert.ok(result.includes('data-msg='), 'Should have data-msg attribute');
+    assert.ok(result.match(/data-msg=["']/), 'Should keep quotes on attribute with complex value');
+    assert.ok(result.includes('&#34;') || result.includes('&#39;'), 'Should escape quotes');
 
     // Test with `quoteCharacter` and `removeAttributeQuotes` together
-    const input5 = '<a href="test.html" data-safe="value" data-both="Has &#34;quotes&#34; and &#39;apostrophes&#39;">Link</a>';
-    const result5 = await minify(input5, {
+    result = await minify('<a href="test.html" data-safe="value" data-both="Has &#34;quotes&#34; and &#39;apostrophes&#39;">Link</a>', {
       preventAttributesEscaping: true,
       decodeEntities: true,
       removeAttributeQuotes: true,
       quoteCharacter: '\''
     });
     // Simple values can have quotes removed
-    assert.ok(result5.includes('href=test.html') || result5.includes("href='test.html'"), 'href should be processed');
-    assert.ok(result5.includes('data-safe=value') || result5.includes("data-safe='value'"), 'data-safe should be processed');
+    assert.ok(result.includes('href=test.html') || result.includes("href='test.html'"), 'href should be processed');
+    assert.ok(result.includes('data-safe=value') || result.includes("data-safe='value'"), 'data-safe should be processed');
     // Complex value with both quotes must keep quotes and escape
-    assert.ok(result5.match(/data-both=["']/), 'data-both must keep quotes');
-    assert.ok(result5.includes('&#34;') || result5.includes('&#39;'), 'Should escape quotes in data-both');
+    assert.ok(result.match(/data-both=["']/), 'data-both must keep quotes');
+    assert.ok(result.includes('&#34;') || result.includes('&#39;'), 'Should escape quotes in data-both');
   });
 
   test('quoteCharacter is single quote', async () => {
@@ -4333,21 +4334,19 @@ describe('HTML', () => {
     const phpFragments = [/<%[\s\S]*?%>/g, /<\?[\s\S]*?\?>/g];
 
     // Long whitespace before custom fragment
-    const input1 = `<div>${longWhitespace}<?php echo "test"; ?></div>`;
-    const result1 = await minify(input1, {
+    let result = await minify(`<div>${longWhitespace}<?php echo "test"; ?></div>`, {
       ignoreCustomFragments: phpFragments,
       collapseWhitespace: true
     });
-    assert.ok(result1.includes('<?php echo "test"; ?>'));
+    assert.ok(result.includes('<?php echo "test"; ?>'));
 
     // Multiple consecutive fragments with long whitespace
-    const input2 = `<div>${longWhitespace}<?php echo "test1"; ?>${longWhitespace}<?php echo "test2"; ?>${longWhitespace}</div>`;
-    const result2 = await minify(input2, {
+    result = await minify(`<div>${longWhitespace}<?php echo "test1"; ?>${longWhitespace}<?php echo "test2"; ?>${longWhitespace}</div>`, {
       ignoreCustomFragments: phpFragments,
       collapseWhitespace: true
     });
-    assert.ok(result2.includes('<?php echo "test1"; ?>'));
-    assert.ok(result2.includes('<?php echo "test2"; ?>'));
+    assert.ok(result.includes('<?php echo "test1"; ?>'));
+    assert.ok(result.includes('<?php echo "test2"; ?>'));
   });
 
   test('inline custom elements', async () => {
