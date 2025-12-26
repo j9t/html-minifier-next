@@ -260,20 +260,20 @@ function isIdentityTransform(transform) {
   const trimmed = transform.trim();
 
   // Check for common identity transforms
-  // `translate(0)`, `translate(0,0)`
-  if (/^translate\s*\(\s*0\s*(?:,\s*0\s*)?\)$/i.test(trimmed)) return true;
+  // `translate(0)`, `translate(0,0)` (matches 0, 0.0, 0.00, etc.)
+  if (/^translate\s*\(\s*0(?:\.0+)?\s*(?:,\s*0(?:\.0+)?\s*)?\)$/i.test(trimmed)) return true;
 
-  // `scale(1)`, `scale(1,1)`
-  if (/^scale\s*\(\s*1\s*(?:,\s*1\s*)?\)$/i.test(trimmed)) return true;
+  // `scale(1)`, `scale(1,1)` (matches 1, 1.0, 1.00, etc.)
+  if (/^scale\s*\(\s*1(?:\.0+)?\s*(?:,\s*1(?:\.0+)?\s*)?\)$/i.test(trimmed)) return true;
 
-  // `rotate(0)`
-  if (/^rotate\s*\(\s*0\s*(?:,\s*[^)]+)?\)$/i.test(trimmed)) return true;
+  // `rotate(0)` (matches 0, 0.0, 0.00, etc.)
+  if (/^rotate\s*\(\s*0(?:\.0+)?\s*(?:,\s*[^)]+)?\)$/i.test(trimmed)) return true;
 
-  // `skewX(0)`, `skewY(0)`
-  if (/^skew[XY]\s*\(\s*0\s*\)$/i.test(trimmed)) return true;
+  // `skewX(0)`, `skewY(0)` (matches 0, 0.0, 0.00, etc.)
+  if (/^skew[XY]\s*\(\s*0(?:\.0+)?\s*\)$/i.test(trimmed)) return true;
 
-  // `matrix(1,0,0,1,0,0)`—identity matrix
-  if (/^matrix\s*\(\s*1\s*,\s*0\s*,\s*0\s*,\s*1\s*,\s*0\s*,\s*0\s*\)$/i.test(trimmed)) return true;
+  // `matrix(1,0,0,1,0,0)`—identity matrix (matches 1.0/0.0 variants)
+  if (/^matrix\s*\(\s*1(?:\.0+)?\s*,\s*0(?:\.0+)?\s*,\s*0(?:\.0+)?\s*,\s*1(?:\.0+)?\s*,\s*0(?:\.0+)?\s*,\s*0(?:\.0+)?\s*\)$/i.test(trimmed)) return true;
 
   return false;
 }
