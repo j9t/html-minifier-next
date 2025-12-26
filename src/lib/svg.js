@@ -175,29 +175,48 @@ function minifyAttributeWhitespace(value) {
 
 /**
  * Minify color values (hex shortening, rgb to hex conversion, named colors)
+ * Only processes simple color values; preserves case-sensitive references like `url(#id)`
  * @param {string} color - Color value to minify
  * @returns {string} Minified color value
  */
 function minifyColor(color) {
   if (!color || typeof color !== 'string') return color;
 
-  const trimmed = color.trim().toLowerCase();
-  let result = trimmed;
+  const trimmed = color.trim();
+
+  // Don’t process values that aren’t simple colors (preserve case-sensitive references)
+  // `url(#id)`, `var(--name)`, `inherit`, `currentColor`, etc.
+  if (trimmed.includes('url(') || trimmed.includes('var(') ||
+      trimmed === 'inherit' || trimmed === 'currentColor') {
+    return trimmed;
+  }
+
+  // Now safe to lowercase for color matching
+  const lower = trimmed.toLowerCase();
 
   // Shorten 6-digit hex to 3-digit when possible
   // #aabbcc → #abc, #000000 → #000
-  const hexMatch = trimmed.match(/^#([0-9a-f]{6})$/);
+  const hexMatch = lower.match(/^#([0-9a-f]{6})$/i);
   if (hexMatch) {
     const hex = hexMatch[1];
     if (hex[0] === hex[1] && hex[2] === hex[3] && hex[4] === hex[5]) {
-      result = '#' + hex[0] + hex[2] + hex[4];
-    } else {
-      result = trimmed; // Keep 6-digit hex if can't shorten
+      const shortened = '#' + hex[0] + hex[2] + hex[4];
+      // Try to use named color if shorter
+      return NAMED_COLORS[shortened] || shortened;
     }
+    // Can’t shorten, but check for named color
+    return NAMED_COLORS[lower] || lower;
+  }
+
+  // Match 3-digit hex colors
+  const hex3Match = lower.match(/^#[0-9a-f]{3}$/i);
+  if (hex3Match) {
+    // Check if there’s a shorter named color
+    return NAMED_COLORS[lower] || lower;
   }
 
   // Convert rgb(255,255,255) to hex
-  const rgbMatch = trimmed.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
+  const rgbMatch = lower.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
   if (rgbMatch) {
     const r = parseInt(rgbMatch[1], 10);
     const g = parseInt(rgbMatch[2], 10);
@@ -212,20 +231,15 @@ function minifyColor(color) {
 
       // Try to shorten if possible
       if (hexColor[1] === hexColor[2] && hexColor[3] === hexColor[4] && hexColor[5] === hexColor[6]) {
-        result = '#' + hexColor[1] + hexColor[3] + hexColor[5];
-      } else {
-        result = hexColor;
+        const shortened = '#' + hexColor[1] + hexColor[3] + hexColor[5];
+        return NAMED_COLORS[shortened] || shortened;
       }
+      return NAMED_COLORS[hexColor] || hexColor;
     }
   }
 
-  // Try to use named color if shorter
-  const namedColor = NAMED_COLORS[result];
-  if (namedColor) {
-    return namedColor;
-  }
-
-  return result;
+  // Not a recognized color format, return as-is (preserves case)
+  return trimmed;
 }
 
 // Attributes that contain numeric sequences or path data

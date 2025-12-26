@@ -204,6 +204,38 @@ describe('SVG', () => {
     );
   });
 
+  test('Color references preserve case', async () => {
+    // url() references should preserve case (SVG IDs are case-sensitive)
+    assert.strictEqual(
+      await minify('<svg><rect fill="url(#MyGradient)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect fill="url(#MyGradient)"/></svg>'
+    );
+
+    // Multiple `url()` references
+    assert.strictEqual(
+      await minify('<svg><rect fill="url(#Pattern1)" stroke="url(#Pattern2)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect fill="url(#Pattern1)" stroke="url(#Pattern2)"/></svg>'
+    );
+
+    // `var()` CSS custom properties
+    assert.strictEqual(
+      await minify('<svg><rect fill="var(--MyColor)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect fill="var(--MyColor)"/></svg>'
+    );
+
+    // `inherit` and `currentColor` keywords
+    assert.strictEqual(
+      await minify('<svg><rect fill="inherit" stroke="currentColor"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect fill="inherit" stroke="currentColor"/></svg>'
+    );
+
+    // Mixed: `url()` reference alongside regular color
+    assert.strictEqual(
+      await minify('<svg><rect fill="url(#MyGradient)" stroke="#ff0000"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><rect fill="url(#MyGradient)" stroke="red"/></svg>'
+    );
+  });
+
   test('Mixed HTML and SVG', async () => {
     // HTML elements before and after SVG
     assert.strictEqual(
