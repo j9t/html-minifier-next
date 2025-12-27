@@ -359,24 +359,24 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **50** | 51 | 52 | 51 | 54 | 52 |
 | [Apple](https://www.apple.com/) | 211 | **176** | 187 | 189 | 190 | 191 | 192 |
-| [BBC](https://www.bbc.co.uk/) | 674 | **613** | 633 | 633 | 634 | 669 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 686 | **624** | 643 | 644 | 645 | 680 | n/a |
 | [CERN](https://home.cern/) | 152 | **83** | 91 | 91 | 91 | 93 | 96 |
 | [CSS-Tricks](https://css-tricks.com/) | 162 | **119** | 127 | 143 | 143 | 148 | 144 |
 | [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6401** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 70 | 70 | 71 | 75 | 73 |
 | [EFF](https://www.eff.org/) | 54 | **45** | 49 | 47 | 48 | 49 | 49 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1570 | 1458 | **1405** | 1494 | 1505 | 1516 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1587 | 1476 | **1421** | 1511 | 1522 | 1533 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 153 | **122** | 126 | 126 | 126 | 132 | 127 |
-| [Frontend Dogma](https://frontenddogma.com/) | 225 | **217** | 238 | 224 | 225 | 244 | 225 |
+| [Frontend Dogma](https://frontenddogma.com/) | 225 | **217** | 238 | 223 | 225 | 244 | 225 |
 | [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 18 | 18 |
-| [Ground News](https://ground.news/) | 2259 | **1978** | 2077 | 2107 | 2109 | 2246 | n/a |
+| [Ground News](https://ground.news/) | 2291 | **2005** | 2106 | 2136 | 2139 | 2278 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 50 | **33** | 36 | 36 | 36 | 37 | 37 |
 | [Leanpub](https://leanpub.com/) | 235 | **205** | 220 | 219 | 220 | 230 | 232 |
 | [Mastodon](https://mastodon.social/explore) | 37 | **28** | 32 | 35 | 35 | 36 | 36 |
 | [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | 64 | 65 | 65 | 68 | 68 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 223 | **196** | 203 | 201 | 201 | 202 | 203 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 223 | **197** | 203 | 201 | 201 | 202 | 203 |
 | [Mistral AI](https://mistral.ai/) | 361 | **319** | 324 | 326 | 327 | 357 | n/a |
 | [Mozilla](https://www.mozilla.org/) | 45 | **31** | 34 | 34 | 34 | 35 | 35 |
 | [Nielsen Norman Group](https://www.nngroup.com/) | 86 | 68 | **55** | 74 | 75 | 77 | 76 |
@@ -386,8 +386,8 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | [TPGi](https://www.tpgi.com/) | 174 | **158** | 159 | 163 | 165 | 171 | 171 |
 | [United Nations](https://www.un.org/en/) | 152 | **112** | 121 | 125 | 125 | 130 | 123 |
 | [Vivaldi](https://vivaldi.com/) | 92 | **74** | n/a | 79 | 81 | 83 | 81 |
-| [W3C](https://www.w3.org/) | 50 | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 120 ms (30/30) | 143 ms (29/30) | 49 ms (30/30) | **13 ms (30/30)** | 270 ms (30/30) | 1252 ms (24/30) |
+| [W3C](https://www.w3.org/) | 51 | **36** | 39 | 38 | 38 | 41 | 39 |
+| **Average processing time** |  | 100 ms (30/30) | 157 ms (29/30) | 52 ms (30/30) | **14 ms (30/30)** | 278 ms (30/30) | 1385 ms (24/30) |
 
 (Last updated: Dec 27, 2025)
 <!-- End auto-generated -->
