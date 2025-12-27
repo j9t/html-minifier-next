@@ -12,8 +12,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Reverted to two-pass regex approach
   - Added fast path check to skip regex when no whitespace exists
   - Pre-compiled regex patterns at module scope for faster execution
-  - Combined optimizations show ~40% performance improvement over 4.16.1
-  - Simple constant replacements avoid function call overhead and conditional branching
 - `minifyURLs` optimization
   - Added LRU caching for URL minification results
   - Instance-specific caches ensure correct results for different site configurations
