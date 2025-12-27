@@ -580,7 +580,7 @@ npm i;
 npm run backtest
 ```
 
-The results are made available in the “backtest” folder. The script accepts a number as input on how many commits to include.
+The results are made available in the “backtest” folder. Optionally, the script accepts a number as input on how many commits to include.
 
 ## Acknowledgements
 
