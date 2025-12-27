@@ -97,7 +97,7 @@ async function minify(hash, options) {
         const minified = await minifyFn(data, getOptions(fileName, options));
         const endTime = performance.now();
         const duration = Math.round(endTime - startTime);
-        if (minified) {
+        if (minified != null) {
           process.send({ name: fileName, size: minified.length, time: duration });
         } else {
           throw new Error('unexpected result: ' + minified);
@@ -125,7 +125,7 @@ async function print(table, step = 1) {
 
   // Sort hashes by date (most recent first)
   const hashes = Object.keys(table).sort((a, b) => {
-    // Parse ISO dates directly from git (format: “2025-12-27 18:23:13 +0100”)
+    // Parse ISO dates directly from Git (format: “2025-12-27 18:23:13 +0100”)
     const dateA = new Date(table[a].date);
     const dateB = new Date(table[b].date);
     return dateB - dateA; // Descending order (newest first)
@@ -263,8 +263,6 @@ if (process.argv.length > 2 || !process.send) {
         console.error(`Error: Invalid step “${parts[1]}”—must be a positive integer`);
         process.exit(1);
       }
-
-      const actualTests = Math.ceil(count / step);
     } else {
       count = parseInt(arg, 10);
       if (!Number.isInteger(count) || count < 1) {
@@ -354,9 +352,9 @@ if (process.argv.length > 2 || !process.send) {
       const table = {};
       let commits = data.split(/\s*?\n/).map(function (line) {
         const index = line.indexOf(' ');
-        const hash = line.substr(0, index);
+        const hash = line.substring(0, index);
         table[hash] = {
-          date: line.substr(index + 1) // Keep original ISO date format from git
+          date: line.substring(index + 1)
         };
         return hash;
       });
