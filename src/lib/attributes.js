@@ -6,6 +6,9 @@ import {
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
   RE_AMP_ENTITY,
+  RE_ATTR_WS_CHECK,
+  RE_ATTR_WS_COLLAPSE,
+  RE_ATTR_WS_TRIM,
   generalDefaults,
   tagDefaults,
   executableScriptsMimetypes,
@@ -18,12 +21,6 @@ import {
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
 import { minifySVGAttributeValue, shouldRemoveSVGAttribute } from './svg.js';
-
-// Pre-compiled regex patterns for `collapseAttributeWhitespace`
-
-const RE_ATTR_WS_CHECK = /[ \n\r\t\f]/;
-const RE_ATTR_WS_COLLAPSE = /[ \n\r\t\f]+/g;
-const RE_ATTR_WS_TRIM = /^[ \n\r\t\f]+|[ \n\r\t\f]+$/g;
 
 // Validators
 

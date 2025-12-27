@@ -10,9 +10,7 @@
  */
 
 import { LRU } from './utils.js';
-
-// Regex pattern for matching numeric values in SVG (coordinates, dimensions, etc.)
-const RE_NUMERIC_VALUE = /-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
+import { RE_NUMERIC_VALUE } from './constants.js';
 
 // Cache for minified numbers
 const numberCache = new LRU(100);
