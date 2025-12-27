@@ -13,6 +13,9 @@ const __dirname = path.dirname(__filename);
 // Default number of commits to test when no parameter is provided
 const DEFAULT_COMMIT_COUNT = 50;
 
+// Timeout per commit in milliseconds (increase if testing large files with slow minification)
+const TASK_TIMEOUT_MS = 60000;
+
 // Output directory for results
 const OUTPUT_DIR = path.join(__dirname, 'backtest');
 
@@ -66,7 +69,30 @@ async function minify(hash, options) {
 
     for (const fileName of fileNames) {
       try {
-        const data = await readText(path.join(__dirname, 'sources', fileName + '.html'));
+        const sourcesDir = path.join(__dirname, 'sources');
+        const filePath = path.join(sourcesDir, fileName + '.html');
+
+        // Check if “sources” directory exists
+        try {
+          await fs.stat(sourcesDir);
+        } catch (err) {
+          throw new Error(
+            `Sources directory not found at "${sourcesDir}"\n` +
+            `Run “npm run benchmarks” to download benchmark HTML files`
+          );
+        }
+
+        // Check if the specific file exists
+        try {
+          await fs.stat(filePath);
+        } catch (err) {
+          throw new Error(
+            `Benchmark file not found: “${fileName}.html”\n` +
+            `Run “npm run benchmarks” to download all benchmark HTML files`
+          );
+        }
+
+        const data = await readText(filePath);
         const startTime = performance.now();
         const minified = await minifyFn(data, getOptions(fileName, options));
         const endTime = performance.now();
@@ -99,11 +125,9 @@ async function print(table) {
 
   // Sort hashes by date (most recent first)
   const hashes = Object.keys(table).sort((a, b) => {
-    // Fix date format: “2025-12-27 18:23:13 0100” → “2025-12-27 18:23:13 +0100”
-    const dateStrA = table[a].date.replace(/\s(\d{4})$/, ' +$1');
-    const dateStrB = table[b].date.replace(/\s(\d{4})$/, ' +$1');
-    const dateA = new Date(dateStrA);
-    const dateB = new Date(dateStrB);
+    // Parse ISO dates directly from git (format: “2025-12-27 18:23:13 +0100”)
+    const dateA = new Date(table[a].date);
+    const dateB = new Date(table[b].date);
     return dateB - dateA; // Descending order (newest first)
   });
 
@@ -148,6 +172,9 @@ async function print(table) {
     sites: {}
   };
 
+  // Use consistent number formatting for JSON (locale-independent)
+  const formatNumber = new Intl.NumberFormat('en-US').format;
+
   // Build per-site objects with date+hash keys
   fileNames.forEach(fileName => {
     jsonOutput.sites[fileName] = {};
@@ -170,7 +197,7 @@ async function print(table) {
         const timeDelta = prevTime ? time - prevTime : 0;
 
         // Format value: “size @ time” or “size (±size%) @ time (±time%)”
-        let value = `${size.toLocaleString()} @ ${time} ms`;
+        let value = `${formatNumber(size)} @ ${time} ms`;
         if ((sizeDelta !== 0 || timeDelta !== 0) && prevSize && prevTime) {
           const sizePercent = ((sizeDelta / prevSize) * 100).toFixed(2);
           const timePercent = ((timeDelta / prevTime) * 100).toFixed(2);
@@ -181,7 +208,7 @@ async function print(table) {
           const sizeChange = sizePercent !== '0.00' ? ` (${sizeSign}${sizePercent}%)` : '';
           const timeChange = timePercent !== '0.00' ? ` (${timeSign}${timePercent}%)` : '';
 
-          value = `${size.toLocaleString()}${sizeChange} @ ${time} ms${timeChange}`;
+          value = `${formatNumber(size)}${sizeChange} @ ${time} ms${timeChange}`;
         }
 
         jsonOutput.sites[fileName][key] = value;
@@ -193,11 +220,21 @@ async function print(table) {
 }
 
 if (process.argv.length > 2 || !process.send) {
-  const count = process.argv.length > 2 ? +process.argv[2] : DEFAULT_COMMIT_COUNT;
-  if (count) {
-    if (!process.argv[2]) {
-      console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: "backtest.js <count>" to specify)`);
+  let count = DEFAULT_COMMIT_COUNT;
+
+  if (process.argv.length > 2) {
+    const input = parseInt(process.argv[2], 10);
+    if (!Number.isInteger(input) || input < 1) {
+      console.error(`Error: Invalid commit count "${process.argv[2]}"—must be a positive integer`);
+      console.error(`Example: backtest.js 50`);
+      process.exit(1);
     }
+    count = input;
+  } else {
+    console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: "backtest.js <count>" to specify)`);
+  }
+
+  if (count > 0) {
 
     // Check for uncommitted changes in “src” directory
     git('status', '--porcelain', '--', path.join(__dirname, '..', 'src'), async function (code, output) {
@@ -214,8 +251,63 @@ if (process.argv.length > 2 || !process.send) {
       try {
         originalConfig = await readText(configPath);
       } catch (err) {
-        // File might not exist, that’s ok
+        // File might not exist, that's ok
       }
+
+      // Cleanup function to restore files on exit/error
+      let cleanupCalled = false;
+      const cleanup = async function (reason) {
+        if (cleanupCalled) return;
+        cleanupCalled = true;
+
+        if (reason) {
+          console.log(`\nCleaning up after ${reason}…`);
+        }
+
+        // Restore original html-minifier.json
+        if (originalConfig) {
+          try {
+            await writeText(configPath, originalConfig);
+          } catch (err) {
+            console.error('Warning: Failed to restore html-minifier.json');
+          }
+        }
+
+        // Restore src directory from HEAD
+        await new Promise((resolve) => {
+          git('checkout', 'HEAD', '--', path.join(__dirname, '..', 'src'), function (code) {
+            if (code !== 0) {
+              console.error('Warning: Failed to restore "src" directory');
+            }
+            resolve();
+          });
+        });
+      };
+
+      // Register cleanup handlers for various exit scenarios
+      const sigintHandler = async () => {
+        await cleanup('SIGINT (Ctrl+C)');
+        process.exit(130);
+      };
+      const sigtermHandler = async () => {
+        await cleanup('SIGTERM');
+        process.exit(143);
+      };
+      const uncaughtExceptionHandler = async (err) => {
+        console.error('Uncaught exception:', err);
+        await cleanup('uncaught exception');
+        process.exit(1);
+      };
+      const unhandledRejectionHandler = async (reason) => {
+        console.error('Unhandled rejection:', reason);
+        await cleanup('unhandled rejection');
+        process.exit(1);
+      };
+
+      process.on('SIGINT', sigintHandler);
+      process.on('SIGTERM', sigtermHandler);
+      process.on('uncaughtException', uncaughtExceptionHandler);
+      process.on('unhandledRejection', unhandledRejectionHandler);
 
       git('log', '--date=iso', '--pretty=format:%h %cd', '-' + count, async function (code, data) {
       const table = {};
@@ -223,7 +315,7 @@ if (process.argv.length > 2 || !process.send) {
         const index = line.indexOf(' ');
         const hash = line.substr(0, index);
         table[hash] = {
-          date: line.substr(index + 1).replace('+', '').replace(/ 0000$/, '')
+          date: line.substr(index + 1) // Keep original ISO date format from git
         };
         return hash;
       });
@@ -244,7 +336,7 @@ if (process.argv.length > 2 || !process.send) {
               error += 'task timed out\n';
               task.kill();
             }
-          }, 60000);
+          }, TASK_TIMEOUT_MS);
           task.on('message', function (data) {
             if (data === 'ready') {
               progress.tick(1);
@@ -260,20 +352,15 @@ if (process.argv.length > 2 || !process.send) {
             }
             if (!--running && !commits.length) {
               await print(table);
-              // Restore original html-minifier.json
-              if (originalConfig) {
-                try {
-                  await writeText(configPath, originalConfig);
-                } catch (err) {
-                  console.error('Warning: Failed to restore html-minifier.json');
-                }
-              }
-              // Restore “src” directory from HEAD (safe because we checked for clean state)
-              git('checkout', 'HEAD', '--', path.join(__dirname, '..', 'src'), function (code) {
-                if (code !== 0) {
-                  console.error('Warning: Failed to restore “src” directory');
-                }
-              });
+
+              // Successful completion - clean up and unregister handlers
+              await cleanup();
+
+              // Unregister cleanup handlers to prevent duplicate cleanup
+              process.removeListener('SIGINT', sigintHandler);
+              process.removeListener('SIGTERM', sigtermHandler);
+              process.removeListener('uncaughtException', uncaughtExceptionHandler);
+              process.removeListener('unhandledRejection', unhandledRejectionHandler);
             } else {
               forkTask();
             }
@@ -291,8 +378,6 @@ if (process.argv.length > 2 || !process.send) {
       forkTask();
       });
     });
-  } else {
-    console.error('Invalid input:', process.argv[2]);
   }
 } else if (process.send) {
   // Running as forked child process
