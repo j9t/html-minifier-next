@@ -10,6 +10,9 @@ import Progress from 'progress';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Default number of commits to test when no parameter is provided
+const DEFAULT_COMMIT_COUNT = 25;
+
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
 
@@ -53,26 +56,31 @@ function getOptions(fileName, options) {
 }
 
 async function minify(hash, options) {
-  const minifyFn = await loadModule();
-  process.send('ready');
-  let count = fileNames.length;
+  try {
+    const minifyFn = await loadModule();
+    process.send('ready');
+    let count = fileNames.length;
 
-  for (const fileName of fileNames) {
-    try {
-      const data = await readText(path.join('./', fileName + '.html'));
-      const minified = minifyFn(data, getOptions(fileName, options));
-      if (minified) {
-        process.send({ name: fileName, size: minified.length });
-      } else {
-        throw new Error('unexpected result: ' + minified);
-      }
-    } catch (err) {
-      console.error('[' + fileName + ']', err.stack || err);
-    } finally {
-      if (!--count) {
-        process.disconnect();
+    for (const fileName of fileNames) {
+      try {
+        const data = await readText(path.join(__dirname, 'sources', fileName + '.html'));
+        const minified = await minifyFn(data, getOptions(fileName, options));
+        if (minified) {
+          process.send({ name: fileName, size: minified.length });
+        } else {
+          throw new Error('unexpected result: ' + minified);
+        }
+      } catch (err) {
+        console.error('[' + fileName + ']', err.stack || err);
+      } finally {
+        if (!--count) {
+          process.disconnect();
+        }
       }
     }
+  } catch (err) {
+    console.error('[FATAL]', err.stack || err);
+    process.disconnect();
   }
 }
 
@@ -97,9 +105,12 @@ function print(table) {
   writeText('backtest.log', errors.join('\n'));
 }
 
-if (process.argv.length > 2) {
-  const count = +process.argv[2];
+if (process.argv.length > 2 || !process.send) {
+  const count = process.argv.length > 2 ? +process.argv[2] : DEFAULT_COMMIT_COUNT;
   if (count) {
+    if (!process.argv[2]) {
+      console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: “backtest.js <count>” to specify)`);
+    }
     git('log', '--date=iso', '--pretty=format:%h %cd', '-' + count, function (code, data) {
       const table = {};
       const commits = data.split(/\s*?\n/).map(function (line) {
@@ -162,7 +173,8 @@ if (process.argv.length > 2) {
   } else {
     console.error('Invalid input:', process.argv[2]);
   }
-} else {
+} else if (process.send) {
+  // Running as forked child process
   process.on('message', function (hash) {
     const paths = ['src', 'benchmark.conf', 'html-minifier.json'];
     git('reset', 'HEAD', '--', paths, function () {
