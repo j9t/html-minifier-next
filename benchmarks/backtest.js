@@ -116,7 +116,7 @@ async function minify(hash, options) {
   }
 }
 
-async function print(table) {
+async function print(table, step = 1) {
   // Ensure output directory exists
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
 
@@ -138,11 +138,18 @@ async function print(table) {
   for (const hash of hashes) {
     const data = table[hash];
     row = [hash, '"' + data.date + '"'];
+    let hasData = false;
     fileNames.forEach(function (fileName) {
       const sizeData = data[fileName];
       row.push(sizeData ? sizeData.size : '');
+      if (sizeData) {
+        hasData = true;
+      }
     });
-    output.push(row.join(','));
+    // Only include rows that have at least one data point
+    if (hasData) {
+      output.push(row.join(','));
+    }
     if (data.error) {
       errors.push(hash + ' - ' + data.error);
     }
@@ -166,6 +173,7 @@ async function print(table) {
   const jsonOutput = {
     summary: {
       commits: hashes.length,
+      step: step,
       sites: fileNames.length,
       generated: new Date().toISOString().split('T')[0]
     },
@@ -189,8 +197,17 @@ async function print(table) {
         const dateShort = data.date.substring(0, 16); // “2025-12-27 18:23”
         const key = `${dateShort} ${hash}`;
 
-        // Calculate deltas from previous commit (chronologically, which is next in array)
-        const prevData = index < hashes.length - 1 ? table[hashes[index + 1]][fileName] : null;
+        // Calculate deltas comparing to the entry displayed below (index+1, chronologically older)
+        // This shows how the commit performs compared to the older one below it
+        let prevData = null;
+        for (let i = index + 1; i < hashes.length; i++) {
+          const candidateData = table[hashes[i]][fileName];
+          if (candidateData) {
+            prevData = candidateData;
+            break;
+          }
+        }
+
         const prevSize = prevData ? prevData.size : null;
         const prevTime = prevData ? prevData.time : null;
         const sizeDelta = prevSize ? size - prevSize : 0;
@@ -262,12 +279,14 @@ if (process.argv.length > 2 || !process.send) {
 
   if (count > 0) {
 
-    // Check for uncommitted changes in “src” directory
-    git('status', '--porcelain', '--', path.join(__dirname, '..', 'src'), async function (code, output) {
+    // Check for uncommitted changes in “src” directory and html-minifier.json
+    const srcPath = path.join(__dirname, '..', 'src');
+    const configPath = path.join(__dirname, 'html-minifier.json');
+    git('status', '--porcelain', '--', srcPath, configPath, async function (code, output) {
       if (output.trim().length > 0) {
-        console.error('Error: Uncommitted changes detected in “src” directory');
+        console.error('Error: Uncommitted changes detected in “src” directory or html-minifier.json benchmarks config');
         console.error('Please commit or stash your changes before running backtest');
-        console.error('This is required because backtest temporarily modifies “src” for testing');
+        console.error('This is required because backtest temporarily modifies these files for testing');
         process.exit(1);
       }
 
@@ -283,15 +302,6 @@ if (process.argv.length > 2 || !process.send) {
         console.log(`Testing last ${count} commits, sampling every ${getOrdinal(step)} commit (${actualTests} tests)`);
       }
 
-      // Save current html-minifier.json to restore later
-      const configPath = path.join(__dirname, 'html-minifier.json');
-      let originalConfig = null;
-      try {
-        originalConfig = await readText(configPath);
-      } catch (err) {
-        // File might not exist, that's ok
-      }
-
       // Cleanup function to restore files on exit/error
       let cleanupCalled = false;
       const cleanup = async function (reason) {
@@ -302,20 +312,13 @@ if (process.argv.length > 2 || !process.send) {
           console.log(`\nCleaning up after ${reason}…`);
         }
 
-        // Restore original html-minifier.json
-        if (originalConfig) {
-          try {
-            await writeText(configPath, originalConfig);
-          } catch (err) {
-            console.error('Warning: Failed to restore html-minifier.json');
-          }
-        }
-
-        // Restore src directory from HEAD
+        // Restore both “src” and html-minifier.json from HEAD using Git
         await new Promise((resolve) => {
-          git('checkout', 'HEAD', '--', path.join(__dirname, '..', 'src'), function (code) {
+          const srcPath = path.join(__dirname, '..', 'src');
+          const configPath = path.join(__dirname, 'html-minifier.json');
+          git('checkout', 'HEAD', '--', srcPath, configPath, function (code) {
             if (code !== 0) {
-              console.error('Warning: Failed to restore “src” directory');
+              console.error('Warning: Failed to restore modified files');
             }
             resolve();
           });
@@ -395,7 +398,7 @@ if (process.argv.length > 2 || !process.send) {
               table[hash].error = error;
             }
             if (!--running && !commits.length) {
-              await print(table);
+              await print(table, step);
 
               // Successful completion—clean up and unregister handlers
               await cleanup();
