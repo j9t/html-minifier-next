@@ -11,6 +11,9 @@
 
 import { LRU } from './utils.js';
 
+// Regex pattern for matching numeric values in SVG (coordinates, dimensions, etc.)
+const RE_NUMERIC_VALUE = /-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
+
 // Cache for minified numbers
 const numberCache = new LRU(100);
 
@@ -128,7 +131,7 @@ function minifyPathData(pathData, precision = 3) {
   if (!pathData || typeof pathData !== 'string') return pathData;
 
   // First, minify all numbers
-  let result = pathData.replace(/-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g, (match) => {
+  let result = pathData.replace(RE_NUMERIC_VALUE, (match) => {
     return minifyNumber(match, precision);
   });
 
@@ -355,7 +358,7 @@ export function minifySVGAttributeValue(name, value, options = {}) {
 
   // Numeric attributes get precision reduction and whitespace minification
   if (NUMERIC_ATTRS.has(name)) {
-    const minified = value.replace(/-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g, (match) => {
+    const minified = value.replace(RE_NUMERIC_VALUE, (match) => {
       return minifyNumber(match, precision);
     });
     return minifyAttributeWhitespace(minified);
