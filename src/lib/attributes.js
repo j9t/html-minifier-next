@@ -65,9 +65,28 @@ function attributesInclude(attributes, attribute) {
 }
 
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
+  // Fast-path: Check if this element–attribute combination can possibly be redundant
+  // before doing expensive string operations
+
+  // Check if attribute name is in general defaults
+  const hasGeneralDefault = attrName in generalDefaults;
+
+  // Check if element has any default attributes
+  const tagHasDefaults = tag in tagDefaults;
+
+  // Check for legacy attribute rules (element- and attribute-specific)
+  const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) ||
+                       (tag === 'a' && attrName === 'name');
+
+  // If none of these conditions apply, attribute cannot be redundant
+  if (!hasGeneralDefault && !tagHasDefaults && !isLegacyAttr) {
+    return false;
+  }
+
+  // Now we know we need to check the value, so normalize it
   attrValue = attrValue ? trimWhitespace(attrValue.toLowerCase()) : '';
 
-  // Legacy attributes
+  // Legacy attribute checks
   if (tag === 'script' && attrName === 'language' && attrValue === 'javascript') {
     return true;
   }
@@ -79,12 +98,12 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   }
 
   // Check general defaults
-  if (generalDefaults[attrName] === attrValue) {
+  if (hasGeneralDefault && generalDefaults[attrName] === attrValue) {
     return true;
   }
 
   // Check tag-specific defaults
-  return tagDefaults[tag]?.[attrName] === attrValue;
+  return tagHasDefaults && tagDefaults[tag][attrName] === attrValue;
 }
 
 function isScriptTypeAttribute(attrValue = '') {

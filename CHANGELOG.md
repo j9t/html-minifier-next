@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `decodeEntities` optimization
   - Pre-compiled large entity regex pattern to module-level constant
   - Eliminates regex compilation overhead on every text node with entities
+- `removeRedundantAttributes` optimization
+  - Added fast-path early exit to skip expensive string operations for non-redundant attributes
+  - Only normalizes attribute values when element–attribute combination can possibly be redundant
 - Extracted duplicate regex pattern in SVG processing to module-level constant
 
 ## [4.16.2] - 2025-12-27
