@@ -580,7 +580,7 @@ npm i;
 npm run backtest
 ```
 
-The backtest tool tracks minification performance across git history. Results are saved in `benchmarks/backtest/` as CSV and JSON files.
+The backtest tool tracks minification performance across Git history. Results are saved in `benchmarks/backtest/` as CSV and JSON files.
 
 Parameters:
 
