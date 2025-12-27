@@ -19,6 +19,12 @@ import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
 import { minifySVGAttributeValue, shouldRemoveSVGAttribute } from './svg.js';
 
+// Pre-compiled regex patterns for `collapseAttributeWhitespace`
+
+const RE_ATTR_WS_CHECK = /[ \n\r\t\f]/;
+const RE_ATTR_WS_COLLAPSE = /[ \n\r\t\f]+/g;
+const RE_ATTR_WS_TRIM = /^[ \n\r\t\f]+|[ \n\r\t\f]+$/g;
+
 // Validators
 
 function isConditionalComment(text) {
@@ -226,15 +232,13 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
   // Apply early whitespace normalization if enabled
   // Preserves special spaces (non-breaking space, hair space, etc.) for consistency with `collapseWhitespace`
   if (options.collapseAttributeWhitespace) {
-    // Single-pass: Trim leading/trailing whitespace and collapse internal whitespace to single space
-    attrValue = attrValue.replace(/^[ \n\r\t\f]+|[ \n\r\t\f]+$|[ \n\r\t\f]+/g, function(match, offset, str) {
-      // Leading whitespace (`offset === 0`)
-      if (offset === 0) return '';
-      // Trailing whitespace (match ends at string end)
-      if (offset + match.length === str.length) return '';
-      // Internal whitespace
-      return ' ';
-    });
+    // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
+    if (RE_ATTR_WS_CHECK.test(attrValue)) {
+      // Two-pass approach (faster than single-pass with callback)
+      // First: Collapse internal whitespace sequences to single space
+      // Second: Trim leading/trailing whitespace
+      attrValue = attrValue.replace(RE_ATTR_WS_COLLAPSE, ' ').replace(RE_ATTR_WS_TRIM, '');
+    }
   }
 
   if (isEventAttribute(attrName, options)) {
