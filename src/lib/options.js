@@ -106,24 +106,30 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
         if (!text || !text.trim()) {
           return text;
         }
-        text = await replaceAsync(
-          text,
-          /(url\s*\(\s*)(?:"([^"]*)"|'([^']*)'|([^\s)]+))(\s*\))/ig,
-          async function (match, prefix, dq, sq, unq, suffix) {
-            const quote = dq != null ? '"' : (sq != null ? "'" : '');
-            const url = dq ?? sq ?? unq ?? '';
-            try {
-              const out = await options.minifyURLs(url);
-              return prefix + quote + (typeof out === 'string' ? out : url) + quote + suffix;
-            } catch (err) {
-              if (!options.continueOnMinifyError) {
-                throw err;
+
+        // Optimization: Only process URLs if minification is enabled (not identity function)
+        // This avoids expensive `replaceAsync` when URL minification is disabled
+        if (options.minifyURLs !== identity) {
+          text = await replaceAsync(
+            text,
+            /(url\s*\(\s*)(?:"([^"]*)"|'([^']*)'|([^\s)]+))(\s*\))/ig,
+            async function (match, prefix, dq, sq, unq, suffix) {
+              const quote = dq != null ? '"' : (sq != null ? "'" : '');
+              const url = dq ?? sq ?? unq ?? '';
+              try {
+                const out = await options.minifyURLs(url);
+                return prefix + quote + (typeof out === 'string' ? out : url) + quote + suffix;
+              } catch (err) {
+                if (!options.continueOnMinifyError) {
+                  throw err;
+                }
+                options.log && options.log(err);
+                return match;
               }
-              options.log && options.log(err);
-              return match;
             }
-          }
-        );
+          );
+        }
+
         // Cache key: Wrapped content, type, options signature
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
@@ -135,36 +141,44 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
         try {
           const cached = cssMinifyCache.get(cssKey);
           if (cached) {
-            return cached;
+            // Support both resolved values and in-flight promises
+            return await cached;
           }
 
-          const transformCSS = await getLightningCSS();
-          const result = transformCSS({
-            filename: 'input.css',
-            code: Buffer.from(inputCSS),
-            minify: true,
-            errorRecovery: !!options.continueOnMinifyError,
-            ...lightningCssOptions
-          });
+          // In-flight promise caching: Prevent duplicate concurrent minifications
+          // of the same CSS content (same pattern as JS minification)
+          const inFlight = (async () => {
+            const transformCSS = await getLightningCSS();
+            // Note: `Buffer.from()` is required—Lightning CSS API expects Uint8Array
+            const result = transformCSS({
+              filename: 'input.css',
+              code: Buffer.from(inputCSS),
+              minify: true,
+              errorRecovery: !!options.continueOnMinifyError,
+              ...lightningCssOptions
+            });
 
-          const outputCSS = unwrapCSS(result.code.toString(), type);
+            const outputCSS = unwrapCSS(result.code.toString(), type);
 
-          // If Lightning CSS removed significant content that looks like template syntax or UIDs, return original
-          // This preserves:
-          // 1. Template code like `<?php ?>`, `<%= %>`, `{{ }}`, etc. (contain `<` or `>` but not `CDATA`)
-          // 2. UIDs representing custom fragments (only lowercase letters and digits, no spaces)
-          // CDATA sections, HTML entities, and other invalid CSS are allowed to be removed
-          const isCDATA = text.includes('<![CDATA[');
-          const uidPattern = /[a-z0-9]{10,}/; // UIDs are long alphanumeric strings
-          const hasUID = uidPattern.test(text) && !isCDATA; // Exclude CDATA from UID detection
-          const looksLikeTemplate = (text.includes('<') || text.includes('>')) && !isCDATA;
+            // If Lightning CSS removed significant content that looks like template syntax or UIDs, return original
+            // This preserves:
+            // 1. Template code like `<?php ?>`, `<%= ?>`, `{{ }}`, etc. (contain `<` or `>` but not `CDATA`)
+            // 2. UIDs representing custom fragments (only lowercase letters and digits, no spaces)
+            // CDATA sections, HTML entities, and other invalid CSS are allowed to be removed
+            const isCDATA = text.includes('<![CDATA[');
+            const uidPattern = /[a-z0-9]{10,}/; // UIDs are long alphanumeric strings
+            const hasUID = uidPattern.test(text) && !isCDATA; // Exclude CDATA from UID detection
+            const looksLikeTemplate = (text.includes('<') || text.includes('>')) && !isCDATA;
 
-          // Preserve if output is empty and input had template syntax or UIDs
-          // This catches cases where Lightning CSS removed content that should be preserved
-          const finalOutput = (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
+            // Preserve if output is empty and input had template syntax or UIDs
+            // This catches cases where Lightning CSS removed content that should be preserved
+            return (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
+          })();
 
-          cssMinifyCache.set(cssKey, finalOutput);
-          return finalOutput;
+          cssMinifyCache.set(cssKey, inFlight);
+          const resolved = await inFlight;
+          cssMinifyCache.set(cssKey, resolved);
+          return resolved;
         } catch (err) {
           cssMinifyCache.delete(cssKey);
           if (!options.continueOnMinifyError) {
