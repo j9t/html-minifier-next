@@ -8,6 +8,8 @@ import { presets, getPreset, getPresetNames } from './presets.js';
 import { LRU, identity, uniqueId } from './lib/utils.js';
 
 import {
+  RE_LEGACY_ENTITIES,
+  RE_ESCAPE_LT,
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
   specialContentTags,
@@ -93,6 +95,7 @@ async function getSwc() {
 
 const cssMinifyCache = new LRU(500);
 const jsMinifyCache = new LRU(500);
+const urlMinifyCache = new LRU(500);
 
 // Type definitions
 
@@ -1160,10 +1163,10 @@ async function minifyHTML(value, options, partialMarkup) {
         // Note that `&` can be escaped as `&amp`, without the semi-colon.
         // https://mathiasbynens.be/notes/ambiguous-ampersands
         if (text.indexOf('&') !== -1) {
-          text = text.replace(/&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt)(?!;)|(?:#?[0-9a-zA-Z]+;))/g, '&amp$1');
+          text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
         }
         if (text.indexOf('<') !== -1) {
-          text = text.replace(/</g, '&lt;');
+          text = text.replace(RE_ESCAPE_LT, '&lt;');
         }
       }
       if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
@@ -1372,7 +1375,8 @@ export const minify = async function (value, options) {
     getTerser,
     getSwc,
     cssMinifyCache,
-    jsMinifyCache
+    jsMinifyCache,
+    urlMinifyCache
   });
   const result = await minifyHTML(value, options);
   options.log('minified in: ' + (Date.now() - start) + 'ms');
