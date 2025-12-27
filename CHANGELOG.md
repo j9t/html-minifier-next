@@ -14,6 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Pre-compiled regex patterns at module scope for faster execution
   - Combined optimizations show ~40% performance improvement over 4.16.1
   - Simple constant replacements avoid function call overhead and conditional branching
+- `minifyURLs` optimization
+  - Added LRU caching for URL minification results
+  - Instance-specific caches ensure correct results for different site configurations
+- `decodeEntities` optimization
+  - Pre-compiled large entity regex pattern to module-level constant
+  - Eliminates regex compilation overhead on every text node with entities
+- Extracted duplicate regex pattern in SVG processing to module-level constant
 
 ## [4.16.2] - 2025-12-27
 
