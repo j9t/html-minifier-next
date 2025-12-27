@@ -572,6 +572,16 @@ npm run benchmarks
 
 (In case of dependency conflicts, run `npm i` with the `--legacy-peer-deps` flag.)
 
+### Regression tests
+
+```shell
+cd benchmarks;
+npm i;
+npm run backtest
+```
+
+The results are made available in the “backtest” folder. The script accepts a number as input on how many commits to include.
+
 ## Acknowledgements
 
 With many thanks to all the previous authors of HTML Minifier, especially [Juriy “kangax” Zaytsev](https://github.com/kangax), and to everyone who helped make this new edition better, particularly [Daniel Ruf](https://github.com/DanielRuf) and [Jonas Geiler](https://github.com/jonasgeiler).
