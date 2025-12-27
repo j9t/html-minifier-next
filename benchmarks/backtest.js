@@ -199,16 +199,25 @@ if (process.argv.length > 2 || !process.send) {
       console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: "backtest.js <count>" to specify)`);
     }
 
-    // Save current html-minifier.json to restore later
-    const configPath = path.join(__dirname, 'html-minifier.json');
-    let originalConfig = null;
-    try {
-      originalConfig = await readText(configPath);
-    } catch (err) {
-      // File might not exist, that’s ok
-    }
+    // Check for uncommitted changes in “src” directory
+    git('status', '--porcelain', '--', path.join(__dirname, '..', 'src'), async function (code, output) {
+      if (output.trim().length > 0) {
+        console.error('Error: Uncommitted changes detected in “src” directory.');
+        console.error('Please commit or stash your changes before running backtest.');
+        console.error('This is required because backtest temporarily modifies “src” for testing.');
+        process.exit(1);
+      }
 
-    git('log', '--date=iso', '--pretty=format:%h %cd', '-' + count, async function (code, data) {
+      // Save current html-minifier.json to restore later
+      const configPath = path.join(__dirname, 'html-minifier.json');
+      let originalConfig = null;
+      try {
+        originalConfig = await readText(configPath);
+      } catch (err) {
+        // File might not exist, that’s ok
+      }
+
+      git('log', '--date=iso', '--pretty=format:%h %cd', '-' + count, async function (code, data) {
       const table = {};
       const commits = data.split(/\s*?\n/).map(function (line) {
         const index = line.indexOf(' ');
@@ -259,8 +268,12 @@ if (process.argv.length > 2 || !process.send) {
                   console.error('Warning: Failed to restore html-minifier.json');
                 }
               }
-              // Restore src directory from HEAD
-              git('checkout', 'HEAD', '--', 'src', function () {});
+              // Restore “src” directory from HEAD (safe because we checked for clean state)
+              git('checkout', 'HEAD', '--', path.join(__dirname, '..', 'src'), function (code) {
+                if (code !== 0) {
+                  console.error('Warning: Failed to restore “src” directory');
+                }
+              });
             } else {
               forkTask();
             }
@@ -276,6 +289,7 @@ if (process.argv.length > 2 || !process.send) {
       }
 
       forkTask();
+      });
     });
   } else {
     console.error('Invalid input:', process.argv[2]);
