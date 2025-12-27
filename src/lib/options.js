@@ -31,9 +31,10 @@ function shouldMinifyInnerHTML(options) {
  * @param {Function} deps.getSwc - Function to lazily load @swc/core
  * @param {LRU} deps.cssMinifyCache - CSS minification cache
  * @param {LRU} deps.jsMinifyCache - JS minification cache
+ * @param {LRU} deps.urlMinifyCache - URL minification cache
  * @returns {MinifierOptions} Normalized options with defaults applied
  */
-const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssMinifyCache, jsMinifyCache } = {}) => {
+const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssMinifyCache, jsMinifyCache, urlMinifyCache } = {}) => {
   const options = {
     name: function (name) {
       return name.toLowerCase();
@@ -310,16 +311,33 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       // Cache RelateURL instance for reuse (expensive to create)
       const relateUrlInstance = new RelateURL(relateUrlOptions.site || '', relateUrlOptions);
 
+      // Create instance-specific cache (results depend on site configuration)
+      const instanceCache = urlMinifyCache ? new (urlMinifyCache.constructor)(500) : null;
+
       options.minifyURLs = function (text) {
-        // Fast-path: Skip if text doesn’t look like a URL that needs processing
+        // Fast-path: Skip if text doesn't look like a URL that needs processing
         // Only process if contains URL-like characters (`/`, `:`, `#`, `?`) or spaces that need encoding
         if (!/[/:?#\s]/.test(text)) {
           return text;
         }
 
+        // Check instance-specific cache
+        if (instanceCache) {
+          const cached = instanceCache.get(text);
+          if (cached !== undefined) {
+            return cached;
+          }
+        }
+
         try {
-          return relateUrlInstance.relate(text);
+          const result = relateUrlInstance.relate(text);
+          // Cache successful results
+          if (instanceCache) {
+            instanceCache.set(text, result);
+          }
+          return result;
         } catch (err) {
+          // Don’t cache errors
           if (!options.continueOnMinifyError) {
             throw err;
           }

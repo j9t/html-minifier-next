@@ -6,6 +6,9 @@ import {
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
   RE_AMP_ENTITY,
+  RE_ATTR_WS_CHECK,
+  RE_ATTR_WS_COLLAPSE,
+  RE_ATTR_WS_TRIM,
   generalDefaults,
   tagDefaults,
   executableScriptsMimetypes,
@@ -62,9 +65,28 @@ function attributesInclude(attributes, attribute) {
 }
 
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
+  // Fast-path: Check if this element–attribute combination can possibly be redundant
+  // before doing expensive string operations
+
+  // Check if attribute name is in general defaults
+  const hasGeneralDefault = attrName in generalDefaults;
+
+  // Check if element has any default attributes
+  const tagHasDefaults = tag in tagDefaults;
+
+  // Check for legacy attribute rules (element- and attribute-specific)
+  const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) ||
+                       (tag === 'a' && attrName === 'name');
+
+  // If none of these conditions apply, attribute cannot be redundant
+  if (!hasGeneralDefault && !tagHasDefaults && !isLegacyAttr) {
+    return false;
+  }
+
+  // Now we know we need to check the value, so normalize it
   attrValue = attrValue ? trimWhitespace(attrValue.toLowerCase()) : '';
 
-  // Legacy attributes
+  // Legacy attribute checks
   if (tag === 'script' && attrName === 'language' && attrValue === 'javascript') {
     return true;
   }
@@ -76,12 +98,12 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   }
 
   // Check general defaults
-  if (generalDefaults[attrName] === attrValue) {
+  if (hasGeneralDefault && generalDefaults[attrName] === attrValue) {
     return true;
   }
 
   // Check tag-specific defaults
-  return tagDefaults[tag]?.[attrName] === attrValue;
+  return tagHasDefaults && tagDefaults[tag][attrName] === attrValue;
 }
 
 function isScriptTypeAttribute(attrValue = '') {
@@ -226,15 +248,13 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
   // Apply early whitespace normalization if enabled
   // Preserves special spaces (non-breaking space, hair space, etc.) for consistency with `collapseWhitespace`
   if (options.collapseAttributeWhitespace) {
-    // Single-pass: Trim leading/trailing whitespace and collapse internal whitespace to single space
-    attrValue = attrValue.replace(/^[ \n\r\t\f]+|[ \n\r\t\f]+$|[ \n\r\t\f]+/g, function(match, offset, str) {
-      // Leading whitespace (`offset === 0`)
-      if (offset === 0) return '';
-      // Trailing whitespace (match ends at string end)
-      if (offset + match.length === str.length) return '';
-      // Internal whitespace
-      return ' ';
-    });
+    // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
+    if (RE_ATTR_WS_CHECK.test(attrValue)) {
+      // Two-pass approach (faster than single-pass with callback)
+      // First: Collapse internal whitespace sequences to single space
+      // Second: Trim leading/trailing whitespace
+      attrValue = attrValue.replace(RE_ATTR_WS_COLLAPSE, ' ').replace(RE_ATTR_WS_TRIM, '');
+    }
   }
 
   if (isEventAttribute(attrName, options)) {

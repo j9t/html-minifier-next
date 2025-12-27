@@ -4,6 +4,25 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.16.3] - 2025-12-27
+
+### Performance
+
+- `collapseAttributeWhitespace` optimizations
+  - Reverted to two-pass regex approach
+  - Added fast path check to skip regex when no whitespace exists
+  - Pre-compiled regex patterns at module scope for faster execution
+- `minifyURLs` optimization
+  - Added LRU caching for URL minification results
+  - Instance-specific caches ensure correct results for different site configurations
+- `decodeEntities` optimization
+  - Pre-compiled large entity regex pattern to module-level constant
+  - Eliminates regex compilation overhead on every text node with entities
+- `removeRedundantAttributes` optimization
+  - Added fast-path early exit to skip expensive string operations for non-redundant attributes
+  - Only normalizes attribute values when element–attribute combination can possibly be redundant
+- Extracted duplicate regex pattern in SVG processing to module-level constant
+
 ## [4.16.2] - 2025-12-27
 
 ### Performance
