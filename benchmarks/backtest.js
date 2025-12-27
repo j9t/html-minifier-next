@@ -77,7 +77,7 @@ async function minify(hash, options) {
           await fs.stat(sourcesDir);
         } catch (err) {
           throw new Error(
-            `Sources directory not found at "${sourcesDir}"\n` +
+            `Sources directory not found at “${sourcesDir}”\n` +
             `Run “npm run benchmarks” to download benchmark HTML files`
           );
         }
@@ -221,17 +221,43 @@ async function print(table) {
 
 if (process.argv.length > 2 || !process.send) {
   let count = DEFAULT_COMMIT_COUNT;
+  let step = 1;
 
   if (process.argv.length > 2) {
-    const input = parseInt(process.argv[2], 10);
-    if (!Number.isInteger(input) || input < 1) {
-      console.error(`Error: Invalid commit count "${process.argv[2]}"—must be a positive integer`);
-      console.error(`Example: backtest.js 50`);
-      process.exit(1);
+    const arg = process.argv[2];
+
+    // Parse “COUNT/STEP” or just “COUNT”
+    if (arg.includes('/')) {
+      const parts = arg.split('/');
+      if (parts.length !== 2) {
+        console.error(`Error: Invalid format “${arg}”—use “COUNT” or “COUNT/STEP”`);
+        console.error(`Examples: “backtest.js 50” or “backtest.js 500/10”`);
+        process.exit(1);
+      }
+
+      count = parseInt(parts[0], 10);
+      step = parseInt(parts[1], 10);
+
+      if (!Number.isInteger(count) || count < 1) {
+        console.error(`Error: Invalid commit count “${parts[0]}”—must be a positive integer`);
+        process.exit(1);
+      }
+      if (!Number.isInteger(step) || step < 1) {
+        console.error(`Error: Invalid step “${parts[1]}”—must be a positive integer`);
+        process.exit(1);
+      }
+
+      const actualTests = Math.ceil(count / step);
+    } else {
+      count = parseInt(arg, 10);
+      if (!Number.isInteger(count) || count < 1) {
+        console.error(`Error: Invalid commit count “${arg}”—must be a positive integer`);
+        console.error(`Example: “backtest.js 50”`);
+        process.exit(1);
+      }
     }
-    count = input;
   } else {
-    console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: "backtest.js <count>" to specify)`);
+    console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: “backtest.js COUNT” to specify)`);
   }
 
   if (count > 0) {
@@ -239,10 +265,22 @@ if (process.argv.length > 2 || !process.send) {
     // Check for uncommitted changes in “src” directory
     git('status', '--porcelain', '--', path.join(__dirname, '..', 'src'), async function (code, output) {
       if (output.trim().length > 0) {
-        console.error('Error: Uncommitted changes detected in “src” directory.');
-        console.error('Please commit or stash your changes before running backtest.');
-        console.error('This is required because backtest temporarily modifies “src” for testing.');
+        console.error('Error: Uncommitted changes detected in “src” directory');
+        console.error('Please commit or stash your changes before running backtest');
+        console.error('This is required because backtest temporarily modifies “src” for testing');
         process.exit(1);
+      }
+
+      // Print backtest info after pre-flight checks pass
+      if (step > 1) {
+        // Generate proper ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
+        const getOrdinal = (n) => {
+          const s = ['th', 'st', 'nd', 'rd'];
+          const v = n % 100;
+          return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+        const actualTests = Math.ceil(count / step);
+        console.log(`Testing last ${count} commits, sampling every ${getOrdinal(step)} commit (${actualTests} tests)`);
       }
 
       // Save current html-minifier.json to restore later
@@ -277,7 +315,7 @@ if (process.argv.length > 2 || !process.send) {
         await new Promise((resolve) => {
           git('checkout', 'HEAD', '--', path.join(__dirname, '..', 'src'), function (code) {
             if (code !== 0) {
-              console.error('Warning: Failed to restore "src" directory');
+              console.error('Warning: Failed to restore “src” directory');
             }
             resolve();
           });
@@ -311,7 +349,7 @@ if (process.argv.length > 2 || !process.send) {
 
       git('log', '--date=iso', '--pretty=format:%h %cd', '-' + count, async function (code, data) {
       const table = {};
-      const commits = data.split(/\s*?\n/).map(function (line) {
+      let commits = data.split(/\s*?\n/).map(function (line) {
         const index = line.indexOf(' ');
         const hash = line.substr(0, index);
         table[hash] = {
@@ -319,6 +357,12 @@ if (process.argv.length > 2 || !process.send) {
         };
         return hash;
       });
+
+      // Apply step filtering—keep every nth commit starting from most recent (index 0)
+      if (step > 1) {
+        commits = commits.filter((_, index) => index % step === 0);
+      }
+
       const nThreads = os.cpus().length;
       let running = 0;
       const progress = new Progress('[:bar] :etas', {
@@ -353,7 +397,7 @@ if (process.argv.length > 2 || !process.send) {
             if (!--running && !commits.length) {
               await print(table);
 
-              // Successful completion - clean up and unregister handlers
+              // Successful completion—clean up and unregister handlers
               await cleanup();
 
               // Unregister cleanup handlers to prevent duplicate cleanup

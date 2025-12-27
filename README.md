@@ -580,7 +580,13 @@ npm i;
 npm run backtest
 ```
 
-The results are made available in the “backtest” folder. Optionally, the script accepts a number as input on how many commits to include.
+The backtest tool tracks minification performance across git history. Results are saved in `benchmarks/backtest/` as CSV and JSON files.
+
+Parameters:
+
+* No argument: Tests last 50 commits (default)
+* `COUNT`: Tests last `COUNT` commits (e.g., `npm run backtest 100`)
+* `COUNT/STEP`: Tests last `COUNT` commits, sampling every `STEP`th commit (e.g., `npm run backtest 500/10` tests 50 commits)
 
 ## Acknowledgements
 
