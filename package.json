@@ -23,7 +23,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@swc/core": "^1.15.7",
     "eslint": "^9.39.2",
-    "rollup": "^4.53.3",
+    "rollup": "^4.54.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
     "typescript": "^5.9.3",
     "vite": "^7.2.7"
