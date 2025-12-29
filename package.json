@@ -42,6 +42,7 @@
     "dist/",
     "src/"
   ],
+  "funding": "https://buymeacoffee.com/meiert",
   "homepage": "https://j9t.github.io/html-minifier-next/",
   "keywords": [
     "cli",
@@ -78,7 +79,10 @@
       "optional": true
     }
   },
-  "repository": "https://github.com/j9t/html-minifier-next.git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/j9t/html-minifier-next.git"
+  },
   "scripts": {
     "prebuild": "node --eval='require(`fs`).rmSync(`dist`,{recursive:true,force:true})'",
     "build": "tsc && rollup -c",
