@@ -59,7 +59,7 @@ const defaultOptions = [
     id: 'ignoreCustomFragments',
     type: 'text',
     label: 'Ignore custom fragments',
-    helpText: 'Space-separated regex patterns for template syntax to ignore—<em>use bounded quantifiers</em> like <code>{0,1000}</code> to prevent performance issues (examples: <code>\\{%[\\s\\S]{0,1000}?%\\}</code> for Jinja/Django, <code>\\{\\{[\\s\\S]{0,500}?\\}\\}</code> for Handlebars/Vue)',
+    helpText: 'Space-separated regex patterns for template syntax to ignore—<em>use bounded quantifiers</em> like <code>{0,1000}</code> to prevent performance issues (examples: <code>\\{%[\\s\\S]{0,1000}?%\\}</code> for Jinja/Django, <code>\\{\\{[\\s\\S]{0,500}?\\}\\}</code> for Handlebars/Vue), and note that escaping differs by context (CLI, config file, web demo)',
     value: ''
   },
   {

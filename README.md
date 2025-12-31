@@ -551,6 +551,44 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 
 **Important:** When using custom `ignoreCustomFragments`, the minifier automatically applies bounded quantifiers to prevent ReDoS attacks, but you can also write safer patterns yourself using explicit bounds.
 
+#### Escaping patterns in different contexts
+
+The escaping requirements for `ignoreCustomFragments` patterns differ depending on how you’re using HMN:
+
+**Config file (JSON):**
+
+```json
+{
+  "ignoreCustomFragments": ["\\{%[\\s\\S]{0,1000}?%\\}", "\\{\\{[\\s\\S]{0,500}?\\}\\}"]
+}
+```
+
+**Programmatic (JavaScript/Node.js):**
+
+```javascript
+ignoreCustomFragments: [/\{%[\s\S]{0,1000}?%\}/, /\{\{[\s\S]{0,500}?\}\}/]
+```
+
+**CLI (via config file—recommended):**
+
+```shell
+html-minifier-next --config-file=config.json input.html
+```
+
+**CLI (inline—not recommended due to complex escaping):**
+
+```shell
+html-minifier-next --ignore-custom-fragments '[\\\"\\\\{%[\\\\s\\\\S]{0,1000}?%\\\\}\\\"]' input.html
+```
+
+For CLI usage, using a config file is strongly recommended to avoid complex shell and JSON escaping.
+
+**Web demo:**
+
+```
+\{%[\s\S]{0,1000}?%\} \{\{[\s\S]{0,500}?\}\}
+```
+
 ## Running HTML Minifier Next locally
 
 ### Local server
