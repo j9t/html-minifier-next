@@ -4,6 +4,15 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.16.4] - 2025-12-31
+
+### Internal
+
+- Demo optimizations
+  - Added `ignoreCustomFragments` field for template engine support
+  - Improved error messages with automatic template syntax detection and pattern suggestions
+- Added escaping notes for `ignoreCustomFragments` (config file, CLI, web demo, programmatic)
+
 ## [4.16.3] - 2025-12-27
 
 ### Performance
