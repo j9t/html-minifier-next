@@ -452,7 +452,7 @@ const minifierData = () => ({
 
         if (detectedTemplates.length > 0) {
           const suggestions = detectedTemplates.map(t => t.pattern).join(' ');
-          errorText += `\n\n💡 Tip: Detected ${detectedTemplates.map(t => t.name).join('/')} template syntax. Add this to the "Ignore custom fragments" field:\n${suggestions}`;
+          errorText += `\n\n💡 Tip: Detected ${detectedTemplates.map(t => t.name).join('/')} template syntax. Add this to the “Ignore custom fragments” field:\n${suggestions}`;
         }
       }
 

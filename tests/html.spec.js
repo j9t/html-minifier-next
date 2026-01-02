@@ -4943,7 +4943,7 @@ describe('HTML', () => {
     const result = await minify(input, benchmarkConfig);
 
     // Should successfully minify without parse errors showing escaped quotes and double spaces
-    // Parse error would look like: <div  id=\"personalisation\"  data-snacks-3:custom=\"...
+    // Parse error would look like: <div  id=\"personalisation\"  data-snacks-3:custom=\"…
     assert.ok(!result.includes('\\"'), 'Should not contain escaped quotes');
     assert.ok(!result.includes('  '), 'Should not contain double spaces');
     assert.ok(result.includes('data-snacks-3:custom'), 'Should preserve custom attribute names');

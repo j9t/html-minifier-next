@@ -201,7 +201,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       // Validate engine
       const supportedEngines = ['terser', 'swc'];
       if (!supportedEngines.includes(engine)) {
-        throw new Error(`Unsupported JS minifier engine: "${engine}". Supported engines: ${supportedEngines.join(', ')}`);
+        throw new Error(`Unsupported JS minifier engine: “${engine}”. Supported engines: ${supportedEngines.join(', ')}`);
       }
 
       // Extract engine-specific options (excluding `engine` field itself)
