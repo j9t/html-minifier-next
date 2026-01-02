@@ -219,7 +219,7 @@ function generateMarkdownTable() {
     if (!rows[fileName] || !rows[fileName].report) return; // Prevent outputting rows with missing data
     const row = rows[fileName].report;
     const boldIndices = rows[fileName].boldIndices;
-    // Apply bold formatting during output without modifying original data
+    // Apply bold formatting during output without modifying the original data
     const formattedRow = row.map((cell, i) => boldIndices?.has(i) ? `**${cell}**` : cell);
     output(formattedRow);
   });
@@ -776,7 +776,7 @@ async function processFile(fileName) {
           });
 
           writeStream.on('close', function () {
-            // Ensure cleanup if stream closes without finish
+            // Ensure clean-up if stream closes without finishing
             if (!resolved) {
               safeResolve(null);
             }

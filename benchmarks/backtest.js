@@ -183,7 +183,7 @@ async function print(table, step = 1) {
   // Use consistent number formatting for JSON (locale-independent)
   const formatNumber = new Intl.NumberFormat('en-US').format;
 
-  // Build per-site objects with date+hash keys
+  // Build per-site objects with date and hash keys
   fileNames.forEach(fileName => {
     jsonOutput.sites[fileName] = {};
 
@@ -197,7 +197,7 @@ async function print(table, step = 1) {
         const dateShort = data.date.substring(0, 16); // “2025-12-27 18:23”
         const key = `${dateShort} ${hash}`;
 
-        // Calculate deltas comparing to the entry displayed below (index+1, chronologically older)
+        // Calculate deltas comparing to the entry displayed below (index + 1, chronologically older)
         // This shows how the commit performs compared to the older one below it
         let prevData = null;
         for (let i = index + 1; i < hashes.length; i++) {
@@ -300,7 +300,7 @@ if (process.argv.length > 2 || !process.send) {
         console.log(`Testing last ${count} commits, sampling every ${getOrdinal(step)} commit (${actualTests} tests)`);
       }
 
-      // Cleanup function to restore files on exit/error
+      // Clean-up function to restore files on exit/error
       let cleanupCalled = false;
       const cleanup = async function (reason) {
         if (cleanupCalled) return;
@@ -323,7 +323,7 @@ if (process.argv.length > 2 || !process.send) {
         });
       };
 
-      // Register cleanup handlers for various exit scenarios
+      // Register clean-up handlers for various exit scenarios
       const sigintHandler = async () => {
         await cleanup('SIGINT (Ctrl+C)');
         process.exit(130);
@@ -401,7 +401,7 @@ if (process.argv.length > 2 || !process.send) {
               // Successful completion—clean up and unregister handlers
               await cleanup();
 
-              // Unregister cleanup handlers to prevent duplicate cleanup
+              // Unregister cleanup handlers to prevent duplicate clean-up
               process.removeListener('SIGINT', sigintHandler);
               process.removeListener('SIGTERM', sigtermHandler);
               process.removeListener('uncaughtException', uncaughtExceptionHandler);
