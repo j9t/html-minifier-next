@@ -42,7 +42,7 @@
     "dist/",
     "src/"
   ],
-  "funding": "https://buymeacoffee.com/meiert",
+  "funding": "https://github.com/j9t/html-minifier-next?sponsor=1",
   "homepage": "https://j9t.github.io/html-minifier-next/",
   "keywords": [
     "cli",
