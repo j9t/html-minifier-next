@@ -351,13 +351,13 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       // The actual minification is applied inline during attribute processing
       options.minifySVG = getSVGMinifierOptions(option);
     } else if (key === 'customAttrCollapse') {
-      // Single RegExp pattern
+      // Single regex pattern
       options[key] = parseRegExp(option);
     } else if (key === 'customAttrSurround') {
       // Nested array of RegExp pairs: `[[openRegExp, closeRegExp], …]`
       options[key] = parseNestedRegExpArray(option);
     } else if (['customAttrAssign', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
-      // Array of RegExp patterns
+      // Array of regex patterns
       options[key] = parseRegExpArray(option);
     } else {
       options[key] = option;
