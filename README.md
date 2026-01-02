@@ -152,10 +152,10 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with `collapseWhitespace: true` | `false` |
 | `continueOnMinifyError`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |
 | `continueOnParseError`<br>`--continue-on-parse-error` | [Handle parse errors](https://html.spec.whatwg.org/multipage/parsing.html#parse-errors) instead of aborting | `false` |
-| `customAttrAssign`<br>`--custom-attr-assign` | Arrays of regexes that allow to support custom attribute assign expressions (e.g., `<div flex?="{{mode != cover}}"></div>`) | `[]` |
+| `customAttrAssign`<br>`--custom-attr-assign` | Array of regexes that allow to support custom attribute assign expressions (e.g., `<div flex?="{{mode != cover}}"></div>`) | `[]` |
 | `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | |
-| `customAttrSurround`<br>`--custom-attr-surround` | Arrays of regexes that allow to support custom attribute surround expressions (e.g., `<input {{#if value}}checked="checked"{{/if}}>`) | `[]` |
-| `customEventAttributes`<br>`--custom-event-attributes` | Arrays of regexes that allow to support custom event attributes for `minifyJS` (e.g., `ng-click`) | `[ /^on[a-z]{3,}$/ ]` |
+| `customAttrSurround`<br>`--custom-attr-surround` | Array of regexes that allow to support custom attribute surround expressions (e.g., `<input {{#if value}}checked="checked"{{/if}}>`) | `[]` |
+| `customEventAttributes`<br>`--custom-event-attributes` | Array of regexes that allow to support custom event attributes for `minifyJS` (e.g., `ng-click`) | `[ /^on[a-z]{3,}$/ ]` |
 | `customFragmentQuantifierLimit`<br>`--custom-fragment-quantifier-limit` | Set maximum quantifier limit for custom fragments to prevent ReDoS attacks | `200` |
 | `decodeEntities`<br>`--decode-entities` | Use direct Unicode characters whenever possible | `false` |
 | `html5`<br>`--no-html5` | Parse input according to the HTML specification; when `false`, enforces legacy inline/block nesting rules that may restructure modern HTML | `true` |
