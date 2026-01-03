@@ -1097,7 +1097,7 @@ describe('CLI', () => {
     const configPath = path.resolve(fixturesDir, 'tmp-preset-config2.json');
     await fs.promises.writeFile(configPath, JSON.stringify({
       preset: 'conservative',
-      useShortDoctype: false  // Override preset's useShortDoctype
+      useShortDoctype: false // Override preset’s useShortDoctype
     }));
 
     const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p>test</p>';

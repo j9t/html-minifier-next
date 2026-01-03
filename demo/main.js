@@ -84,7 +84,7 @@ const defaultOptions = [
     id: 'minifyCSS',
     type: 'checkbox',
     label: 'Minify CSS',
-    helpText: 'Minify CSS in <code>style</code> elements and <code>style</code> attributes (disabled in web version—Lightning CSS requires Node.js)',
+    helpText: 'Minify CSS in <code>style</code> elements and <code>style</code> attributes (disabled in web demo—Lightning CSS requires Node.js)',
     checked: false,
     disabled: true
   },
@@ -241,12 +241,14 @@ const defaultOptions = [
     id: 'useShortDoctype',
     type: 'checkbox',
     label: 'Use short doctype',
-    helpText: 'Replaces the doctype with the short (HTML) doctype',
+    helpText: 'Replaces the doctype with the short HTML doctype',
     checked: true
   }
 ];
 
 const sillyClone = (o) => JSON.parse(JSON.stringify(o));
+
+const formatNumber = (num) => num.toLocaleString('en-US');
 
 const getOptions = (options) => {
   const minifierOptions = {};
@@ -303,7 +305,7 @@ const MAX_URL_LENGTH = 2000; // Conservative limit for URL hash
 
 // Option migration map for backward compatibility
 // When renaming options, add entries here to preserve old URLs
-// Example: { 'oldOptionName': 'newOptionName' }
+// Example: `{ 'oldOptionName': 'newOptionName' }`
 const OPTION_MIGRATIONS = {};
 
 const encodeState = (input, options) => {
@@ -432,7 +434,7 @@ const minifierData = () => ({
 
       this.output = data;
       this.stats.result = 'success';
-      this.stats.text = `Original size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
+      this.stats.text = `Original size: ${formatNumber(this.input.length)}, minified size: ${formatNumber(data.length)}, savings: ${formatNumber(diff)} (${savings}%)`;
     } catch (err) {
       this.output = '';
       this.stats.result = 'failure';
@@ -452,7 +454,7 @@ const minifierData = () => ({
 
         if (detectedTemplates.length > 0) {
           const suggestions = detectedTemplates.map(t => t.pattern).join(' ');
-          errorText += `\n\n💡 Tip: Detected ${detectedTemplates.map(t => t.name).join('/')} template syntax. Add this to the "Ignore custom fragments" field:\n${suggestions}`;
+          errorText += `\n\n💡 Tip: Detected ${detectedTemplates.map(t => t.name).join('/')} template syntax. Add this to the “Ignore custom fragments” field:\n${suggestions}`;
         }
       }
 
@@ -478,13 +480,13 @@ const minifierData = () => ({
 
       // Copy to clipboard
       if (!navigator.clipboard || !navigator.clipboard.writeText) {
-        this.share = `✓ URL updated (${result.length} characters). Clipboard not supported—copy from address bar.`;
+        this.share = `✓ URL updated (${formatNumber(result.length)} characters)—clipboard not supported, copy from address bar`;
       } else {
         try {
           await navigator.clipboard.writeText(result.url);
-          this.share = `✓ URL copied to clipboard (${result.length} characters)`;
+          this.share = `✓ URL copied to clipboard (${formatNumber(result.length)} characters)`;
         } catch {
-          this.share = `✓ URL updated (${result.length} characters). Copy from address bar.`;
+          this.share = `✓ URL updated (${formatNumber(result.length)} characters)—copy from address bar`;
         }
       }
 
@@ -502,17 +504,17 @@ const minifierData = () => ({
 
         // Copy to clipboard
         if (!navigator.clipboard || !navigator.clipboard.writeText) {
-          this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. Clipboard not supported—copy from address bar.`;
+          this.share = `⚠ Code too large for URL (${formatNumber(result.length)} chars), sharing options only—clipboard not supported, copy from address bar`;
         } else {
           try {
             await navigator.clipboard.writeText(optionsOnly.url);
-            this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. URL copied to clipboard.`;
+            this.share = `⚠ Code too large for URL (${formatNumber(result.length)} chars), sharing options only—URL copied to clipboard`;
           } catch {
-            this.share = `⚠ Code too large for URL (${result.length} chars). Sharing options only. Copy from address bar.`;
+            this.share = `⚠ Code too large for URL (${formatNumber(result.length)} chars), sharing options only—copy from address bar`;
           }
         }
       } else {
-        this.share = `✗ Content too large to share via URL (${optionsOnly.length} characters, max ${MAX_URL_LENGTH})`;
+        this.share = `✗ Content too large to share via URL (${formatNumber(optionsOnly.length)} characters, max ${formatNumber(MAX_URL_LENGTH)})`;
       }
 
       // Clear message after 8 seconds

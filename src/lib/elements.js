@@ -175,7 +175,7 @@ function parseRemoveEmptyElementsExcept(input, options) {
     if (typeof item === 'string') {
       const spec = parseElementSpec(item, options);
       if (!spec && options.log) {
-        options.log('Warning: Unable to parse “removeEmptyElementsExcept” specification: "' + item + '"');
+        options.log('Warning: Unable to parse “removeEmptyElementsExcept” specification: “' + item + '”');
       }
       return spec;
     }

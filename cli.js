@@ -126,10 +126,10 @@ const mainOptions = {
   conservativeCollapse: 'Always collapse to one space (never remove it entirely)—use with “--collapse-whitespace”',
   continueOnMinifyError: 'Abort on minification errors',
   continueOnParseError: 'Handle parse errors instead of aborting',
-  customAttrAssign: ['Arrays of regexes that allow to support custom attribute assign expressions (e.g., “<div flex?="{{mode != cover}}"></div>”)', parseJSONRegExpArray],
+  customAttrAssign: ['Array of regexes that allow to support custom attribute assign expressions (e.g., “<div flex?="{{mode != cover}}"></div>”)', parseJSONRegExpArray],
   customAttrCollapse: ['Regex that specifies custom attribute to strip newlines from (e.g., /ng-class/)', parseRegExp],
-  customAttrSurround: ['Arrays of regexes that allow to support custom attribute surround expressions (e.g., “<input {{#if value}}checked="checked"{{/if}}>”)', parseJSONRegExpArray],
-  customEventAttributes: ['Arrays of regexes that allow to support custom event attributes for minifyJS (e.g., “ng-click”)', parseJSONRegExpArray],
+  customAttrSurround: ['Array of regexes that allow to support custom attribute surround expressions (e.g., “<input {{#if value}}checked="checked"{{/if}}>”)', parseJSONRegExpArray],
+  customEventAttributes: ['Array of regexes that allow to support custom event attributes for minifyJS (e.g., “ng-click”)', parseJSONRegExpArray],
   customFragmentQuantifierLimit: ['Set maximum quantifier limit for custom fragments to prevent ReDoS attacks (default: 200)', parseValidInt('customFragmentQuantifierLimit')],
   decodeEntities: 'Use direct Unicode characters whenever possible',
   html5: 'Don’t parse input according to the HTML specification (not recommended for modern HTML)',
@@ -140,8 +140,8 @@ const mainOptions = {
   keepClosingSlash: 'Keep the trailing slash on void elements',
   maxInputLength: ['Maximum input length to prevent ReDoS attacks', parseValidInt('maxInputLength')],
   maxLineLength: ['Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points', parseValidInt('maxLineLength')],
-  minifyCSS: ['Minify CSS in "style" elements and "style" attributes (uses Lightning CSS)', parseJSON],
-  minifyJS: ['Minify JavaScript in "script" elements and event attributes (uses Terser or SWC; pass "{"engine": "swc"}" for SWC)', parseJSON],
+  minifyCSS: ['Minify CSS in “style” elements and “style” attributes (uses Lightning CSS)', parseJSON],
+  minifyJS: ['Minify JavaScript in “script” elements and event attributes (uses Terser or SWC; pass “{"engine": "swc"}” for SWC)', parseJSON],
   minifySVG: ['Minify SVG elements and attributes (numeric precision, default attributes, colors)', parseJSON],
   minifyURLs: ['Minify URLs in various attributes (uses relateurl)', parseJSON],
   noNewlinesBeforeTagClose: 'Never add a newline before a tag that closes an element',
@@ -164,7 +164,7 @@ const mainOptions = {
   sortAttributes: 'Sort attributes by frequency',
   sortClassName: 'Sort style classes by frequency',
   trimCustomFragments: 'Trim whitespace around “ignoreCustomFragments”',
-  useShortDoctype: 'Replaces the doctype with the short (HTML) doctype'
+  useShortDoctype: 'Replaces the doctype with the short HTML doctype'
 };
 
 // Configure command line flags

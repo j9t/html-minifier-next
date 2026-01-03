@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.16.5] - 2026-01-@@
+
+### Internal
+
+- Reformatted and optimized code and documentation
+- Optimized code, copy, and DX of web demo
+- Extended HMN benchmarks config (to reflect all settings if possible, except `customAttrCollapse`, `maxInputLength`, `quoteCharacter`) and re-ran benchmarks
+
 ## [4.16.4] - 2025-12-31
 
 ### Internal
@@ -424,7 +432,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added “Presets” section to README with usage examples and priority explanation
 - Added `--preset` option to CLI options table in README
 - Updated CLI help text to include preset option
-- Fixed case in web version (demo)
+- Fixed case in web demo
 
 ## [4.4.0] - 2025-11-26
 

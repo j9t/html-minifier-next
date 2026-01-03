@@ -1,4 +1,4 @@
-// RegExp patterns (to avoid repeated allocations in hot paths)
+// Regex patterns (to avoid repeated allocations in hot paths)
 
 const RE_WS_START = /^[ \n\r\t\f]+/;
 const RE_WS_END = /[ \n\r\t\f]+$/;
@@ -162,7 +162,7 @@ const specialContentTags = new Set(['script', 'style']);
 // Exports
 
 export {
-  // RegExp patterns
+  // Regex patterns
   RE_WS_START,
   RE_WS_END,
   RE_ALL_WS_NBSP,

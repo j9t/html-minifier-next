@@ -7,8 +7,13 @@
   "conservativeCollapse": false,
   "continueOnMinifyError": true,
   "continueOnParseError": true,
+  "customAttrAssign": [],
+  "customAttrSurround": [],
+  "customEventAttributes": [],
+  "customFragmentQuantifierLimit": 200,
   "decodeEntities": true,
   "html5": true,
+  "ignoreCustomComments": [],
   "ignoreCustomFragments": [
     "<#[\\s\\S]*?#>",
     "<%[\\s\\S]*?%>",
@@ -29,10 +34,7 @@
   "preserveLineBreaks": false,
   "preventAttributesEscaping": true,
   "processConditionalComments": true,
-  "processScripts": [
-    "text/html",
-    "application/ld+json"
-  ],
+  "processScripts": [],
   "removeAttributeQuotes": true,
   "removeComments": true,
   "removeEmptyAttributes": true,

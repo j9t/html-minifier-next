@@ -30,9 +30,9 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/types/htmlminifier.d.ts",
       "import": "./src/htmlminifier.js",
-      "require": "./dist/htmlminifier.cjs"
+      "require": "./dist/htmlminifier.cjs",
+      "types": "./dist/types/htmlminifier.d.ts"
     },
     "./dist/*": "./dist/*.js",
     "./package.json": "./package.json"
@@ -69,7 +69,6 @@
   "license": "MIT",
   "main": "./dist/htmlminifier.cjs",
   "module": "./src/htmlminifier.js",
-  "types": "./dist/types/htmlminifier.d.ts",
   "name": "html-minifier-next",
   "peerDependencies": {
     "@swc/core": "^1.15.7"
@@ -84,11 +83,11 @@
     "url": "git+https://github.com/j9t/html-minifier-next.git"
   },
   "scripts": {
-    "prebuild": "node --eval='require(`fs`).rmSync(`dist`,{recursive:true,force:true})'",
     "build": "tsc && rollup -c",
     "build:docs": "vite build --base /html-minifier-next/ --outDir build",
     "deploy": "npm run build && npm run build:docs",
     "lint": "eslint .",
+    "prebuild": "node --eval='require(`fs`).rmSync(`dist`,{recursive:true,force:true})'",
     "prepack": "npm run build",
     "prepare": "git config core.hooksPath .githooks || true",
     "serve": "npm run build && vite",
@@ -97,5 +96,6 @@
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
+  "types": "./dist/types/htmlminifier.d.ts",
   "version": "4.16.4"
 }
