@@ -164,7 +164,7 @@ const mainOptions = {
   sortAttributes: 'Sort attributes by frequency',
   sortClassName: 'Sort style classes by frequency',
   trimCustomFragments: 'Trim whitespace around “ignoreCustomFragments”',
-  useShortDoctype: 'Replaces the doctype with the short (HTML) doctype'
+  useShortDoctype: 'Replaces the doctype with the short HTML doctype'
 };
 
 // Configure command line flags

@@ -190,7 +190,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassName`<br>`--sort-class-name` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around `ignoreCustomFragments` | `false` |
-| `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short (HTML) doctype](https://perfectionkills.com/experimenting-with-html-minifier#use_short_doctype) | `false` |
+| `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier#use_short_doctype) | `false` |
 
 ### Sorting attributes and style classes
 

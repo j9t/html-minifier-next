@@ -432,7 +432,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added “Presets” section to README with usage examples and priority explanation
 - Added `--preset` option to CLI options table in README
 - Updated CLI help text to include preset option
-- Fixed case in web version (demo)
+- Fixed case in web demo
 
 ## [4.4.0] - 2025-11-26
 
