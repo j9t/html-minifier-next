@@ -3,19 +3,19 @@
 	<head>
 		<meta charset="utf-8">
 		<meta name="viewport" content="initial-scale=1,width=device-width">
-		<title>HTML Minifier Next</title>
+		<title>HTML Minifier Next · Web demo of the super-configurable, well-tested, JavaScript-based HTML minifier</title>
 		<link rel="stylesheet" href="./main.css">
 	</head>
 	<body>
-		<h1 class="header">HTML Minifier Next <span id="minifier-version"></span></h1>
-		<div class="main" x-data="minifier" x-cloak>
+		<h1>HTML Minifier Next <span id="minifier-version"></span></h1>
+		<main x-data="minifier" x-cloak>
 			<div class="workspace">
-				<textarea rows="10" cols="40" class="input-content" x-model="input"></textarea>
+				<textarea rows="10" cols="40" id="input" x-model="input"></textarea>
 				<div class="alt">
 					<button type="button" @click="minify()">Minify</button>
 					<button type="button" @click="shareUrl()">Share</button>
 				</div>
-				<textarea rows="10" cols="40" class="output-content" readonly x-model="output"></textarea>
+				<textarea rows="10" cols="40" id="output" readonly x-model="output"></textarea>
 				<p x-text="stats.text" :class="stats.result"></p>
 				<p x-show="share" x-text="share" class="share"></p>
 			</div>
@@ -56,20 +56,20 @@
 				<div>
 					<span>Select:</span>
 					<a href="#" @click.prevent="selectAllOptions(true)">All</a>,
-					<a href="#" @click.prevent="applyPreset('comprehensive')">Comprehensive</a>,
-					<a href="#" @click.prevent="applyPreset('conservative')">Conservative</a>,
-					<a href="#" @click.prevent="selectAllOptions(false)">None</a>,
-					<a href="#" @click.prevent="resetOptions()">Reset</a>
+					<a href="#" @click.prevent="applyPreset('comprehensive')">comprehensive</a>,
+					<a href="#" @click.prevent="applyPreset('conservative')">conservative</a>,
+					<a href="#" @click.prevent="selectAllOptions(false)">none</a>,
+					<a href="#" @click.prevent="resetOptions()">reset</a>
 				</div>
 			</div>
-		</div>
+		</main>
 		<footer>
 			<p class="quiet">
+				HTML Minifier Next is an enhanced and maintained minifier by <a href="https://meiert.com/">Jens Oliver Meiert</a>.
 				The original HTML Minifier was made by <a href="https://perfectionkills.com/">Juriy “kangax” Zaytsev</a>,
 				using a tweaked version of HTML parser by <a href="https://johnresig.com/">John Resig</a>,
 				which was based on work by <a href="https://web.archive.org/web/20200818163733/http://erik.eae.net/">Erik Arvidsson</a>.
-				HTML Minifier Next is maintained by <a href="https://meiert.com/">Jens Oliver Meiert</a>.
-				Source and bug tracker are <a href="https://github.com/j9t/html-minifier-next">hosted on GitHub</a>.
+				Source and bug tracker are <a href="https://github.com/j9t/html-minifier-next">available on GitHub</a>.
 			</p>
 		</footer>
 		<script src="/lz-string.min.js"></script>
