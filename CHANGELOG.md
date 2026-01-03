@@ -8,8 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Internal
 
-- Corrected documentation
-- Reformatted code and documentation
+- Reformatted and optimized code and documentation
+- Optimized web demo
 - Extended HMN benchmarks config (to reflect all settings if possible, except `customAttrCollapse`, `maxInputLength`, `quoteCharacter`) and re-ran benchmarks
 
 ## [4.16.4] - 2025-12-31
