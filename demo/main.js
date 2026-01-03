@@ -248,6 +248,8 @@ const defaultOptions = [
 
 const sillyClone = (o) => JSON.parse(JSON.stringify(o));
 
+const formatNumber = (num) => num.toLocaleString('en-US');
+
 const getOptions = (options) => {
   const minifierOptions = {};
 
@@ -432,7 +434,7 @@ const minifierData = () => ({
 
       this.output = data;
       this.stats.result = 'success';
-      this.stats.text = `Original size: ${this.input.length}, minified size: ${data.length}, savings: ${diff} (${savings}%)`;
+      this.stats.text = `Original size: ${formatNumber(this.input.length)}, minified size: ${formatNumber(data.length)}, savings: ${formatNumber(diff)} (${savings}%)`;
     } catch (err) {
       this.output = '';
       this.stats.result = 'failure';
@@ -478,13 +480,13 @@ const minifierData = () => ({
 
       // Copy to clipboard
       if (!navigator.clipboard || !navigator.clipboard.writeText) {
-        this.share = `✓ URL updated (${result.length} characters)—clipboard not supported, copy from address bar`;
+        this.share = `✓ URL updated (${formatNumber(result.length)} characters)—clipboard not supported, copy from address bar`;
       } else {
         try {
           await navigator.clipboard.writeText(result.url);
-          this.share = `✓ URL copied to clipboard (${result.length} characters)`;
+          this.share = `✓ URL copied to clipboard (${formatNumber(result.length)} characters)`;
         } catch {
-          this.share = `✓ URL updated (${result.length} characters)—copy from address bar`;
+          this.share = `✓ URL updated (${formatNumber(result.length)} characters)—copy from address bar`;
         }
       }
 
@@ -502,17 +504,17 @@ const minifierData = () => ({
 
         // Copy to clipboard
         if (!navigator.clipboard || !navigator.clipboard.writeText) {
-          this.share = `⚠ Code too large for URL (${result.length} chars), sharing options only—clipboard not supported, copy from address bar`;
+          this.share = `⚠ Code too large for URL (${formatNumber(result.length)} chars), sharing options only—clipboard not supported, copy from address bar`;
         } else {
           try {
             await navigator.clipboard.writeText(optionsOnly.url);
-            this.share = `⚠ Code too large for URL (${result.length} chars), sharing options only—URL copied to clipboard`;
+            this.share = `⚠ Code too large for URL (${formatNumber(result.length)} chars), sharing options only—URL copied to clipboard`;
           } catch {
-            this.share = `⚠ Code too large for URL (${result.length} chars), sharing options only—copy from address bar`;
+            this.share = `⚠ Code too large for URL (${formatNumber(result.length)} chars), sharing options only—copy from address bar`;
           }
         }
       } else {
-        this.share = `✗ Content too large to share via URL (${optionsOnly.length} characters, max ${MAX_URL_LENGTH})`;
+        this.share = `✗ Content too large to share via URL (${formatNumber(optionsOnly.length)} characters, max ${formatNumber(MAX_URL_LENGTH)})`;
       }
 
       // Clear message after 8 seconds
