@@ -75,8 +75,7 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   const tagHasDefaults = tag in tagDefaults;
 
   // Check for legacy attribute rules (element- and attribute-specific)
-  const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) ||
-                       (tag === 'a' && attrName === 'name');
+  const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) || (tag === 'a' && attrName === 'name');
 
   // If none of these conditions apply, attribute cannot be redundant
   if (!hasGeneralDefault && !tagHasDefaults && !isLegacyAttr) {
@@ -302,7 +301,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
       try {
         attrValue = await options.minifyCSS(attrValue, 'inline');
         // After minification, check if CSS consists entirely of invalid properties (no values)
-        // E.g., `color:` or `margin:;padding:` should be treated as empty
+        // I.e., `color:` or `margin:;padding:` should be treated as empty
         if (attrValue && /^(?:[a-z-]+:\s*;?\s*)+$/i.test(attrValue)) {
           attrValue = '';
         }
@@ -472,7 +471,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
         attrValue = attrValue.replace(/'/g, '&#39;');
       }
     } else {
-      // `preventAttributesEscaping` mode: choose safe quotes but don't escape
+      // `preventAttributesEscaping` mode: Choose safe quotes but don't escape
       // except when both quote types are present—then escape to prevent invalid HTML
       const hasDoubleQuote = attrValue.indexOf('"') !== -1;
       const hasSingleQuote = attrValue.indexOf("'") !== -1;
