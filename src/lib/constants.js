@@ -95,7 +95,7 @@ const isBooleanValue = new Set(['true', 'false']);
 
 // `srcset` elements
 
-const srcsetTags = new Set(['img', 'source']);
+const srcsetElements = new Set(['img', 'source']);
 
 // JSON script types
 
@@ -122,35 +122,35 @@ const optionalStartTags = new Set(['html', 'head', 'body', 'colgroup', 'tbody'])
 
 const optionalEndTags = new Set(['html', 'head', 'body', 'li', 'dt', 'dd', 'p', 'rb', 'rt', 'rtc', 'rp', 'optgroup', 'option', 'colgroup', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th']);
 
-const headerTags = new Set(['meta', 'link', 'script', 'style', 'template', 'noscript']);
+const headerElements = new Set(['meta', 'link', 'script', 'style', 'template', 'noscript']);
 
-const descriptionTags = new Set(['dt', 'dd']);
+const descriptionElements = new Set(['dt', 'dd']);
 
-const pBlockTags = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'dialog', 'div', 'dl', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'main', 'menu', 'nav', 'ol', 'p', 'pre', 'search', 'section', 'table', 'ul']);
+const pBlockElements = new Set(['address', 'article', 'aside', 'blockquote', 'details', 'dialog', 'div', 'dl', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'main', 'menu', 'nav', 'ol', 'p', 'pre', 'search', 'section', 'table', 'ul']);
 
-const pInlineTags = new Set(['a', 'audio', 'del', 'ins', 'map', 'noscript', 'video']);
+const pInlineElements = new Set(['a', 'audio', 'del', 'ins', 'map', 'noscript', 'video']);
 
 const rubyEndTagOmission = new Set(['rb', 'rt', 'rtc', 'rp']); // `</rb>`, `</rt>`, `</rp>` can be omitted if followed by `<rb>`, `<rt>`, `<rtc>`, or `<rp>`
 
 const rubyRtcEndTagOmission = new Set(['rb', 'rtc']); // `</rtc>` can be omitted if followed by `<rb>` or `<rtc>` (not `<rt>` or `<rp>`)
 
-const optionTag = new Set(['option', 'optgroup']);
+const optionElements = new Set(['option', 'optgroup']);
 
-const tableContentTags = new Set(['tbody', 'tfoot']);
+const tableContentElements = new Set(['tbody', 'tfoot']);
 
-const tableSectionTags = new Set(['thead', 'tbody', 'tfoot']);
+const tableSectionElements = new Set(['thead', 'tbody', 'tfoot']);
 
-const cellTags = new Set(['td', 'th']);
+const cellElements = new Set(['td', 'th']);
 
-const topLevelTags = new Set(['html', 'head', 'body']);
+const topLevelElements = new Set(['html', 'head', 'body']);
 
-const compactTags = new Set(['html', 'body']);
+const compactElements = new Set(['html', 'body']);
 
-const looseTags = new Set(['head', 'colgroup', 'caption']);
+const looseElements = new Set(['head', 'colgroup', 'caption']);
 
-const trailingTags = new Set(['dt', 'thead']);
+const trailingElements = new Set(['dt', 'thead']);
 
-const htmlTags = new Set(['a', 'abbr', 'acronym', 'address', 'applet', 'area', 'article', 'aside', 'audio', 'b', 'base', 'basefont', 'bdi', 'bdo', 'bgsound', 'big', 'blink', 'blockquote', 'body', 'br', 'button', 'canvas', 'caption', 'center', 'cite', 'code', 'col', 'colgroup', 'command', 'content', 'data', 'datalist', 'dd', 'del', 'details', 'dfn', 'dialog', 'dir', 'div', 'dl', 'dt', 'element', 'em', 'embed', 'fieldset', 'figcaption', 'figure', 'font', 'footer', 'form', 'frame', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'i', 'iframe', 'image', 'img', 'input', 'ins', 'isindex', 'kbd', 'keygen', 'label', 'legend', 'li', 'link', 'listing', 'main', 'map', 'mark', 'marquee', 'menu', 'menuitem', 'meta', 'meter', 'multicol', 'nav', 'nobr', 'noembed', 'noframes', 'noscript', 'object', 'ol', 'optgroup', 'option', 'output', 'p', 'param', 'picture', 'plaintext', 'pre', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'script', 'search', 'section', 'select', 'selectedcontent', 'shadow', 'small', 'source', 'spacer', 'span', 'strike', 'strong', 'style', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'template', 'textarea', 'tfoot', 'th', 'thead', 'time', 'title', 'tr', 'track', 'tt', 'u', 'ul', 'var', 'video', 'wbr', 'xmp']);
+const htmlElements = new Set(['a', 'abbr', 'acronym', 'address', 'applet', 'area', 'article', 'aside', 'audio', 'b', 'base', 'basefont', 'bdi', 'bdo', 'bgsound', 'big', 'blink', 'blockquote', 'body', 'br', 'button', 'canvas', 'caption', 'center', 'cite', 'code', 'col', 'colgroup', 'command', 'content', 'data', 'datalist', 'dd', 'del', 'details', 'dfn', 'dialog', 'dir', 'div', 'dl', 'dt', 'element', 'em', 'embed', 'fieldset', 'figcaption', 'figure', 'font', 'footer', 'form', 'frame', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'i', 'iframe', 'image', 'img', 'input', 'ins', 'isindex', 'kbd', 'keygen', 'label', 'legend', 'li', 'link', 'listing', 'main', 'map', 'mark', 'marquee', 'menu', 'menuitem', 'meta', 'meter', 'multicol', 'nav', 'nobr', 'noembed', 'noframes', 'noscript', 'object', 'ol', 'optgroup', 'option', 'output', 'p', 'param', 'picture', 'plaintext', 'pre', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'script', 'search', 'section', 'select', 'selectedcontent', 'shadow', 'small', 'source', 'spacer', 'span', 'strike', 'strong', 'style', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'template', 'textarea', 'tfoot', 'th', 'thead', 'time', 'title', 'tr', 'track', 'tt', 'u', 'ul', 'var', 'video', 'wbr', 'xmp']);
 
 // Empty attribute regex
 
@@ -160,7 +160,7 @@ const reEmptyAttribute = new RegExp(
 
 // Special content elements
 
-const specialContentTags = new Set(['script', 'style']);
+const specialContentElements = new Set(['script', 'style']);
 
 // Exports
 
@@ -204,28 +204,28 @@ export {
   isBooleanValue,
 
   // Misc
-  srcsetTags,
+  srcsetElements,
 
   // Tag omission rules
   optionalStartTags,
   optionalEndTags,
-  headerTags,
-  descriptionTags,
-  pBlockTags,
-  pInlineTags,
+  headerElements,
+  descriptionElements,
+  pBlockElements,
+  pInlineElements,
   rubyEndTagOmission,
   rubyRtcEndTagOmission,
-  optionTag,
-  tableContentTags,
-  tableSectionTags,
-  cellTags,
-  topLevelTags,
-  compactTags,
-  looseTags,
-  trailingTags,
-  htmlTags,
+  optionElements,
+  tableContentElements,
+  tableSectionElements,
+  cellElements,
+  topLevelElements,
+  compactElements,
+  looseElements,
+  trailingElements,
+  htmlElements,
 
   // Regex
   reEmptyAttribute,
-  specialContentTags
+  specialContentElements
 };

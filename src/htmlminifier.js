@@ -12,15 +12,15 @@ import {
   RE_ESCAPE_LT,
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
-  specialContentTags,
-  htmlTags,
+  specialContentElements,
+  htmlElements,
   optionalStartTags,
   optionalEndTags,
-  topLevelTags,
-  compactTags,
-  looseTags,
-  trailingTags,
-  pInlineTags
+  topLevelElements,
+  compactElements,
+  looseElements,
+  trailingElements,
+  pInlineElements
 } from './lib/constants.js';
 
 import {
@@ -549,7 +549,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       chars: async function (text) {
         // Only recursively scan HTML content, not JSON-LD or other non-HTML script types
         // `scan()` is for analyzing HTML attribute order, not for parsing JSON
-        if (options.processScripts && specialContentTags.has(currentTag) &&
+        if (options.processScripts && specialContentElements.has(currentTag) &&
           options.processScripts.indexOf(currentType) > -1 &&
           currentType === 'text/html') {
           await scan(text);
@@ -925,7 +925,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
       let optional = options.removeOptionalTags;
       if (optional) {
-        const htmlTag = htmlTags.has(tag);
+        const htmlTag = htmlElements.has(tag);
         // `<html>` may be omitted if first thing inside is not a comment
         // `<head>` may be omitted if first thing inside is an element
         // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, <`style>`, or `<template>`
@@ -1023,7 +1023,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
       if (options.removeOptionalTags) {
         // `<html>`, `<head>` or `<body>` may be omitted if the element is empty
-        if (isElementEmpty && topLevelTags.has(optionalStartTag)) {
+        if (isElementEmpty && topLevelElements.has(optionalStartTag)) {
           removeStartTag();
         }
         optionalStartTag = '';
@@ -1031,7 +1031,7 @@ async function minifyHTML(value, options, partialMarkup) {
         // `</head>` may be omitted if not followed by space or comment
         // `</p>` may be omitted if no more content in non-`</a>` parent
         // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
-        if (tag && optionalEndTag && !trailingTags.has(optionalEndTag) && (optionalEndTag !== 'p' || !pInlineTags.has(tag))) {
+        if (tag && optionalEndTag && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || !pInlineElements.has(tag))) {
           removeEndTag();
         }
         optionalEndTag = optionalEndTags.has(tag) ? tag : '';
@@ -1081,7 +1081,7 @@ async function minifyHTML(value, options, partialMarkup) {
     chars: async function (text, prevTag, nextTag) {
       prevTag = prevTag === '' ? 'comment' : prevTag;
       nextTag = nextTag === '' ? 'comment' : nextTag;
-      if (options.decodeEntities && text && !specialContentTags.has(currentTag)) {
+      if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         if (text.indexOf('&') !== -1) {
           text = decodeHTML(text);
         }
@@ -1129,7 +1129,7 @@ async function minifyHTML(value, options, partialMarkup) {
           text = collapseWhitespace(text, options, false, false, true);
         }
       }
-      if (specialContentTags.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs))) {
+      if (specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs))) {
         text = await processScript(text, options, currentAttrs, minifyHTML);
       }
       if (isExecutableScript(currentTag, currentAttrs)) {
@@ -1147,7 +1147,7 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalStartTag = '';
         // `</html>` or `</body>` may be omitted if not followed by comment
         // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
-        if (compactTags.has(optionalEndTag) || (looseTags.has(optionalEndTag) && !/^\s/.test(text))) {
+        if (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(text))) {
           removeEndTag();
         }
         // Don’t reset optionalEndTag if text is only whitespace and will be collapsed (not conservatively)
@@ -1156,7 +1156,7 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
       charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
-      if (options.decodeEntities && text && !specialContentTags.has(currentTag)) {
+      if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         // Escape any `&` symbols that start either:
         // 1) a legacy named character reference (i.e., one that doesn’t end with `;`)
         // 2) or any other character reference (i.e., one that does end with `;`)
@@ -1286,11 +1286,11 @@ async function minifyHTML(value, options, partialMarkup) {
   if (options.removeOptionalTags) {
     // `<html>` may be omitted if first thing inside is not a comment
     // `<head>` or `<body>` may be omitted if empty
-    if (topLevelTags.has(optionalStartTag)) {
+    if (topLevelElements.has(optionalStartTag)) {
       removeStartTag();
     }
     // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
-    if (optionalEndTag && !trailingTags.has(optionalEndTag)) {
+    if (optionalEndTag && !trailingElements.has(optionalEndTag)) {
       removeEndTag();
     }
   }

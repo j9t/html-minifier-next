@@ -15,7 +15,7 @@ import {
   keepScriptsMimetypes,
   isSimpleBoolean,
   isBooleanValue,
-  srcsetTags,
+  srcsetElements,
   reEmptyAttribute
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
@@ -194,7 +194,7 @@ function isMediaQuery(tag, attrs, attrName) {
 }
 
 function isSrcset(attrName, tag) {
-  return attrName === 'srcset' && srcsetTags.has(tag);
+  return attrName === 'srcset' && srcsetElements.has(tag);
 }
 
 function isMetaViewport(tag, attrs) {

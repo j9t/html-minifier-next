@@ -1,15 +1,15 @@
 // Imports
 
 import {
-  headerTags,
-  descriptionTags,
-  pBlockTags,
+  headerElements,
+  descriptionElements,
+  pBlockElements,
   rubyEndTagOmission,
   rubyRtcEndTagOmission,
-  optionTag,
-  tableContentTags,
-  tableSectionTags,
-  cellTags
+  optionElements,
+  tableContentElements,
+  tableSectionElements,
+  cellElements
 } from './constants.js';
 import { hasAttrName } from './attributes.js';
 
@@ -21,7 +21,7 @@ function canRemoveParentTag(optionalStartTag, tag) {
     case 'head':
       return true;
     case 'body':
-      return !headerTags.has(tag);
+      return !headerElements.has(tag);
     case 'colgroup':
       return tag === 'col';
     case 'tbody':
@@ -35,7 +35,7 @@ function isStartTagMandatory(optionalEndTag, tag) {
     case 'colgroup':
       return optionalEndTag === 'colgroup';
     case 'tbody':
-      return tableSectionTags.has(optionalEndTag);
+      return tableSectionElements.has(optionalEndTag);
   }
   return false;
 }
@@ -54,9 +54,9 @@ function canRemovePrecedingTag(optionalEndTag, tag) {
       return tag === optionalEndTag;
     case 'dt':
     case 'dd':
-      return descriptionTags.has(tag);
+      return descriptionElements.has(tag);
     case 'p':
-      return pBlockTags.has(tag);
+      return pBlockElements.has(tag);
     case 'rb':
     case 'rt':
     case 'rp':
@@ -64,15 +64,15 @@ function canRemovePrecedingTag(optionalEndTag, tag) {
     case 'rtc':
       return rubyRtcEndTagOmission.has(tag);
     case 'option':
-      return optionTag.has(tag);
+      return optionElements.has(tag);
     case 'thead':
     case 'tbody':
-      return tableContentTags.has(tag);
+      return tableContentElements.has(tag);
     case 'tfoot':
       return tag === 'tbody';
     case 'td':
     case 'th':
-      return cellTags.has(tag);
+      return cellElements.has(tag);
   }
   return false;
 }
