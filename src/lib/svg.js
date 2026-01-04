@@ -9,6 +9,8 @@
  * - Path data space optimization
  */
 
+// Imports
+
 import { LRU } from './utils.js';
 import { RE_NUMERIC_VALUE } from './constants.js';
 
