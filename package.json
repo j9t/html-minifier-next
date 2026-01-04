@@ -30,9 +30,9 @@
   },
   "exports": {
     ".": {
+      "types": "./dist/types/htmlminifier.d.ts",
       "import": "./src/htmlminifier.js",
-      "require": "./dist/htmlminifier.cjs",
-      "types": "./dist/types/htmlminifier.d.ts"
+      "require": "./dist/htmlminifier.cjs"
     },
     "./dist/*": "./dist/*.js",
     "./package.json": "./package.json"
