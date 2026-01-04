@@ -134,7 +134,7 @@ function isStyleLinkTypeAttribute(attrValue = '') {
   return attrValue === '' || attrValue === 'text/css';
 }
 
-function isStyleSheet(tag, attrs) {
+function isStyleElement(tag, attrs) {
   if (tag !== 'style') {
     return false;
   }
@@ -191,7 +191,7 @@ function isLinkType(tag, attrs, value) {
 }
 
 function isMediaQuery(tag, attrs, attrName) {
-  return attrName === 'media' && (isLinkType(tag, attrs, 'stylesheet') || isStyleSheet(tag, attrs));
+  return attrName === 'media' && (isLinkType(tag, attrs, 'stylesheet') || isStyleElement(tag, attrs));
 }
 
 function isSrcset(attrName, tag) {
@@ -203,7 +203,7 @@ function isMetaViewport(tag, attrs) {
     return false;
   }
   for (let i = 0, len = attrs.length; i < len; i++) {
-    if (attrs[i].name === 'name' && attrs[i].value === 'viewport') {
+    if (attrs[i].name.toLowerCase() === 'name' && attrs[i].value.toLowerCase() === 'viewport') {
       return true;
     }
   }
@@ -223,7 +223,7 @@ function isContentSecurityPolicy(tag, attrs) {
 }
 
 function canDeleteEmptyAttribute(tag, attrName, attrValue, options) {
-  const isValueEmpty = !attrValue || /^\s*$/.test(attrValue);
+  const isValueEmpty = !attrValue || attrValue.trim() === '';
   if (!isValueEmpty) {
     return false;
   }
@@ -544,7 +544,7 @@ export {
   keepScriptTypeAttribute,
   isExecutableScript,
   isStyleLinkTypeAttribute,
-  isStyleSheet,
+  isStyleElement,
   isBooleanAttribute,
   isUriTypeAttribute,
   isNumberTypeAttribute,

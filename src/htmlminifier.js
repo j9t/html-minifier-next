@@ -36,7 +36,7 @@ import {
   isConditionalComment,
   isIgnoredComment,
   isExecutableScript,
-  isStyleSheet,
+  isStyleElement,
   normalizeAttr,
   buildAttr
 } from './lib/attributes.js';
@@ -1135,7 +1135,7 @@ async function minifyHTML(value, options, partialMarkup) {
       if (isExecutableScript(currentTag, currentAttrs)) {
         text = await options.minifyJS(text);
       }
-      if (isStyleSheet(currentTag, currentAttrs)) {
+      if (isStyleElement(currentTag, currentAttrs)) {
         text = await options.minifyCSS(text);
       }
       if (options.removeOptionalTags && text) {
