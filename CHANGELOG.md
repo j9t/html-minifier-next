@@ -301,7 +301,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Pre-compiled regexes for common special elements (`script`, `style`, `noscript`) in HTML parser to eliminate regex creation overhead during parsing
 - Lazy-load heavy dependencies (Terser, Lightning CSS) only when CSS/JS minification is enabled
 - Optimized attribute quote counting by replacing two regex operations with single-pass character iteration
-- Cached inline element Sets to avoid redundant creation when no custom elements are configured
+- Cached inline element sets to avoid redundant creation when no custom elements are configured
 - Improved attribute processing by replacing O(n²) unshift operations with O(n) push and reverse (faster for elements with many attributes)
 
 ## [4.8.1] - 2025-12-10

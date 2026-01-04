@@ -742,7 +742,7 @@ async function minifyHTML(value, options, partialMarkup) {
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
   const normalizedCustomElements = customElementsArr.map(name => options.name(name));
-  // Fast path: Reuse base Sets if no custom elements
+  // Fast path: Reuse base sets if no custom elements
   const inlineTextSet = normalizedCustomElements.length
     ? new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements])
     : inlineElementsToKeepWhitespaceWithin;

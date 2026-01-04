@@ -19,7 +19,7 @@ const RE_ATTR_WS_COLLAPSE = /[ \n\r\t\f]+/g;
 const RE_ATTR_WS_TRIM = /^[ \n\r\t\f]+|[ \n\r\t\f]+$/g;
 const RE_NUMERIC_VALUE = /-?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g;
 
-// Inline element Sets for whitespace handling
+// Inline element sets for whitespace handling
 
 // Non-empty elements that will maintain whitespace around them
 const inlineElementsToKeepWhitespaceAround = new Set(['a', 'abbr', 'acronym', 'b', 'bdi', 'bdo', 'big', 'button', 'cite', 'code', 'del', 'dfn', 'em', 'font', 'i', 'img', 'input', 'ins', 'kbd', 'label', 'mark', 'math', 'meter', 'nobr', 'object', 'output', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'select', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'svg', 'textarea', 'time', 'tt', 'u', 'var', 'wbr']);
@@ -84,7 +84,7 @@ const keepScriptsMimetypes = new Set([
   'module'
 ]);
 
-// Boolean attribute Sets
+// Boolean attribute sets
 
 const isSimpleBoolean = new Set(['allowfullscreen', 'async', 'autofocus', 'autoplay', 'checked', 'compact', 'controls', 'declare', 'default', 'defaultchecked', 'defaultmuted', 'defaultselected', 'defer', 'disabled', 'enabled', 'formnovalidate', 'hidden', 'indeterminate', 'inert', 'ismap', 'itemscope', 'loop', 'multiple', 'muted', 'nohref', 'noresize', 'noshade', 'novalidate', 'nowrap', 'open', 'pauseonexit', 'readonly', 'required', 'reversed', 'scoped', 'seamless', 'selected', 'sortable', 'truespeed', 'typemustmatch', 'visible']);
 
@@ -108,7 +108,7 @@ const jsonScriptTypes = new Set([
   'speculationrules',
 ]);
 
-// Tag omission rules and element Sets
+// Tag omission rules and element sets
 
 // Tag omission rules from https://html.spec.whatwg.org/multipage/syntax.html#optional-tags with the following extensions:
 // - retain `<body>` if followed by `<noscript>`
@@ -182,7 +182,7 @@ export {
   RE_ATTR_WS_TRIM,
   RE_NUMERIC_VALUE,
 
-  // Inline element Sets
+  // Inline element sets
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
   inlineElementsToKeepWhitespace,
@@ -196,7 +196,7 @@ export {
   keepScriptsMimetypes,
   jsonScriptTypes,
 
-  // Boolean Sets
+  // Boolean sets
   isSimpleBoolean,
   isBooleanValue,
 
