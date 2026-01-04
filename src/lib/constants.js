@@ -69,14 +69,17 @@ const tagDefaults = {
 // Script MIME types
 
 // https://mathiasbynens.be/demo/javascript-mime-type
-// https://developer.mozilla.org/en/docs/Web/HTML/Element/script#attr-type
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/script
 const executableScriptsMimetypes = new Set([
   'text/javascript',
+  'text/x-javascript',
   'text/ecmascript',
+  'text/x-ecmascript',
   'text/jscript',
   'application/javascript',
   'application/x-javascript',
   'application/ecmascript',
+  'application/x-ecmascript',
   'module'
 ]);
 
@@ -90,7 +93,7 @@ const isSimpleBoolean = new Set(['allowfullscreen', 'async', 'autofocus', 'autop
 
 const isBooleanValue = new Set(['true', 'false']);
 
-// `srcset` tags
+// `srcset` elements
 
 const srcsetTags = new Set(['img', 'source']);
 
