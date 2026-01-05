@@ -2,8 +2,8 @@
  * Preset configurations for HTML Minifier Next
  *
  * Presets provide curated option sets for common use cases:
- * - conservative: Safe minification suitable for most projects
- * - comprehensive: Aggressive minification for maximum file size reduction
+ * - `conservative`: Safe minification suitable for most projects
+ * - `comprehensive`: Aggressive minification for maximum file size reduction
  */
 
 export const presets = {

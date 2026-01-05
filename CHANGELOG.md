@@ -203,7 +203,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Implemented parallel file processing with bounded concurrency (up to 8 workers based on CPU count)
 - Added lazy-loading for minifier module to reduce CLI cold-start overhead
-- Optimized URL minification with fast-path guards and cached RelateURL instances
+- Optimized URL minification with fast-path guards and cached relateurl instances
 - Added LRU memoization for class name sorting
 - Consolidated and fine-tuned cache
 

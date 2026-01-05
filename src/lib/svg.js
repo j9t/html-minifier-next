@@ -1,6 +1,5 @@
 /**
  * Lightweight SVG optimizations:
- *
  * - Numeric precision reduction for coordinates and path data
  * - Whitespace removal in attribute values (numeric sequences)
  * - Default attribute removal (safe, well-documented defaults)
@@ -154,9 +153,9 @@ function minifyPathData(pathData, precision = 3) {
 /**
  * Minify whitespace in numeric attribute values
  * Examples:
- *   "10 , 20" → "10,20"
- *   "translate( 10 20 )" → "translate(10 20)"
- *   "100, 10  40,  198" → "100,10 40,198"
+ * - “10 , 20" → "10,20"
+ * - "translate( 10 20 )" → "translate(10 20)"
+ * - "100, 10  40,  198" → "100,10 40,198"
  *
  * @param {string} value - Attribute value to minify
  * @returns {string} Minified value
@@ -198,7 +197,7 @@ function minifyColor(color) {
   const lower = trimmed.toLowerCase();
 
   // Shorten 6-digit hex to 3-digit when possible
-  // #aabbcc → #abc, #000000 → #000
+  // “#aabbcc” → “#abc”, “#000000” → “#000”
   const hexMatch = lower.match(/^#([0-9a-f]{6})$/);
   if (hexMatch) {
     const hex = hexMatch[1];
@@ -218,7 +217,7 @@ function minifyColor(color) {
     return NAMED_COLORS[lower] || lower;
   }
 
-  // Convert rgb(255,255,255) to hex
+  // Convert rgb() to hex
   const rgbMatch = lower.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
   if (rgbMatch) {
     const r = parseInt(rgbMatch[1], 10);
