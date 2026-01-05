@@ -28,8 +28,8 @@ import {
   collapseWhitespaceAll,
   collapseWhitespace,
   collapseWhitespaceSmart,
-  canCollapseWhitespace,
-  canTrimWhitespace
+  canCollapseWhitespace as defaultCanCollapseWhitespace,
+  canTrimWhitespace as defaultCanTrimWhitespace
 } from './lib/whitespace.js';
 
 import {
@@ -845,12 +845,12 @@ async function minifyHTML(value, options, partialMarkup) {
     });
   }
 
-  function _canCollapseWhitespace(tag, attrs) {
-    return options.canCollapseWhitespace(tag, attrs, canCollapseWhitespace);
+  function canCollapseWhitespace(tag, attrs) {
+    return options.canCollapseWhitespace(tag, attrs, defaultCanCollapseWhitespace);
   }
 
-  function _canTrimWhitespace(tag, attrs) {
-    return options.canTrimWhitespace(tag, attrs, canTrimWhitespace);
+  function canTrimWhitespace(tag, attrs) {
+    return options.canTrimWhitespace(tag, attrs, defaultCanTrimWhitespace);
   }
 
   function removeStartTag() {
@@ -871,7 +871,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // Look for trailing whitespaces, bypass any inline tags
   function trimTrailingWhitespace(index, nextTag) {
-    for (let endTag = null; index >= 0 && _canTrimWhitespace(endTag); index--) {
+    for (let endTag = null; index >= 0 && canTrimWhitespace(endTag); index--) {
       const str = buffer[index];
       const match = str.match(/^<\/([\w:-]+)>$/);
       if (match) {
@@ -951,10 +951,10 @@ async function minifyHTML(value, options, partialMarkup) {
           squashTrailingWhitespace(tag);
         }
         if (!unary) {
-          if (!_canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
+          if (!canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
             stackNoTrimWhitespace.push(tag);
           }
-          if (!_canCollapseWhitespace(tag, attrs) || stackNoCollapseWhitespace.length) {
+          if (!canCollapseWhitespace(tag, attrs) || stackNoCollapseWhitespace.length) {
             stackNoCollapseWhitespace.push(tag);
           }
         }
