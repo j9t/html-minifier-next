@@ -517,7 +517,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
 
   // Pre-compile regex patterns for reuse (performance optimization)
-  // These must be declared before scan() since scan uses them
+  // These must be declared before `scan()` since scan uses them
   const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
   const whitespaceSplitPatternSort = /[ \n\f\r]+/;
 
@@ -574,7 +574,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   // For the first pass, create a copy of options and disable aggressive minification.
   // Keep attribute transformations (like `removeStyleLinkTypeAttributes`) for accurate analysis.
   // This is safe because `createSortFns` is called before custom fragment UID markers (`uidAttr`) are added.
-  // Note: `htmlmin:ignore` UID markers (uidIgnore) already exist and are expanded for analysis.
+  // Note: `htmlmin:ignore` UID markers (`uidIgnore`) already exist and are expanded for analysis.
   const firstPassOptions = Object.assign({}, options, {
     // Disable sorting for the analysis pass
     sortAttributes: false,
@@ -593,7 +593,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   });
 
   // Temporarily enable `continueOnParseError` for the `scan()` function call below.
-  // Note: `firstPassOptions` already has `continueOnParseError: true` for the minifyHTML call.
+  // Note: `firstPassOptions` already has `continueOnParseError: true` for the `minifyHTML` call.
   const originalContinueOnParseError = options.continueOnParseError;
   options.continueOnParseError = true;
 
@@ -606,7 +606,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     : null;
 
   try {
-    // Expand UID tokens back to original content for frequency analysis
+    // Expand UID tokens back to the original content for frequency analysis
     let expandedValue = value;
     if (uidReplacePattern) {
       expandedValue = value.replace(uidReplacePattern, function (match, index) {
@@ -655,7 +655,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
           attrOrderCache.set(cacheKey, sortedNames);
         }
 
-        // Apply the sorted order to attrs
+        // Apply the sorted order to `attrs`
         const attrMap = Object.create(null);
         names.forEach(function (name, index) {
           (attrMap[name] || (attrMap[name] = [])).push(attrs[index]);
@@ -762,7 +762,7 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there.
-  // For all we care there might be completely-horribly-broken-alien-non-html-emoj-cthulhu-filled content
+  // For all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
   value = value.replace(/<!-- htmlmin:ignore -->([\s\S]*?)<!-- htmlmin:ignore -->/g, function (match, group1) {
     if (!uidIgnore) {
       uidIgnore = uniqueId(value);
@@ -945,7 +945,7 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalEndTag = '';
       }
 
-      // Set whitespace flags for nested tags (e.g., <code> within a <pre>)
+      // Set whitespace flags for nested tags (e.g., `<code>` within a `<pre>`)
       if (options.collapseWhitespace) {
         if (!stackNoTrimWhitespace.length) {
           squashTrailingWhitespace(tag);
@@ -1158,9 +1158,9 @@ async function minifyHTML(value, options, partialMarkup) {
       charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
       if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         // Escape any `&` symbols that start either:
-        // 1) a legacy named character reference (i.e., one that doesn’t end with `;`)
+        // 1) a legacy-named character reference (i.e., one that doesn’t end with `;`)
         // 2) or any other character reference (i.e., one that does end with `;`)
-        // Note that `&` can be escaped as `&amp`, without the semi-colon.
+        // Note that `&` can be escaped as `&amp`, without the semicolon.
         // https://mathiasbynens.be/notes/ambiguous-ampersands
         if (text.indexOf('&') !== -1) {
           text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
@@ -1225,7 +1225,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
                   // Only collapse whitespace if both blocks contain HTML (start with `<`)
                   // Don’t collapse if either contains plain text, as that would change meaning
-                  // Note: This check will match HTML comments (`<!-- … -->`), but the tag-name
+                  // Note: This check will match HTML comments (`<!-- … -->`), but the tag name
                   // regex below requires starting with a letter, so comments are intentionally
                   // excluded by the `currentTagMatch && prevTagMatch` guard
                   if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
