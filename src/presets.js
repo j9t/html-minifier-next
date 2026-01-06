@@ -1,5 +1,5 @@
 /**
- * Preset configurations for HTML Minifier Next
+ * Preset configurations
  *
  * Presets provide curated option sets for common use cases:
  * - `conservative`: Safe minification suitable for most projects
@@ -49,7 +49,7 @@ export const presets = {
 
 /**
  * Get preset configuration by name
- * @param {string} name - Preset name ('conservative' or 'comprehensive')
+ * @param {string} name - Preset name (“conservative” or “comprehensive”)
  * @returns {object|null} Preset options object or null if not found
  */
 export function getPreset(name) {

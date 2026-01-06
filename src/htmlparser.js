@@ -9,10 +9,10 @@
  * Use like so:
  *
  * HTMLParser(htmlString, {
- *     start: function(tag, attrs, unary) {},
- *     end: function(tag) {},
- *     chars: function(text) {},
- *     comment: function(text) {}
+ *   start: function(tag, attrs, unary) {},
+ *   end: function(tag) {},
+ *   chars: function(text) {},
+ *   comment: function(text) {}
  * });
  */
 
@@ -75,7 +75,7 @@ const nonPhrasing = new CaseInsensitiveSet(['address', 'article', 'aside', 'base
 const reCache = {};
 
 // Pre-compiled regexes for common special elements (`script`, `style`, `noscript`)
-// These are used frequently and pre-compiling them avoids regex creation overhead
+// These are used frequently, and pre-compiling them avoids regex creation overhead
 const preCompiledStackedTags = {
   'script': /([\s\S]*?)<\/script[^>]*>/i,
   'style': /([\s\S]*?)<\/style[^>]*>/i,
@@ -329,7 +329,7 @@ export class HTMLParser {
         input = input.slice(consumed);
         let end, attr;
 
-        // Safety limit: max length of input to check for attributes
+        // Safety limit: Max length of input to check for attributes
         // Protects against catastrophic backtracking on massive attribute values
         const MAX_ATTR_PARSE_LENGTH = 20000; // 20 KB should be enough for any reasonable tag
 
@@ -429,7 +429,7 @@ export class HTMLParser {
     }
 
     async function parseEndTagAt(pos) {
-      // Close all open elements up to pos (mirrors parseEndTag’s core branch)
+      // Close all open elements up to `pos` (mirrors `parseEndTag`’s core branch)
       for (let i = stack.length - 1; i >= pos; i--) {
         if (handler.end) {
           await handler.end(stack[i].tag, stack[i].attrs, true);
