@@ -242,7 +242,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Added WeakMap cache for attribute regex compilation to reduce setup overhead when parsing multiple documents with the same handler
   - Optimized line/column calculation to use single-pass loop instead of string splitting
   - Cached lowercased tag names on the stack to eliminate repeated `.toLowerCase()` calls during tag lookups
-  - Replaced O(n²) algorithms in TokenChain with Map-based O(n) implementations
+  - Replaced O(n²) algorithms in TokenChain with map-based O(n) implementations
   - Eliminated repeated `indexOf` and `splice` operations in token sorting by using position tracking and array rebuilding
 
 ### Internal
