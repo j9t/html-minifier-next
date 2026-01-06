@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 
 describe('CSS and JS', () => {
-  test('style minification', async () => {
+  test('Style minification', async () => {
     let input, output;
 
     input = '<style></style>div#foo { background-color: red; color: white }';
@@ -75,13 +75,13 @@ describe('CSS and JS', () => {
     }), output);
   });
 
-  test('style attribute minification', async () => {
+  test('Style attribute minification', async () => {
     const input = '<div style="color: red; background-color: yellow; font-family: Verdana, Arial, sans-serif;"></div>';
     const output = '<div style="color:red;background-color:#ff0;font-family:Verdana,Arial,sans-serif"></div>';
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('invalid/empty CSS in style attributes', async () => {
+  test('Invalid/empty CSS in style attributes', async () => {
     // Regression test for issue where invalid CSS like `color: ` was minified to `color:` instead of being removed
     let input, output;
 

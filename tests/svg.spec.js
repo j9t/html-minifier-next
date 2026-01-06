@@ -23,7 +23,7 @@ describe('SVG', () => {
     );
   });
 
-  test('whitespace in numeric attributes', async () => {
+  test('Whitespace in numeric attributes', async () => {
     // `transform` attribute with excess whitespace
     assert.strictEqual(
       await minify('<svg><rect transform="translate( 10 , 20 ) scale( 2 )"/></svg>', { minifySVG: true, collapseWhitespace: true }),
