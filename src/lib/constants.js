@@ -30,6 +30,9 @@ const inlineElementsToKeepWhitespaceWithin = new Set(['a', 'abbr', 'acronym', 'b
 // Elements that will always maintain whitespace around them
 const inlineElementsToKeepWhitespace = new Set(['comment', 'img', 'input', 'wbr']);
 
+// Form control elements (for conditional whitespace collapsing)
+const formControlElements = new Set(['input', 'button', 'select', 'textarea', 'output', 'meter', 'progress']);
+
 // Default attribute values
 
 // Default attribute values (could apply to any element)
@@ -189,6 +192,7 @@ export {
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
   inlineElementsToKeepWhitespace,
+  formControlElements,
 
   // Default values
   generalDefaults,

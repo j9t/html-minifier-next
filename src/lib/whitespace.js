@@ -9,7 +9,8 @@ import {
   RE_NBSP_TRAILING_GROUP,
   RE_NBSP_TRAILING_STRIP,
   inlineElementsToKeepWhitespace,
-  inlineElementsToKeepWhitespaceWithin
+  inlineElementsToKeepWhitespaceWithin,
+  formControlElements
 } from './constants.js';
 
 // Trim whitespace
@@ -106,11 +107,42 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
 
 // Collapse whitespace smartly based on surrounding tags
 
-function collapseWhitespaceSmart(str, prevTag, nextTag, options, inlineElements, inlineTextSet) {
+function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet) {
+  const prevTagName = prevTag && (prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag);
+  const nextTagName = nextTag && (nextTag.charAt(0) === '/' ? nextTag.slice(1) : nextTag);
+
+  // Helper: Check if an input element has `type="hidden"`
+  const isHiddenInput = (tagName, attrs) => {
+    if (tagName !== 'input' || !attrs || !attrs.length) return false;
+    const typeAttr = attrs.find(attr => attr.name === 'type');
+    return typeAttr && typeAttr.value === 'hidden';
+  };
+
+  // Check if prev/next are non-rendering (hidden) elements
+  const prevIsHidden = isHiddenInput(prevTagName, prevAttrs);
+  const nextIsHidden = isHiddenInput(nextTagName, nextAttrs);
+
   let trimLeft = prevTag && !inlineElementsToKeepWhitespace.has(prevTag);
+
+  // Smart default behavior: Collapse space after non-rendering elements (`type="hidden"`)
+  // This happens even in basic `collapseWhitespace` mode (safe optimization)
+  if (!trimLeft && prevIsHidden && str && !/\S/.test(str)) {
+    trimLeft = true;
+  }
+
+  // Aggressive mode: Collapse between all form controls (pure whitespace only)
+  const isPureWhitespace = str && !/\S/.test(str);
+  if (!trimLeft && prevTagName && nextTagName &&
+      options.collapseInlineTagWhitespace &&
+      isPureWhitespace &&
+      formControlElements.has(prevTagName) && formControlElements.has(nextTagName)) {
+    trimLeft = true;
+  }
+
   if (trimLeft && !options.collapseInlineTagWhitespace) {
     trimLeft = prevTag.charAt(0) === '/' ? !inlineElements.has(prevTag.slice(1)) : !inlineTextSet.has(prevTag);
   }
+
   // When `collapseInlineTagWhitespace` is enabled, still preserve whitespace around inline text elements
   if (trimLeft && options.collapseInlineTagWhitespace) {
     const tagName = prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag;
@@ -118,10 +150,26 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, options, inlineElements,
       trimLeft = false;
     }
   }
+
   let trimRight = nextTag && !inlineElementsToKeepWhitespace.has(nextTag);
+
+  // Smart default behavior: Collapse space before non-rendering elements (`type="hidden"`)
+  if (!trimRight && nextIsHidden && str && !/\S/.test(str)) {
+    trimRight = true;
+  }
+
+  // Aggressive mode: Same as `trimLeft`
+  if (!trimRight && prevTagName && nextTagName &&
+      options.collapseInlineTagWhitespace &&
+      isPureWhitespace &&
+      formControlElements.has(prevTagName) && formControlElements.has(nextTagName)) {
+    trimRight = true;
+  }
+
   if (trimRight && !options.collapseInlineTagWhitespace) {
     trimRight = nextTag.charAt(0) === '/' ? !inlineTextSet.has(nextTag.slice(1)) : !inlineElements.has(nextTag);
   }
+
   // When `collapseInlineTagWhitespace` is enabled, still preserve whitespace around inline text elements
   if (trimRight && options.collapseInlineTagWhitespace) {
     const tagName = nextTag.charAt(0) === '/' ? nextTag.slice(1) : nextTag;
@@ -129,6 +177,7 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, options, inlineElements,
       trimRight = false;
     }
   }
+
   return collapseWhitespace(str, options, trimLeft, trimRight, prevTag && nextTag);
 }
 

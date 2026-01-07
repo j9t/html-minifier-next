@@ -138,6 +138,7 @@ export class HTMLParser {
     // Use cached attribute regex for this handler configuration
     const attribute = getAttrRegexForHandler(handler);
     let prevTag = undefined, nextTag = undefined;
+    let prevAttrs = [], nextAttrs = [];
 
     // Index-based parsing
     let pos = 0;
@@ -181,6 +182,7 @@ export class HTMLParser {
               }
               advance(commentEnd + 3);
               prevTag = '';
+              prevAttrs = [];
               continue;
             }
           }
@@ -195,6 +197,7 @@ export class HTMLParser {
               }
               advance(conditionalEnd + 2);
               prevTag = '';
+              prevAttrs = [];
               continue;
             }
           }
@@ -207,6 +210,7 @@ export class HTMLParser {
             }
             advance(doctypeMatch[0].length);
             prevTag = '';
+            prevAttrs = [];
             continue;
           }
 
@@ -216,6 +220,7 @@ export class HTMLParser {
             advance(endTagMatch[0].length);
             await parseEndTag(endTagMatch[0], endTagMatch[1]);
             prevTag = '/' + endTagMatch[1].toLowerCase();
+            prevAttrs = [];
             continue;
           }
 
@@ -248,19 +253,24 @@ export class HTMLParser {
         let nextTagMatch = parseStartTag(nextHtml);
         if (nextTagMatch) {
           nextTag = nextTagMatch.tagName;
+          // Extract minimal attribute info for whitespace logic (just name/value pairs)
+          nextAttrs = extractAttrInfo(nextTagMatch.attrs);
         } else {
           nextTagMatch = nextHtml.match(endTag);
           if (nextTagMatch) {
             nextTag = '/' + nextTagMatch[1];
+            nextAttrs = [];
           } else {
             nextTag = '';
+            nextAttrs = [];
           }
         }
 
         if (handler.chars) {
-          await handler.chars(text, prevTag, nextTag);
+          await handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs);
         }
         prevTag = '';
+        prevAttrs = [];
       } else {
         const stackedTag = lastTag.toLowerCase();
         // Use pre-compiled regex for common tags (`script`, `style`, `noscript`) to avoid regex creation overhead
@@ -283,7 +293,7 @@ export class HTMLParser {
         } else {
           // No closing tag found; to avoid infinite loop, break similarly to previous behavior
           if (handler.continueOnParseError && handler.chars && html) {
-            await handler.chars(html[0], prevTag, '');
+            await handler.chars(html[0], prevTag, '', prevAttrs, []);
             advance(1);
           } else {
             break;
@@ -295,10 +305,11 @@ export class HTMLParser {
         if (handler.continueOnParseError) {
           // Skip the problematic character and continue
           if (handler.chars) {
-            await handler.chars(fullHtml[pos], prevTag, '');
+            await handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
           }
           advance(1);
           prevTag = '';
+          prevAttrs = [];
           continue;
         }
         const loc = getLineColumn(pos);
@@ -315,6 +326,23 @@ export class HTMLParser {
     if (!handler.partialMarkup) {
       // Clean up any remaining tags
       await parseEndTag();
+    }
+
+    // Helper to extract minimal attribute info (name/value pairs) from raw attribute matches
+    // Used for whitespace collapsing logic—doesn’t need full processing
+    function extractAttrInfo(rawAttrs) {
+      if (!rawAttrs || !rawAttrs.length) return [];
+
+      const numCustomParts = handler.customAttrSurround ? handler.customAttrSurround.length * NCP : 0;
+      const baseIndex = 1 + numCustomParts;
+
+      return rawAttrs.map(args => {
+        // Extract attribute name (always at `baseIndex`)
+        const name = args[baseIndex];
+        // Extract value from double-quoted (`baseIndex + 2`), single-quoted (`baseIndex + 3`), or unquoted (`baseIndex + 4`)
+        const value = args[baseIndex + 2] ?? args[baseIndex + 3] ?? args[baseIndex + 4];
+        return { name: name?.toLowerCase(), value };
+      }).filter(attr => attr.name); // Filter out invalid entries
     }
 
     function parseStartTag(input) {
@@ -553,6 +581,9 @@ export class HTMLParser {
         lastTag = tagName;
         unarySlash = '';
       }
+
+      // Store attributes for `prevAttrs` tracking (used in whitespace collapsing)
+      prevAttrs = attrs;
 
       if (handler.start) {
         await handler.start(tagName, attrs, unary, unarySlash);

@@ -876,7 +876,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const match = str.match(/^<\/([\w:-]+)>$/);
       if (match) {
         endTag = match[1];
-      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, null, nextTag, options, inlineElements, inlineTextSet))) {
+      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, null, nextTag, [], [], options, inlineElements, inlineTextSet))) {
         break;
       }
     }
@@ -1078,9 +1078,11 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
     },
-    chars: async function (text, prevTag, nextTag) {
+    chars: async function (text, prevTag, nextTag, prevAttrs, nextAttrs) {
       prevTag = prevTag === '' ? 'comment' : prevTag;
       nextTag = nextTag === '' ? 'comment' : nextTag;
+      prevAttrs = prevAttrs || [];
+      nextAttrs = nextAttrs || [];
       if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         if (text.indexOf('&') !== -1) {
           text = decodeHTML(text);
@@ -1117,7 +1119,7 @@ async function minifyHTML(value, options, partialMarkup) {
             }
           }
           if (prevTag || nextTag) {
-            text = collapseWhitespaceSmart(text, prevTag, nextTag, options, inlineElements, inlineTextSet);
+            text = collapseWhitespaceSmart(text, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet);
           } else {
             text = collapseWhitespace(text, options, true, true);
           }

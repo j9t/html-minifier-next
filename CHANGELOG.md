@@ -4,15 +4,18 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.16.5] - 2026-01-@@
+## [4.17.0] - 2026-01-@@
 
 ### Changed
 
+- Improved whitespace handling around hidden form elements
+  - Smart default behavior now detects `<input type="hidden">` elements and collapses adjacent pure whitespace even in basic `collapseWhitespace` mode (safe optimization)
+  - Infrastructure supports future optimizations for other non-rendering elements (`hidden` attribute, `aria-hidden="true"`, etc.)
 - More JavaScript-related `type` attributes are being removed (`executableScriptsMimetypes`)
 
 ### Internal
 
-- Reformatted and optimized code and documentation
+- Audited, reformatted, and optimized code and documentation
 - Optimized code, copy, and DX of web demo
 - Extended HMN benchmarks config (to reflect all settings if possible, except `customAttrCollapse`, `maxInputLength`, `quoteCharacter`) and re-ran benchmarks
 

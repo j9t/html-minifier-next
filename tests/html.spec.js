@@ -3174,6 +3174,90 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeAttributeQuotes: true }), output);
   });
 
+  test('Collapse whitespace between form controls with collapseInlineTagWhitespace', async () => {
+    let input, output;
+
+    // Form controls: `button`
+    input = '<form> <button>Buy now</button> </form>';
+    output = '<form><button>Buy now</button></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Form controls: `input` and `button`
+    input = '<form><input type="hidden" name="tag" value="example"> <button>Buy now</button></form>';
+    output = '<form><input type="hidden" name="tag" value="example"><button>Buy now</button></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    output = '<form><input type="hidden" name="tag" value="example"><button>Buy now</button></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Multiple `input` elements
+    input = '<form><input type="text"> <input type="radio"></form>';
+    output = '<form><input type="text"> <input type="radio"></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    output = '<form><input type="text"><input type="radio"></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Input with `textarea`
+    input = '<form><input type="text"> <textarea></textarea></form>';
+    output = '<form><input type="text"> <textarea></textarea></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    output = '<form><input type="text"><textarea></textarea></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Input with `select`
+    input = '<form><input> <select><option>A</option></select></form>';
+    output = '<form><input> <select><option>A</option></select></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    output = '<form><input><select><option>A</option></select></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Input with other form controls: `output`, `meter`, `progress`
+    input = '<form><input> <output>Result</output> <meter value="0.6">60%</meter> <progress value="70" max="100">70%</progress></form>';
+    output = '<form><input> <output>Result</output> <meter value="0.6">60%</meter> <progress value="70" max="100">70%</progress></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    output = '<form><input><output>Result</output><meter value="0.6">60%</meter><progress value="70" max="100">70%</progress></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Preserve whitespace when input is in text flow (not between form controls)
+    input = '<p>Enter name: <input> here</p>';
+    output = '<p>Enter name: <input> here</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    // Should still preserve space in text flow even with aggressive option
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Text adjacent to `input`
+    input = '<div>a <input> c</div>';
+    output = '<div>a <input> c</div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    // Should still preserve space in text flow even with aggressive option
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Input with non-form-control inline elements (`a`, `span`, etc.)
+    input = '<div><input> <span>text</span></div>';
+    output = '<div><input> <span>text</span></div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    // Should preserve space when not between form controls
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Preserve meaningful text content between form controls
+    input = '<form>Name: <input type="text"> Email: <input type="email"> Age: <input type="number"></form>';
+    output = '<form>Name: <input type="text"> Email: <input type="email"> Age: <input type="number"></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    // Text content like “ Email: ” must be preserved even with aggressive option
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // Multiple inputs with only whitespace (no text) should collapse
+    input = '<form><input type="text"> <input type="text"> <input type="text"></form>';
+    output = '<form><input type="text"> <input type="text"> <input type="text"></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    output = '<form><input type="text"><input type="text"><input type="text"></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
+    // `datalist` with `option` elements
+    input = '<datalist> <option label="A" value="1"> <option label="B" value="2"> </datalist>';
+    output = '<datalist><option label="A" value="1"><option label="B" value="2"></datalist>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, includeAutoGeneratedTags: false }), output);
+  });
+
   test('Ignoring custom comments', async () => {
     let input;
 
