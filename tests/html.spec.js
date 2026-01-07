@@ -19,9 +19,9 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p title="</p>">x</p>'), '<p title="</p>">x</p>');
     assert.strictEqual(await minify('<p title=" <!-- hello world --> ">x</p>'), '<p title=" <!-- hello world --> ">x</p>');
     assert.strictEqual(await minify('<p title=" <![CDATA[ \n\n foobar baz ]]> ">x</p>'), '<p title=" <![CDATA[ \n\n foobar baz ]]> ">x</p>');
-    assert.strictEqual(await minify('<p foo-bar=baz>xxx</p>'), '<p foo-bar="baz">xxx</p>');
-    assert.strictEqual(await minify('<p foo:bar=baz>xxx</p>'), '<p foo:bar="baz">xxx</p>');
-    assert.strictEqual(await minify('<p foo.bar=baz>xxx</p>'), '<p foo.bar="baz">xxx</p>');
+    assert.strictEqual(await minify('<p foo-bar=baz>xxx</p>'), '<p foo-bar=baz>xxx</p>');
+    assert.strictEqual(await minify('<p foo:bar=baz>xxx</p>'), '<p foo:bar=baz>xxx</p>');
+    assert.strictEqual(await minify('<p foo.bar=baz>xxx</p>'), '<p foo.bar=baz>xxx</p>');
 
     input = '<div><div><div><div><div><div><div><div><div><div>' +
       'i\'m 10 levels deep' +
@@ -50,7 +50,7 @@ describe('HTML', () => {
 
     // Will cause test to time out if fail
     input = '<p>For more information, read <a href=https://stackoverflow.com/questions/17408815/fieldset-resizes-wrong-appears-to-have-unremovable-min-width-min-content/17863685#17863685>this Stack Overflow answer</a>.</p>';
-    output = '<p>For more information, read <a href="https://stackoverflow.com/questions/17408815/fieldset-resizes-wrong-appears-to-have-unremovable-min-width-min-content/17863685#17863685">this Stack Overflow answer</a>.</p>';
+    output = '<p>For more information, read <a href=https://stackoverflow.com/questions/17408815/fieldset-resizes-wrong-appears-to-have-unremovable-min-width-min-content/17863685#17863685>this Stack Overflow answer</a>.</p>';
     assert.strictEqual(await minify(input), output);
 
     input = '<html ⚡></html>';
@@ -128,7 +128,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { continueOnParseError: true }), input);
 
     input = '<br a=\u00A0 b="&nbsp;" c="\u00A0">';
-    output = '<br a="\u00A0" b="&nbsp;" c="\u00A0">';
+    output = '<br a=\u00A0 b="&nbsp;" c="\u00A0">';
     assert.strictEqual(await minify(input), output);
     output = '<br a="\u00A0"b="\u00A0"c="\u00A0">';
     assert.strictEqual(await minify(input, { decodeEntities: true, removeTagWhitespace: true }), output);
@@ -1768,7 +1768,7 @@ describe('HTML', () => {
 
     // Unquoted attribute value matches quoted spec
     input = '<div><span aria-hidden=true></span></div>';
-    output = '<div><span aria-hidden="true"></span></div>';
+    output = '<div><span aria-hidden=true></span></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
 
     // Case-insensitive attribute name matching (uppercase HTML attribute)
@@ -1783,7 +1783,7 @@ describe('HTML', () => {
 
     // Boolean attribute matching—element with boolean attribute is preserved
     input = '<div><button disabled></button><button></button></div>';
-    output = '<div><button disabled="disabled"></button></div>';
+    output = '<div><button disabled=disabled></button></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<button disabled>'] }), output);
 
     // Boolean attribute matching—element without boolean attribute is removed
@@ -1793,12 +1793,12 @@ describe('HTML', () => {
 
     // Boolean attribute with valued attribute—both must match
     input = '<div><button type="button" disabled></button><button type="button"></button><button disabled></button></div>';
-    output = '<div><button type="button" disabled="disabled"></button></div>';
+    output = '<div><button type="button" disabled=disabled></button></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<button type="button" disabled>'] }), output);
 
     // Multiple boolean attributes in spec
     input = '<div><button disabled hidden></button><button disabled></button><button></button></div>';
-    output = '<div><button disabled="disabled" hidden></button></div>';
+    output = '<div><button disabled=disabled hidden></button></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<button disabled hidden>'] }), output);
 
     // Boolean attribute matches regardless of how it appears in HTML (preserves original format)
@@ -3189,6 +3189,13 @@ describe('HTML', () => {
     output = '<form><input type="hidden" name="tag" value="example"><button>Buy now</button></form>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
 
+    // Form controls: `input` without quotes and `button`
+    input = '<form><input type=hidden name=tag value=example> <button>Buy now</button></form>';
+    output = '<form><input type=hidden name=tag value=example><button>Buy now</button></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    output = '<form><input type=hidden name=tag value=example><button>Buy now</button></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+
     // Multiple `input` elements
     input = '<form><input type="text"> <input type="radio"></form>';
     output = '<form><input type="text"> <input type="radio"></form>';
@@ -3464,7 +3471,7 @@ describe('HTML', () => {
     input = '<!-- htmlmin:ignore --><div class="blah" style="color: red">\n   test   <span> <input disabled/>  foo </span>\n\n   </div><!-- htmlmin:ignore -->' +
       '<div class="blah" style="color: red">\n   test   <span> <input disabled/>  foo </span>\n\n   </div>';
     output = '<div class="blah" style="color: red">\n   test   <span> <input disabled/>  foo </span>\n\n   </div>' +
-      '<div class="blah" style="color: red">test <span><input disabled="disabled"> foo</span></div>';
+      '<div class="blah" style="color: red">test <span><input disabled=disabled> foo</span></div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
     input = '<!-- htmlmin:ignore --><!-- htmlmin:ignore -->';
@@ -3634,8 +3641,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p title="</p>">x</p>'), '<p title="</p>">x</p>');
     assert.strictEqual(await minify('<p title=" <!-- hello world --> ">x</p>'), '<p title=" <!-- hello world --> ">x</p>');
     assert.strictEqual(await minify('<p title=" <![CDATA[ \n\n foobar baz ]]> ">x</p>'), '<p title=" <![CDATA[ \n\n foobar baz ]]> ">x</p>');
-    assert.strictEqual(await minify('<p foo-bar=baz>xxx</p>'), '<p foo-bar="baz">xxx</p>');
-    assert.strictEqual(await minify('<p foo:bar=baz>xxx</p>'), '<p foo:bar="baz">xxx</p>');
+    assert.strictEqual(await minify('<p foo-bar=baz>xxx</p>'), '<p foo-bar=baz>xxx</p>');
+    assert.strictEqual(await minify('<p foo:bar=baz>xxx</p>'), '<p foo:bar=baz>xxx</p>');
 
     input = [
       '<div><div><div><div><div>',
@@ -3767,7 +3774,7 @@ describe('HTML', () => {
 
     input = '<div foo bar=\'\' baz="" moo=1 loo=\'2\' haa="3"></div>';
     assert.strictEqual(await minify(input, { preventAttributesEscaping: true }), input);
-    const output = '<div foo bar="" baz="" moo="1" loo="2" haa="3"></div>';
+    const output = '<div foo bar=\'\' baz="" moo=1 loo=\'2\' haa="3"></div>';
     assert.strictEqual(await minify(input), output);
   });
 
@@ -4483,7 +4490,7 @@ describe('HTML', () => {
 
     // `srcdoc` with nested quotes and escaping
     input = '<iframe srcdoc="<p title=\'quoted text\'>Content<!-- comment --></p>"></iframe>';
-    output = '<iframe srcdoc=\'<p title="quoted text">Content</p>\'></iframe>';
+    output = '<iframe srcdoc="<p title=\'quoted text\'>Content</p>"></iframe>';
     assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true }), output);
 
     // `srcdoc` with both `src` and `srcdoc` attributes (`srcdoc` takes precedence)
@@ -4512,7 +4519,7 @@ describe('HTML', () => {
 
     // `srcdoc` with inline styles and scripts
     input = '<iframe srcdoc="<div style=\'  color: red;  \' onclick=\'  alert(&quot;Hello&quot;);  \'>Test</div>"></iframe>';
-    output = '<iframe srcdoc=\'<div style="color:red" onclick="alert(&quot;Hello&quot;);">Test</div>\'></iframe>';
+    output = '<iframe srcdoc="<div style=\'color:red\' onclick=\'alert(&quot;Hello&quot;);\'>Test</div>"></iframe>';
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyJS: true, collapseWhitespace: true }), output);
     await assert.rejects(
       minify(input, { continueOnMinifyError: false, minifyCSS: true, minifyJS: true, collapseWhitespace: true }),
@@ -4521,7 +4528,7 @@ describe('HTML', () => {
 
     // Nested iframe `srcdoc` should recurse
     input = '<iframe srcdoc="<iframe srcdoc=\'<p>  Hi  </p>\'></iframe>"></iframe>';
-    output = '<iframe srcdoc=\'<iframe srcdoc="<p>Hi</p>"></iframe>\'></iframe>';
+    output = '<iframe srcdoc="<iframe srcdoc=\'<p>Hi</p>\'></iframe>"></iframe>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
     // `decodeEntities` should decode inner markup
@@ -4540,7 +4547,7 @@ describe('HTML', () => {
 
     // `minifyURLs` should apply inside `srcdoc` content
     input = '<iframe srcdoc="<a href=\'https://example.com/foo\'>x</a>"></iframe>';
-    output = '<iframe srcdoc=\'<a href="foo">x</a>\'></iframe>';
+    output = '<iframe srcdoc="<a href=\'foo\'>x</a>"></iframe>';
     assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), output);
 
     // After collapsing whitespace to empty, iframe with empty `srcdoc` is preserved

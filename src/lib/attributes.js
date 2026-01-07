@@ -459,12 +459,28 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   let attrFragment;
   let emittedAttrValue;
 
-  if (typeof attrValue !== 'undefined' && (!options.removeAttributeQuotes ||
-    attrValue.indexOf(uidAttr) !== -1 || !canRemoveAttributeQuotes(attrValue))) {
+  // Determine if we need to add/keep quotes
+  const shouldAddQuotes = typeof attrValue !== 'undefined' && (
+    // If `removeAttributeQuotes` is enabled, add quotes only if they can’t be removed
+    (options.removeAttributeQuotes && (attrValue.indexOf(uidAttr) !== -1 || !canRemoveAttributeQuotes(attrValue))) ||
+    // If `removeAttributeQuotes` is not enabled, preserve original quote style or add quotes if value requires them
+    (!options.removeAttributeQuotes && (attrQuote !== '' || !canRemoveAttributeQuotes(attrValue) ||
+      // Special case: With `removeTagWhitespace`, unquoted values that aren’t last will have space added,
+      // which can create ambiguous/invalid HTML—add quotes to be safe
+      (options.removeTagWhitespace && attrQuote === '' && !isLast)))
+  );
+
+  if (shouldAddQuotes) {
     // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
-      // Normal mode: choose quotes and escape
-      attrQuote = chooseAttributeQuote(attrValue, options);
+      // Normal mode: Choose optimal quote type to minimize escaping
+      // unless we’re preserving original quotes and they don’t need escaping
+      const needsEscaping = (attrQuote === '"' && attrValue.indexOf('"') !== -1) || (attrQuote === "'" && attrValue.indexOf("'") !== -1);
+
+      if (options.removeAttributeQuotes || typeof options.quoteCharacter !== 'undefined' || needsEscaping || attrQuote === '') {
+        attrQuote = chooseAttributeQuote(attrValue, options);
+      }
+
       if (attrQuote === '"') {
         attrValue = attrValue.replace(/"/g, '&#34;');
       } else {
@@ -512,7 +528,8 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     // Last attribute in a non-self-closing tag: no space needed
     emittedAttrValue = attrValue;
   } else {
-    // Not last attribute, or is a self-closing tag: add space
+    // Not last attribute, or is a self-closing tag:
+    // Unquoted values must have space after them to delimit from next attribute
     emittedAttrValue = attrValue + ' ';
   }
 
