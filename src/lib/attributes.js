@@ -506,8 +506,17 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
           attrQuote = "'";
         } else if (attrQuote === "'" && hasSingleQuote && !hasDoubleQuote) {
           attrQuote = '"';
+        // If no quote character yet (empty string), choose based on content
+        } else if (attrQuote === '') {
+          if (hasSingleQuote && !hasDoubleQuote) {
+            attrQuote = '"';
+          } else if (hasDoubleQuote && !hasSingleQuote) {
+            attrQuote = "'";
+          } else {
+            attrQuote = '"';
+          }
         // Fallback for invalid/unsupported attrQuote values (not `"`, `'`, or empty string): Choose safe default based on value content
-        } else if (attrQuote !== '"' && attrQuote !== "'" && attrQuote !== '') {
+        } else if (attrQuote !== '"' && attrQuote !== "'") {
           if (hasSingleQuote && !hasDoubleQuote) {
             attrQuote = '"';
           } else if (hasDoubleQuote && !hasSingleQuote) {
@@ -517,7 +526,22 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
           }
         }
       } else {
-        attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
+        // `quoteCharacter` is explicitly set
+        const preferredQuote = options.quoteCharacter === '\'' ? '\'' : '"';
+        // Safety check: If the preferred quote conflicts with value content, switch to the opposite quote
+        if ((preferredQuote === '"' && hasDoubleQuote && !hasSingleQuote) || (preferredQuote === "'" && hasSingleQuote && !hasDoubleQuote)) {
+          attrQuote = preferredQuote === '"' ? "'" : '"';
+        } else if ((preferredQuote === '"' && hasDoubleQuote && hasSingleQuote) || (preferredQuote === "'" && hasSingleQuote && hasDoubleQuote)) {
+          // Both quote types present: Fall back to escaping despite preventAttributesEscaping
+          attrQuote = preferredQuote;
+          if (attrQuote === '"') {
+            attrValue = attrValue.replace(/"/g, '&#34;');
+          } else {
+            attrValue = attrValue.replace(/'/g, '&#39;');
+          }
+        } else {
+          attrQuote = preferredQuote;
+        }
       }
     }
     emittedAttrValue = attrQuote + attrValue + attrQuote;

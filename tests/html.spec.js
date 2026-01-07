@@ -3791,6 +3791,35 @@ describe('HTML', () => {
     const result2 = await minify(safeInput, { preventAttributesEscaping: true });
     assert.strictEqual(result2, '<a data-rid-relay=\'{"299": "itsct"}\'>Example</a>',
       'Should preserve single quotes when they are safe');
+
+    // Edge case: `preventAttributesEscaping` with `removeTagWhitespace` and unquoted attributes should add quotes to avoid ambiguity
+    const unquotedInput = '<br a=foo b=bar>';
+    const result3 = await minify(unquotedInput, { preventAttributesEscaping: true, removeTagWhitespace: true });
+    assert.strictEqual(result3, '<br a="foo"b=bar>',
+      'Should add quotes to non-last unquoted attributes with removeTagWhitespace to prevent ambiguity');
+  });
+
+  test('preventAttributesEscaping with quoteCharacter: Handle quote conflicts safely', async () => {
+    // When `quoteCharacter` is set but conflicts with attribute value content,
+    // the minifier should switch to the opposite quote type to avoid invalid HTML
+
+    // Test 1: `quoteCharacter: '\''` but value contains single quote—should switch to double quotes
+    const input1 = '<p data="it\'s fine">text</p>';
+    const result1 = await minify(input1, { preventAttributesEscaping: true, quoteCharacter: '\'' });
+    assert.strictEqual(result1, '<p data="it\'s fine">text</p>',
+      'Should switch to double quotes when single quoteCharacter conflicts with value content');
+
+    // Test 2: `quoteCharacter: '"'` but value contains double quote—should switch to single quotes
+    const input2 = '<p data=\'has "quotes"\'>text</p>';
+    const result2 = await minify(input2, { preventAttributesEscaping: true, quoteCharacter: '"' });
+    assert.strictEqual(result2, '<p data=\'has "quotes"\'>text</p>',
+      'Should switch to single quotes when double quoteCharacter conflicts with value content');
+
+    // Test 3: No conflict—should use preferred `quoteCharacter`
+    const input3 = '<p data="safe value">text</p>';
+    const result3 = await minify(input3, { preventAttributesEscaping: true, quoteCharacter: '\'' });
+    assert.strictEqual(result3, '<p data=\'safe value\'>text</p>',
+      'Should use preferred quoteCharacter when there is no conflict');
   });
 
   test('preventAttributesEscaping: Real-world Apple TV snippet with benchmark config', async () => {
