@@ -699,7 +699,7 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
       }
 
       // Resolve base directory for consistent path comparisons
-      const inputDirResolved = await fs.promises.realpath(inputDir).catch(() => inputDir);
+      const inputDirResolved = inputReal || inputDir;
 
       if (showProgress) {
         // Start with indeterminate progress, count in background

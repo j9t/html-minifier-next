@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Previously, if `quoteCharacter` was set to a quote type that existed in the attribute value, the minifier would produce invalid HTML (e.g., `<p data='it's'>` where the apostrophe terminates the attribute early)
   - Now automatically switches to the opposite quote type when there’s a conflict, ensuring valid HTML output
 
+### Performance
+
+- Eliminated redundant filesystem call when resolving input directory paths (CLI)
+
 ### Internal
 
 - Audited, reformatted, and optimized code and documentation
