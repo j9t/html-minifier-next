@@ -2,13 +2,13 @@
 
 [![npm version](https://img.shields.io/npm/v/html-minifier-next.svg)](https://www.npmjs.com/package/html-minifier-next) [![Build status](https://github.com/j9t/html-minifier-next/workflows/Tests/badge.svg)](https://github.com/j9t/html-minifier-next/actions) [![Socket](https://badge.socket.dev/npm/package/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next)
 
-HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier**.
+HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier** that can also handle in-document CSS, JavaScript, and SVG minification.
 
-The project was based on [HTML Minifier Terser](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier](https://github.com/kangax/html-minifier). HMN offers additional features, but is backwards-compatible with both. The project was set up because as of 2025, both HTML Minifier Terser and HTML Minifier had been unmaintained for a few years. As the project seems maintainable [to me, [Jens](https://meiert.com/), an HTML optimizer]—even more so with community support—, it’s being [updated, extended, and documented](https://github.com/j9t/html-minifier-next/blob/main/CHANGELOG.md) further in this place.
+The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier); as of 2025, both HTML Minifier Terser and HTML Minifier had been unmaintained for several years. HMN offers additional features and has been optimized for speed. While an independent project, it is still backwards-compatible with HMT and HM.
 
 ## Installation
 
-From npm for use as a command line app:
+From npm for use as a command-line app:
 
 ```shell
 npm i -g html-minifier-next
@@ -39,15 +39,14 @@ Use `html-minifier-next --help` to check all available options:
 | `--output-dir <dir>` | Specify an output directory | `--output-dir=dist` |
 | `--file-ext <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
 | `-o <file>`, `--output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
-| `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
 | `--preset <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
+| `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
 | `-v`, `--verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `-d`, `--dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
-| `-V`, `--version` | Output the version number | `html-minifier-next --version` |
 
 ### Configuration file
 
-You can also use a configuration file to specify options. The file can be either JSON format or a JavaScript module that exports the configuration object:
+You can use a configuration file to specify options. The file can be either JSON format or a JavaScript module that exports the configuration object:
 
 **JSON configuration example:**
 
@@ -71,16 +70,6 @@ module.exports = {
 };
 ```
 
-**Using a configuration file:**
-
-```shell
-# Specify config file
-html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir=dist
-
-# CLI arguments override config file settings
-html-minifier-next --config-file=html-minifier.json --file-ext=xml --input-dir=src --output-dir=dist
-```
-
 ### Node.js
 
 ESM with Node.js ≥16.14:
@@ -88,35 +77,32 @@ ESM with Node.js ≥16.14:
 ```js
 import { minify } from 'html-minifier-next';
 
-const result = await minify('<p title="blah" id="moo">foo</p>', {
+const result = await minify('<p title="example" id="moo">foo</p>', {
   removeAttributeQuotes: true,
+  removeOptionalTags: true
 });
-console.log(result); // “<p title=blah id=moo>foo</p>”
+console.log(result); // “<p title=example id=moo>foo”
 ```
 
 CommonJS:
 
 ```js
-const { minify } = require('html-minifier-next');
+const { minify, getPreset } = require('html-minifier-next');
 
 (async () => {
-  const result = await minify('<p title="blah" id="moo">foo</p>', {
-    removeAttributeQuotes: true,
-  });
-  console.log(result);
+  const result = await minify('<p title="example" id="moo">foo</p>', getPreset('comprehensive'));
+  console.log(result); // “<p id=moo title=example>foo”
 })();
 ```
 
-See [the original blog post](https://perfectionkills.com/experimenting-with-html-minifier) for details of [how it works](https://perfectionkills.com/experimenting-with-html-minifier#how_it_works), [description of each option](https://perfectionkills.com/experimenting-with-html-minifier#options), [testing results](https://perfectionkills.com/experimenting-with-html-minifier#field_testing), and [conclusions](https://perfectionkills.com/experimenting-with-html-minifier#cost_and_benefits).
-
-For lint-like capabilities, take a look at [HTMLLint](https://github.com/kangax/html-lint).
+See [the original blog post](https://perfectionkills.com/experimenting-with-html-minifier/) for details of [how it works](https://perfectionkills.com/experimenting-with-html-minifier/#how_it_works), [descriptions of most options](https://perfectionkills.com/experimenting-with-html-minifier/#options), [testing results](https://perfectionkills.com/experimenting-with-html-minifier/#field_testing), and [conclusions](https://perfectionkills.com/experimenting-with-html-minifier/#cost_and_benefits).
 
 ## Presets
 
 HTML Minifier Next provides presets for common use cases. Presets are pre-configured option sets that can be used as a starting point:
 
 * `conservative`: Safe minification suitable for most projects. Includes whitespace collapsing, comment removal, and doctype normalization.
-* `comprehensive`: Aggressive minification for maximum file size reduction. Includes relevant conservative options plus attribute quote removal, optional tag removal, and more.
+* `comprehensive`: More aggressive minification for better file size reduction. Includes relevant conservative options plus attribute quote removal, optional tag removal, and more.
 
 To review the specific options set, [presets.js](https://github.com/j9t/html-minifier-next/blob/main/src/presets.js) lists them in an accessible manner.
 
@@ -146,14 +132,14 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | --- | --- | --- |
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
-| `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier#collapse_boolean_attributes) | `false` |
-| `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Don’t leave any spaces between `display: inline;` elements when collapsing—use with `collapseWhitespace: true` | `false` |
-| `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier#collapse_whitespace) | `false` |
+| `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
+| `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | More aggressively collapse whitespace between inline elements—use with `collapseWhitespace: true` | `false` |
+| `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace) | `false` |
 | `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with `collapseWhitespace: true` | `false` |
 | `continueOnMinifyError`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |
 | `continueOnParseError`<br>`--continue-on-parse-error` | [Handle parse errors](https://html.spec.whatwg.org/multipage/parsing.html#parse-errors) instead of aborting | `false` |
 | `customAttrAssign`<br>`--custom-attr-assign` | Array of regexes that allow to support custom attribute assign expressions (e.g., `<div flex?="{{mode != cover}}"></div>`) | `[]` |
-| `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | |
+| `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | `undefined` |
 | `customAttrSurround`<br>`--custom-attr-surround` | Array of regexes that allow to support custom attribute surround expressions (e.g., `<input {{#if value}}checked="checked"{{/if}}>`) | `[]` |
 | `customEventAttributes`<br>`--custom-event-attributes` | Array of regexes that allow to support custom event attributes for `minifyJS` (e.g., `ng-click`) | `[ /^on[a-z]{3,}$/ ]` |
 | `customFragmentQuantifierLimit`<br>`--custom-fragment-quantifier-limit` | Set maximum quantifier limit for custom fragments to prevent ReDoS attacks | `200` |
@@ -165,7 +151,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `inlineCustomElements`<br>`--inline-custom-elements` | Array of names of custom elements which are inline | `[]` |
 | `keepClosingSlash`<br>`--keep-closing-slash` | Keep the trailing slash on void elements | `false` |
 | `maxInputLength`<br>`--max-input-length` | Maximum input length to prevent ReDoS attacks (disabled by default) | `undefined` |
-| `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | |
+| `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | `undefined` |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://github.com/terser/terser) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
 | `minifySVG`<br>`--minify-svg` | Minify SVG elements and attributes (numeric precision, default attributes, colors) | `false` (could be `true`, `Object`) |
@@ -177,12 +163,12 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `processConditionalComments`<br>`--process-conditional-comments` | Process contents of conditional comments through minifier | `false` |
 | `processScripts`<br>`--process-scripts` | Array of strings corresponding to types of `script` elements to process through minifier (e.g., `text/ng-template`, `text/x-handlebars-template`, etc.) | `[]` |
 | `quoteCharacter`<br>`--quote-character` | Type of quote to use for attribute values (`'` or `"`) | Auto-detected (uses the quote requiring less escaping; defaults to `"` when equal) |
-| `removeAttributeQuotes`<br>`--remove-attribute-quotes` | [Remove quotes around attributes when possible](https://perfectionkills.com/experimenting-with-html-minifier#remove_attribute_quotes) | `false` |
-| `removeComments`<br>`--remove-comments` | [Strip HTML comments](https://perfectionkills.com/experimenting-with-html-minifier#remove_comments) | `false` |
-| `removeEmptyAttributes`<br>`--remove-empty-attributes` | [Remove all attributes with whitespace-only values](https://perfectionkills.com/experimenting-with-html-minifier#remove_empty_or_blank_attributes) | `false` (could be `true`, `Function(attrName, tag)`) |
-| `removeEmptyElements`<br>`--remove-empty-elements` | [Remove all elements with empty contents](https://perfectionkills.com/experimenting-with-html-minifier#remove_empty_elements) | `false` |
+| `removeAttributeQuotes`<br>`--remove-attribute-quotes` | [Remove quotes around attributes when possible](https://perfectionkills.com/experimenting-with-html-minifier/#remove_attribute_quotes) | `false` |
+| `removeComments`<br>`--remove-comments` | [Strip HTML comments](https://perfectionkills.com/experimenting-with-html-minifier/#remove_comments) | `false` |
+| `removeEmptyAttributes`<br>`--remove-empty-attributes` | [Remove all attributes with whitespace-only values](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_or_blank_attributes) | `false` (could be `true`, `Function(attrName, tag)`) |
+| `removeEmptyElements`<br>`--remove-empty-elements` | [Remove all elements with empty contents](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_elements) | `false` |
 | `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve when `removeEmptyElements` is enabled; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<span aria-hidden='true'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
-| `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier#remove_optional_tags) | `false` |
+| `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeScriptTypeAttributes`<br>`--remove-script-type-attributes` | Remove `type="text/javascript"` from `script` elements; other `type` attribute values are left intact | `false` |
 | `removeStyleLinkTypeAttributes`<br>`--remove-style-link-type-attributes` | Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact | `false` |
@@ -190,7 +176,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassName`<br>`--sort-class-name` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
-| `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier#use_short_doctype) | `false` |
+| `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype) | `false` |
 
 ### Sorting attributes and style classes
 
@@ -404,7 +390,7 @@ Notes: Minimize does not minify CSS and JS. [HTML Minifier Terser](https://githu
 html-minifier-next --collapse-whitespace --remove-comments --minify-js --input-dir=. --output-dir=example
 ```
 
-Another example, using npx:
+Example using npx:
 
 ```shell
 npx html-minifier-next --input-dir=test --file-ext html --preset comprehensive --output-dir example
@@ -552,7 +538,7 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 
 **Important:** When using custom `ignoreCustomFragments`, the minifier automatically applies bounded quantifiers to prevent ReDoS attacks, but you can also write safer patterns yourself using explicit bounds.
 
-#### Escaping patterns in different contexts
+##### Escaping patterns in different contexts
 
 The escaping requirements for `ignoreCustomFragments` patterns differ depending on how you’re using HMN:
 

@@ -124,7 +124,7 @@ const mainOptions = {
   caseSensitive: 'Treat attributes in case-sensitive manner (useful for custom HTML elements)',
   collapseAttributeWhitespace: 'Trim and collapse whitespace characters within attribute values',
   collapseBooleanAttributes: 'Omit attribute values from boolean attributes',
-  collapseInlineTagWhitespace: 'Don’t leave any spaces between `display: inline;` elements when collapsing—use with `--collapse-whitespace`',
+  collapseInlineTagWhitespace: 'More aggressively collapse whitespace between inline elements—use with `--collapse-whitespace`',
   collapseWhitespace: 'Collapse whitespace that contributes to text nodes in a document tree',
   conservativeCollapse: 'Always collapse to one space (never remove it entirely)—use with `--collapse-whitespace`',
   continueOnMinifyError: 'Abort on minification errors',
@@ -170,7 +170,7 @@ const mainOptions = {
   useShortDoctype: 'Replaces the doctype with the short HTML doctype'
 };
 
-// Configure command line flags
+// Configure command-line flags
 const mainOptionKeys = Object.keys(mainOptions);
 mainOptionKeys.forEach(function (key) {
   const option = mainOptions[key];

@@ -25,7 +25,7 @@ const defaultOptions = [
     id: 'collapseInlineTagWhitespace',
     type: 'checkbox',
     label: 'Collapse inline tag whitespace',
-    helpText: `Don’t leave any spaces between <code>display: inline;</code> elements when collapsing—use with <code>collapseWhitespace</code>`,
+    helpText: `More aggressively collapse whitespace between inline elements—use with <code>collapseWhitespace</code>`,
     unsafe: true
   },
   {
