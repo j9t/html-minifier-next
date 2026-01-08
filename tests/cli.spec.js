@@ -539,7 +539,7 @@ describe('CLI', () => {
 
     const result = execCliWithStderr(cliArguments);
 
-    // Should output to stderr
+    // Should output to STDERR
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Would minify:'));
     assert.ok(result.stderr.includes('Original:'));
@@ -547,7 +547,7 @@ describe('CLI', () => {
     assert.ok(result.stderr.includes('Saved:'));
     assert.ok(result.stderr.includes('bytes'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
 
     // Should exit successfully
@@ -564,13 +564,13 @@ describe('CLI', () => {
 
     const result = execCliWithStderr(cliArguments);
 
-    // Should output to stderr
+    // Should output to STDERR
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Would process directory:'));
     assert.ok(result.stderr.includes('Total:'));
     assert.ok(result.stderr.includes('bytes'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
 
     // Should exit successfully
@@ -608,7 +608,7 @@ describe('CLI', () => {
     assert.ok(stderrStr.includes('Original:'));
     assert.ok(stderrStr.includes('Minified:'));
     assert.ok(stderrStr.includes('Saved:'));
-    // Should not output minified HTML to stdout in dry run
+    // Should not output minified HTML to STDOUT in dry run
     assert.strictEqual(stdout.toString().trim(), '');
   });
 
@@ -695,7 +695,7 @@ describe('CLI', () => {
       '--collapse-whitespace'
     ]);
 
-    // Should output to stdout
+    // Should output to STDOUT
     assert.ok(result.length > 0);
     assert.ok(result.includes('<!DOCTYPE html>'));
   });
@@ -760,7 +760,7 @@ describe('CLI', () => {
       '-o', 'tmp/verbose-output.html'
     ]);
 
-    // Should output to stderr
+    // Should output to STDERR
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('collapseWhitespace'));
     assert.ok(result.stderr.includes('✓'));
@@ -768,7 +768,7 @@ describe('CLI', () => {
     assert.ok(result.stderr.includes('→'));
     assert.ok(result.stderr.includes('bytes'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
 
     // Should exit successfully
@@ -786,14 +786,14 @@ describe('CLI', () => {
       '--collapse-whitespace'
     ]);
 
-    // Should output to stderr
+    // Should output to STDERR
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('✓'));
     assert.ok(result.stderr.includes('→'));
     assert.ok(result.stderr.includes('bytes'));
     assert.ok(result.stderr.includes('Total:'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
 
     // Should exit successfully
@@ -819,7 +819,7 @@ describe('CLI', () => {
     assert.ok(stderrStr.includes('→'));
     assert.ok(stderrStr.includes('bytes'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(stdout.toString().trim(), '');
 
     // Should create output file
@@ -900,7 +900,7 @@ describe('CLI', () => {
       '--collapse-whitespace'
     ]);
 
-    // In non-TTY (CI/piped), no progress should appear in stderr
+    // In non-TTY (CI/piped), no progress should appear in STDERR
     assert.strictEqual(result.exitCode, 0);
     assert.strictEqual(result.stderr, '');
     assert.strictEqual(result.stdout, '');

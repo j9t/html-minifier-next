@@ -4107,7 +4107,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, canTrimWhitespace: canCollapseAndTrimWhitespace, canCollapseWhitespace: canCollapseAndTrimWhitespace }), output);
 
     // Regression test: Previously the first `</div>` would clear the internal
-    // stackNo{Collapse,Trim}Whitespace, so that “ foo  bar” turned into “ foo bar”
+    // `stackNoCollapseWhitespace` and `stackNoTrimWhitespace` stacks,
+    // so that “ foo  bar” turned into “ foo bar”
     input = '<div class="leaveAlone"><div></div><span> </span> foo  bar</div>';
     output = '<div class="leaveAlone"><div></div><span> </span> foo  bar</div>';
 
