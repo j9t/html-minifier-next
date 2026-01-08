@@ -550,8 +550,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         // Only recursively scan HTML content, not JSON-LD or other non-HTML script types
         // `scan()` is for analyzing HTML attribute order, not for parsing JSON
         if (options.processScripts && specialContentElements.has(currentTag) &&
-          options.processScripts.indexOf(currentType) > -1 &&
-          currentType === 'text/html') {
+            options.processScripts.indexOf(currentType) > -1 &&
+            currentType === 'text/html') {
           await scan(text);
         }
       },
@@ -783,7 +783,7 @@ async function minifyHTML(value, options, partialMarkup) {
   // Create sort functions after `htmlmin:ignore` processing but before custom fragment UID markers
   // This allows proper frequency analysis with access to ignored content via UID tokens
   if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
-    (options.sortClassName && typeof options.sortClassName !== 'function')) {
+      (options.sortClassName && typeof options.sortClassName !== 'function')) {
     await createSortFns(value, options, uidIgnore, null, ignoredMarkupChunks);
   }
 
@@ -1010,7 +1010,7 @@ async function minifyHTML(value, options, partialMarkup) {
           squashTrailingWhitespace('/' + tag);
         }
         if (stackNoCollapseWhitespace.length &&
-          tag === stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
+            tag === stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
           stackNoCollapseWhitespace.pop();
         }
       }

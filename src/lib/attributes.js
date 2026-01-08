@@ -421,13 +421,13 @@ async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   }
 
   if ((options.removeRedundantAttributes &&
-      isAttributeRedundant(tag, attrName, attrValue, attrs)) ||
-    (options.removeScriptTypeAttributes && tag === 'script' &&
-      attrName === 'type' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue)) ||
-    (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
-      attrName === 'type' && isStyleLinkTypeAttribute(attrValue)) ||
-    (options.insideSVG && options.minifySVG &&
-      shouldRemoveSVGAttribute(tag, attrName, attrValue, options.minifySVG))) {
+       isAttributeRedundant(tag, attrName, attrValue, attrs)) ||
+      (options.removeScriptTypeAttributes && tag === 'script' &&
+       attrName === 'type' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue)) ||
+      (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
+       attrName === 'type' && isStyleLinkTypeAttribute(attrValue)) ||
+      (options.insideSVG && options.minifySVG &&
+       shouldRemoveSVGAttribute(tag, attrName, attrValue, options.minifySVG))) {
     return;
   }
 
@@ -436,7 +436,7 @@ async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   }
 
   if (options.removeEmptyAttributes &&
-    canDeleteEmptyAttribute(tag, attrName, attrValue, options)) {
+      canDeleteEmptyAttribute(tag, attrName, attrValue, options)) {
     return;
   }
 
@@ -560,7 +560,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   }
 
   if (typeof attrValue === 'undefined' || (options.collapseBooleanAttributes &&
-    isBooleanAttribute(attrName.toLowerCase(), (attrValue || '').toLowerCase()))) {
+      isBooleanAttribute(attrName.toLowerCase(), (attrValue || '').toLowerCase()))) {
     attrFragment = attrName;
     if (!isLast) {
       attrFragment += ' ';

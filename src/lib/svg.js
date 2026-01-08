@@ -188,8 +188,7 @@ function minifyColor(color) {
 
   // Don’t process values that aren’t simple colors (preserve case-sensitive references)
   // `url(#id)`, `var(--name)`, `inherit`, `currentColor`, etc.
-  if (trimmed.includes('url(') || trimmed.includes('var(') ||
-      trimmed === 'inherit' || trimmed === 'currentColor') {
+  if (trimmed.includes('url(') || trimmed.includes('var(') || trimmed === 'inherit' || trimmed === 'currentColor') {
     return trimmed;
   }
 
