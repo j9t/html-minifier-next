@@ -9,7 +9,7 @@ describe('HTML', () => {
     assert.ok(minify);
   });
 
-  test('Parsing non-trivial markup', async () => {
+  test('Parse non-trivial markup', async () => {
     let input, output;
 
     assert.strictEqual(await minify('</td>'), '');
@@ -135,6 +135,24 @@ describe('HTML', () => {
     output = '<br a=\u00A0 b=\u00A0 c=\u00A0>';
     assert.strictEqual(await minify(input, { decodeEntities: true, removeAttributeQuotes: true }), output);
     assert.strictEqual(await minify(input, { decodeEntities: true, removeAttributeQuotes: true, removeTagWhitespace: true }), output);
+  });
+
+  test('Parse error messages', async () => {
+    // Test that parse errors include line and column information
+    const input = '<div>\n<p>\ninvalid<tag\n</p>\n</div>';
+
+    await assert.rejects(
+      async () => { await minify(input, { continueOnParseError: false }); },
+      (err) => {
+        // Require both positional info and an offending-markup snippet
+        return /line\s+\d+.*column\s+\d+/i.test(err.message) && err.message.includes('invalid<tag');
+      },
+      'Error must include line/column numbers and offending markup'
+    );
+
+    // Test that `continueOnParseError` allows processing to continue
+    const output = await minify(input, { continueOnParseError: true });
+    assert.ok(output, 'Should produce output when continueOnParseError is true');
   });
 
   test('Options', async () => {
@@ -341,15 +359,15 @@ describe('HTML', () => {
     // Hair space passed as HTML entity, in decodeEntities:true mode
     assert.strictEqual(await minify(inputWithEntities, { collapseWhitespace: true, decodeEntities: true }), input);
 
-    // Non-breaking space
+    // No-break space
     input = '<div>\xa0fo\xa0o\xa0</div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
 
-    // Non-breaking space passed as HTML entity
+    // No-break space passed as HTML entity
     inputWithEntities = '<div>&nbsp;fo&nbsp;o&nbsp;</div>';
     assert.strictEqual(await minify(inputWithEntities, { collapseWhitespace: true }), inputWithEntities);
 
-    // Non-breaking space passed as HTML entity, in decodeEntities:true mode
+    // No-break space passed as HTML entity, in decodeEntities:true mode
     assert.strictEqual(await minify(inputWithEntities, { collapseWhitespace: true, decodeEntities: true }), input);
 
     // Do not remove hair space when preserving line breaks between tags
@@ -389,7 +407,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { useShortDoctype: true }), output);
   });
 
-  test('Removing comments', async () => {
+  test('Remove comments', async () => {
     let input;
 
     input = '<!-- test -->';
@@ -409,7 +427,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeComments: true }), '<style><!-- alert(1) --></style>');
   });
 
-  test('Ignoring comments', async () => {
+  test('Ignore comments', async () => {
     let input;
 
     input = '<!--! test -->';
@@ -510,7 +528,13 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, processConditionalComments: true }), output);
   });
 
-  test('Collapsing space in conditional comments', async () => {
+  test('Downlevel-revealed conditional comments', async () => {
+    const input = '<![if !IE]><link href="non-ie.css" rel="stylesheet"><![endif]>';
+    assert.strictEqual(await minify(input), input);
+    assert.strictEqual(await minify(input, { removeComments: true }), input);
+  });
+
+  test('Collapse space in conditional comments', async () => {
     let input, output;
 
     input = '<!--[if IE 7]>\n\n   \t\n   \t\t ' +
@@ -538,7 +562,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, processConditionalComments: true }), output);
   });
 
-  test('Removing comments from scripts', async () => {
+  test('Remove comments from scripts', async () => {
     let input, output;
 
     input = '<script><!--\nalert(1);\n--></script>';
@@ -617,7 +641,7 @@ describe('HTML', () => {
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
   });
 
-  test('Removing comments from styles', async () => {
+  test('Remove comments from styles', async () => {
     let input, output;
 
     input = '<style><!--\np.a{background:red}\n--></style>';
@@ -665,7 +689,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), input);
   });
 
-  test('Removing CDATA sections from scripts and styles', async () => {
+  test('Remove CDATA sections from scripts and styles', async () => {
     let input, output;
 
     input = '<script><![CDATA[\nalert(1)\n]]></script>';
@@ -924,7 +948,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeEmptyAttributes: function (attrName, tag) { return tag === 'img' && attrName === 'src'; } }), '<img alt="">');
   });
 
-  test('Cleaning class and style attributes', async () => {
+  test('Clean `class` and `style` attributes', async () => {
     let input, output;
 
     input = '<p class=" foo bar  ">foo bar baz</p>';
@@ -951,7 +975,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), output);
   });
 
-  test('Cleaning URI-based attributes', async () => {
+  test('Clean URI-based attributes', async () => {
     let input, output;
 
     input = '<a href="   https://example.com  ">x</a>';
@@ -993,7 +1017,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
   });
 
-  test('Cleaning number-based attributes', async () => {
+  test('Clean number-based attributes', async () => {
     let input, output;
 
     input = '<a href="#" tabindex="   1  ">x</a><button tabindex="   2  ">y</button>';
@@ -1021,7 +1045,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), output);
   });
 
-  test('Cleaning other attributes', async () => {
+  test('Clean other attributes', async () => {
     let input, output;
 
     input = '<a href="#" onclick="  window.prompt(\'boo\'); " onmouseover=" \n\n alert(123)  \t \n\t  ">blah</a>';
@@ -1033,7 +1057,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), output);
   });
 
-  test('Removing redundant attributes: `<form method="get" …>`', async () => {
+  test('Remove redundant attributes: `<form method="get" …>`', async () => {
     let input;
 
     input = '<form method="get">hello world</form>';
@@ -1043,7 +1067,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<form method="post">hello world</form>');
   });
 
-  test('Removing redundant attributes: `<input type="text" …>`', async () => {
+  test('Remove redundant attributes: `<input type="text" …>`', async () => {
     let input;
 
     input = '<input type="text">';
@@ -1056,7 +1080,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<input type="checkbox">');
   });
 
-  test('Removing redundant attributes: `<a name="…" id="…" …>`', async () => {
+  test('Remove redundant attributes: `<a name="…" id="…" …>`', async () => {
     let input;
 
     input = '<a id="foo" name="foo">blah</a>';
@@ -1072,7 +1096,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<a href="…" id="bar">blah</a>');
   });
 
-  test('Removing redundant attributes: `<script src="…" charset="…">`', async () => {
+  test('Remove redundant attributes: `<script src="…" charset="…">`', async () => {
     let input, output;
 
     input = '<script type="text/javascript" charset="UTF-8">alert(222);</script>';
@@ -1087,7 +1111,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), output);
   });
 
-  test('Removing redundant attributes: `<… language="javascript" …>`', async () => {
+  test('Remove redundant attributes: `<… language="javascript" …>`', async () => {
     let input;
 
     input = '<script language="Javascript">x=2,y=4</script>';
@@ -1097,10 +1121,26 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), '<script>x=2,y=4</script>');
   });
 
-  test('Removing redundant attributes: `<area shape="rect" …>`)', async () => {
+  test('Remove redundant attributes: `<area shape="rect" …>`)', async () => {
     const input = '<area shape="rect" coords="696,25,958,47" href="#" title="foo">';
     const output = '<area coords="696,25,958,47" href="#" title="foo">';
     assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), output);
+  });
+
+  test('Remove redundant attributes: `<… = "javascript: …" …>`', async () => {
+    let input;
+
+    input = '<p onclick="javascript:alert(1)">x</p>';
+    assert.strictEqual(await minify(input), '<p onclick="alert(1)">x</p>');
+
+    input = '<p onclick="javascript:x">x</p>';
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<p onclick=x>x</p>');
+
+    input = '<p onclick=" JavaScript: x">x</p>';
+    assert.strictEqual(await minify(input), '<p onclick="x">x</p>');
+
+    input = '<p title="javascript:(function() { /* some stuff here */ })()">x</p>';
+    assert.strictEqual(await minify(input), input);
   });
 
   test('Attribute value defaults', async () => {
@@ -1149,13 +1189,13 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeRedundantAttributes: true, removeAttributeQuotes: true }), expected);
   });
 
-  test('Removing optional tags with attribute value defaults', async () => {
+  test('Remove optional tags with attribute value defaults', async () => {
     const input = '<html dir=ltr>';
     const output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, removeRedundantAttributes: true }), output);
   });
 
-  test('Removing `media="all"` and minifying CSS', async () => {
+  test('Remove `media="all"` and minifying CSS', async () => {
     // Regression test for issue where `media="all"` was corrupted to `media="a{top:0}"` when `minifyCSS` was enabled
     const input = '<html><head>' +
       '<link rel="stylesheet" href="style.css" media="all">' +
@@ -1206,23 +1246,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeAttributeQuotes: true, minifyCSS: true }), output);
   });
 
-  test('Removing redundant attributes: `<… = "javascript: …" …>`', async () => {
-    let input;
-
-    input = '<p onclick="javascript:alert(1)">x</p>';
-    assert.strictEqual(await minify(input), '<p onclick="alert(1)">x</p>');
-
-    input = '<p onclick="javascript:x">x</p>';
-    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<p onclick=x>x</p>');
-
-    input = '<p onclick=" JavaScript: x">x</p>';
-    assert.strictEqual(await minify(input), '<p onclick="x">x</p>');
-
-    input = '<p title="javascript:(function() { /* some stuff here */ })()">x</p>';
-    assert.strictEqual(await minify(input), input);
-  });
-
-  test('Removing JavaScript-related `type` attributes', async () => {
+  test('Remove JavaScript-related `type` attributes', async () => {
     let input, output;
 
     input = '<script type="">alert(1)</script>';
@@ -1280,7 +1304,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
   });
 
-  test('Removing CSS-related `type` attributes', async () => {
+  test('Remove CSS-related `type` attributes', async () => {
     let input, output;
 
     input = '<style type="">.foo { color: red }</style>';
@@ -1319,7 +1343,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), input);
   });
 
-  test('Removing attribute quotes', async () => {
+  test('Remove attribute quotes', async () => {
     let input;
 
     input = '<p title="blah" class="a23B-foo.bar_baz:qux" id="moo">foo</p>';
@@ -1347,7 +1371,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), '<p class=foo|bar:baz></p>');
   });
 
-  test('Not removing attribute quotes needed for special characters', async () => {
+  test('Not remove attribute quotes needed for special characters', async () => {
     const testCases = [
       // Whitespace characters
       { name: 'space', input: '<input value="hello world">', expected: '<input value="hello world">' },
@@ -1376,7 +1400,7 @@ describe('HTML', () => {
     }));
   });
 
-  test('Removing attribute quotes for safe values', async () => {
+  test('Remove attribute quotes for safe values', async () => {
     const testCases = [
       { name: 'alphanumeric', input: '<div id="test123">x</div>', expected: '<div id=test123>x</div>' },
       { name: 'underscore', input: '<div data-name="foo_bar">x</div>', expected: '<div data-name=foo_bar>x</div>' },
@@ -1397,7 +1421,7 @@ describe('HTML', () => {
     }));
   });
 
-  test('Removing attribute quotes around URL edge cases', async () => {
+  test('Remove attribute quotes around URL edge cases', async () => {
     const testCases = [
       { name: 'URL with ampersand only (can remove quotes)', input: '<a href="/?foo&bar">link</a>', expected: '<a href=/?foo&bar>link</a>' },
       { name: 'URL with equals (must keep quotes)', input: '<a href="/?key=value">link</a>', expected: '<a href="/?key=value">link</a>' },
@@ -1412,7 +1436,7 @@ describe('HTML', () => {
     }));
   });
 
-  test('Removing attribute quotes without trailing slash regression', async () => {
+  test('Remove attribute quotes without trailing slash regression', async () => {
     // Regression test for bug where unquoted attribute values ending with “/” incorrectly added extra space before closing tag
     const testCases = [
       { name: 'single attribute ending with /', input: '<a href="/topics/html/">html</a>', options: { removeAttributeQuotes: true }, expected: '<a href=/topics/html/>html</a>' },
@@ -1428,7 +1452,7 @@ describe('HTML', () => {
     }));
   });
 
-  test('Preserving custom attribute-wrapping markup', async () => {
+  test('Preserve custom attribute-wrapping markup', async () => {
     let input, customAttrOptions;
 
     // With a single rule
@@ -1482,7 +1506,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, customAttrOptions), '<input {{#if value1}}checked {{/if}}{{#if value2}}data-attr=foo {{/if}}/>');
   });
 
-  test('Preserving custom attribute-joining markup', async () => {
+  test('Preserve custom attribute-joining markup', async () => {
     let input;
     const polymerConditionalAttributeJoin = /\?=/;
     const customAttrOptions = {
@@ -1494,7 +1518,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, customAttrOptions), input);
   });
 
-  test('Collapsing whitespace', async () => {
+  test('Collapse whitespace', async () => {
     let input, output;
 
     input = '<script type="text/javascript">  \n\t   alert(1) \n\n\n  \t </script>';
@@ -1566,7 +1590,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('Removing empty elements', async () => {
+  test('Remove empty elements', async () => {
     let input, output;
 
     assert.strictEqual(await minify('<p>x</p>', { removeEmptyElements: true }), '<p>x</p>');
@@ -1674,10 +1698,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), output);
   });
 
-  test('`removeEmptyElementsExcept` option', async () => {
+  test('`removeEmptyElementsExcept`', async () => {
     let input, output;
 
-    // removeEmptyElementsExcept has no effect without removeEmptyElements
+    // `removeEmptyElementsExcept` has no effect without `removeEmptyElements`
     input = '<p></p><span></span>';
     assert.strictEqual(await minify(input, { removeEmptyElementsExcept: ['p', 'span'] }), input);
 
@@ -1731,17 +1755,17 @@ describe('HTML', () => {
     output = '<div><td></td><span aria-hidden="true"></span></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td', '<span aria-hidden="true">'] }), output);
 
-    // Case insensitivity (tags are normalized via options.name)
+    // Case insensitivity (tags are normalized via `options.name`)
     input = '<div><TD></TD><Span></Span></div>';
     output = '<div><td></td></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td'], caseSensitive: false }), output);
 
-    // Bulma burger example from issue #94
+    // Bulma burger example
     input = '<a role="button" class="navbar-burger"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></a>';
     output = '<a role="button" class="navbar-burger"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></a>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
 
-    // Empty table cell example from issue #94
+    // Empty table cell example
     input = '<table><tr><td>Kira</td><td>Goddess</td><td></td></tr></table>';
     output = '<table><tr><td>Kira</td><td>Goddess</td><td></td></tr></table>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td'] }), output);
@@ -1751,12 +1775,12 @@ describe('HTML', () => {
     output = '<div><td></td></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td'] }), output);
 
-    // Case sensitivity: lowercase spec does not preserve uppercase element
+    // Case sensitivity: Lowercase spec does not preserve uppercase element
     input = '<div><TD></TD><td></td></div>';
     output = '<div><td></td></div>';
     assert.strictEqual(await minify(input, { caseSensitive: true, removeEmptyElements: true, removeEmptyElementsExcept: ['td'] }), output);
 
-    // Case sensitivity: exact-case spec preserves matching element
+    // Case sensitivity: Exact-case spec preserves matching element
     input = '<div><TD></TD><td></td></div>';
     output = '<div><TD></TD></div>';
     assert.strictEqual(await minify(input, { caseSensitive: true, removeEmptyElements: true, removeEmptyElementsExcept: ['TD'] }), output);
@@ -1807,7 +1831,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span hidden>'] }), output);
   });
 
-  test('Collapsing boolean attributes', async () => {
+  test('Collapse boolean attributes', async () => {
     let input, output;
 
     input = '<input disabled="disabled">';
@@ -1846,7 +1870,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseBooleanAttributes: true, caseSensitive: true }), output);
   });
 
-  test('Collapsing enumerated attributes', async () => {
+  test('Collapse enumerated attributes', async () => {
     assert.strictEqual(await minify('<div draggable="auto"></div>', { collapseBooleanAttributes: true }), '<div draggable></div>');
     assert.strictEqual(await minify('<div draggable="true"></div>', { collapseBooleanAttributes: true }), '<div draggable="true"></div>');
     assert.strictEqual(await minify('<div draggable="false"></div>', { collapseBooleanAttributes: true }), '<div draggable="false"></div>');
@@ -1860,7 +1884,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div draggable="Auto"></div>', { collapseBooleanAttributes: true }), '<div draggable></div>');
   });
 
-  test('Keeping trailing slashes in tags', async () => {
+  test('Keep trailing slashes in tags', async () => {
     assert.strictEqual(await minify('<img src="test"/>', { keepClosingSlash: true }), '<img src="test"/>');
     // https://github.com/kangax/html-minifier/issues/233
     assert.strictEqual(await minify('<img src="test"/>', { keepClosingSlash: true, removeAttributeQuotes: true }), '<img src=test />');
@@ -1868,7 +1892,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<img title="foo" src="test"/>', { keepClosingSlash: true, removeAttributeQuotes: true }), '<img title=foo src=test />');
   });
 
-  test('Removing optional tags', async () => {
+  test('Remove optional tags', async () => {
     let input, output;
 
     input = '<p>foo';
@@ -1974,7 +1998,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
   });
 
-  test('Removing optional tags in tables', async () => {
+  test('Remove optional tags in tables', async () => {
     let input, output;
 
     input = '<table>' +
@@ -2034,7 +2058,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
   });
 
-  test('Removing optional tags in description lists', async () => {
+  test('Remove optional tags in description lists', async () => {
     let input, output;
 
     // `dt` and `dd` with closing tags
@@ -2060,7 +2084,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
   });
 
-  test('Removing optional tags in options', async () => {
+  test('Remove optional tags in options', async () => {
     let input, output;
 
     input = '<select><option>foo</option><option>bar</option></select>';
@@ -2175,7 +2199,7 @@ describe('HTML', () => {
   });
 
   // https://github.com/kangax/html-minifier/issues/10
-  test('Ignoring custom fragments', async () => {
+  test('Ignore custom fragments', async () => {
     let input, output;
     const reFragments = [/<\?[^?]+\?>/, /<%[^%]+%>/, /\{\{[^}]*\}\}/];
 
@@ -2248,9 +2272,9 @@ describe('HTML', () => {
 
     input = '<img class="{% foo %} {% bar %}">';
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g] }), input);
-    // `trimCustomFragments` withOUT `collapseWhitespace`, does not break the “{% foo %} {% bar %}” test
+    // `trimCustomFragments` without `collapseWhitespace`, does not break the “{% foo %} {% bar %}” test
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g], trimCustomFragments: true }), input);
-    // `trimCustomFragments` WITH `collapseWhitespace`, changes output
+    // `trimCustomFragments` with `collapseWhitespace`, changes output
     output = '<img class="{% foo %}{% bar %}">';
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g], collapseWhitespace: true, trimCustomFragments: true }), output);
 
@@ -2313,16 +2337,6 @@ describe('HTML', () => {
     input = '<style>body{font-size:<%=1%>2pt}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input);
-  });
-
-  test('Bootstrap’s `span` > `button` > `span` markup', async () => {
-    const input = '<span class="input-group-btn">' +
-      '\n  <button class="btn btn-default" type="button">' +
-      '\n    <span class="glyphicon glyphicon-search"></span>' +
-      '\n  </button>' +
-      '</span>';
-    const output = '<span class=input-group-btn><button class="btn btn-default" type=button><span class="glyphicon glyphicon-search"></span></button></span>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, removeAttributeQuotes: true }), output);
   });
 
   test('`caseSensitive`', async () => {
@@ -2660,7 +2674,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyJS: true, customEventAttributes: [/^ng-/, /^@/, /^x-on:/] }), output);
   });
 
-  test('Escaping `script` end tag', async () => {
+  test('Escape `script` end tag', async () => {
     const input = '<script>window.jQuery || document.write(\'<script src="jquery.js"><\\/script>\')</script>';
     const output = '<script>window.jQuery||document.write(\'<script src="jquery.js"><\\/script>\')</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
@@ -3049,7 +3063,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, conservativeCollapse: true }), output);
   });
 
-  test('Collapse preserving a line break', async () => {
+  test('Collapse preserving line breaks', async () => {
     let input, output;
 
     input = '\n\n\n<!DOCTYPE html>   \n<html lang="en" class="no-js">\n' +
@@ -3265,7 +3279,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, includeAutoGeneratedTags: false }), output);
   });
 
-  test('Ignoring custom comments', async () => {
+  test('Ignore custom comments', async () => {
     let input;
 
     input = '<!--! test -->';
@@ -3284,7 +3298,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeComments: true, ignoreCustomComments: false }), output);
 
     input = '<!-- ko if: someExpressionGoesHere --><li>test</li><!-- /ko -->';
-    // Ignore knockout comments
+    // Ignore Knockout comments
     assert.strictEqual(await minify(input, { removeComments: true, ignoreCustomComments: [/^\s+ko/, /\/ko\s+$/] }), input);
 
     input = '<!--#include virtual="/cgi-bin/counter.pl" -->';
@@ -3301,13 +3315,13 @@ describe('HTML', () => {
   });
 
   test('`processScripts` matching semantics (raw value) vs. JSON detection (normalized value)', async () => {
-    // processScripts should match against RAW value (case-sensitive, exact match)
+    // `processScripts` should match against raw value (case-sensitive, exact match)
     let input = '<script type="Text/NG-Template"><div> test </div></script>';
     // Must match exact case
     let result = await minify(input, { collapseWhitespace: true, processScripts: ['Text/NG-Template'] });
     assert.ok(result.includes('<div>test</div>'), 'processScripts should match raw case-sensitive value');
 
-    // processScripts should not match if case differs
+    // `processScripts` should not match if case differs
     // Different case
     result = await minify(input, { collapseWhitespace: true, processScripts: ['text/ng-template']
     });
@@ -3322,147 +3336,6 @@ describe('HTML', () => {
     input = '<script type="application/json; charset=utf-8">{"foo": "bar"}</script>';
     result = await minify(input, { collapseWhitespace: true });
     assert.ok(result.includes('{"foo":"bar"}'), 'JSON detection should strip parameters');
-  });
-
-  test('JSON script minification for `application/ld+json`', async () => {
-    const input = '<script type="application/ld+json">{"foo":  "bar"}\n\n</script>';
-    const output = '<script type="application/ld+json">{"foo":"bar"}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/ld+json` (invalid/malformed)', async () => {
-    const input = '<script type="application/ld+json">{"foo:  "bar"}\n\n</script>';
-    const output = '<script type="application/ld+json">{"foo:  "bar"}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `importmap`', async () => {
-    const input = '<script type="importmap">\n{\n  "imports": {\n    "lodash": "/js/lodash.js",\n    "vue": "https://cdn.jsdelivr.net/npm/vue@3/dist/vue.esm-browser.js"\n  }\n}\n</script>';
-    const output = '<script type="importmap">{"imports":{"lodash":"/js/lodash.js","vue":"https://cdn.jsdelivr.net/npm/vue@3/dist/vue.esm-browser.js"}}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/json`', async () => {
-    const input = '<script type="application/json">{\n  "data": {\n    "name": "test",\n    "value": 123\n  }\n}</script>';
-    const output = '<script type="application/json">{"data":{"name":"test","value":123}}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `speculationrules`', async () => {
-    const input = '<script type="speculationrules">{\n  "prerender": [\n    {\n      "source": "list",\n      "urls": ["/page1", "/page2"]\n    }\n  ]\n}</script>';
-    const output = '<script type="speculationrules">{"prerender":[{"source":"list","urls":["/page1","/page2"]}]}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/manifest+json`', async () => {
-    const input = '<script type="application/manifest+json">{\n  "name": "App",\n  "version": "1.0"\n}</script>';
-    const output = '<script type="application/manifest+json">{"name":"App","version":"1.0"}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/manifest+json` (invalid/malformed)', async () => {
-    const input = '<script type="application/manifest+json">{"name": invalid}\n</script>';
-    const output = '<script type="application/manifest+json">{"name": invalid}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/vnd.geo+json`', async () => {
-    const input = '<script type="application/vnd.geo+json">{\n  "type": "Point",\n  "coordinates": [100.0, 0.0]\n}</script>';
-    const output = '<script type="application/vnd.geo+json">{"type":"Point","coordinates":[100,0]}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/vnd.geo+json` (invalid/malformed)', async () => {
-    const input = '<script type="application/vnd.geo+json">{"type": Point}\n</script>';
-    const output = '<script type="application/vnd.geo+json">{"type": Point}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for case-insensitive `type` attribute', async () => {
-    const input = '<script type="Application/JSON">{\n  "test": "value"\n}</script>';
-    const output = '<script type="Application/JSON">{"test":"value"}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `type` attribute with whitespace', async () => {
-    const input = '<script type=" application/json ">{\n  "test": "value"\n}</script>';
-    const output = '<script type="application/json">{"test":"value"}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `type` attribute with `charset` parameter', async () => {
-    const input = '<script type="application/json; charset=utf-8">{\n  "test": "value"\n}</script>';
-    const output = '<script type="application/json;charset=utf-8">{"test":"value"}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/problem+json`', async () => {
-    const input = '<script type="application/problem+json">{\n  "type": "about:blank",\n  "status": 404\n}</script>';
-    const output = '<script type="application/problem+json">{"type":"about:blank","status":404}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/merge-patch+json`', async () => {
-    const input = '<script type="application/merge-patch+json">{\n  "title": "New Title"\n}</script>';
-    const output = '<script type="application/merge-patch+json">{"title":"New Title"}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/json-patch+json`', async () => {
-    const input = '<script type="application/json-patch+json">[\n  {\n    "op": "replace",\n    "path": "/title",\n    "value": "New"\n  }\n]</script>';
-    const output = '<script type="application/json-patch+json">[{"op":"replace","path":"/title","value":"New"}]</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for `application/merge-patch+json` (invalid/malformed)', async () => {
-    const input = '<script type="application/merge-patch+json">{"title": invalid value}\n</script>';
-    const output = '<script type="application/merge-patch+json">{"title": invalid value}</script>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-  });
-
-  test('JSON script minification for error handling', async () => {
-    // Malformed JSON should be preserved with default `continueOnMinifyError: true`
-    let input = '<script type="application/ld+json">{"foo:  "bar"}</script>';
-    let result = await minify(input, { collapseWhitespace: true });
-    assert.strictEqual(result, input);
-
-    // Malformed JSON should throw with `continueOnMinifyError: false`
-    await assert.rejects(
-      minify(input, { continueOnMinifyError: false, collapseWhitespace: true }),
-      SyntaxError
-    );
-
-    // Valid JSON should work fine with `continueOnMinifyError: false`
-    input = '<script type="application/ld+json">{"foo": "bar"}</script>';
-    const output = '<script type="application/ld+json">{"foo":"bar"}</script>';
-    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, collapseWhitespace: true }));
-    result = await minify(input, { continueOnMinifyError: false, collapseWhitespace: true });
-    assert.strictEqual(result, output);
-  });
-
-  test('JSON script minification with presets', async () => {
-    const { getPreset } = await import('../src/presets.js');
-
-    // Test with conservative preset
-    let input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n    <script type="application/ld+json">\n{\n  "name": "Test",\n  "url": "https://example.com/page"\n}\n    </script>\n  </head>\n</html>';
-    let conservativeResult = await minify(input, getPreset('conservative'));
-    // Conservative preset should: remove comments, collapse whitespace, minify JSON, use short doctype
-    assert.ok(!conservativeResult.includes('<!-- Comment -->'), 'Conservative: should remove comments');
-    assert.ok(conservativeResult.includes('<!doctype html>'), 'Conservative: should use short doctype');
-    assert.ok(conservativeResult.includes('{"name":"Test","url":"https://example.com/page"}'), 'Conservative: should minify JSON');
-    assert.ok(!conservativeResult.includes('\n{\n'), 'Conservative: should collapse whitespace in script content');
-
-    // Test with comprehensive preset
-    input = '<script type="importmap">\n{\n  "imports": {\n    "vue": "https://cdn.example.com/vue.js"\n  }\n}\n</script>';
-    let comprehensiveResult = await minify(input, getPreset('comprehensive'));
-    // Comprehensive preset should: minify JSON, collapse whitespace, remove quotes from attributes where possible
-    assert.ok(comprehensiveResult.includes('{"imports":{"vue":"https://cdn.example.com/vue.js"}}'), 'Comprehensive: should minify JSON');
-    assert.ok(comprehensiveResult.includes('type=importmap'), 'Comprehensive: should remove attribute quotes');
-
-    // Verify JSON minification works even with no options (automatic behavior)
-    input = '<script type="application/json">{\n  "test": "value"\n}</script>';
-    const noOptionsResult = await minify(input, {});
-    assert.strictEqual(noOptionsResult, '<script type="application/json">{"test":"value"}</script>', 'No options: should still minify JSON automatically');
   });
 
   test('`htmlmin:ignore`', async () => {
@@ -3509,7 +3382,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), '+0');
   });
 
-  test('Whitespace-collapsing between consecutive `htmlmin:ignore` blocks', async () => {
+  test('Whitespace-collapse between consecutive `htmlmin:ignore` blocks', async () => {
     let input, output;
 
     // Simple consecutive ignore blocks with HTML elements
@@ -3596,12 +3469,6 @@ describe('HTML', () => {
     input = '<meta name="viewport" content="width=device-width, initial-scale=1.0001, maximum-scale=3.140000">';
     output = '<meta name="viewport" content="width=device-width,initial-scale=1.0001,maximum-scale=3.14">';
     assert.strictEqual(await minify(input), output);
-  });
-
-  test('Downlevel-revealed conditional comments', async () => {
-    const input = '<![if !IE]><link href="non-ie.css" rel="stylesheet"><![endif]>';
-    assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { removeComments: true }), input);
   });
 
   test('`noscript`', async () => {
@@ -3799,72 +3666,27 @@ describe('HTML', () => {
       'Should add quotes to non-last unquoted attributes with removeTagWhitespace to prevent ambiguity');
   });
 
-  test('preventAttributesEscaping with `quoteCharacter`: Handle quote conflicts safely', async () => {
+  test('`preventAttributesEscaping` with `quoteCharacter`: Handle quote conflicts safely', async () => {
     // When `quoteCharacter` is set but conflicts with attribute value content,
     // the minifier should switch to the opposite quote type to avoid invalid HTML
 
-    // Test 1: `quoteCharacter: '\''` but value contains single quote—should switch to double quotes
+    // `quoteCharacter: '\''` but value contains single quote—should switch to double quotes
     const input1 = '<p data="it\'s fine">text</p>';
     const result1 = await minify(input1, { preventAttributesEscaping: true, quoteCharacter: '\'' });
     assert.strictEqual(result1, '<p data="it\'s fine">text</p>',
       'Should switch to double quotes when single quoteCharacter conflicts with value content');
 
-    // Test 2: `quoteCharacter: '"'` but value contains double quote—should switch to single quotes
+    // `quoteCharacter: '"'` but value contains double quote—should switch to single quotes
     const input2 = '<p data=\'has "quotes"\'>text</p>';
     const result2 = await minify(input2, { preventAttributesEscaping: true, quoteCharacter: '"' });
     assert.strictEqual(result2, '<p data=\'has "quotes"\'>text</p>',
       'Should switch to single quotes when double quoteCharacter conflicts with value content');
 
-    // Test 3: No conflict—should use preferred `quoteCharacter`
+    // No conflict—should use preferred `quoteCharacter`
     const input3 = '<p data="safe value">text</p>';
     const result3 = await minify(input3, { preventAttributesEscaping: true, quoteCharacter: '\'' });
     assert.strictEqual(result3, '<p data=\'safe value\'>text</p>',
       'Should use preferred quoteCharacter when there is no conflict');
-  });
-
-  test('preventAttributesEscaping: Real-world Apple TV snippet with benchmark config', async () => {
-    // Real-world example from Apple TV website with JSON data in `data-rid-relay` attribute
-    const input = '<a id="media-gallery-item-1-link" class="media-gallery-wrapper-link fam-media-gallery-wrapper-link" href="https://tv.apple.com/us/movie/f1-the-movie/umc.cmc.3t6dvnnr87zwd4wmvpdx5came?l=en-US?itscg=10000&itsct=atv-apl_hp-stream_now--220622" data-analytics-title="stream now" data-rid-relay=\'{"289":"itsct"}\' data-analytics-exit-link data-analytics-activitymap-region-id="tv-plus-gallery-f1 the movie" aria-label="Stream now, F1 The Movie - Action - Now streaming on Apple TV.">Example</a>';
-
-    // Benchmark config similar to current benchmarks/html-minifier.json
-    const benchmarkConfig = {
-      caseSensitive: false,
-      collapseAttributeWhitespace: true,
-      collapseBooleanAttributes: true,
-      collapseInlineTagWhitespace: true,
-      collapseWhitespace: true,
-      conservativeCollapse: false,
-      continueOnMinifyError: true,
-      continueOnParseError: true,
-      decodeEntities: true,
-      html5: true,
-      includeAutoGeneratedTags: false,
-      keepClosingSlash: false,
-      minifyCSS: true,
-      minifyJS: true,
-      noNewlinesBeforeTagClose: true,
-      preventAttributesEscaping: false,
-      processConditionalComments: true,
-      removeAttributeQuotes: true,
-      removeComments: true,
-      removeEmptyAttributes: true,
-      removeEmptyElements: true,
-      removeOptionalTags: true,
-      removeRedundantAttributes: true,
-      removeScriptTypeAttributes: true,
-      removeStyleLinkTypeAttributes: true,
-      removeTagWhitespace: true,
-      sortAttributes: false,
-      sortClassName: false,
-      trimCustomFragments: true,
-      useShortDoctype: true
-    };
-
-    const result = await minify(input, benchmarkConfig);
-    // Should successfully minify without parse errors
-    assert.ok(result.length > 0, 'Should produce non-empty output');
-    assert.ok(result.includes('data-rid-relay'), 'Should preserve data-rid-relay attribute');
-    assert.ok(result.includes('{"289":"itsct"}'), 'Should preserve JSON data in attribute');
   });
 
   test('`preventAttributesEscaping`: Both quote types present forces escaping', async () => {
@@ -3935,7 +3757,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div class="bar">foo</div>', { quoteCharacter: 'm' }), '<div class="bar">foo</div>');
   });
 
-  test('Removing space between attributes', async () => {
+  test('Remove space between attributes', async () => {
     let input, output;
     const options = {
       collapseBooleanAttributes: true,
@@ -3967,43 +3789,6 @@ describe('HTML', () => {
     input = '<input checked="checked" data-attr="example" value="hello world!"/>';
     output = '<input checked data-attr=example value="hello world!"/>';
     assert.strictEqual(await minify(input, options), output);
-  });
-
-  test('Markup from Angular 2', async () => {
-    let output;
-    const input = '<template ngFor #hero [ngForOf]="heroes">\n' +
-      '  <hero-detail *ngIf="hero" [hero]="hero"></hero-detail>\n' +
-      '</template>\n' +
-      '<form (ngSubmit)="onSubmit(theForm)" #theForm="ngForm">\n' +
-      '  <div class="form-group">\n' +
-      '    <label for="name">Name</label>\n' +
-      '    <input class="form-control" required ngControl="firstName"\n' +
-      '      [(ngModel)]="currentHero.firstName">\n' +
-      '  </div>\n' +
-      '  <button type="submit" [disabled]="!theForm.form.valid">Submit</button>\n' +
-      '</form>';
-    output = '<template ngFor #hero [ngForOf]="heroes">\n' +
-      '  <hero-detail *ngIf="hero" [hero]="hero"></hero-detail>\n' +
-      '</template>\n' +
-      '<form (ngSubmit)="onSubmit(theForm)" #theForm="ngForm">\n' +
-      '  <div class="form-group">\n' +
-      '    <label for="name">Name</label>\n' +
-      '    <input class="form-control" required ngControl="firstName" [(ngModel)]="currentHero.firstName">\n' +
-      '  </div>\n' +
-      '  <button type="submit" [disabled]="!theForm.form.valid">Submit</button>\n' +
-      '</form>';
-    assert.strictEqual(await minify(input, { caseSensitive: true }), output);
-    output = '<template ngFor #hero [ngForOf]=heroes>' +
-      '<hero-detail *ngIf=hero [hero]=hero></hero-detail>' +
-      '</template>' +
-      '<form (ngSubmit)=onSubmit(theForm) #theForm=ngForm>' +
-      '<div class=form-group>' +
-      '<label for=name>Name</label>' +
-      ' <input class=form-control required ngControl=firstName [(ngModel)]=currentHero.firstName>' +
-      '</div>' +
-      '<button [disabled]=!theForm.form.valid>Submit</button>' +
-      '</form>';
-    assert.strictEqual(await minify(input, { caseSensitive: true, collapseBooleanAttributes: true, collapseWhitespace: true, removeAttributeQuotes: true, removeComments: true, removeEmptyAttributes: true, removeOptionalTags: true, removeRedundantAttributes: true, removeScriptTypeAttributes: true, removeStyleLinkTypeAttributes: true, removeTagWhitespace: true, useShortDoctype: true }), output);
   });
 
   test('Auto-generated tags', async () => {
@@ -4211,7 +3996,7 @@ describe('HTML', () => {
     output = '<article class="cursor-pointer lg:border-[1px] lg:border-grey-700 lg:border-solid lg:dark:border-grey-700-dark lg:flex lg:flex-row mb-[40px] sm:mx-[40px]" data-selector="teaser-object parent-image-label picture-article" data-external-selector="teaser-object parent-image-label"></article>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, sortClassName: true }), output);
 
-    // Complex script/div example with whitespace
+    // Complex `script`/`div` example with whitespace
     input = '<script>  avenga.snacks.init()</script><div id="personalisation" data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null">  <div data-snacks-3:filterslider="_tracking.inview { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'View\', label = \'Meine FAZ\' }, _tracking.click { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'Click\', label = \'Meine FAZ\' }, register_button { text = \'Kostenfrei aktivieren\'}, _load { type = auth, loggedin = false }, id = \'no-reload\', criteria { groupids [1] }, headline = \'Meine F.A.Z.\', introtext = \'Wählen Sie Ihre Lieblingsthemen und wir zeigen Ihnen an dieser Stelle passende Beiträge.\', count = 35, client_title = \'faznet\', _plugins [login-reload, [auth-track, { regtype = \'Filterslider\', regsubtype = \'faz.net Startseite\', logintype = \'Filterslider\', loginsubtype = \'faz.net Startseite\'}]], shape = square"></div></div>';
     output = '<script>avenga.snacks.init()</script><div id="personalisation" data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null"><div data-snacks-3:filterslider="_tracking.inview { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'View\', label = \'Meine FAZ\' }, _tracking.click { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'Click\', label = \'Meine FAZ\' }, register_button { text = \'Kostenfrei aktivieren\'}, _load { type = auth, loggedin = false }, id = \'no-reload\', criteria { groupids [1] }, headline = \'Meine F.A.Z.\', introtext = \'Wählen Sie Ihre Lieblingsthemen und wir zeigen Ihnen an dieser Stelle passende Beiträge.\', count = 35, client_title = \'faznet\', _plugins [login-reload, [auth-track, { regtype = \'Filterslider\', regsubtype = \'faz.net Startseite\', logintype = \'Filterslider\', loginsubtype = \'faz.net Startseite\'}]], shape = square"></div></div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, minifyJS: true }), output);
@@ -4235,16 +4020,16 @@ describe('HTML', () => {
     output = '<p title="foo bar">Hello world</p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseAttributeWhitespace: true }), output);
 
-    // Special Unicode whitespace (hair space, non-breaking space) is preserved for consistency with `collapseWhitespace`
+    // Special Unicode whitespace (hair space, no-break space) is preserved for consistency with `collapseWhitespace`
     input = '<div title="foo\u200Abar  baz"></div>';
     output = '<div title="foo\u200Abar baz"></div>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
 
-    // Non-breaking space is preserved (consistent with `collapseWhitespace` behavior in text nodes)
+    // No-break space is preserved (consistent with `collapseWhitespace` behavior in text nodes)
     input = '<div title="foo\u00A0\u00A0bar"></div>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
 
-    // Special Unicode whitespace (hair space, non-breaking space) is preserved for consistency with `collapseWhitespace`
+    // Special Unicode whitespace (hair space, no-break space) is preserved for consistency with `collapseWhitespace`
     input = '<div title="foo\u200Abar  baz &nbsp; @&#8202;test"></div>';
     output = '<div title="foo bar baz   @ test"></div>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, decodeEntities: true }), output);
@@ -4306,102 +4091,6 @@ describe('HTML', () => {
     output = '<? &amp; ?>&<pre><? &amp; ?>&</pre>';
     assert.strictEqual(await minify(input, { collapseWhitespace: false, decodeEntities: true }), output);
     assert.strictEqual(await minify(input, { collapseWhitespace: true, decodeEntities: true }), output);
-  });
-
-  test('Tests from PHPTAL', async () => {
-    await Promise.all([
-      // Trailing `</p>` removed by minifier, but not by PHPTAL
-      ['<p>foo bar baz', '<p>foo     \t bar\n\n\n baz</p>'],
-      ['<p>foo bar<pre>  \tfoo\t   \nbar   </pre>', '<p>foo   \t\n bar</p><pre>  \tfoo\t   \nbar   </pre>'],
-      ['<p>foo <a href="">bar </a>baz', '<p>foo <a href=""> bar </a> baz  </p>'],
-      ['<p>foo <a href="">bar </a>baz', ' <p>foo <a href=""> bar </a>baz </p>'],
-      ['<p>foo<a href=""> bar </a>baz', ' <p> foo<a href=""> bar </a>baz </p>  '],
-      ['<p>foo <a href="">bar</a> baz', ' <p> foo <a href="">bar</a> baz</p>'],
-      ['<p>foo<br>', '<p>foo <br/></p>'],
-      // PHPTAL remove whitespace after “foo”—problematic if `<span>` is used as icon font
-      ['<p>foo <span></span>', '<p>foo <span></span></p>'],
-      ['<p>foo <span></span>', '<p>foo <span></span> </p>'],
-      // Comments removed by minifier, but not by PHPTAL
-      ['<p>foo', '<p>foo <!-- --> </p>'],
-      ['<div>a<div>b</div>c<div>d</div>e</div>', '<div>a <div>b</div> c <div> d </div> e </div>'],
-      // Unary slashes removed by minifier, but not by PHPTAL
-      ['<div><img></div>', '<div> <img/> </div>'],
-      ['<div>x <img></div>', '<div> x <img/> </div>'],
-      ['<div>x <img> y</div>', '<div> x <img/> y </div>'],
-      ['<div><img> y</div>', '<div><img/> y </div>'],
-      ['<div><button>Z</button></div>', '<div> <button>Z</button> </div>'],
-      ['<div>x <button>Z</button></div>', '<div> x <button>Z</button> </div>'],
-      ['<div>x <button>Z</button> y</div>', '<div> x <button>Z</button> y </div>'],
-      ['<div><button>Z</button> y</div>', '<div><button>Z</button> y </div>'],
-      ['<div><button>Z</button></div>', '<div> <button> Z </button> </div>'],
-      ['<div>x <button>Z</button></div>', '<div> x <button> Z </button> </div>'],
-      ['<div>x <button>Z</button> y</div>', '<div> x <button> Z </button> y </div>'],
-      ['<div><button>Z</button> y</div>', '<div><button> Z </button> y </div>'],
-      ['<script>//foo\nbar()</script>', '<script>//foo\nbar()</script>'],
-      // Optional tags removed by minifier, but not by PHPTAL
-      // Parser cannot handle `<script/>`
-      [
-        '<title></title><link><script>" ";</script><script></script><meta><style></style>',
-        '<html >\n' +
-        '<head > <title > </title > <link /> <script >" ";</script> <script>\n</script>\n' +
-        ' <meta /> <style\n' +
-        '  > </style >\n' +
-        '   </head > </html>'
-      ],
-      ['<div><p>test 123<p>456<ul><li>x</ul></div>', '<div> <p> test 123 </p> <p> 456 </p> <ul> <li>x</li> </ul> </div>'],
-      ['<div><p>test 123<pre> 456 </pre><p>x</div>', '<div> <p> test 123 </p> <pre> 456 </pre> <p> x </p> </div>'],
-      /* minifier does not assume <li> as "display: inline"
-      ['<div><ul><li><a>a </a></li><li>b </li><li>c</li></ul></div>', '<div> <ul> <li> <a> a </a> </li> <li> b </li> <li> c </li> </ul> </div>'], */
-      ['<table>x<tr>x<td>foo</td>x</tr>x</table>', '<table> x <tr> x <td> foo </td> x </tr> x </table>'],
-      ['<select>x<option></option>x<optgroup>x<option></option>x</optgroup>x</select>', '<select> x <option> </option> x <optgroup> x <option> </option> x </optgroup> x </select> '],
-      // Closing slash and optional attribute quotes removed by minifier, but not by PHPTAL
-      // Attribute ordering differences between minifier and PHPTAL
-      ['<img alt=x height=5 src=foo width=10>', '<img width="10" height="5" src="foo" alt="x" />'],
-      ['<img alpha=1 beta=2 gamma=3>', '<img gamma="3" alpha="1" beta="2" />'],
-      ['<pre>\n\n\ntest</pre>', '<pre>\n\n\ntest</pre>'],
-      /* single line-break preceding <pre> is redundant, assuming <pre> is block element
-      ['<pre>test</pre>', '<pre>\ntest</pre>'], */
-      // Closing slash and optional attribute quotes removed by minifier, but not by PHPTAL
-      // Attribute ordering differences between minifier and PHPTAL
-      // Redundant inter-attribute spacing removed by minifier, but not by PHPTAL
-      ['<meta content="text/plain;charset=UTF-8"http-equiv=Content-Type>', '<meta http-equiv=\'Content-Type\' content=\'text/plain;charset=UTF-8\'/>'],
-      /* minifier does not optimise <meta/> in HTML5 mode
-      ['<meta charset=utf-8>', '<meta http-equiv=\'Content-Type\' content=\'text/plain;charset=UTF-8\'/>'], */
-      /* minifier does not optimise <script/> in HTML5 mode
-      [
-        '<script></script><style></style>',
-        '<script type=\'text/javascript ;charset=utf-8\'\n' +
-        'language=\'javascript\'></script><style type=\'text/css\'></style>'
-      ], */
-      // Minifier removes more JavaScript `type` attributes than PHPTAL
-      ['<script></script><script type=text/hack></script>', '<script type="text/javascript;e4x=1"></script><script type="text/hack"></script>']
-      /* trim "title" attribute value in <a>
-      [
-        '<title>Foo</title><p><a title="x"href=test>x </a>xu</p><br>foo',
-        '<html> <head> <title> Foo </title> </head>\n' +
-        '<body>\n' +
-        '<p>\n' +
-        '<a title="   x " href=" test "> x </a> xu\n' +
-        '</p>\n' +
-        '<br/>\n' +
-        'foo</body> </html>  <!-- bla -->'
-      ] */
-    ].map(async function (tokens) {
-      assert.strictEqual(await minify(tokens[1], {
-        collapseBooleanAttributes: true,
-        collapseWhitespace: true,
-        removeAttributeQuotes: true,
-        removeComments: true,
-        removeEmptyAttributes: true,
-        removeOptionalTags: true,
-        removeRedundantAttributes: true,
-        removeScriptTypeAttributes: true,
-        removeStyleLinkTypeAttributes: true,
-        removeTagWhitespace: true,
-        sortAttributes: true,
-        useShortDoctype: true
-      }), tokens[0]);
-    }));
   });
 
   test('`canCollapseWhitespace` and `canTrimWhitespace` hooks', async () => {
@@ -4724,7 +4413,7 @@ describe('HTML', () => {
     output = '<ruby><rb>a<rtc><rt>x<rb>b</ruby>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-    // Ensuring `rtc` end tag is not omitted before `rt` (spec says `rtc` can only be followed by `rb` or `rtc`)
+    // Ensure `rtc` end tag is not omitted before `rt` (spec says `rtc` can only be followed by `rb` or `rtc`)
     input = '<ruby><rtc><rt>annotation</rt></rtc><rt>more</rt></ruby>';
     output = '<ruby><rtc><rt>annotation</rtc><rt>more</ruby>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
@@ -4735,7 +4424,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
   });
 
-  test('`maxInputLength` security option', async () => {
+  test('`maxInputLength`', async () => {
     // Test that large inputs are rejected when `maxInputLength` is set
     const largeInput = '<p>' + 'x'.repeat(100000) + '</p>';
 
@@ -4761,75 +4450,10 @@ describe('HTML', () => {
       { message: /Input length .* exceeds maximum allowed length/ }
     );
 
-    // Test that without maxInputLength, large inputs are processed
+    // Test that without `maxInputLength`, large inputs are processed
     const result2 = await minify('<p>' + 'x'.repeat(1000) + '</p>', { collapseWhitespace: true });
     assert.ok(result2.length > 0);
     assert.ok(result2.includes('xxx'));
-  });
-
-  test('JavaScript minification error handling', async () => {
-    // Test invalid JavaScript syntax
-    let input = '<script>function foo( { syntax error</script>';
-    let result = await minify(input, { minifyJS: true });
-    // Should not crash and should contain script element
-    assert.ok(result.includes('<script>'));
-    assert.ok(result.includes('</script>'));
-    // Invalid JS should be preserved or partially processed
-    assert.ok(result.includes('foo'));
-    await assert.rejects(
-      minify(input, { continueOnMinifyError: false, minifyJS: true }),
-      { message: /Unexpected token/ }
-    );
-
-    // Test completely malformed JavaScript
-    input = '<script>{{ this is not valid javascript }} [[</script>';
-    result = await minify(input, { minifyJS: true });
-    assert.ok(result.includes('<script>'));
-    assert.ok(result.includes('</script>'));
-    await assert.rejects(
-      minify(input, { continueOnMinifyError: false, minifyJS: true }),
-      { message: /Unexpected token/ }
-    );
-
-    // Test JS with unclosed brackets
-    input = '<script>function test() { console.log("hi");</script>';
-    result = await minify(input, { minifyJS: true });
-    assert.ok(result.includes('script'));
-    await assert.rejects(
-      minify(input, { continueOnMinifyError: false, minifyJS: true }),
-      { message: /Unexpected token/ }
-    );
-
-    // Test empty `script` element
-    input = '<script></script>';
-    result = await minify(input, { minifyJS: true, removeEmptyElements: false });
-    assert.strictEqual(result, '<script></script>');
-    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
-
-    // Test event attribute with invalid JS
-    input = '<button onclick="function( { syntax">Click</button>';
-    result = await minify(input, { minifyJS: true });
-    assert.ok(result.includes('button'));
-    assert.ok(result.includes('Click'));
-    await assert.rejects(
-      minify(input, { continueOnMinifyError: false, minifyJS: true }),
-      { message: /Unexpected token/ }
-    );
-
-    // Test valid JS still works
-    input = '<script>  console.log( "test" );  </script>';
-    result = await minify(input, { minifyJS: true });
-    assert.strictEqual(result, '<script>console.log("test")</script>');
-    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
-
-    // Test event attribute with valid JS (quote style may change during minification)
-    input = '<button onclick="  alert( \'test\' )  ">Click</button>';
-    result = await minify(input, { minifyJS: true });
-    // Minifier may normalize quote styles
-    assert.ok(result.includes('onclick='));
-    assert.ok(result.includes('alert'));
-    assert.ok(result.includes('test'));
-    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
   });
 
   test('`dialog` and `search` elements with optional `p` tag omission', async () => {
@@ -4962,24 +4586,6 @@ describe('HTML', () => {
       'partialMarkup and removeOptionalTags work independently (optional </p> is removed)');
   });
 
-  test('Parse error messages', async () => {
-    // Test that parse errors include line and column information
-    const input = '<div>\n<p>\ninvalid<tag\n</p>\n</div>';
-
-    await assert.rejects(
-      async () => { await minify(input, { continueOnParseError: false }); },
-      (err) => {
-        // Require both positional info and an offending-markup snippet
-        return /line\s+\d+.*column\s+\d+/i.test(err.message) && err.message.includes('invalid<tag');
-      },
-      'Error must include line/column numbers and offending markup'
-    );
-
-    // Test that `continueOnParseError` allows processing to continue
-    const output = await minify(input, { continueOnParseError: true });
-    assert.ok(output, 'Should produce output when continueOnParseError is true');
-  });
-
   test('`sortAttributes` with `processScripts` should not corrupt HTML', async () => {
     const input = '<div id="test" class="foo">content</div>';
     const expected = '<div class="foo" id="test">content</div>'; // Attributes sorted, no corruption
@@ -5062,7 +4668,7 @@ describe('HTML', () => {
     const result = await minify(input, benchmarkConfig);
 
     // Should successfully minify without parse errors showing escaped quotes and double spaces
-    // Parse error would look like: <div  id=\"personalisation\"  data-snacks-3:custom=\"…
+    // Parse error would look like: `<div  id=\"personalisation\"  data-snacks-3:custom=\"…`
     assert.ok(!result.includes('\\"'), 'Should not contain escaped quotes');
     assert.ok(!result.includes('  '), 'Should not contain double spaces');
     assert.ok(result.includes('data-snacks-3:custom'), 'Should preserve custom attribute names');
@@ -5312,7 +4918,7 @@ describe('HTML', () => {
     const baseline = await minify(html, { minifyJS: true });
     assert.strictEqual(baseline, '<div ng-click="alert(1 + 2)">test</div>');
 
-    // With string-based customEventAttributes, ng-click SHOULD be minified
+    // With string-based `customEventAttributes`, `ng-click` should be minified
     const configWithStrings = {
       minifyJS: true,
       // String patterns that should be converted to RegExp
@@ -5394,5 +5000,195 @@ describe('HTML', () => {
     const html2 = '<div {{#unless hidden}}class="visible"{{/unless}}>content</div>';
     const result2 = await minify(html2, jsonConfig);
     assert.strictEqual(result2, '<div {{#unless hidden}}class=visible{{/unless}}>content</div>');
+  });
+
+  // Tests inspired by real-world examples
+
+  test('Bootstrap’s `span` > `button` > `span` markup', async () => {
+    const input = '<span class="input-group-btn">' +
+      '\n  <button class="btn btn-default" type="button">' +
+      '\n    <span class="glyphicon glyphicon-search"></span>' +
+      '\n  </button>' +
+      '</span>';
+    const output = '<span class=input-group-btn><button class="btn btn-default" type=button><span class="glyphicon glyphicon-search"></span></button></span>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, removeAttributeQuotes: true }), output);
+  });
+
+  test('Angular 2 markup', async () => {
+    let output;
+    const input = '<template ngFor #hero [ngForOf]="heroes">\n' +
+      '  <hero-detail *ngIf="hero" [hero]="hero"></hero-detail>\n' +
+      '</template>\n' +
+      '<form (ngSubmit)="onSubmit(theForm)" #theForm="ngForm">\n' +
+      '  <div class="form-group">\n' +
+      '    <label for="name">Name</label>\n' +
+      '    <input class="form-control" required ngControl="firstName"\n' +
+      '      [(ngModel)]="currentHero.firstName">\n' +
+      '  </div>\n' +
+      '  <button type="submit" [disabled]="!theForm.form.valid">Submit</button>\n' +
+      '</form>';
+    output = '<template ngFor #hero [ngForOf]="heroes">\n' +
+      '  <hero-detail *ngIf="hero" [hero]="hero"></hero-detail>\n' +
+      '</template>\n' +
+      '<form (ngSubmit)="onSubmit(theForm)" #theForm="ngForm">\n' +
+      '  <div class="form-group">\n' +
+      '    <label for="name">Name</label>\n' +
+      '    <input class="form-control" required ngControl="firstName" [(ngModel)]="currentHero.firstName">\n' +
+      '  </div>\n' +
+      '  <button type="submit" [disabled]="!theForm.form.valid">Submit</button>\n' +
+      '</form>';
+    assert.strictEqual(await minify(input, { caseSensitive: true }), output);
+    output = '<template ngFor #hero [ngForOf]=heroes>' +
+      '<hero-detail *ngIf=hero [hero]=hero></hero-detail>' +
+      '</template>' +
+      '<form (ngSubmit)=onSubmit(theForm) #theForm=ngForm>' +
+      '<div class=form-group>' +
+      '<label for=name>Name</label>' +
+      ' <input class=form-control required ngControl=firstName [(ngModel)]=currentHero.firstName>' +
+      '</div>' +
+      '<button [disabled]=!theForm.form.valid>Submit</button>' +
+      '</form>';
+    assert.strictEqual(await minify(input, { caseSensitive: true, collapseBooleanAttributes: true, collapseWhitespace: true, removeAttributeQuotes: true, removeComments: true, removeEmptyAttributes: true, removeOptionalTags: true, removeRedundantAttributes: true, removeScriptTypeAttributes: true, removeStyleLinkTypeAttributes: true, removeTagWhitespace: true, useShortDoctype: true }), output);
+  });
+
+  test('PHPTAL markup', async () => {
+    await Promise.all([
+      // Trailing `</p>` removed by minifier, but not by PHPTAL
+      ['<p>foo bar baz', '<p>foo     \t bar\n\n\n baz</p>'],
+      ['<p>foo bar<pre>  \tfoo\t   \nbar   </pre>', '<p>foo   \t\n bar</p><pre>  \tfoo\t   \nbar   </pre>'],
+      ['<p>foo <a href="">bar </a>baz', '<p>foo <a href=""> bar </a> baz  </p>'],
+      ['<p>foo <a href="">bar </a>baz', ' <p>foo <a href=""> bar </a>baz </p>'],
+      ['<p>foo<a href=""> bar </a>baz', ' <p> foo<a href=""> bar </a>baz </p>  '],
+      ['<p>foo <a href="">bar</a> baz', ' <p> foo <a href="">bar</a> baz</p>'],
+      ['<p>foo<br>', '<p>foo <br/></p>'],
+      // PHPTAL remove whitespace after “foo”—problematic if `<span>` is used as icon font
+      ['<p>foo <span></span>', '<p>foo <span></span></p>'],
+      ['<p>foo <span></span>', '<p>foo <span></span> </p>'],
+      // Comments removed by minifier, but not by PHPTAL
+      ['<p>foo', '<p>foo <!-- --> </p>'],
+      ['<div>a<div>b</div>c<div>d</div>e</div>', '<div>a <div>b</div> c <div> d </div> e </div>'],
+      // Unary slashes removed by minifier, but not by PHPTAL
+      ['<div><img></div>', '<div> <img/> </div>'],
+      ['<div>x <img></div>', '<div> x <img/> </div>'],
+      ['<div>x <img> y</div>', '<div> x <img/> y </div>'],
+      ['<div><img> y</div>', '<div><img/> y </div>'],
+      ['<div><button>Z</button></div>', '<div> <button>Z</button> </div>'],
+      ['<div>x <button>Z</button></div>', '<div> x <button>Z</button> </div>'],
+      ['<div>x <button>Z</button> y</div>', '<div> x <button>Z</button> y </div>'],
+      ['<div><button>Z</button> y</div>', '<div><button>Z</button> y </div>'],
+      ['<div><button>Z</button></div>', '<div> <button> Z </button> </div>'],
+      ['<div>x <button>Z</button></div>', '<div> x <button> Z </button> </div>'],
+      ['<div>x <button>Z</button> y</div>', '<div> x <button> Z </button> y </div>'],
+      ['<div><button>Z</button> y</div>', '<div><button> Z </button> y </div>'],
+      ['<script>//foo\nbar()</script>', '<script>//foo\nbar()</script>'],
+      // Optional tags removed by minifier, but not by PHPTAL
+      // Parser cannot handle `<script/>`
+      [
+        '<title></title><link><script>" ";</script><script></script><meta><style></style>',
+        '<html >\n' +
+        '<head > <title > </title > <link /> <script >" ";</script> <script>\n</script>\n' +
+        ' <meta /> <style\n' +
+        '  > </style >\n' +
+        '   </head > </html>'
+      ],
+      ['<div><p>test 123<p>456<ul><li>x</ul></div>', '<div> <p> test 123 </p> <p> 456 </p> <ul> <li>x</li> </ul> </div>'],
+      ['<div><p>test 123<pre> 456 </pre><p>x</div>', '<div> <p> test 123 </p> <pre> 456 </pre> <p> x </p> </div>'],
+      /* minifier does not assume <li> as "display: inline"
+      ['<div><ul><li><a>a </a></li><li>b </li><li>c</li></ul></div>', '<div> <ul> <li> <a> a </a> </li> <li> b </li> <li> c </li> </ul> </div>'], */
+      ['<table>x<tr>x<td>foo</td>x</tr>x</table>', '<table> x <tr> x <td> foo </td> x </tr> x </table>'],
+      ['<select>x<option></option>x<optgroup>x<option></option>x</optgroup>x</select>', '<select> x <option> </option> x <optgroup> x <option> </option> x </optgroup> x </select> '],
+      // Closing slash and optional attribute quotes removed by minifier, but not by PHPTAL
+      // Attribute ordering differences between minifier and PHPTAL
+      ['<img alt=x height=5 src=foo width=10>', '<img width="10" height="5" src="foo" alt="x" />'],
+      ['<img alpha=1 beta=2 gamma=3>', '<img gamma="3" alpha="1" beta="2" />'],
+      ['<pre>\n\n\ntest</pre>', '<pre>\n\n\ntest</pre>'],
+      /* single line-break preceding <pre> is redundant, assuming <pre> is block element
+      ['<pre>test</pre>', '<pre>\ntest</pre>'], */
+      // Closing slash and optional attribute quotes removed by minifier, but not by PHPTAL
+      // Attribute ordering differences between minifier and PHPTAL
+      // Redundant inter-attribute spacing removed by minifier, but not by PHPTAL
+      ['<meta content="text/plain;charset=UTF-8"http-equiv=Content-Type>', '<meta http-equiv=\'Content-Type\' content=\'text/plain;charset=UTF-8\'/>'],
+      /* minifier does not optimise <meta/> in HTML5 mode
+      ['<meta charset=utf-8>', '<meta http-equiv=\'Content-Type\' content=\'text/plain;charset=UTF-8\'/>'], */
+      /* minifier does not optimise <script/> in HTML5 mode
+      [
+        '<script></script><style></style>',
+        '<script type=\'text/javascript ;charset=utf-8\'\n' +
+        'language=\'javascript\'></script><style type=\'text/css\'></style>'
+      ], */
+      // Minifier removes more JavaScript `type` attributes than PHPTAL
+      ['<script></script><script type=text/hack></script>', '<script type="text/javascript;e4x=1"></script><script type="text/hack"></script>']
+      /* trim "title" attribute value in <a>
+      [
+        '<title>Foo</title><p><a title="x"href=test>x </a>xu</p><br>foo',
+        '<html> <head> <title> Foo </title> </head>\n' +
+        '<body>\n' +
+        '<p>\n' +
+        '<a title="   x " href=" test "> x </a> xu\n' +
+        '</p>\n' +
+        '<br/>\n' +
+        'foo</body> </html>  <!-- bla -->'
+      ] */
+    ].map(async function (tokens) {
+      assert.strictEqual(await minify(tokens[1], {
+        collapseBooleanAttributes: true,
+        collapseWhitespace: true,
+        removeAttributeQuotes: true,
+        removeComments: true,
+        removeEmptyAttributes: true,
+        removeOptionalTags: true,
+        removeRedundantAttributes: true,
+        removeScriptTypeAttributes: true,
+        removeStyleLinkTypeAttributes: true,
+        removeTagWhitespace: true,
+        sortAttributes: true,
+        useShortDoctype: true
+      }), tokens[0]);
+    }));
+  });
+
+  test('Apple TV markup', async () => {
+    // Real-world example from Apple TV website with JSON data in `data-rid-relay` attribute
+    const input = '<a id="media-gallery-item-1-link" class="media-gallery-wrapper-link fam-media-gallery-wrapper-link" href="https://tv.apple.com/us/movie/f1-the-movie/umc.cmc.3t6dvnnr87zwd4wmvpdx5came?l=en-US?itscg=10000&itsct=atv-apl_hp-stream_now--220622" data-analytics-title="stream now" data-rid-relay=\'{"289":"itsct"}\' data-analytics-exit-link data-analytics-activitymap-region-id="tv-plus-gallery-f1 the movie" aria-label="Stream now, F1 The Movie - Action - Now streaming on Apple TV.">Example</a>';
+
+    // Benchmark config similar to then-current benchmarks/html-minifier.json
+    const benchmarkConfig = {
+      caseSensitive: false,
+      collapseAttributeWhitespace: true,
+      collapseBooleanAttributes: true,
+      collapseInlineTagWhitespace: true,
+      collapseWhitespace: true,
+      conservativeCollapse: false,
+      continueOnMinifyError: true,
+      continueOnParseError: true,
+      decodeEntities: true,
+      html5: true,
+      includeAutoGeneratedTags: false,
+      keepClosingSlash: false,
+      minifyCSS: true,
+      minifyJS: true,
+      noNewlinesBeforeTagClose: true,
+      preventAttributesEscaping: false,
+      processConditionalComments: true,
+      removeAttributeQuotes: true,
+      removeComments: true,
+      removeEmptyAttributes: true,
+      removeEmptyElements: true,
+      removeOptionalTags: true,
+      removeRedundantAttributes: true,
+      removeScriptTypeAttributes: true,
+      removeStyleLinkTypeAttributes: true,
+      removeTagWhitespace: true,
+      sortAttributes: false,
+      sortClassName: false,
+      trimCustomFragments: true,
+      useShortDoctype: true
+    };
+
+    const result = await minify(input, benchmarkConfig);
+    // Should successfully minify without parse errors
+    assert.ok(result.length > 0, 'Should produce non-empty output');
+    assert.ok(result.includes('data-rid-relay'), 'Should preserve data-rid-relay attribute');
+    assert.ok(result.includes('{"289":"itsct"}'), 'Should preserve JSON data in attribute');
   });
 });

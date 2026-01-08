@@ -15,7 +15,7 @@ import { minify, type MinifierOptions, type HTMLAttribute } from '../src/htmlmin
 async function testBasicMinify() {
   const html = '<div>  test  </div>';
 
-  // Should accept string and return Promise<string>
+  // Should accept string and return `Promise<string>`
   const result: string = await minify(html);
 
   // Should accept options

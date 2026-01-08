@@ -81,7 +81,7 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('Invalid/empty CSS in style attributes', async () => {
+  test('Invalid/empty CSS in `style` attributes', async () => {
     // Regression test for issue where invalid CSS like `color: ` was minified to `color:` instead of being removed
     let input, output;
 
@@ -173,14 +173,14 @@ describe('CSS and JS', () => {
   });
 
   // Tests for minifyCSS configuration options
-  test('minifyCSS: Basic boolean true', async () => {
+  test('CSS: Basic boolean true', async () => {
     const input = '<style>body { color: red; font-size: 12px; }</style>';
     const output = '<style>body{color:red;font-size:12px}</style>';
 
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('minifyCSS: Custom options', async () => {
+  test('CSS: Custom options', async () => {
     const input = '<style>.class1 { color: red; } .class2 { color: red; }</style>';
     const result = await minify(input, {
       minifyCSS: {}
@@ -191,22 +191,22 @@ describe('CSS and JS', () => {
     assert.ok(result.length < input.length, 'Output should be shorter');
   });
 
-  test('minifyCSS: Inline `style` attribute', async () => {
+  test('CSS: Inline `style` attribute', async () => {
     const input = '<div style="  color: red;  margin: 10px;  "></div>';
     const output = '<div style="color:red;margin:10px"></div>';
 
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('minifyCSS: Preserve important comments', async () => {
+  test('CSS: Preserve important comments', async () => {
     const input = '<style>/*! Important license */ body { color: red; }</style>';
     const result = await minify(input, { minifyCSS: true });
 
-    // Lightning CSS preserves “/*!” comments by default
+    // Lightning CSS preserves `/*!` comments by default
     assert.ok(result.includes('Important license'), 'Important comment should be preserved');
   });
 
-  test('minifyCSS: Combined with `collapseWhitespace`', async () => {
+  test('CSS: Combined with `collapseWhitespace`', async () => {
     const input = `
       <style>
         body {
@@ -224,7 +224,7 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('\n'), 'Whitespace should be collapsed');
   });
 
-  test('minifyCSS: Media query minification', async () => {
+  test('CSS: Media query minification', async () => {
     const input = '<link rel="stylesheet" media="  screen  and  ( min-width: 768px )  " href="style.css">';
     const result = await minify(input, { minifyCSS: true });
 
@@ -234,14 +234,14 @@ describe('CSS and JS', () => {
   });
 
   // Tests for minifyJS configuration options
-  test('minifyJS: Basic boolean true', async () => {
+  test('JS: Basic boolean true', async () => {
     const input = '<script>function myFunction() { var x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
   });
 
-  test('minifyJS: Mangle disabled (`mangle: false`)', async () => {
+  test('JS: Mangle disabled (`mangle: false`)', async () => {
     // Note: Even with `mangle: false`, Terser still applies compress optimizations by default
     // To truly preserve variable names, need to disable both mangle and compress
     const input = '<script>function myFunction(myParam) { var myVariable = myParam + 1; return myVariable; }</script>';
@@ -250,10 +250,10 @@ describe('CSS and JS', () => {
     // Function and variable names should not be mangled (shortened)
     assert.ok(result.includes('myFunction'), 'Function name should be preserved');
     assert.ok(result.includes('myParam'), 'Parameter name should be preserved');
-    // Note: myVariable may still be optimized away if compress is enabled
+    // Note: `myVariable` may still be optimized away if compress is enabled
   });
 
-  test('minifyJS: Top-level mangling (`mangle: { toplevel: true }`)', async () => {
+  test('JS: Top-level mangling (`mangle: { toplevel: true }`)', async () => {
     const input = '<script>function myFunction() { var myVariable = 123; return myVariable; }</script>';
     const result = await minify(input, { minifyJS: { mangle: { toplevel: true } } });
 
@@ -264,7 +264,7 @@ describe('CSS and JS', () => {
     assert.ok(result.length < input.length, 'Output should be shorter than input');
   });
 
-  test('minifyJS: Reserved names (`mangle: { reserved: ["myFunction"] }`)', async () => {
+  test('JS: Reserved names (`mangle: { reserved: ["myFunction"] }`)', async () => {
     const input = '<script>function myFunction() { var myVariable = 123; return myVariable; }</script>';
     const result = await minify(input, {
       minifyJS: {
@@ -280,7 +280,7 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('myVariable'), 'Variable name should be mangled');
   });
 
-  test('minifyJS: Drop console statements (`compress: { drop_console: true }`)', async () => {
+  test('JS: Drop console statements (`compress: { drop_console: true }`)', async () => {
     const input = '<script>console.log("debug"); alert("keep this");</script>';
     const output = '<script>alert("keep this")</script>';
 
@@ -291,7 +291,7 @@ describe('CSS and JS', () => {
     }), output);
   });
 
-  test('minifyJS: Combined mangle and compress options', async () => {
+  test('JS: Combined mangle and compress options', async () => {
     const input = '<script>function calculate() { console.log("calculating"); var result = 10 + 20; return result; }</script>';
     const result = await minify(input, {
       minifyJS: {
@@ -300,13 +300,13 @@ describe('CSS and JS', () => {
       }
     });
 
-    // Should remove console.log and mangle names
+    // Should remove `console.log` and mangle names
     assert.ok(!result.includes('console.log'), 'Console statement should be removed');
     assert.ok(!result.includes('calculate'), 'Function name should be mangled');
     assert.ok(result.includes('30'), 'Should optimize 10 + 20 to 30');
   });
 
-  test('minifyJS: Event attribute with mangle disabled', async () => {
+  test('JS: Event attribute with mangle disabled', async () => {
     const input = '<button onclick="var myVar = 42; alert(myVar);">Click</button>';
     const result = await minify(input, { minifyJS: { mangle: false } });
 
@@ -314,33 +314,16 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('alert'), 'Function call should be preserved');
   });
 
-  // Combined tests
-  test('minifyJS and minifyCSS together', async () => {
-    const input = `
-      <style>body { color: red; }</style>
-      <script>function test() { console.log("test"); }</script>
-    `;
-    const result = await minify(input, {
-      minifyJS: { compress: { drop_console: true } },
-      minifyCSS: true,
-      collapseWhitespace: true
-    });
-
-    assert.ok(result.includes('body{color:red}'), 'CSS should be minified');
-    assert.ok(!result.includes('console.log'), 'Console should be dropped');
-    assert.ok(result.includes('function test(){}'), 'Empty function after console removal');
-  });
-
   // Engine field tests
-  test('minifyJS: Default engine (Terser)', async () => {
+  test('JS: Default engine (Terser)', async () => {
     const input = '<script>function myFunction() { var x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
-    // Should use terser by default
+    // Should use Terser by default
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
   });
 
-  test('minifyJS: Explicit Terser engine', async () => {
+  test('JS: Explicit Terser engine', async () => {
     const input = '<script>function myFunction() { var x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
@@ -348,7 +331,7 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyJS: { engine: 'terser' } }), output);
   });
 
-  test('minifyJS: SWC engine for script blocks', async () => {
+  test('JS: SWC engine for script blocks', async () => {
     const input = '<script>function myFunction() { var x = 1; return x; }</script>';
 
     // SWC should minify the code (exact output may differ from Terser)
@@ -359,7 +342,7 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('var x'), 'Variable should be optimized away');
   });
 
-  test('minifyJS: Hybrid behavior with Terser processing inline handlers', async () => {
+  test('JS: Hybrid behavior with Terser processing inline handlers', async () => {
     const input = '<button onclick="return false;">Click</button>';
 
     // Even with SWC engine, inline handlers should use Terser
@@ -369,7 +352,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('return'), 'Return statement should work (via Terser)');
   });
 
-  test('minifyJS: Hybrid behavior—complex example', async () => {
+  test('JS: Hybrid behavior—complex example', async () => {
     const input = `
       <script>function calculate() { var x = 10; var y = 20; return x + y; }</script>
       <button onclick="var result = calculate(); alert(result); return false;">Test</button>
@@ -387,7 +370,7 @@ describe('CSS and JS', () => {
     assert.ok(result.length < input.length, 'Should be minified overall');
   });
 
-  test('minifyJS: Invalid engine throws error', async () => {
+  test('JS: Invalid engine throws error', async () => {
     const input = '<script>function test() { return 1; }</script>';
 
     await assert.rejects(
@@ -397,7 +380,7 @@ describe('CSS and JS', () => {
     );
   });
 
-  test('minifyJS: Engine-specific options for Terser', async () => {
+  test('JS: Engine-specific options for Terser', async () => {
     const input = '<script>function myFunction() { console.log("test"); var x = 1; return x; }</script>';
 
     const result = await minify(input, {
@@ -414,7 +397,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('return'), 'Return statement should be present');
   });
 
-  test('minifyJS: Engine-specific options for SWC', async () => {
+  test('JS: Engine-specific options for SWC', async () => {
     const input = '<script>function myFunction() { var unused = "test"; var x = 1; return x; }</script>';
 
     const result = await minify(input, {
@@ -431,7 +414,7 @@ describe('CSS and JS', () => {
     // Just check that it’s shorter (minified)
   });
 
-  test('minifyJS: SWC case-insensitivity', async () => {
+  test('JS: SWC case-insensitivity', async () => {
     const input = '<script>function test() { return 42; }</script>';
 
     // Engine field should be case-insensitive
@@ -441,5 +424,87 @@ describe('CSS and JS', () => {
 
     assert.strictEqual(result1, result2, 'Case variations should produce same result');
     assert.strictEqual(result2, result3, 'Case variations should produce same result');
+  });
+
+  test('JavaScript minification error handling', async () => {
+    // Test invalid JavaScript syntax
+    let input = '<script>function foo( { syntax error</script>';
+    let result = await minify(input, { minifyJS: true });
+    // Should not crash and should contain `script` element
+    assert.ok(result.includes('<script>'));
+    assert.ok(result.includes('</script>'));
+    // Invalid JS should be preserved or partially processed
+    assert.ok(result.includes('foo'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
+
+    // Test completely malformed JavaScript
+    input = '<script>{{ this is not valid javascript }} [[</script>';
+    result = await minify(input, { minifyJS: true });
+    assert.ok(result.includes('<script>'));
+    assert.ok(result.includes('</script>'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
+
+    // Test JS with unclosed brackets
+    input = '<script>function test() { console.log("hi");</script>';
+    result = await minify(input, { minifyJS: true });
+    assert.ok(result.includes('script'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
+
+    // Test empty `script` element
+    input = '<script></script>';
+    result = await minify(input, { minifyJS: true, removeEmptyElements: false });
+    assert.strictEqual(result, '<script></script>');
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
+
+    // Test event attribute with invalid JS
+    input = '<button onclick="function( { syntax">Click</button>';
+    result = await minify(input, { minifyJS: true });
+    assert.ok(result.includes('button'));
+    assert.ok(result.includes('Click'));
+    await assert.rejects(
+      minify(input, { continueOnMinifyError: false, minifyJS: true }),
+      { message: /Unexpected token/ }
+    );
+
+    // Test valid JS still works
+    input = '<script>  console.log( "test" );  </script>';
+    result = await minify(input, { minifyJS: true });
+    assert.strictEqual(result, '<script>console.log("test")</script>');
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
+
+    // Test event attribute with valid JS (quote style may change during minification)
+    input = '<button onclick="  alert( \'test\' )  ">Click</button>';
+    result = await minify(input, { minifyJS: true });
+    // Minifier may normalize quote styles
+    assert.ok(result.includes('onclick='));
+    assert.ok(result.includes('alert'));
+    assert.ok(result.includes('test'));
+    await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
+  });
+
+  // Combined tests
+  test('`minifyJS` and `minifyCSS` together', async () => {
+    const input = `
+      <style>body { color: red; }</style>
+      <script>function test() { console.log("test"); }</script>
+    `;
+    const result = await minify(input, {
+      minifyJS: { compress: { drop_console: true } },
+      minifyCSS: true,
+      collapseWhitespace: true
+    });
+
+    assert.ok(result.includes('body{color:red}'), 'CSS should be minified');
+    assert.ok(!result.includes('console.log'), 'Console should be dropped');
+    assert.ok(result.includes('function test(){}'), 'Empty function after console removal');
   });
 });

@@ -59,7 +59,7 @@ describe('CLI', () => {
     await removeFixture('tmp');
   });
 
-  test('Minify the HTML', async () => {
+  test('Should minify the HTML', async () => {
     const input = await readFixture('default.html');
 
     const minifyOptions = {
@@ -485,7 +485,7 @@ describe('CLI', () => {
       '--config-file=./tmp/test-config-override.json',
       '--input-dir=./',
       '--output-dir=./tmp/config-override',
-      '--file-ext=htm'  // CLI overrides to htm
+      '--file-ext=htm' // CLI overrides to htm
     ];
 
     execCli(cliArguments);
@@ -514,7 +514,7 @@ describe('CLI', () => {
       '--config-file=./tmp/test-config-empty-override.json',
       '--input-dir=./',
       '--output-dir=./tmp/config-empty-override',
-      '--file-ext='  // Empty CLI argument should override config and process ALL files
+      '--file-ext=' // Empty CLI argument should override config and process ALL files
     ];
 
     execCli(cliArguments);
@@ -652,7 +652,7 @@ describe('CLI', () => {
     assert.strictEqual(stderr.toString().trim(), '');
   });
 
-  // -o flag combination tests
+  // `-o` flag combination tests
   test('Should handle file to file with `-o` flag in dry run', () => {
     const result = execCliWithStderr([
       'default.html',
@@ -982,7 +982,7 @@ describe('CLI', () => {
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/in/a.html'), '<html><body>a</body></html>');
     const result = execCliWithStderr([
       '--input-dir=tmp/in',
-      '--output-dir=tmp/in/sub', // nested
+      '--output-dir=tmp/in/sub', // Nested
       '--collapse-whitespace'
     ]);
     assert.strictEqual(result.exitCode, 0);
@@ -1054,7 +1054,7 @@ describe('CLI', () => {
 
   test('Should override preset options with CLI flags', () => {
     const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p class="">test</p>';
-    // Conservative preset has useShortDoctype, and we add removeEmptyAttributes via CLI
+    // Conservative preset has `useShortDoctype`, and we add `removeEmptyAttributes` via CLI
     const { stdout, status } = spawnSync('node', [cliPath, '--preset', 'conservative', '--remove-empty-attributes'], {
       cwd: fixturesDir,
       input: input
@@ -1063,9 +1063,9 @@ describe('CLI', () => {
     // Both preset and CLI options should be applied
     assert.strictEqual(status, 0);
     const output = stdout.toString();
-    // useShortDoctype from preset
+    // `useShortDoctype` from preset
     assert.ok(output.includes('<!doctype html>'));
-    // removeEmptyAttributes from CLI (empty class should be removed)
+    // `removeEmptyAttributes` from CLI (empty class should be removed)
     assert.ok(!output.includes('class=""'));
   });
 
@@ -1097,11 +1097,11 @@ describe('CLI', () => {
     const configPath = path.resolve(fixturesDir, 'tmp-preset-config2.json');
     await fs.promises.writeFile(configPath, JSON.stringify({
       preset: 'conservative',
-      useShortDoctype: false // Override preset’s useShortDoctype
+      useShortDoctype: false // Override preset’s `useShortDoctype`
     }));
 
     const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p>test</p>';
-    // Config says useShortDoctype: false, but CLI should override to true
+    // Config says `useShortDoctype: false`, but CLI should override to true
     const { stdout, status } = spawnSync('node', [cliPath, '-c', configPath, '--use-short-doctype'], {
       cwd: fixturesDir,
       input: input
@@ -1284,9 +1284,9 @@ describe('CLI', () => {
 
     assert.strictEqual(result.exitCode, 0);
     assert.strictEqual(existsFixture('tmp-out/a.html'), true);
-    // libs should be processed (not ignored) due to CLI override
+    // “libs” should be processed (not ignored) due to CLI override
     assert.strictEqual(existsFixture('tmp-out/libs/b.html'), true);
-    // vendor should be ignored
+    // “vendor” should be ignored
     assert.strictEqual(existsFixture('tmp-out/vendor/c.html'), false);
 
     await removeFixture('tmp-out');
