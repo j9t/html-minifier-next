@@ -245,7 +245,7 @@ function hasAttrName(name, attrs) {
 
 async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
   // Apply early whitespace normalization if enabled
-  // Preserves special spaces (non-breaking space, hair space, etc.) for consistency with `collapseWhitespace`
+  // Preserves special spaces (no-break space, hair space, etc.) for consistency with `collapseWhitespace`
   if (options.collapseAttributeWhitespace) {
     // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
     if (RE_ATTR_WS_CHECK.test(attrValue)) {
@@ -515,7 +515,8 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
           } else {
             attrQuote = '"';
           }
-        // Fallback for invalid/unsupported attrQuote values (not `"`, `'`, or empty string): Choose safe default based on value content
+        // Fallback for invalid/unsupported attrQuote values (not `"`, `'`, or empty string):
+        // Choose safe default based on value content
         } else if (attrQuote !== '"' && attrQuote !== "'") {
           if (hasSingleQuote && !hasDoubleQuote) {
             attrQuote = '"';
@@ -532,7 +533,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
         if ((preferredQuote === '"' && hasDoubleQuote && !hasSingleQuote) || (preferredQuote === "'" && hasSingleQuote && !hasDoubleQuote)) {
           attrQuote = preferredQuote === '"' ? "'" : '"';
         } else if ((preferredQuote === '"' && hasDoubleQuote && hasSingleQuote) || (preferredQuote === "'" && hasSingleQuote && hasDoubleQuote)) {
-          // Both quote types present: Fall back to escaping despite preventAttributesEscaping
+          // Both quote types present: Fall back to escaping despite `preventAttributesEscaping`
           attrQuote = preferredQuote;
           if (attrQuote === '"') {
             attrValue = attrValue.replace(/"/g, '&#34;');
@@ -549,7 +550,8 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       emittedAttrValue += ' ';
     }
   } else if (isLast && !hasUnarySlash) {
-    // Last attribute in a non-self-closing tag: no space needed
+    // Last attribute in a non-self-closing tag:
+    // No space needed
     emittedAttrValue = attrValue;
   } else {
     // Not last attribute, or is a self-closing tag:

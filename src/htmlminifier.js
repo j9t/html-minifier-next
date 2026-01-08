@@ -928,7 +928,7 @@ async function minifyHTML(value, options, partialMarkup) {
         const htmlTag = htmlElements.has(tag);
         // `<html>` may be omitted if first thing inside is not a comment
         // `<head>` may be omitted if first thing inside is an element
-        // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, <`style>`, or `<template>`
+        // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
         // `<colgroup>` may be omitted if first thing inside is `<col>`
         // `<tbody>` may be omitted if first thing inside is `<tr>`
         if (htmlTag && canRemoveParentTag(optionalStartTag, tag)) {

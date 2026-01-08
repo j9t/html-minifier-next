@@ -72,7 +72,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   }
 
   if (trimLeft) {
-    // Non-breaking space is specifically handled inside the replacer function
+    // No-break space is specifically handled inside the replacer function
     str = str.replace(/^[ \n\r\t\f\xA0]+/, function (spaces) {
       const conservative = !lineBreakBefore && options.conservativeCollapse;
       if (conservative && spaces === '\t') {
@@ -83,7 +83,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   }
 
   if (trimRight) {
-    // Non-breaking space is specifically handled inside the replacer function
+    // No-break space is specifically handled inside the replacer function
     str = str.replace(/[ \n\r\t\f\xA0]+$/, function (spaces) {
       const conservative = !lineBreakAfter && options.conservativeCollapse;
       if (conservative && spaces === '\t') {

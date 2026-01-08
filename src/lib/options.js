@@ -347,7 +347,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       };
     } else if (key === 'minifySVG') {
       // Process SVG minification options
-      // Unlike minifyCSS/minifyJS, this is a simple options object, not a function
+      // Unlike `minifyCSS`/`minifyJS`, this is a simple options object, not a function
       // The actual minification is applied inline during attribute processing
       options.minifySVG = getSVGMinifierOptions(option);
     } else if (key === 'customAttrCollapse') {
