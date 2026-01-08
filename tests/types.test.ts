@@ -6,12 +6,12 @@
  * 2. Types are correctly exported and usable
  * 3. Type inference works as expected
  *
- * This file is NOT executed—it only needs to type-check successfully.
+ * This file is not executed—it only needs to type-check successfully.
  */
 
 import { minify, type MinifierOptions, type HTMLAttribute } from '../src/htmlminifier.js';
 
-// Test: minify function basic usage
+// Minify function basic usage
 async function testBasicMinify() {
   const html = '<div>  test  </div>';
 
@@ -27,7 +27,7 @@ async function testBasicMinify() {
   return result;
 }
 
-// Test: all boolean options
+// All boolean options
 async function testBooleanOptions() {
   const html = '<div>test</div>';
 
@@ -62,7 +62,7 @@ async function testBooleanOptions() {
   return await minify(html, options);
 }
 
-// Test: minifyCSS option types
+// `minifyCSS` option types
 async function testMinifyCSSOptions() {
   const html = '<style>body { color: red; }</style>';
 
@@ -88,7 +88,7 @@ async function testMinifyCSSOptions() {
   });
 }
 
-// Test: minifyJS option types
+// `minifyJS` option types
 async function testMinifyJSOptions() {
   const html = '<script>var x = 1;</script>';
 
@@ -118,7 +118,7 @@ async function testMinifyJSOptions() {
   });
 }
 
-// Test: minifyURLs option types
+// `minifyURLs` option types
 async function testMinifyURLsOptions() {
   const html = '<a href="/path/to/page.html">Link</a>';
 
@@ -150,7 +150,7 @@ async function testMinifyURLsOptions() {
   });
 }
 
-// Test: RegExp array options
+// RegExp array options
 async function testRegExpOptions() {
   const html = '<div ng-click="test()">test</div>';
 
@@ -164,7 +164,7 @@ async function testRegExpOptions() {
   return await minify(html, options);
 }
 
-// Test: custom surround patterns
+// Custom surround patterns
 async function testCustomAttrSurround() {
   const html = '<input {{#if value}}checked{{/if}}>';
 
@@ -178,7 +178,7 @@ async function testCustomAttrSurround() {
   return await minify(html, options);
 }
 
-// Test: function options
+// Function options
 async function testFunctionOptions() {
   const html = '<div class="b a c">test</div>';
 
@@ -207,7 +207,7 @@ async function testFunctionOptions() {
   return await minify(html, options);
 }
 
-// Test: number options
+// Number options
 async function testNumberOptions() {
   const html = '<div>test</div>';
 
@@ -220,7 +220,7 @@ async function testNumberOptions() {
   return await minify(html, options);
 }
 
-// Test: array options
+// Array options
 async function testArrayOptions() {
   const html = '<script type="text/ng-template"><div>test</div></script>';
 
@@ -232,7 +232,7 @@ async function testArrayOptions() {
   return await minify(html, options);
 }
 
-// Test: quote character option
+// Quote character option
 async function testQuoteCharacter() {
   const html = '<div class="test">content</div>';
 
@@ -240,11 +240,11 @@ async function testQuoteCharacter() {
   await minify(html, { quoteCharacter: '"' });
   await minify(html, { quoteCharacter: "'" });
 
-  // Note: TypeScript correctly restricts quoteCharacter to only '"' or "'"
+  // Note: TypeScript correctly restricts `quoteCharacter` to only “"” or “'”
   // Any other value would be a type error
 }
 
-// Test: HTMLAttribute type
+// `HTMLAttribute` type
 function testHTMLAttributeType() {
   const attr: HTMLAttribute = {
     name: 'class',
@@ -267,20 +267,20 @@ function testHTMLAttributeType() {
   return [attr, attrMinimal, attrCustom];
 }
 
-// Test: Type inference works
+// Type inference
 async function testTypeInference() {
-  // Should infer return type as Promise<string>
+  // Should infer return type as `Promise<string>`
   const result = await minify('<div>test</div>', {
     collapseWhitespace: true,
   });
 
-  // result should be inferred as string
+  // Result should be inferred as string
   const length: number = result.length;
 
   return result;
 }
 
-// Test: Complex real-world usage
+// Complex real-world usage
 async function testRealWorldUsage() {
   const html = `
     <!DOCTYPE html>
@@ -322,7 +322,7 @@ async function testRealWorldUsage() {
   return result;
 }
 
-// Export to avoid "unused" warnings
+// Export to avoid “unused” warnings
 export {
   testBasicMinify,
   testBooleanOptions,

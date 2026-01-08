@@ -133,7 +133,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "invalid"`/);
   });
 
-  test('Should reject max-line-length with trailing characters', () => {
+  test('Should reject `max-line-length` with trailing characters', () => {
     const cliArguments = [
       'default.html',
       '--max-line-length=12abc'
@@ -142,7 +142,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "12abc"`/);
   });
 
-  test('Should reject max-input-length with trailing characters', () => {
+  test('Should reject `max-input-length` with trailing characters', () => {
     const cliArguments = [
       'default.html',
       '--max-input-length=99KB'
@@ -151,7 +151,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "99KB"`/);
   });
 
-  test('Should reject custom-fragment-quantifier-limit with trailing characters', () => {
+  test('Should reject `custom-fragment-quantifier-limit` with trailing characters', () => {
     const cliArguments = [
       'default.html',
       '--custom-fragment-quantifier-limit=100x'
@@ -160,7 +160,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "100x"`/);
   });
 
-  test('Should reject negative max-line-length', () => {
+  test('Should reject negative `max-line-length`', () => {
     const cliArguments = [
       'default.html',
       '--max-line-length=-50'
@@ -169,7 +169,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "-50"`/);
   });
 
-  test('Should reject negative max-input-length', () => {
+  test('Should reject negative `max-input-length`', () => {
     const cliArguments = [
       'default.html',
       '--max-input-length=-100'
@@ -259,7 +259,7 @@ describe('CLI', () => {
   });
 
   // Parsing array inputs
-  test('Should handle inline-custom-elements correctly', async () => {
+  test('Should handle `inline-custom-elements` correctly', async () => {
     const input = await readFixture('fragment-inline-custom-elements.html');
 
     const minifyOptions = {
@@ -612,7 +612,7 @@ describe('CLI', () => {
     assert.strictEqual(stdout.toString().trim(), '');
   });
 
-  test('Should handle STDIN to file with -o flag in dry run', () => {
+  test('Should handle STDIN to file with `-o` flag in dry run', () => {
     const input = '<p>  test  </p>';
     const { stdout, stderr, status } = spawnSync('node', [cliPath, '-o', 'tmp/stdin-output.html', '--dry', '--collapse-whitespace'], {
       cwd: fixturesDir,
@@ -653,7 +653,7 @@ describe('CLI', () => {
   });
 
   // -o flag combination tests
-  test('Should handle file to file with -o flag in dry run', () => {
+  test('Should handle file to file with `-o` flag in dry run', () => {
     const result = execCliWithStderr([
       'default.html',
       '-o', 'tmp/output-flag.html',
@@ -671,7 +671,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/output-flag.html'), false);
   });
 
-  test('Should handle file to file with -o flag without dry run', async () => {
+  test('Should handle file to file with `-o` flag without dry run', async () => {
     // Ensure tmp directory exists
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
 
@@ -689,7 +689,7 @@ describe('CLI', () => {
     assert.ok(output.includes('<!DOCTYPE html>'));
   });
 
-  test('Should handle file to STDOUT without -o flag', () => {
+  test('Should handle file to STDOUT without `-o` flag', () => {
     const result = execCli([
       'default.html',
       '--collapse-whitespace'
@@ -826,7 +826,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/verbose-stdin.html'), true);
   });
 
-  test('Should automatically enable verbose mode with --dry flag', () => {
+  test('Should automatically enable verbose mode with `--dry` flag', () => {
     const result = execCliWithStderr([
       'default.html',
       '--dry',
@@ -843,7 +843,7 @@ describe('CLI', () => {
     assert.strictEqual(result.exitCode, 0);
   });
 
-  test('Should work correctly with both --dry and --verbose flags', () => {
+  test('Should work correctly with both `--dry` and `--verbose` flags', () => {
     const result = execCliWithStderr([
       'default.html',
       '--dry',
@@ -862,7 +862,7 @@ describe('CLI', () => {
     assert.strictEqual(result.stdout, '');
   });
 
-  test('Should not show verbose output without --verbose flag', () => {
+  test('Should not show verbose output without `--verbose` flag', () => {
     const result = execCliWithStderr([
       'default.html',
       '--collapse-whitespace',
@@ -881,7 +881,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/non-verbose.html'), true);
   });
 
-  test('Should display version with --version flag', () => {
+  test('Should display version with `--version` flag', () => {
     const result = execCliWithStderr(['--version']);
 
     assert.strictEqual(result.exitCode, 0);
@@ -908,7 +908,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('Should not show progress indicator with --verbose flag', async () => {
+  test('Should not show progress indicator with `--verbose` flag', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
@@ -931,7 +931,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('Should not show progress indicator with --dry flag', async () => {
+  test('Should not show progress indicator with `--dry` flag', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
@@ -1020,7 +1020,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('Should use conservative preset', () => {
+  test('Should use “conservative” preset', () => {
     const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p>  Hello  </p>  </body></html>';
     const { stdout, stderr, status } = spawnSync('node', [cliPath, '--preset', 'conservative', '--verbose'], {
       cwd: fixturesDir,
@@ -1036,7 +1036,7 @@ describe('CLI', () => {
     assert.ok(!output.includes('  '));
   });
 
-  test('Should use comprehensive preset', () => {
+  test('Should use “comprehensive” preset', () => {
     const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p class="z a">  Hello  </p>  </body></html>';
     const { stdout, stderr, status } = spawnSync('node', [cliPath, '--preset', 'comprehensive', '--verbose'], {
       cwd: fixturesDir,
@@ -1211,7 +1211,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('Should support ignoreDir from config file as string', async () => {
+  test('Should support `ignoreDir` from config file as string', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
@@ -1235,7 +1235,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('Should support ignoreDir from config file as array', async () => {
+  test('Should support `ignoreDir` from config file as array', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
@@ -1262,7 +1262,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('Should allow CLI ignore-dir to override config file', async () => {
+  test('Should allow CLI `ignore-dir` to override config file', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
@@ -1271,7 +1271,7 @@ describe('CLI', () => {
 
     const configContent = JSON.stringify({
       collapseWhitespace: true,
-      ignoreDir: 'libs'  // Config says ignore libs
+      ignoreDir: 'libs' // Config says ignore libs
     }, null, 2);
     fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test-config-ignore-override.json'), configContent);
 
@@ -1279,7 +1279,7 @@ describe('CLI', () => {
       '--config-file=./tmp/test-config-ignore-override.json',
       '--input-dir=tmp',
       '--output-dir=tmp-out',
-      '--ignore-dir=vendor'  // CLI overrides to ignore vendor instead
+      '--ignore-dir=vendor' // CLI overrides to ignore vendor instead
     ]);
 
     assert.strictEqual(result.exitCode, 0);
@@ -1292,7 +1292,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('Should handle ignore-dir with spaces in comma-separated list', async () => {
+  test('Should handle `ignore-dir` with spaces in comma-separated list', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
@@ -1314,7 +1314,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('Should handle ignore-dir with trailing slashes', async () => {
+  test('Should handle `ignore-dir` with trailing slashes', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');

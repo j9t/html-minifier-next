@@ -191,7 +191,7 @@ describe('CSS and JS', () => {
     assert.ok(result.length < input.length, 'Output should be shorter');
   });
 
-  test('minifyCSS: Inline style attribute', async () => {
+  test('minifyCSS: Inline `style` attribute', async () => {
     const input = '<div style="  color: red;  margin: 10px;  "></div>';
     const output = '<div style="color:red;margin:10px"></div>';
 
@@ -206,7 +206,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('Important license'), 'Important comment should be preserved');
   });
 
-  test('minifyCSS: Combined with collapseWhitespace', async () => {
+  test('minifyCSS: Combined with `collapseWhitespace`', async () => {
     const input = `
       <style>
         body {
@@ -241,8 +241,8 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
   });
 
-  test('minifyJS: Mangle disabled (mangle: false)', async () => {
-    // Note: Even with mangle:false, Terser still applies compress optimizations by default
+  test('minifyJS: Mangle disabled (`mangle: false`)', async () => {
+    // Note: Even with `mangle: false`, Terser still applies compress optimizations by default
     // To truly preserve variable names, need to disable both mangle and compress
     const input = '<script>function myFunction(myParam) { var myVariable = myParam + 1; return myVariable; }</script>';
     const result = await minify(input, { minifyJS: { mangle: false } });
@@ -253,18 +253,18 @@ describe('CSS and JS', () => {
     // Note: myVariable may still be optimized away if compress is enabled
   });
 
-  test('minifyJS: Top-level mangling (mangle: { toplevel: true })', async () => {
+  test('minifyJS: Top-level mangling (`mangle: { toplevel: true }`)', async () => {
     const input = '<script>function myFunction() { var myVariable = 123; return myVariable; }</script>';
     const result = await minify(input, { minifyJS: { mangle: { toplevel: true } } });
 
-    // With toplevel mangling, function name should be mangled (shortened)
+    // With top-level mangling, function name should be mangled (shortened)
     assert.ok(result.includes('<script>'));
     assert.ok(result.includes('</script>'));
     assert.ok(!result.includes('myFunction'), 'Function name should be mangled');
     assert.ok(result.length < input.length, 'Output should be shorter than input');
   });
 
-  test('minifyJS: Reserved names (mangle: { reserved: ["myFunction"] })', async () => {
+  test('minifyJS: Reserved names (`mangle: { reserved: ["myFunction"] }`)', async () => {
     const input = '<script>function myFunction() { var myVariable = 123; return myVariable; }</script>';
     const result = await minify(input, {
       minifyJS: {
@@ -280,7 +280,7 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('myVariable'), 'Variable name should be mangled');
   });
 
-  test('minifyJS: Drop console statements (compress: { drop_console: true })', async () => {
+  test('minifyJS: Drop console statements (`compress: { drop_console: true }`)', async () => {
     const input = '<script>console.log("debug"); alert("keep this");</script>';
     const output = '<script>alert("keep this")</script>';
 
@@ -359,7 +359,7 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('var x'), 'Variable should be optimized away');
   });
 
-  test('minifyJS: Hybrid behavior—inline handlers always use Terser', async () => {
+  test('minifyJS: Hybrid behavior with Terser processing inline handlers', async () => {
     const input = '<button onclick="return false;">Click</button>';
 
     // Even with SWC engine, inline handlers should use Terser
