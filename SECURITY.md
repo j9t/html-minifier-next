@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-The latest version of HTML Minifier Next is supported. It’s advised to update older versions to the respective current version.
+Only the latest and therefore current version of HTML Minifier Next is supported. It’s advised to update older versions to the latest version.
 
 ## Reporting a Vulnerability
 
