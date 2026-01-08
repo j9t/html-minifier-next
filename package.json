@@ -52,6 +52,7 @@
     "html",
     "htmlmin",
     "javascript",
+    "js",
     "min",
     "minification",
     "minifier",
@@ -60,8 +61,8 @@
     "optimizer",
     "pack",
     "packer",
-    "parse",
-    "parser",
+    "svg",
+    "swc",
     "terser",
     "uglifier",
     "uglify"
