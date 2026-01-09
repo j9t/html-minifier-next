@@ -133,7 +133,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
-| `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | More aggressively collapse whitespace between inline elements—use with `collapseWhitespace: true` | `false` |
+| `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Collapse whitespace more aggressively between inline elements—use with `collapseWhitespace: true` | `false` |
 | `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace) | `false` |
 | `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with `collapseWhitespace: true` | `false` |
 | `continueOnMinifyError`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |

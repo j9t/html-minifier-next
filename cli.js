@@ -124,7 +124,7 @@ const mainOptions = {
   caseSensitive: 'Treat attributes in case-sensitive manner (useful for custom HTML elements)',
   collapseAttributeWhitespace: 'Trim and collapse whitespace characters within attribute values',
   collapseBooleanAttributes: 'Omit attribute values from boolean attributes',
-  collapseInlineTagWhitespace: 'More aggressively collapse whitespace between inline elements—use with `--collapse-whitespace`',
+  collapseInlineTagWhitespace: 'Collapse whitespace more aggressively between inline elements—use with `--collapse-whitespace`',
   collapseWhitespace: 'Collapse whitespace that contributes to text nodes in a document tree',
   conservativeCollapse: 'Always collapse to one space (never remove it entirely)—use with `--collapse-whitespace`',
   continueOnMinifyError: 'Abort on minification errors',
