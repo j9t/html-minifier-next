@@ -1,5 +1,4 @@
 {
-  "type": "module",
   "dependencies": {
     "@minify-html/node": "^0.18.1",
     "@swc/core": "^1.15.8",
@@ -17,5 +16,6 @@
   "scripts": {
     "backtest": "node backtest.js",
     "benchmarks": "node benchmark.js"
-  }
+  },
+  "type": "module"
 }

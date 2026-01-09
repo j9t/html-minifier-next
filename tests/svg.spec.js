@@ -23,7 +23,7 @@ describe('SVG', () => {
     );
   });
 
-  test('whitespace in numeric attributes', async () => {
+  test('Whitespace in numeric attributes', async () => {
     // `transform` attribute with excess whitespace
     assert.strictEqual(
       await minify('<svg><rect transform="translate( 10 , 20 ) scale( 2 )"/></svg>', { minifySVG: true, collapseWhitespace: true }),
@@ -346,23 +346,23 @@ describe('SVG', () => {
     const identityTransforms = [
       'translate(0)',
       'translate(0,0)',
-      'translate(0 0)', // space-separated
+      'translate(0 0)', // Space-separated
       'scale(1)',
       'scale(1,1)',
-      'scale(1 1)', // space-separated
+      'scale(1 1)', // Space-separated
       'rotate(0)',
       'skewX(0)',
       'skewY(0)',
       'matrix(1,0,0,1,0,0)',
-      'matrix(1 0 0 1 0 0)', // space-separated
-      'translate( 0 , 0 )', // with whitespace
-      'translate(0.0, 0.00)', // decimal variants
-      'translate(0.0 0.00)', // decimal with spaces
+      'matrix(1 0 0 1 0 0)', // Space-separated
+      'translate( 0 , 0 )', // With whitespace
+      'translate(0.0, 0.00)', // Decimal variants
+      'translate(0.0 0.00)', // Decimal with spaces
       'scale(1.00)',
-      'scale(1.0 1.0)', // decimal with spaces
+      'scale(1.0 1.0)', // Decimal with spaces
       'rotate(0.000)',
       'matrix(1.0,0.0,0.0,1.0,0.0,0.0)',
-      'matrix(1.0 0.0 0.0 1.0 0.0 0.0)' // decimal with spaces
+      'matrix(1.0 0.0 0.0 1.0 0.0 0.0)' // Decimal with spaces
     ];
 
     for (const transform of identityTransforms) {

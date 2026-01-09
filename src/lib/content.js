@@ -10,7 +10,6 @@ import { trimWhitespace } from './whitespace.js';
 
 // Wrap CSS declarations for inline styles and media queries
 // This ensures proper context for CSS minification
-
 function wrapCSS(text, type) {
   switch (type) {
     case 'inline':

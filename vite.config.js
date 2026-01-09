@@ -32,12 +32,12 @@ const config = defineConfig({
     load(id) {
       if (id === '\0virtual:lightningcss-stub') {
         return `export function transform() {
-  throw new Error('Lightning CSS is not available in browser environments. CSS minification is disabled in the demo.');
+  throw new Error('Lightning CSS is not available in browser environments. CSS minification is disabled in web demo.');
 }`;
       }
       if (id === '\0virtual:swc-stub') {
         return `export function minify() {
-  throw new Error('SWC is not available in browser environments. JavaScript minification requires Terser in the demo.');
+  throw new Error('SWC is not available in browser environments. JavaScript minification uses Terser in web demo.');
 }`;
       }
     }

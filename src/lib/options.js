@@ -26,8 +26,8 @@ function shouldMinifyInnerHTML(options) {
 /**
  * @param {Partial<MinifierOptions>} inputOptions - User-provided options
  * @param {Object} deps - Dependencies from htmlminifier.js
- * @param {Function} deps.getLightningCSS - Function to lazily load lightningcss
- * @param {Function} deps.getTerser - Function to lazily load terser
+ * @param {Function} deps.getLightningCSS - Function to lazily load Lightning CSS
+ * @param {Function} deps.getTerser - Function to lazily load Terser
  * @param {Function} deps.getSwc - Function to lazily load @swc/core
  * @param {LRU} deps.cssMinifyCache - CSS minification cache
  * @param {LRU} deps.jsMinifyCache - JS minification cache
@@ -64,7 +64,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
     if (typeof value === 'string') {
       return new RegExp(value.replace(/^\/(.*)\/$/, '$1'));
     }
-    return value; // Already a RegExp or other type
+    return value; // Already a RegExp or another type
   };
 
   const parseRegExpArray = (arr) => {
@@ -201,7 +201,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       // Validate engine
       const supportedEngines = ['terser', 'swc'];
       if (!supportedEngines.includes(engine)) {
-        throw new Error(`Unsupported JS minifier engine: "${engine}". Supported engines: ${supportedEngines.join(', ')}`);
+        throw new Error(`Unsupported JS minifier engine: “${engine}”. Supported engines: ${supportedEngines.join(', ')}`);
       }
 
       // Extract engine-specific options (excluding `engine` field itself)
@@ -308,14 +308,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
         relateUrlOptions = {};
       }
 
-      // Cache RelateURL instance for reuse (expensive to create)
+      // Cache relateurl instance for reuse (expensive to create)
       const relateUrlInstance = new RelateURL(relateUrlOptions.site || '', relateUrlOptions);
 
       // Create instance-specific cache (results depend on site configuration)
       const instanceCache = urlMinifyCache ? new (urlMinifyCache.constructor)(500) : null;
 
       options.minifyURLs = function (text) {
-        // Fast-path: Skip if text doesn't look like a URL that needs processing
+        // Fast-path: Skip if text doesn’t look like a URL that needs processing
         // Only process if contains URL-like characters (`/`, `:`, `#`, `?`) or spaces that need encoding
         if (!/[/:?#\s]/.test(text)) {
           return text;
@@ -347,17 +347,17 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       };
     } else if (key === 'minifySVG') {
       // Process SVG minification options
-      // Unlike minifyCSS/minifyJS, this is a simple options object, not a function
+      // Unlike `minifyCSS`/`minifyJS`, this is a simple options object, not a function
       // The actual minification is applied inline during attribute processing
       options.minifySVG = getSVGMinifierOptions(option);
     } else if (key === 'customAttrCollapse') {
-      // Single RegExp pattern
+      // Single regex pattern
       options[key] = parseRegExp(option);
     } else if (key === 'customAttrSurround') {
       // Nested array of RegExp pairs: `[[openRegExp, closeRegExp], …]`
       options[key] = parseNestedRegExpArray(option);
     } else if (['customAttrAssign', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
-      // Array of RegExp patterns
+      // Array of regex patterns
       options[key] = parseRegExpArray(option);
     } else {
       options[key] = option;

@@ -59,7 +59,7 @@ describe('CLI', () => {
     await removeFixture('tmp');
   });
 
-  test('minify the HTML', async () => {
+  test('Should minify the HTML', async () => {
     const input = await readFixture('default.html');
 
     const minifyOptions = {
@@ -82,7 +82,7 @@ describe('CLI', () => {
     assert.notStrictEqual(cliMinifiedHTML, minifiedHTML);
   });
 
-  test('should throw error if input file not found', () => {
+  test('Should throw error if input file not found', () => {
     const cliArguments = [
       'no-file.html'
     ];
@@ -90,7 +90,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /no such file/);
   });
 
-  test('should throw if output directory not specified', () => {
+  test('Should throw if output directory not specified', () => {
     const cliArguments = [
       '--input-dir=./'
     ];
@@ -98,7 +98,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /You need to specify where to write the output files with the option `--output-dir`/);
   });
 
-  test('should throw if input directory not specified', () => {
+  test('Should throw if input directory not specified', () => {
     const cliArguments = [
       '--output-dir=./'
     ];
@@ -106,7 +106,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `-o`/);
   });
 
-  test('should throw error for invalid max-line-length value', () => {
+  test('Should throw error for invalid max-line-length value', () => {
     const cliArguments = [
       'default.html',
       '--max-line-length=abc'
@@ -115,7 +115,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "abc"`/);
   });
 
-  test('should throw error for invalid max-input-length value', () => {
+  test('Should throw error for invalid max-input-length value', () => {
     const cliArguments = [
       'default.html',
       '--max-input-length=xyz'
@@ -124,7 +124,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "xyz"`/);
   });
 
-  test('should throw error for invalid custom-fragment-quantifier-limit value', () => {
+  test('Should throw error for invalid custom-fragment-quantifier-limit value', () => {
     const cliArguments = [
       'default.html',
       '--custom-fragment-quantifier-limit=invalid'
@@ -133,7 +133,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "invalid"`/);
   });
 
-  test('should reject max-line-length with trailing characters', () => {
+  test('Should reject `max-line-length` with trailing characters', () => {
     const cliArguments = [
       'default.html',
       '--max-line-length=12abc'
@@ -142,7 +142,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "12abc"`/);
   });
 
-  test('should reject max-input-length with trailing characters', () => {
+  test('Should reject `max-input-length` with trailing characters', () => {
     const cliArguments = [
       'default.html',
       '--max-input-length=99KB'
@@ -151,7 +151,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "99KB"`/);
   });
 
-  test('should reject custom-fragment-quantifier-limit with trailing characters', () => {
+  test('Should reject `custom-fragment-quantifier-limit` with trailing characters', () => {
     const cliArguments = [
       'default.html',
       '--custom-fragment-quantifier-limit=100x'
@@ -160,7 +160,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "100x"`/);
   });
 
-  test('should reject negative max-line-length', () => {
+  test('Should reject negative `max-line-length`', () => {
     const cliArguments = [
       'default.html',
       '--max-line-length=-50'
@@ -169,7 +169,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-line-length: "-50"`/);
   });
 
-  test('should reject negative max-input-length', () => {
+  test('Should reject negative `max-input-length`', () => {
     const cliArguments = [
       'default.html',
       '--max-input-length=-100'
@@ -178,7 +178,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "-100"`/);
   });
 
-  test('should throw error for malformed JSON array', () => {
+  test('Should throw error for malformed JSON array', () => {
     const cliArguments = [
       'default.html',
       '--minify-css=[bad, json]'
@@ -187,7 +187,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Could not parse JSON value `\[bad, json\]`/);
   });
 
-  test('should throw error for JSON with leading whitespace', () => {
+  test('Should throw error for JSON with leading whitespace', () => {
     const cliArguments = [
       'default.html',
       '--minify-js=  {bad: json}'
@@ -196,7 +196,7 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Could not parse JSON value ` {2}\{bad: json\}`/);
   });
 
-  test('should write files to output directory', () => {
+  test('Should write files to output directory', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp'
@@ -206,7 +206,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/default.html'), true);
   });
 
-  test('should write files to output nested directory', () => {
+  test('Should write files to output nested directory', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/nested'
@@ -217,7 +217,7 @@ describe('CLI', () => {
   });
 
   // Parsing JSON
-  test('should minify URLs correctly', async () => {
+  test('Should minify URLs correctly', async () => {
     const input = await readFixture('url.html');
 
     const minifyOptions = {
@@ -239,7 +239,7 @@ describe('CLI', () => {
   });
 
   // Parsing string inputs
-  test('should set quote char correctly', async () => {
+  test('Should set quote char correctly', async () => {
     const input = await readFixture('fragment-quote-char.html');
 
     const minifyOptions = {
@@ -259,7 +259,7 @@ describe('CLI', () => {
   });
 
   // Parsing array inputs
-  test('should handle inline-custom-elements correctly', async () => {
+  test('Should handle `inline-custom-elements` correctly', async () => {
     const input = await readFixture('fragment-inline-custom-elements.html');
 
     const minifyOptions = {
@@ -284,7 +284,7 @@ describe('CLI', () => {
     assert.ok(cliMinifiedHTML.includes('<web-component>X</web-component><web-component>Y</web-component>'));
   });
 
-  test('should process files with single extension', () => {
+  test('Should process files with single extension', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/single-ext',
@@ -303,7 +303,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/single-ext/extension.txt'), false);
   });
 
-  test('should process files with multiple extensions', () => {
+  test('Should process files with multiple extensions', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/multi-ext',
@@ -322,7 +322,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/multi-ext/extension.txt'), false);
   });
 
-  test('should process files with mixed-case and dot-prefixed extension tokens', () => {
+  test('Should process files with mixed-case and dot-prefixed extension tokens', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/mixed-case',
@@ -338,7 +338,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/mixed-case/extension.txt'), false);
   });
 
-  test('should process files with comma-separated extensions with spaces', () => {
+  test('Should process files with comma-separated extensions with spaces', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/spaced-ext',
@@ -355,7 +355,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/spaced-ext/extension.txt'), false);
   });
 
-  test('should process all files when no extension specified', () => {
+  test('Should process all files when no extension specified', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/all-files',
@@ -371,7 +371,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/all-files/extension.txt'), true);
   });
 
-  test('should verify minified output for multiple extensions', async () => {
+  test('Should verify minified output for multiple extensions', async () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/verify-output',
@@ -400,7 +400,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/verify-output/extension.php'), false);
   });
 
-  test('should handle empty extension list gracefully', () => {
+  test('Should handle empty extension list gracefully', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/empty-ext',
@@ -417,7 +417,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/empty-ext/extension.txt'), true);
   });
 
-  test('should process files with extensions from config file (string format)', () => {
+  test('Should process files with extensions from config file (string format)', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     const configContent = JSON.stringify({
       fileExt: 'html,htm',
@@ -445,7 +445,7 @@ describe('CLI', () => {
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config.json'));
   });
 
-  test('should process files with extensions from config file (array format)', () => {
+  test('Should process files with extensions from config file (array format)', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     const configContent = JSON.stringify({
       fileExt: ['html'],
@@ -473,7 +473,7 @@ describe('CLI', () => {
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-array.json'));
   });
 
-  test('should override config file extensions with CLI argument', () => {
+  test('Should override config file extensions with CLI argument', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     const configContent = JSON.stringify({
       fileExt: 'html', // Config specifies html
@@ -485,7 +485,7 @@ describe('CLI', () => {
       '--config-file=./tmp/test-config-override.json',
       '--input-dir=./',
       '--output-dir=./tmp/config-override',
-      '--file-ext=htm'  // CLI overrides to htm
+      '--file-ext=htm' // CLI overrides to htm
     ];
 
     execCli(cliArguments);
@@ -502,7 +502,7 @@ describe('CLI', () => {
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-override.json'));
   });
 
-  test('should override config file extensions with empty CLI argument', () => {
+  test('Should override config file extensions with empty CLI argument', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     const configContent = JSON.stringify({
       fileExt: 'html', // Config restricts to HTML only
@@ -514,7 +514,7 @@ describe('CLI', () => {
       '--config-file=./tmp/test-config-empty-override.json',
       '--input-dir=./',
       '--output-dir=./tmp/config-empty-override',
-      '--file-ext='  // Empty CLI argument should override config and process ALL files
+      '--file-ext=' // Empty CLI argument should override config and process ALL files
     ];
 
     execCli(cliArguments);
@@ -530,7 +530,7 @@ describe('CLI', () => {
   });
 
   // Dry run mode tests
-  test('should show statistics in dry run mode for single file', () => {
+  test('Should show statistics in dry run mode for single file', () => {
     const cliArguments = [
       'default.html',
       '--dry',
@@ -539,7 +539,7 @@ describe('CLI', () => {
 
     const result = execCliWithStderr(cliArguments);
 
-    // Should output to stderr
+    // Should output to STDERR
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Would minify:'));
     assert.ok(result.stderr.includes('Original:'));
@@ -547,14 +547,14 @@ describe('CLI', () => {
     assert.ok(result.stderr.includes('Saved:'));
     assert.ok(result.stderr.includes('bytes'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
 
     // Should exit successfully
     assert.strictEqual(result.exitCode, 0);
   });
 
-  test('should show statistics in dry run mode for directory', () => {
+  test('Should show statistics in dry run mode for directory', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/dry-test',
@@ -564,20 +564,20 @@ describe('CLI', () => {
 
     const result = execCliWithStderr(cliArguments);
 
-    // Should output to stderr
+    // Should output to STDERR
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Would process directory:'));
     assert.ok(result.stderr.includes('Total:'));
     assert.ok(result.stderr.includes('bytes'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
 
     // Should exit successfully
     assert.strictEqual(result.exitCode, 0);
   });
 
-  test('should not write files in dry run mode', () => {
+  test('Should not write files in dry run mode', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/dry-no-write',
@@ -593,7 +593,7 @@ describe('CLI', () => {
   });
 
   // STDIN/STDOUT pipe tests
-  test('should handle STDIN to STDOUT pipe in dry run', () => {
+  test('Should handle STDIN to STDOUT pipe in dry run', () => {
     const input = '<p>  test  </p>';
     const { stdout, stderr, status } = spawnSync('node', [cliPath, '--dry', '--collapse-whitespace'], {
       cwd: fixturesDir,
@@ -608,11 +608,11 @@ describe('CLI', () => {
     assert.ok(stderrStr.includes('Original:'));
     assert.ok(stderrStr.includes('Minified:'));
     assert.ok(stderrStr.includes('Saved:'));
-    // Should not output minified HTML to stdout in dry run
+    // Should not output minified HTML to STDOUT in dry run
     assert.strictEqual(stdout.toString().trim(), '');
   });
 
-  test('should handle STDIN to file with -o flag in dry run', () => {
+  test('Should handle STDIN to file with `-o` flag in dry run', () => {
     const input = '<p>  test  </p>';
     const { stdout, stderr, status } = spawnSync('node', [cliPath, '-o', 'tmp/stdin-output.html', '--dry', '--collapse-whitespace'], {
       cwd: fixturesDir,
@@ -631,7 +631,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/stdin-output.html'), false);
   });
 
-  test('should handle STDIN to STDOUT pipe without dry run', () => {
+  test('Should handle STDIN to STDOUT pipe without dry run', () => {
     const input = '<p>  test  </p>';
     const { stdout, status } = spawnSync('node', [cliPath, '--collapse-whitespace'], {
       cwd: fixturesDir,
@@ -642,7 +642,7 @@ describe('CLI', () => {
     assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
   });
 
-  test('should handle EPIPE gracefully when piping to head', () => {
+  test('Should handle EPIPE gracefully when piping to head', () => {
     const command = `node "${cliPath}" --collapse-whitespace < default.html | head -n1`;
     const { status, stderr } = spawnSync('sh', ['-c', command], {
       cwd: fixturesDir
@@ -652,8 +652,8 @@ describe('CLI', () => {
     assert.strictEqual(stderr.toString().trim(), '');
   });
 
-  // -o flag combination tests
-  test('should handle file to file with -o flag in dry run', () => {
+  // `-o` flag combination tests
+  test('Should handle file to file with `-o` flag in dry run', () => {
     const result = execCliWithStderr([
       'default.html',
       '-o', 'tmp/output-flag.html',
@@ -671,7 +671,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/output-flag.html'), false);
   });
 
-  test('should handle file to file with -o flag without dry run', async () => {
+  test('Should handle file to file with `-o` flag without dry run', async () => {
     // Ensure tmp directory exists
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
 
@@ -689,19 +689,19 @@ describe('CLI', () => {
     assert.ok(output.includes('<!DOCTYPE html>'));
   });
 
-  test('should handle file to STDOUT without -o flag', () => {
+  test('Should handle file to STDOUT without `-o` flag', () => {
     const result = execCli([
       'default.html',
       '--collapse-whitespace'
     ]);
 
-    // Should output to stdout
+    // Should output to STDOUT
     assert.ok(result.length > 0);
     assert.ok(result.includes('<!DOCTYPE html>'));
   });
 
   // Error handling tests for dry run
-  test('should show error in dry run for non-existent file', () => {
+  test('Should show error in dry run for non-existent file', () => {
     const result = execCliWithStderr([
       'non-existent.html',
       '--dry',
@@ -713,7 +713,7 @@ describe('CLI', () => {
     assert.ok(result.stderr.includes('Cannot read') || result.stderr.includes('no such file'));
   });
 
-  test('should show error in dry run for invalid directory', () => {
+  test('Should show error in dry run for invalid directory', () => {
     const result = execCliWithStderr([
       '--input-dir=./non-existent-dir',
       '--output-dir=./tmp/output',
@@ -726,7 +726,7 @@ describe('CLI', () => {
     assert.ok(result.stderr.includes('Cannot read') || result.stderr.includes('no such file'));
   });
 
-  test('should handle dry run with config file', () => {
+  test('Should handle dry run with config file', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     const configContent = JSON.stringify({
       collapseWhitespace: true,
@@ -752,7 +752,7 @@ describe('CLI', () => {
   });
 
   // Verbose mode tests
-  test('should show processing info in verbose mode for single file', () => {
+  test('Should show processing info in verbose mode for single file', () => {
     const result = execCliWithStderr([
       'default.html',
       '--verbose',
@@ -760,7 +760,7 @@ describe('CLI', () => {
       '-o', 'tmp/verbose-output.html'
     ]);
 
-    // Should output to stderr
+    // Should output to STDERR
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('collapseWhitespace'));
     assert.ok(result.stderr.includes('✓'));
@@ -768,7 +768,7 @@ describe('CLI', () => {
     assert.ok(result.stderr.includes('→'));
     assert.ok(result.stderr.includes('bytes'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
 
     // Should exit successfully
@@ -778,7 +778,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/verbose-output.html'), true);
   });
 
-  test('should show processing info in verbose mode for directory', () => {
+  test('Should show processing info in verbose mode for directory', () => {
     const result = execCliWithStderr([
       '--input-dir=./',
       '--output-dir=./tmp/verbose-dir',
@@ -786,14 +786,14 @@ describe('CLI', () => {
       '--collapse-whitespace'
     ]);
 
-    // Should output to stderr
+    // Should output to STDERR
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('✓'));
     assert.ok(result.stderr.includes('→'));
     assert.ok(result.stderr.includes('bytes'));
     assert.ok(result.stderr.includes('Total:'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
 
     // Should exit successfully
@@ -803,7 +803,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/verbose-dir/default.html'), true);
   });
 
-  test('should show processing info in verbose mode with STDIN', () => {
+  test('Should show processing info in verbose mode with STDIN', () => {
     const input = '<p>  test  </p>';
     const { stdout, stderr, status } = spawnSync('node', [cliPath, '--verbose', '--collapse-whitespace', '-o', 'tmp/verbose-stdin.html'], {
       cwd: fixturesDir,
@@ -819,14 +819,14 @@ describe('CLI', () => {
     assert.ok(stderrStr.includes('→'));
     assert.ok(stderrStr.includes('bytes'));
 
-    // Should not output to stdout
+    // Should not output to STDOUT
     assert.strictEqual(stdout.toString().trim(), '');
 
     // Should create output file
     assert.strictEqual(existsFixture('tmp/verbose-stdin.html'), true);
   });
 
-  test('should automatically enable verbose mode with --dry flag', () => {
+  test('Should automatically enable verbose mode with `--dry` flag', () => {
     const result = execCliWithStderr([
       'default.html',
       '--dry',
@@ -843,7 +843,7 @@ describe('CLI', () => {
     assert.strictEqual(result.exitCode, 0);
   });
 
-  test('should work correctly with both --dry and --verbose flags', () => {
+  test('Should work correctly with both `--dry` and `--verbose` flags', () => {
     const result = execCliWithStderr([
       'default.html',
       '--dry',
@@ -862,7 +862,7 @@ describe('CLI', () => {
     assert.strictEqual(result.stdout, '');
   });
 
-  test('should not show verbose output without --verbose flag', () => {
+  test('Should not show verbose output without `--verbose` flag', () => {
     const result = execCliWithStderr([
       'default.html',
       '--collapse-whitespace',
@@ -881,7 +881,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/non-verbose.html'), true);
   });
 
-  test('should display version with --version flag', () => {
+  test('Should display version with `--version` flag', () => {
     const result = execCliWithStderr(['--version']);
 
     assert.strictEqual(result.exitCode, 0);
@@ -889,7 +889,7 @@ describe('CLI', () => {
     assert.strictEqual(result.stderr, '');
   });
 
-  test('should not show progress indicator in non-TTY environment', async () => {
+  test('Should not show progress indicator in non-TTY environment', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
@@ -900,7 +900,7 @@ describe('CLI', () => {
       '--collapse-whitespace'
     ]);
 
-    // In non-TTY (CI/piped), no progress should appear in stderr
+    // In non-TTY (CI/piped), no progress should appear in STDERR
     assert.strictEqual(result.exitCode, 0);
     assert.strictEqual(result.stderr, '');
     assert.strictEqual(result.stdout, '');
@@ -908,7 +908,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should not show progress indicator with --verbose flag', async () => {
+  test('Should not show progress indicator with `--verbose` flag', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
@@ -931,7 +931,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should not show progress indicator with --dry flag', async () => {
+  test('Should not show progress indicator with `--dry` flag', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test2.html'), '<html><body><h1>Test</h1></body></html>');
@@ -955,7 +955,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp-out'), false);
   });
 
-  test('should process multiple subdirectories correctly for progress counting', async () => {
+  test('Should process multiple subdirectories correctly for progress counting', async () => {
     // Create nested directory structure
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/sub1/sub2'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/test1.html'), '<html><body><h1>Test 1</h1></body></html>');
@@ -977,12 +977,12 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should skip traversing into output directory when nested in input directory', async () => {
+  test('Should skip traversing into output directory when nested in input directory', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/in/sub'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/in/a.html'), '<html><body>a</body></html>');
     const result = execCliWithStderr([
       '--input-dir=tmp/in',
-      '--output-dir=tmp/in/sub', // nested
+      '--output-dir=tmp/in/sub', // Nested
       '--collapse-whitespace'
     ]);
     assert.strictEqual(result.exitCode, 0);
@@ -993,7 +993,7 @@ describe('CLI', () => {
     assert.ok(output.includes('<html><body>a</body></html>'));
   });
 
-  test('should skip symbolic links', async () => {
+  test('Should skip symbolic links', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/real.html'), '<html><body>x</body></html>');
     // Create symlink pointing to real.html
@@ -1020,7 +1020,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should use conservative preset', () => {
+  test('Should use “conservative” preset', () => {
     const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p>  Hello  </p>  </body></html>';
     const { stdout, stderr, status } = spawnSync('node', [cliPath, '--preset', 'conservative', '--verbose'], {
       cwd: fixturesDir,
@@ -1036,7 +1036,7 @@ describe('CLI', () => {
     assert.ok(!output.includes('  '));
   });
 
-  test('should use comprehensive preset', () => {
+  test('Should use “comprehensive” preset', () => {
     const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p class="z a">  Hello  </p>  </body></html>';
     const { stdout, stderr, status } = spawnSync('node', [cliPath, '--preset', 'comprehensive', '--verbose'], {
       cwd: fixturesDir,
@@ -1052,9 +1052,9 @@ describe('CLI', () => {
     assert.ok(!output.includes('  '));
   });
 
-  test('should override preset options with CLI flags', () => {
+  test('Should override preset options with CLI flags', () => {
     const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p class="">test</p>';
-    // Conservative preset has useShortDoctype, and we add removeEmptyAttributes via CLI
+    // Conservative preset has `useShortDoctype`, and we add `removeEmptyAttributes` via CLI
     const { stdout, status } = spawnSync('node', [cliPath, '--preset', 'conservative', '--remove-empty-attributes'], {
       cwd: fixturesDir,
       input: input
@@ -1063,20 +1063,20 @@ describe('CLI', () => {
     // Both preset and CLI options should be applied
     assert.strictEqual(status, 0);
     const output = stdout.toString();
-    // useShortDoctype from preset
+    // `useShortDoctype` from preset
     assert.ok(output.includes('<!doctype html>'));
-    // removeEmptyAttributes from CLI (empty class should be removed)
+    // `removeEmptyAttributes` from CLI (empty class should be removed)
     assert.ok(!output.includes('class=""'));
   });
 
-  test('should fail with unknown preset', () => {
+  test('Should fail with unknown preset', () => {
     assert.throws(
       () => execCli(['--preset', 'unknown', 'default.html']),
       /Unknown preset "unknown"/
     );
   });
 
-  test('should use preset from config file', async () => {
+  test('Should use preset from config file', async () => {
     const configPath = path.resolve(fixturesDir, 'tmp-preset-config.json');
     await fs.promises.writeFile(configPath, JSON.stringify({ preset: 'conservative' }));
 
@@ -1093,15 +1093,15 @@ describe('CLI', () => {
     await fs.promises.rm(configPath, { force: true });
   });
 
-  test('should override config file options with CLI flags when using preset', async () => {
+  test('Should override config file options with CLI flags when using preset', async () => {
     const configPath = path.resolve(fixturesDir, 'tmp-preset-config2.json');
     await fs.promises.writeFile(configPath, JSON.stringify({
       preset: 'conservative',
-      useShortDoctype: false  // Override preset's useShortDoctype
+      useShortDoctype: false // Override preset’s `useShortDoctype`
     }));
 
     const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p>test</p>';
-    // Config says useShortDoctype: false, but CLI should override to true
+    // Config says `useShortDoctype: false`, but CLI should override to true
     const { stdout, status } = spawnSync('node', [cliPath, '-c', configPath, '--use-short-doctype'], {
       cwd: fixturesDir,
       input: input
@@ -1114,7 +1114,7 @@ describe('CLI', () => {
     await fs.promises.rm(configPath, { force: true });
   });
 
-  test('should prioritize CLI preset over config preset', async () => {
+  test('Should prioritize CLI preset over config preset', async () => {
     const configPath = path.resolve(fixturesDir, 'tmp-preset-config3.json');
     await fs.promises.writeFile(configPath, JSON.stringify({ preset: 'conservative' }));
 
@@ -1131,7 +1131,7 @@ describe('CLI', () => {
     await fs.promises.rm(configPath, { force: true });
   });
 
-  test('should ignore single directory by name', async () => {
+  test('Should ignore single directory by name', async () => {
     // Create test structure: tmp/a.html, tmp/libs/b.html, tmp/sub/c.html
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs/sub'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/sub'), { recursive: true });
@@ -1158,7 +1158,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should ignore multiple directories', async () => {
+  test('Should ignore multiple directories', async () => {
     // Create test structure
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
@@ -1186,7 +1186,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should ignore directories by relative path', async () => {
+  test('Should ignore directories by relative path', async () => {
     // Create test structure
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/static/libs'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
@@ -1211,7 +1211,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should support ignoreDir from config file as string', async () => {
+  test('Should support `ignoreDir` from config file as string', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');
@@ -1235,7 +1235,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should support ignoreDir from config file as array', async () => {
+  test('Should support `ignoreDir` from config file as array', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
@@ -1262,7 +1262,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should allow CLI ignore-dir to override config file', async () => {
+  test('Should allow CLI `ignore-dir` to override config file', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
@@ -1271,7 +1271,7 @@ describe('CLI', () => {
 
     const configContent = JSON.stringify({
       collapseWhitespace: true,
-      ignoreDir: 'libs'  // Config says ignore libs
+      ignoreDir: 'libs' // Config says ignore libs
     }, null, 2);
     fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test-config-ignore-override.json'), configContent);
 
@@ -1279,20 +1279,20 @@ describe('CLI', () => {
       '--config-file=./tmp/test-config-ignore-override.json',
       '--input-dir=tmp',
       '--output-dir=tmp-out',
-      '--ignore-dir=vendor'  // CLI overrides to ignore vendor instead
+      '--ignore-dir=vendor' // CLI overrides to ignore vendor instead
     ]);
 
     assert.strictEqual(result.exitCode, 0);
     assert.strictEqual(existsFixture('tmp-out/a.html'), true);
-    // libs should be processed (not ignored) due to CLI override
+    // “libs” should be processed (not ignored) due to CLI override
     assert.strictEqual(existsFixture('tmp-out/libs/b.html'), true);
-    // vendor should be ignored
+    // “vendor” should be ignored
     assert.strictEqual(existsFixture('tmp-out/vendor/c.html'), false);
 
     await removeFixture('tmp-out');
   });
 
-  test('should handle ignore-dir with spaces in comma-separated list', async () => {
+  test('Should handle `ignore-dir` with spaces in comma-separated list', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/vendor'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
@@ -1314,7 +1314,7 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  test('should handle ignore-dir with trailing slashes', async () => {
+  test('Should handle `ignore-dir` with trailing slashes', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/libs'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/a.html'), '<html><body>a</body></html>');
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/libs/b.html'), '<html><body>b</body></html>');

@@ -12,15 +12,15 @@ import {
   RE_ESCAPE_LT,
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
-  specialContentTags,
-  htmlTags,
+  specialContentElements,
+  htmlElements,
   optionalStartTags,
   optionalEndTags,
-  topLevelTags,
-  compactTags,
-  looseTags,
-  trailingTags,
-  pInlineTags
+  topLevelElements,
+  compactElements,
+  looseElements,
+  trailingElements,
+  pInlineElements
 } from './lib/constants.js';
 
 import {
@@ -28,15 +28,15 @@ import {
   collapseWhitespaceAll,
   collapseWhitespace,
   collapseWhitespaceSmart,
-  canCollapseWhitespace,
-  canTrimWhitespace
+  canCollapseWhitespace as defaultCanCollapseWhitespace,
+  canTrimWhitespace as defaultCanTrimWhitespace
 } from './lib/whitespace.js';
 
 import {
   isConditionalComment,
   isIgnoredComment,
   isExecutableScript,
-  isStyleSheet,
+  isStyleElement,
   normalizeAttr,
   buildAttr
 } from './lib/attributes.js';
@@ -517,7 +517,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
 
   // Pre-compile regex patterns for reuse (performance optimization)
-  // These must be declared before scan() since scan uses them
+  // These must be declared before `scan()` since scan uses them
   const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
   const whitespaceSplitPatternSort = /[ \n\f\r]+/;
 
@@ -549,9 +549,9 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       chars: async function (text) {
         // Only recursively scan HTML content, not JSON-LD or other non-HTML script types
         // `scan()` is for analyzing HTML attribute order, not for parsing JSON
-        if (options.processScripts && specialContentTags.has(currentTag) &&
-          options.processScripts.indexOf(currentType) > -1 &&
-          currentType === 'text/html') {
+        if (options.processScripts && specialContentElements.has(currentTag) &&
+            options.processScripts.indexOf(currentType) > -1 &&
+            currentType === 'text/html') {
           await scan(text);
         }
       },
@@ -574,7 +574,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   // For the first pass, create a copy of options and disable aggressive minification.
   // Keep attribute transformations (like `removeStyleLinkTypeAttributes`) for accurate analysis.
   // This is safe because `createSortFns` is called before custom fragment UID markers (`uidAttr`) are added.
-  // Note: `htmlmin:ignore` UID markers (uidIgnore) already exist and are expanded for analysis.
+  // Note: `htmlmin:ignore` UID markers (`uidIgnore`) already exist and are expanded for analysis.
   const firstPassOptions = Object.assign({}, options, {
     // Disable sorting for the analysis pass
     sortAttributes: false,
@@ -593,7 +593,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   });
 
   // Temporarily enable `continueOnParseError` for the `scan()` function call below.
-  // Note: `firstPassOptions` already has `continueOnParseError: true` for the minifyHTML call.
+  // Note: `firstPassOptions` already has `continueOnParseError: true` for the `minifyHTML` call.
   const originalContinueOnParseError = options.continueOnParseError;
   options.continueOnParseError = true;
 
@@ -606,7 +606,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     : null;
 
   try {
-    // Expand UID tokens back to original content for frequency analysis
+    // Expand UID tokens back to the original content for frequency analysis
     let expandedValue = value;
     if (uidReplacePattern) {
       expandedValue = value.replace(uidReplacePattern, function (match, index) {
@@ -655,7 +655,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
           attrOrderCache.set(cacheKey, sortedNames);
         }
 
-        // Apply the sorted order to attrs
+        // Apply the sorted order to `attrs`
         const attrMap = Object.create(null);
         names.forEach(function (name, index) {
           (attrMap[name] || (attrMap[name] = [])).push(attrs[index]);
@@ -742,7 +742,7 @@ async function minifyHTML(value, options, partialMarkup) {
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
   const normalizedCustomElements = customElementsArr.map(name => options.name(name));
-  // Fast path: Reuse base Sets if no custom elements
+  // Fast path: Reuse base sets if no custom elements
   const inlineTextSet = normalizedCustomElements.length
     ? new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements])
     : inlineElementsToKeepWhitespaceWithin;
@@ -762,7 +762,7 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there.
-  // For all we care there might be completely-horribly-broken-alien-non-html-emoj-cthulhu-filled content
+  // For all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
   value = value.replace(/<!-- htmlmin:ignore -->([\s\S]*?)<!-- htmlmin:ignore -->/g, function (match, group1) {
     if (!uidIgnore) {
       uidIgnore = uniqueId(value);
@@ -783,7 +783,7 @@ async function minifyHTML(value, options, partialMarkup) {
   // Create sort functions after `htmlmin:ignore` processing but before custom fragment UID markers
   // This allows proper frequency analysis with access to ignored content via UID tokens
   if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
-    (options.sortClassName && typeof options.sortClassName !== 'function')) {
+      (options.sortClassName && typeof options.sortClassName !== 'function')) {
     await createSortFns(value, options, uidIgnore, null, ignoredMarkupChunks);
   }
 
@@ -845,12 +845,12 @@ async function minifyHTML(value, options, partialMarkup) {
     });
   }
 
-  function _canCollapseWhitespace(tag, attrs) {
-    return options.canCollapseWhitespace(tag, attrs, canCollapseWhitespace);
+  function canCollapseWhitespace(tag, attrs) {
+    return options.canCollapseWhitespace(tag, attrs, defaultCanCollapseWhitespace);
   }
 
-  function _canTrimWhitespace(tag, attrs) {
-    return options.canTrimWhitespace(tag, attrs, canTrimWhitespace);
+  function canTrimWhitespace(tag, attrs) {
+    return options.canTrimWhitespace(tag, attrs, defaultCanTrimWhitespace);
   }
 
   function removeStartTag() {
@@ -871,12 +871,12 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // Look for trailing whitespaces, bypass any inline tags
   function trimTrailingWhitespace(index, nextTag) {
-    for (let endTag = null; index >= 0 && _canTrimWhitespace(endTag); index--) {
+    for (let endTag = null; index >= 0 && canTrimWhitespace(endTag); index--) {
       const str = buffer[index];
       const match = str.match(/^<\/([\w:-]+)>$/);
       if (match) {
         endTag = match[1];
-      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, null, nextTag, options, inlineElements, inlineTextSet))) {
+      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, null, nextTag, [], [], options, inlineElements, inlineTextSet))) {
         break;
       }
     }
@@ -925,10 +925,10 @@ async function minifyHTML(value, options, partialMarkup) {
 
       let optional = options.removeOptionalTags;
       if (optional) {
-        const htmlTag = htmlTags.has(tag);
+        const htmlTag = htmlElements.has(tag);
         // `<html>` may be omitted if first thing inside is not a comment
         // `<head>` may be omitted if first thing inside is an element
-        // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, <`style>`, or `<template>`
+        // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
         // `<colgroup>` may be omitted if first thing inside is `<col>`
         // `<tbody>` may be omitted if first thing inside is `<tr>`
         if (htmlTag && canRemoveParentTag(optionalStartTag, tag)) {
@@ -945,16 +945,16 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalEndTag = '';
       }
 
-      // Set whitespace flags for nested tags (e.g., <code> within a <pre>)
+      // Set whitespace flags for nested tags (e.g., `<code>` within a `<pre>`)
       if (options.collapseWhitespace) {
         if (!stackNoTrimWhitespace.length) {
           squashTrailingWhitespace(tag);
         }
         if (!unary) {
-          if (!_canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
+          if (!canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
             stackNoTrimWhitespace.push(tag);
           }
-          if (!_canCollapseWhitespace(tag, attrs) || stackNoCollapseWhitespace.length) {
+          if (!canCollapseWhitespace(tag, attrs) || stackNoCollapseWhitespace.length) {
             stackNoCollapseWhitespace.push(tag);
           }
         }
@@ -1010,7 +1010,7 @@ async function minifyHTML(value, options, partialMarkup) {
           squashTrailingWhitespace('/' + tag);
         }
         if (stackNoCollapseWhitespace.length &&
-          tag === stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
+            tag === stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
           stackNoCollapseWhitespace.pop();
         }
       }
@@ -1023,7 +1023,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
       if (options.removeOptionalTags) {
         // `<html>`, `<head>` or `<body>` may be omitted if the element is empty
-        if (isElementEmpty && topLevelTags.has(optionalStartTag)) {
+        if (isElementEmpty && topLevelElements.has(optionalStartTag)) {
           removeStartTag();
         }
         optionalStartTag = '';
@@ -1031,7 +1031,7 @@ async function minifyHTML(value, options, partialMarkup) {
         // `</head>` may be omitted if not followed by space or comment
         // `</p>` may be omitted if no more content in non-`</a>` parent
         // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
-        if (tag && optionalEndTag && !trailingTags.has(optionalEndTag) && (optionalEndTag !== 'p' || !pInlineTags.has(tag))) {
+        if (tag && optionalEndTag && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || !pInlineElements.has(tag))) {
           removeEndTag();
         }
         optionalEndTag = optionalEndTags.has(tag) ? tag : '';
@@ -1078,10 +1078,12 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
     },
-    chars: async function (text, prevTag, nextTag) {
+    chars: async function (text, prevTag, nextTag, prevAttrs, nextAttrs) {
       prevTag = prevTag === '' ? 'comment' : prevTag;
       nextTag = nextTag === '' ? 'comment' : nextTag;
-      if (options.decodeEntities && text && !specialContentTags.has(currentTag)) {
+      prevAttrs = prevAttrs || [];
+      nextAttrs = nextAttrs || [];
+      if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         if (text.indexOf('&') !== -1) {
           text = decodeHTML(text);
         }
@@ -1117,7 +1119,7 @@ async function minifyHTML(value, options, partialMarkup) {
             }
           }
           if (prevTag || nextTag) {
-            text = collapseWhitespaceSmart(text, prevTag, nextTag, options, inlineElements, inlineTextSet);
+            text = collapseWhitespaceSmart(text, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet);
           } else {
             text = collapseWhitespace(text, options, true, true);
           }
@@ -1129,13 +1131,13 @@ async function minifyHTML(value, options, partialMarkup) {
           text = collapseWhitespace(text, options, false, false, true);
         }
       }
-      if (specialContentTags.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs))) {
+      if (specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs))) {
         text = await processScript(text, options, currentAttrs, minifyHTML);
       }
       if (isExecutableScript(currentTag, currentAttrs)) {
         text = await options.minifyJS(text);
       }
-      if (isStyleSheet(currentTag, currentAttrs)) {
+      if (isStyleElement(currentTag, currentAttrs)) {
         text = await options.minifyCSS(text);
       }
       if (options.removeOptionalTags && text) {
@@ -1147,7 +1149,7 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalStartTag = '';
         // `</html>` or `</body>` may be omitted if not followed by comment
         // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
-        if (compactTags.has(optionalEndTag) || (looseTags.has(optionalEndTag) && !/^\s/.test(text))) {
+        if (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(text))) {
           removeEndTag();
         }
         // Don’t reset optionalEndTag if text is only whitespace and will be collapsed (not conservatively)
@@ -1156,11 +1158,11 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
       charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
-      if (options.decodeEntities && text && !specialContentTags.has(currentTag)) {
+      if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         // Escape any `&` symbols that start either:
-        // 1) a legacy named character reference (i.e., one that doesn’t end with `;`)
+        // 1) a legacy-named character reference (i.e., one that doesn’t end with `;`)
         // 2) or any other character reference (i.e., one that does end with `;`)
-        // Note that `&` can be escaped as `&amp`, without the semi-colon.
+        // Note that `&` can be escaped as `&amp`, without the semicolon.
         // https://mathiasbynens.be/notes/ambiguous-ampersands
         if (text.indexOf('&') !== -1) {
           text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
@@ -1225,7 +1227,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
                   // Only collapse whitespace if both blocks contain HTML (start with `<`)
                   // Don’t collapse if either contains plain text, as that would change meaning
-                  // Note: This check will match HTML comments (`<!-- … -->`), but the tag-name
+                  // Note: This check will match HTML comments (`<!-- … -->`), but the tag name
                   // regex below requires starting with a letter, so comments are intentionally
                   // excluded by the `currentTagMatch && prevTagMatch` guard
                   if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
@@ -1286,11 +1288,11 @@ async function minifyHTML(value, options, partialMarkup) {
   if (options.removeOptionalTags) {
     // `<html>` may be omitted if first thing inside is not a comment
     // `<head>` or `<body>` may be omitted if empty
-    if (topLevelTags.has(optionalStartTag)) {
+    if (topLevelElements.has(optionalStartTag)) {
       removeStartTag();
     }
     // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
-    if (optionalEndTag && !trailingTags.has(optionalEndTag)) {
+    if (optionalEndTag && !trailingElements.has(optionalEndTag)) {
       removeEndTag();
     }
   }

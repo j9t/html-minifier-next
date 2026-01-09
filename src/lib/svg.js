@@ -1,6 +1,5 @@
 /**
  * Lightweight SVG optimizations:
- *
  * - Numeric precision reduction for coordinates and path data
  * - Whitespace removal in attribute values (numeric sequences)
  * - Default attribute removal (safe, well-documented defaults)
@@ -8,6 +7,8 @@
  * - Identity transform removal
  * - Path data space optimization
  */
+
+// Imports
 
 import { LRU } from './utils.js';
 import { RE_NUMERIC_VALUE } from './constants.js';
@@ -96,7 +97,7 @@ function minifyNumber(num, precision = 3) {
   if (num === '1.0' || num === '1.00' || num === '1.000') return '1';
 
   // Check cache
-  // (Note: uses input string as key, so “0.0000” and “0.00000” create separate entries.
+  // (Note: Uses input string as key, so “0.0000” and “0.00000” create separate entries.
   // This is intentional to avoid parsing overhead.
   // Real-world SVG files from export tools typically use consistent formats.)
   const cacheKey = `${num}:${precision}`;
@@ -135,15 +136,15 @@ function minifyPathData(pathData, precision = 3) {
 
   // Remove unnecessary spaces around path commands
   // Safe to remove space after a command letter when it’s followed by a number (which may be negative)
-  // M 10 20 → M10 20, L -5 -3 → L-5-3
+  // `M 10 20` → `M10 20`, `L -5 -3` → `L-5-3`
   result = result.replace(/([MLHVCSQTAZmlhvcsqtaz])\s+(?=-?\d)/g, '$1');
 
   // Safe to remove space before command letter when preceded by a number
-  // 0 L → 0L, 20 M → 20M
+  // `0 L` → `0L`, `20 M` → `20M`
   result = result.replace(/(\d)\s+([MLHVCSQTAZmlhvcsqtaz])/g, '$1$2');
 
   // Safe to remove space before negative number when preceded by a number
-  // 10 -20 → 10-20 (numbers are separated by the minus sign)
+  // `10 -20` → `10-20` (numbers are separated by the minus sign)
   result = result.replace(/(\d)\s+(-\d)/g, '$1$2');
 
   return result;
@@ -152,9 +153,9 @@ function minifyPathData(pathData, precision = 3) {
 /**
  * Minify whitespace in numeric attribute values
  * Examples:
- *   "10 , 20" → "10,20"
- *   "translate( 10 20 )" → "translate(10 20)"
- *   "100, 10  40,  198" → "100,10 40,198"
+ * - “10 , 20" → "10,20"
+ * - "translate( 10 20 )" → "translate(10 20)"
+ * - "100, 10  40,  198" → "100,10 40,198"
  *
  * @param {string} value - Attribute value to minify
  * @returns {string} Minified value
@@ -187,8 +188,7 @@ function minifyColor(color) {
 
   // Don’t process values that aren’t simple colors (preserve case-sensitive references)
   // `url(#id)`, `var(--name)`, `inherit`, `currentColor`, etc.
-  if (trimmed.includes('url(') || trimmed.includes('var(') ||
-      trimmed === 'inherit' || trimmed === 'currentColor') {
+  if (trimmed.includes('url(') || trimmed.includes('var(') || trimmed === 'inherit' || trimmed === 'currentColor') {
     return trimmed;
   }
 
@@ -196,7 +196,7 @@ function minifyColor(color) {
   const lower = trimmed.toLowerCase();
 
   // Shorten 6-digit hex to 3-digit when possible
-  // #aabbcc → #abc, #000000 → #000
+  // `#aabbcc` → `#abc`, `#000000` → `#000`
   const hexMatch = lower.match(/^#([0-9a-f]{6})$/);
   if (hexMatch) {
     const hex = hexMatch[1];
@@ -216,7 +216,7 @@ function minifyColor(color) {
     return NAMED_COLORS[lower] || lower;
   }
 
-  // Convert rgb(255,255,255) to hex
+  // Convert rgb() to hex
   const rgbMatch = lower.match(/^rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
   if (rgbMatch) {
     const r = parseInt(rgbMatch[1], 10);
@@ -247,14 +247,14 @@ function minifyColor(color) {
 const NUMERIC_ATTRS = new Set([
   'd', // Path data
   'points', // Polygon/polyline points
-  'viewBox', // viewBox coordinates
+  'viewBox', // `viewBox` coordinates
   'transform', // Transform functions
   'x', 'y', 'x1', 'y1', 'x2', 'y2', // Coordinates
   'cx', 'cy', 'r', 'rx', 'ry', // Circle/ellipse
   'width', 'height', // Dimensions
   'dx', 'dy', // Text offsets
   'offset', // Gradient offset
-  'startOffset', // textPath
+  'startOffset', // `textPath`
   'pathLength', // Path length
   'stdDeviation', // Filter params
   'baseFrequency', // Turbulence

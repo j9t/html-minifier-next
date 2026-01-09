@@ -15,7 +15,7 @@ import {
   keepScriptsMimetypes,
   isSimpleBoolean,
   isBooleanValue,
-  srcsetTags,
+  srcsetElements,
   reEmptyAttribute
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
@@ -75,8 +75,7 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   const tagHasDefaults = tag in tagDefaults;
 
   // Check for legacy attribute rules (element- and attribute-specific)
-  const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) ||
-                       (tag === 'a' && attrName === 'name');
+  const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) || (tag === 'a' && attrName === 'name');
 
   // If none of these conditions apply, attribute cannot be redundant
   if (!hasGeneralDefault && !tagHasDefaults && !isLegacyAttr) {
@@ -134,7 +133,7 @@ function isStyleLinkTypeAttribute(attrValue = '') {
   return attrValue === '' || attrValue === 'text/css';
 }
 
-function isStyleSheet(tag, attrs) {
+function isStyleElement(tag, attrs) {
   if (tag !== 'style') {
     return false;
   }
@@ -191,11 +190,11 @@ function isLinkType(tag, attrs, value) {
 }
 
 function isMediaQuery(tag, attrs, attrName) {
-  return attrName === 'media' && (isLinkType(tag, attrs, 'stylesheet') || isStyleSheet(tag, attrs));
+  return attrName === 'media' && (isLinkType(tag, attrs, 'stylesheet') || isStyleElement(tag, attrs));
 }
 
 function isSrcset(attrName, tag) {
-  return attrName === 'srcset' && srcsetTags.has(tag);
+  return attrName === 'srcset' && srcsetElements.has(tag);
 }
 
 function isMetaViewport(tag, attrs) {
@@ -203,7 +202,7 @@ function isMetaViewport(tag, attrs) {
     return false;
   }
   for (let i = 0, len = attrs.length; i < len; i++) {
-    if (attrs[i].name === 'name' && attrs[i].value === 'viewport') {
+    if (attrs[i].name.toLowerCase() === 'name' && attrs[i].value.toLowerCase() === 'viewport') {
       return true;
     }
   }
@@ -223,7 +222,7 @@ function isContentSecurityPolicy(tag, attrs) {
 }
 
 function canDeleteEmptyAttribute(tag, attrName, attrValue, options) {
-  const isValueEmpty = !attrValue || /^\s*$/.test(attrValue);
+  const isValueEmpty = !attrValue || attrValue.trim() === '';
   if (!isValueEmpty) {
     return false;
   }
@@ -246,7 +245,7 @@ function hasAttrName(name, attrs) {
 
 async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
   // Apply early whitespace normalization if enabled
-  // Preserves special spaces (non-breaking space, hair space, etc.) for consistency with `collapseWhitespace`
+  // Preserves special spaces (no-break space, hair space, etc.) for consistency with `collapseWhitespace`
   if (options.collapseAttributeWhitespace) {
     // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
     if (RE_ATTR_WS_CHECK.test(attrValue)) {
@@ -302,7 +301,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
       try {
         attrValue = await options.minifyCSS(attrValue, 'inline');
         // After minification, check if CSS consists entirely of invalid properties (no values)
-        // E.g., `color:` or `margin:;padding:` should be treated as empty
+        // I.e., `color:` or `margin:;padding:` should be treated as empty
         if (attrValue && /^(?:[a-z-]+:\s*;?\s*)+$/i.test(attrValue)) {
           attrValue = '';
         }
@@ -422,13 +421,13 @@ async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   }
 
   if ((options.removeRedundantAttributes &&
-      isAttributeRedundant(tag, attrName, attrValue, attrs)) ||
-    (options.removeScriptTypeAttributes && tag === 'script' &&
-      attrName === 'type' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue)) ||
-    (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
-      attrName === 'type' && isStyleLinkTypeAttribute(attrValue)) ||
-    (options.insideSVG && options.minifySVG &&
-      shouldRemoveSVGAttribute(tag, attrName, attrValue, options.minifySVG))) {
+       isAttributeRedundant(tag, attrName, attrValue, attrs)) ||
+      (options.removeScriptTypeAttributes && tag === 'script' &&
+       attrName === 'type' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue)) ||
+      (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
+       attrName === 'type' && isStyleLinkTypeAttribute(attrValue)) ||
+      (options.insideSVG && options.minifySVG &&
+       shouldRemoveSVGAttribute(tag, attrName, attrValue, options.minifySVG))) {
     return;
   }
 
@@ -437,7 +436,7 @@ async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   }
 
   if (options.removeEmptyAttributes &&
-    canDeleteEmptyAttribute(tag, attrName, attrValue, options)) {
+      canDeleteEmptyAttribute(tag, attrName, attrValue, options)) {
     return;
   }
 
@@ -460,19 +459,35 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   let attrFragment;
   let emittedAttrValue;
 
-  if (typeof attrValue !== 'undefined' && (!options.removeAttributeQuotes ||
-    attrValue.indexOf(uidAttr) !== -1 || !canRemoveAttributeQuotes(attrValue))) {
+  // Determine if we need to add/keep quotes
+  const shouldAddQuotes = typeof attrValue !== 'undefined' && (
+    // If `removeAttributeQuotes` is enabled, add quotes only if they can’t be removed
+    (options.removeAttributeQuotes && (attrValue.indexOf(uidAttr) !== -1 || !canRemoveAttributeQuotes(attrValue))) ||
+    // If `removeAttributeQuotes` is not enabled, preserve original quote style or add quotes if value requires them
+    (!options.removeAttributeQuotes && (attrQuote !== '' || !canRemoveAttributeQuotes(attrValue) ||
+      // Special case: With `removeTagWhitespace`, unquoted values that aren’t last will have space added,
+      // which can create ambiguous/invalid HTML—add quotes to be safe
+      (options.removeTagWhitespace && attrQuote === '' && !isLast)))
+  );
+
+  if (shouldAddQuotes) {
     // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
-      // Normal mode: choose quotes and escape
-      attrQuote = chooseAttributeQuote(attrValue, options);
+      // Normal mode: Choose optimal quote type to minimize escaping
+      // unless we’re preserving original quotes and they don’t need escaping
+      const needsEscaping = (attrQuote === '"' && attrValue.indexOf('"') !== -1) || (attrQuote === "'" && attrValue.indexOf("'") !== -1);
+
+      if (options.removeAttributeQuotes || typeof options.quoteCharacter !== 'undefined' || needsEscaping || attrQuote === '') {
+        attrQuote = chooseAttributeQuote(attrValue, options);
+      }
+
       if (attrQuote === '"') {
         attrValue = attrValue.replace(/"/g, '&#34;');
       } else {
         attrValue = attrValue.replace(/'/g, '&#39;');
       }
     } else {
-      // `preventAttributesEscaping` mode: choose safe quotes but don't escape
+      // `preventAttributesEscaping` mode: Choose safe quotes but don't escape
       // except when both quote types are present—then escape to prevent invalid HTML
       const hasDoubleQuote = attrValue.indexOf('"') !== -1;
       const hasSingleQuote = attrValue.indexOf("'") !== -1;
@@ -491,8 +506,18 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
           attrQuote = "'";
         } else if (attrQuote === "'" && hasSingleQuote && !hasDoubleQuote) {
           attrQuote = '"';
-        // Fallback for invalid/unsupported attrQuote values (not `"`, `'`, or empty string): Choose safe default based on value content
-        } else if (attrQuote !== '"' && attrQuote !== "'" && attrQuote !== '') {
+        // If no quote character yet (empty string), choose based on content
+        } else if (attrQuote === '') {
+          if (hasSingleQuote && !hasDoubleQuote) {
+            attrQuote = '"';
+          } else if (hasDoubleQuote && !hasSingleQuote) {
+            attrQuote = "'";
+          } else {
+            attrQuote = '"';
+          }
+        // Fallback for invalid/unsupported attrQuote values (not `"`, `'`, or empty string):
+        // Choose safe default based on value content
+        } else if (attrQuote !== '"' && attrQuote !== "'") {
           if (hasSingleQuote && !hasDoubleQuote) {
             attrQuote = '"';
           } else if (hasDoubleQuote && !hasSingleQuote) {
@@ -502,7 +527,22 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
           }
         }
       } else {
-        attrQuote = options.quoteCharacter === '\'' ? '\'' : '"';
+        // `quoteCharacter` is explicitly set
+        const preferredQuote = options.quoteCharacter === '\'' ? '\'' : '"';
+        // Safety check: If the preferred quote conflicts with value content, switch to the opposite quote
+        if ((preferredQuote === '"' && hasDoubleQuote && !hasSingleQuote) || (preferredQuote === "'" && hasSingleQuote && !hasDoubleQuote)) {
+          attrQuote = preferredQuote === '"' ? "'" : '"';
+        } else if ((preferredQuote === '"' && hasDoubleQuote && hasSingleQuote) || (preferredQuote === "'" && hasSingleQuote && hasDoubleQuote)) {
+          // Both quote types present: Fall back to escaping despite `preventAttributesEscaping`
+          attrQuote = preferredQuote;
+          if (attrQuote === '"') {
+            attrValue = attrValue.replace(/"/g, '&#34;');
+          } else {
+            attrValue = attrValue.replace(/'/g, '&#39;');
+          }
+        } else {
+          attrQuote = preferredQuote;
+        }
       }
     }
     emittedAttrValue = attrQuote + attrValue + attrQuote;
@@ -510,15 +550,17 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       emittedAttrValue += ' ';
     }
   } else if (isLast && !hasUnarySlash) {
-    // Last attribute in a non-self-closing tag: no space needed
+    // Last attribute in a non-self-closing tag:
+    // No space needed
     emittedAttrValue = attrValue;
   } else {
-    // Not last attribute, or is a self-closing tag: add space
+    // Not last attribute, or is a self-closing tag:
+    // Unquoted values must have space after them to delimit from next attribute
     emittedAttrValue = attrValue + ' ';
   }
 
   if (typeof attrValue === 'undefined' || (options.collapseBooleanAttributes &&
-    isBooleanAttribute(attrName.toLowerCase(), (attrValue || '').toLowerCase()))) {
+      isBooleanAttribute(attrName.toLowerCase(), (attrValue || '').toLowerCase()))) {
     attrFragment = attrName;
     if (!isLast) {
       attrFragment += ' ';
@@ -544,7 +586,7 @@ export {
   keepScriptTypeAttribute,
   isExecutableScript,
   isStyleLinkTypeAttribute,
-  isStyleSheet,
+  isStyleElement,
   isBooleanAttribute,
   isUriTypeAttribute,
   isNumberTypeAttribute,

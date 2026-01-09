@@ -4,6 +4,36 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.17.0] - 2026-01-09
+
+### Changed
+
+- Improved whitespace handling around hidden form elements
+  - Smart default behavior now detects `<input type="hidden">` elements and collapses adjacent pure whitespace even in basic `collapseWhitespace` mode (safe optimization)
+  - Infrastructure supports future optimizations for other non-rendering elements (`hidden` attribute, `aria-hidden="true"`, etc.)
+- More JavaScript-related `type` attributes are being removed (`executableScriptsMimetypes`)
+
+### Fixed
+
+- Attribute quote preservation: The minifier now preserves the original quote style of attributes by default instead of always adding quotes
+  - Quotes are added only when necessary (value contains spaces/special characters, or options like `removeTagWhitespace` require them for disambiguation)
+  - The `removeAttributeQuotes` option continues to work as expected, actively removing quotes when safe
+  - This update can change the output, but it’s not considered a breaking change in the sense that a minifier adding code is not considered typical behavior
+- Fixed invalid HTML generation when using `preventAttributesEscaping: true` with `quoteCharacter` option
+  - Previously, if `quoteCharacter` was set to a quote type that existed in the attribute value, the minifier would produce invalid HTML (e.g., `<p data='it's'>` where the apostrophe terminates the attribute early)
+  - Now automatically switches to the opposite quote type when there’s a conflict, ensuring valid HTML output
+
+### Performance
+
+- Eliminated redundant filesystem call when resolving input directory paths (CLI)
+
+### Internal
+
+- Audited, reformatted, and optimized code and documentation
+- Optimized code, copy, and DX of web demo
+- Extended HMN benchmarks config (to reflect all settings if possible, except `customAttrCollapse`, `maxInputLength`, `quoteCharacter`) and re-ran benchmarks
+- Reworked tests
+
 ## [4.16.4] - 2025-12-31
 
 ### Internal
@@ -191,7 +221,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - Implemented parallel file processing with bounded concurrency (up to 8 workers based on CPU count)
 - Added lazy-loading for minifier module to reduce CLI cold-start overhead
-- Optimized URL minification with fast-path guards and cached RelateURL instances
+- Optimized URL minification with fast-path guards and cached relateurl instances
 - Added LRU memoization for class name sorting
 - Consolidated and fine-tuned cache
 
@@ -230,7 +260,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Added WeakMap cache for attribute regex compilation to reduce setup overhead when parsing multiple documents with the same handler
   - Optimized line/column calculation to use single-pass loop instead of string splitting
   - Cached lowercased tag names on the stack to eliminate repeated `.toLowerCase()` calls during tag lookups
-  - Replaced O(n²) algorithms in TokenChain with Map-based O(n) implementations
+  - Replaced O(n²) algorithms in TokenChain with map-based O(n) implementations
   - Eliminated repeated `indexOf` and `splice` operations in token sorting by using position tracking and array rebuilding
 
 ### Internal
@@ -293,7 +323,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Pre-compiled regexes for common special elements (`script`, `style`, `noscript`) in HTML parser to eliminate regex creation overhead during parsing
 - Lazy-load heavy dependencies (Terser, Lightning CSS) only when CSS/JS minification is enabled
 - Optimized attribute quote counting by replacing two regex operations with single-pass character iteration
-- Cached inline element Sets to avoid redundant creation when no custom elements are configured
+- Cached inline element sets to avoid redundant creation when no custom elements are configured
 - Improved attribute processing by replacing O(n²) unshift operations with O(n) push and reverse (faster for elements with many attributes)
 
 ## [4.8.1] - 2025-12-10
@@ -424,7 +454,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Added “Presets” section to README with usage examples and priority explanation
 - Added `--preset` option to CLI options table in README
 - Updated CLI help text to include preset option
-- Fixed case in web version (demo)
+- Fixed case in web demo
 
 ## [4.4.0] - 2025-11-26
 

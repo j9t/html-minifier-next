@@ -13,8 +13,8 @@ const onwarn = (warning, warn) => {
 
   // Ignore circular dependency warnings from Node polyfills and Terser internals
   if (warning.code === 'CIRCULAR_DEPENDENCY' &&
-      (warning.message.includes('polyfill-node') ||
-       warning.message.includes('node_modules/terser'))) {
+     (warning.message.includes('polyfill-node') ||
+      warning.message.includes('node_modules/terser'))) {
     return;
   }
 

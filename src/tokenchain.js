@@ -35,7 +35,7 @@ class Sorter {
 
 class TokenChain {
   constructor() {
-    // Use Map instead of object properties for better performance
+    // Use map instead of object properties for better performance
     this.map = new Map();
   }
 
@@ -52,7 +52,7 @@ class TokenChain {
     const sorter = new Sorter();
     sorter.sorterMap = new Map();
 
-    // Convert Map entries to array and sort by frequency (descending) then alphabetically
+    // Convert map entries to array and sort by frequency (descending), then alphabetically
     const entries = Array.from(this.map.entries()).sort((a, b) => {
       const m = a[1].arrays.length;
       const n = b[1].arrays.length;

@@ -26,7 +26,7 @@ export default [
       }
     },
     rules: {
-      // Minimal rules to match existing code style
+      // Minimal rules to match original code style
       'no-unused-vars': 'error',
       'no-undef': 'error'
     }
