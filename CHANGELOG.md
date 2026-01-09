@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Attribute quote preservation: The minifier now preserves the original quote style of attributes by default instead of always adding quotes
   - Quotes are added only when necessary (value contains spaces/special characters, or options like `removeTagWhitespace` require them for disambiguation)
   - The `removeAttributeQuotes` option continues to work as expected, actively removing quotes when safe
+  - This update can change the output, but it’s not considered a breaking change in the sense that a minifier adding code is not considered typical behavior
 - Fixed invalid HTML generation when using `preventAttributesEscaping: true` with `quoteCharacter` option
   - Previously, if `quoteCharacter` was set to a quote type that existed in the attribute value, the minifier would produce invalid HTML (e.g., `<p data='it's'>` where the apostrophe terminates the attribute early)
   - Now automatically switches to the opposite quote type when there’s a conflict, ensuring valid HTML output
