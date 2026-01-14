@@ -92,7 +92,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       Object.assign(options, preset);
     } else {
       const available = getPresetNames().join(', ');
-      console.warn(`HTML Minifier Next: Unknown preset "${inputOptions.preset}". Available presets: ${available}`);
+      console.warn(`HTML Minifier Next: Unknown preset “${inputOptions.preset}”. Available presets: ${available}`);
     }
   }
 
