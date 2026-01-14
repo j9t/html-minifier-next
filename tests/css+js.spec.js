@@ -610,6 +610,18 @@ describe('CSS and JS', () => {
     input = '<script type="application/json">{\n  "test": "value"\n}</script>';
     const noOptionsResult = await minify(input, {});
     assert.strictEqual(noOptionsResult, '<script type="application/json">{"test":"value"}</script>', 'No options: should still minify JSON automatically');
+
+    // Test preset as option key (should work the same as spreading `getPreset`)
+    input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n  </head>\n</html>';
+    const presetOptionResult = await minify(input, { preset: 'conservative' });
+    const spreadPresetResult = await minify(input, getPreset('conservative'));
+    assert.strictEqual(presetOptionResult, spreadPresetResult, 'Using preset option should produce same result as spreading getPreset()');
+    assert.ok(!presetOptionResult.includes('<!-- Comment -->'), 'Preset option: should apply preset settings');
+
+    // Test preset with overrides (user options should override preset)
+    input = '<!DOCTYPE html>\n<html>\n  <head>\n    <!-- Comment -->\n  </head>\n</html>';
+    const presetWithOverride = await minify(input, { preset: 'conservative', removeComments: false });
+    assert.ok(presetWithOverride.includes('<!-- Comment -->'), 'User option should override preset setting');
   });
 
   test('JSON minification error handling', async () => {
