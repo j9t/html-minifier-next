@@ -622,6 +622,19 @@ describe('CSS and JS', () => {
     input = '<!DOCTYPE html>\n<html>\n  <head>\n    <!-- Comment -->\n  </head>\n</html>';
     const presetWithOverride = await minify(input, { preset: 'conservative', removeComments: false });
     assert.ok(presetWithOverride.includes('<!-- Comment -->'), 'User option should override preset setting');
+
+    // Test unknown preset emits warning
+    const originalWarn = console.warn;
+    let warnMessage = '';
+    console.warn = (msg) => { warnMessage = msg; };
+    try {
+      input = '<p>Test</p>';
+      await minify(input, { preset: 'nonexistent' });
+      assert.ok(warnMessage.includes('Unknown preset “nonexistent”'), 'Should warn about unknown preset');
+      assert.ok(warnMessage.includes('conservative, comprehensive'), 'Should list available presets');
+    } finally {
+      console.warn = originalWarn;
+    }
   });
 
   test('JSON minification error handling', async () => {
