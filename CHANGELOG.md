@@ -4,6 +4,18 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.17.1] - 2026-01-14
+
+### Changed
+
+- Removed aggressive `collapseInlineTagWhitespace` setting from `comprehensive` preset
+
+### Fixed
+
+- Fixed `preset` option in programmatic API
+  - Previously, users had to manually spread preset values using `getPreset()`: `minify(html, { ...getPreset('comprehensive') })`
+  - Now the simpler syntax works as documented: `minify(html, { preset: 'comprehensive' })`
+
 ## [4.17.0] - 2026-01-09
 
 ### Changed
