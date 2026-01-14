@@ -6,6 +6,7 @@ import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 import { getSVGMinifierOptions } from './svg.js';
+import { getPreset, getPresetNames } from '../presets.js';
 
 // Helper functions
 
@@ -84,8 +85,24 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
     });
   };
 
+  // Apply preset first if specified (so user options can override preset values)
+  if (inputOptions.preset) {
+    const preset = getPreset(inputOptions.preset);
+    if (preset) {
+      Object.assign(options, preset);
+    } else {
+      const available = getPresetNames().join(', ');
+      console.warn(`HTML Minifier Next: Unknown preset “${inputOptions.preset}”. Available presets: ${available}`);
+    }
+  }
+
   Object.keys(inputOptions).forEach(function (key) {
     const option = inputOptions[key];
+
+    // Skip preset key—it’s already been processed
+    if (key === 'preset') {
+      return;
+    }
 
     if (key === 'caseSensitive') {
       if (option) {

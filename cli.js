@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * html-minifier-next CLI tool
  *
@@ -324,7 +325,7 @@ program.option('--file-ext <extensions>', 'Specify file extension(s) to process 
     if (presetName) {
       const preset = getPreset(presetName);
       if (!preset) {
-        fatal(`Unknown preset "${presetName}". Available presets: ${getPresetNames().join(', ')}`);
+        fatal(`Unknown preset “${presetName}”. Available presets: ${getPresetNames().join(', ')}`);
       }
       Object.assign(options, preset);
     }

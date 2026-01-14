@@ -24,7 +24,6 @@ export const presets = {
   comprehensive: {
     caseSensitive: true,
     collapseBooleanAttributes: true,
-    collapseInlineTagWhitespace: true,
     collapseWhitespace: true,
     continueOnParseError: true,
     decodeEntities: true,

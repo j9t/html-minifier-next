@@ -1072,7 +1072,7 @@ describe('CLI', () => {
   test('Should fail with unknown preset', () => {
     assert.throws(
       () => execCli(['--preset', 'unknown', 'default.html']),
-      /Unknown preset "unknown"/
+      /Unknown preset “unknown”/
     );
   });
 
