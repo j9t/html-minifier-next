@@ -6,7 +6,7 @@ import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 import { getSVGMinifierOptions } from './svg.js';
-import { getPreset } from '../presets.js';
+import { getPreset, getPresetNames } from '../presets.js';
 
 // Helper functions
 
@@ -90,6 +90,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
     const preset = getPreset(inputOptions.preset);
     if (preset) {
       Object.assign(options, preset);
+    } else {
+      const available = getPresetNames().join(', ');
+      console.warn(`html-minifier-next: Unknown preset "${inputOptions.preset}". Available presets: ${available}`);
     }
   }
 
