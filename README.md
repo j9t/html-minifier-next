@@ -61,7 +61,7 @@ You can use a configuration file to specify options. The file can be either JSON
 
 **JavaScript module configuration example:**
 
-```js
+```javascript
 module.exports = {
   collapseWhitespace: true,
   removeComments: true,
@@ -74,7 +74,7 @@ module.exports = {
 
 ESM with Node.js ≥16.14:
 
-```js
+```javascript
 import { minify } from 'html-minifier-next';
 
 const result = await minify('<p title="example" id="moo">foo</p>', {
@@ -86,7 +86,7 @@ console.log(result); // “<p title=example id=moo>foo”
 
 CommonJS:
 
-```js
+```javascript
 const { minify, getPreset } = require('html-minifier-next');
 
 (async () => {
@@ -188,7 +188,7 @@ When `minifyCSS` is set to `true`, HTML Minifier Next uses [Lightning CSS](https
 
 You can pass Lightning CSS configuration options by providing an object:
 
-```js
+```javascript
 const result = await minify(html, {
   minifyCSS: {
     targets: {
@@ -211,7 +211,7 @@ Available Lightning CSS options when passed as an object:
 
 For advanced usage, you can also pass a function:
 
-```js
+```javascript
 const result = await minify(html, {
   minifyCSS: function(text, type) {
     // `text`: CSS string to minify
@@ -227,7 +227,7 @@ When `minifyJS` is set to `true`, HTML Minifier Next uses [Terser](https://githu
 
 You can choose between different JS minifiers using the `engine` field:
 
-```js
+```javascript
 const result = await minify(html, {
   minifyJS: {
     engine: 'swc', // Use SWC for faster minification
@@ -253,7 +253,7 @@ npm i @swc/core
 
 You can pass engine-specific configuration options:
 
-```js
+```javascript
 // Using Terser with custom options
 const result = await minify(html, {
   minifyJS: {
@@ -273,7 +273,7 @@ const result = await minify(html, {
 
 For advanced usage, you can also pass a function:
 
-```js
+```javascript
 const result = await minify(html, {
   minifyJS: function(text, inline) {
     // `text`: JavaScript string to minify
@@ -287,7 +287,7 @@ const result = await minify(html, {
 
 When `minifySVG` is set to `true`, HTML Minifier Next applies SVG-specific optimizations to SVG elements and their attributes. These optimizations are lightweight, fast, and safe:
 
-```js
+```javascript
 const result = await minify(html, {
   minifySVG: true // Enable with default settings
 });
@@ -313,7 +313,7 @@ What gets optimized:
 
 You can customize the optimization behavior by providing an options object:
 
-```js
+```javascript
 const result = await minify(html, {
   minifySVG: {
     precision: 2,           // Use 2 decimal places instead of 3
