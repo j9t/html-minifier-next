@@ -4,6 +4,15 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.17.2] - 2026-01-19
+
+### Changed
+
+- `collapseWhitespace` now trims single trailing newlines inside `<pre>` and `<textarea>` elements
+  - Removes unintentional newlines often added by template engines before closing tags (e.g., `</code></pre>`)
+  - Multiple consecutive newlines are preserved (likely intentional formatting)
+  - Leading newlines and internal whitespace remain unchanged
+
 ## [4.17.1] - 2026-01-14
 
 ### Changed

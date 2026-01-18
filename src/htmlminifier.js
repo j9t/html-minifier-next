@@ -1088,6 +1088,19 @@ async function minifyHTML(value, options, partialMarkup) {
           text = decodeHTML(text);
         }
       }
+      // Trim outermost newline-based whitespace inside `pre`/`textarea` elements
+      // This removes trailing newlines often added by template engines before closing tags
+      // Only trims single trailing newlines (multiple newlines are likely intentional formatting)
+      if (options.collapseWhitespace && stackNoTrimWhitespace.length) {
+        const topTag = stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1];
+        if (topTag === 'pre' || topTag === 'textarea' || stackNoTrimWhitespace.includes('pre') || stackNoTrimWhitespace.includes('textarea')) {
+          // Trim trailing whitespace only if it ends with a single newline (not multiple)
+          // Multiple newlines are likely intentional formatting, single newline is often a template artifact
+          if (nextTag && nextTag === '/' + topTag && /[^\n\r][\n\r][ \t]*$/.test(text)) {
+            text = text.replace(/[\n\r][ \t]*$/, '');
+          }
+        }
+      }
       if (options.collapseWhitespace) {
         if (!stackNoTrimWhitespace.length) {
           if (prevTag === 'comment') {

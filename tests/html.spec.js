@@ -343,7 +343,8 @@ describe('HTML', () => {
       'bar\n' +
       '</pre>\n' +
       'baz\n';
-    output = '<pre>\nfoo\n<br>\nbar\n</pre>baz';
+    // Only single trailing newline is trimmed; leading newlines and internal whitespace preserved
+    output = '<pre>\nfoo\n<br>\nbar</pre>baz';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
@@ -2328,7 +2329,9 @@ describe('HTML', () => {
 
     input = '<pre>\nfoo\n<? bar ?>\nbaz\n</pre>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    // Single trailing newline is trimmed; leading newlines preserved
+    output = '<pre>\nfoo\n<? bar ?>\nbaz</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
     input = '<script>var value="<?php ?>+<?php ?>0"</script>';
     assert.strictEqual(await minify(input), input);
@@ -5191,5 +5194,72 @@ describe('HTML', () => {
     assert.ok(result.length > 0, 'Should produce non-empty output');
     assert.ok(result.includes('data-rid-relay'), 'Should preserve data-rid-relay attribute');
     assert.ok(result.includes('{"289":"itsct"}'), 'Should preserve JSON data in attribute');
+  });
+
+  test('Trim trailing newline in `pre`/`textarea` with `collapseWhitespace`', async () => {
+    let input, output;
+
+    // Single trailing newline before `</pre>` should be trimmed (template artifact)
+    input = '<pre>foo\n</pre>';
+    output = '<pre>foo</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Single trailing newline before `</code></pre>` should be trimmed
+    input = '<pre><code>foo\n</code></pre>';
+    output = '<pre><code>foo</code></pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Trailing newline with spaces/tabs after should be trimmed
+    input = '<pre>foo\n  </pre>';
+    output = '<pre>foo</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Multiple trailing newlines are preserved (likely intentional)
+    input = '<pre>foo\n\n</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+
+    // Leading newlines are preserved (we only trim trailing single newlines)
+    input = '<pre>\nfoo</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+
+    // Multiple leading newlines are preserved (intentional formatting)
+    input = '<pre>\n\n\ntest</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+
+    // Internal whitespace should be preserved
+    input = '<pre>foo\n  bar\nbaz\n</pre>';
+    output = '<pre>foo\n  bar\nbaz</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Nested code blocks—trailing newline trimmed
+    input = '<pre><code>function foo() {\n  return bar;\n}\n</code></pre>';
+    output = '<pre><code>function foo() {\n  return bar;\n}</code></pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Works with `textarea` too (single trailing newline)
+    input = '<textarea>Hello world\n</textarea>';
+    output = '<textarea>Hello world</textarea>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Spaces without newlines are preserved (intentional spacing)
+    input = '<pre> foo </pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+
+    input = '<textarea> moo </textarea>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+
+    // Without the option, all whitespace is preserved
+    input = '<pre>foo\n</pre>';
+    assert.strictEqual(await minify(input), input);
+    assert.strictEqual(await minify(input, { collapseWhitespace: false }), input);
+
+    // Newline-only content is preserved (no non-newline char before newline)
+    input = '<pre>\n</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+
+    // Spaces followed by newline—the trailing newline is trimmed
+    input = '<pre>  \n</pre>';
+    output = '<pre>  </pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 });
