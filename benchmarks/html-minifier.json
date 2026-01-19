@@ -23,6 +23,7 @@
   "inlineCustomElements": [],
   "keepClosingSlash": false,
   "maxLineLength": 0,
+  "mergeScripts": true,
   "minifyCSS": true,
   "minifyJS": {
     "engine": "swc"
