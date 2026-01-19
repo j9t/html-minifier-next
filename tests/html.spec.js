@@ -1883,6 +1883,13 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div Draggable="foo"></div>', { collapseBooleanAttributes: true }), '<div draggable></div>');
     assert.strictEqual(await minify('<div Draggable></div>', { collapseBooleanAttributes: true }), '<div draggable></div>');
     assert.strictEqual(await minify('<div draggable="Auto"></div>', { collapseBooleanAttributes: true }), '<div draggable></div>');
+    assert.strictEqual(await minify('<img crossorigin="">', { collapseBooleanAttributes: true }), '<img crossorigin>');
+    assert.strictEqual(await minify('<img crossorigin="anonymous">', { collapseBooleanAttributes: true }), '<img crossorigin="anonymous">');
+    assert.strictEqual(await minify('<img crossorigin="use-credentials">', { collapseBooleanAttributes: true }), '<img crossorigin="use-credentials">');
+    assert.strictEqual(await minify('<script crossorigin="" src="x.js"></script>', { collapseBooleanAttributes: true }), '<script crossorigin src="x.js"></script>');
+    assert.strictEqual(await minify('<div contenteditable=""></div>', { collapseBooleanAttributes: true }), '<div contenteditable></div>');
+    assert.strictEqual(await minify('<div contenteditable="true"></div>', { collapseBooleanAttributes: true }), '<div contenteditable="true"></div>');
+    assert.strictEqual(await minify('<div contenteditable="false"></div>', { collapseBooleanAttributes: true }), '<div contenteditable="false"></div>');
   });
 
   test('Keep trailing slashes in tags', async () => {
