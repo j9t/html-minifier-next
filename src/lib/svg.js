@@ -115,7 +115,8 @@ function minifyNumber(num, precision = 3) {
   const fixed = parsed.toFixed(precision);
   const trimmed = fixed.replace(/\.?0+$/, '');
 
-  const result = trimmed || '0';
+  // Remove leading zero before decimal point (e.g., `0.5` → `.5`, `-0.3` → `-.3`)
+  const result = (trimmed || '0').replace(/^(-?)0\./, '$1.');
   numberCache.set(cacheKey, result);
   return result;
 }
@@ -135,17 +136,23 @@ function minifyPathData(pathData, precision = 3) {
   });
 
   // Remove unnecessary spaces around path commands
-  // Safe to remove space after a command letter when it’s followed by a number (which may be negative)
-  // `M 10 20` → `M10 20`, `L -5 -3` → `L-5-3`
-  result = result.replace(/([MLHVCSQTAZmlhvcsqtaz])\s+(?=-?\d)/g, '$1');
+  // Safe to remove space after a command letter when it’s followed by a number
+  // (which may be negative or start with a decimal point)
+  // `M 10 20` → `M10 20`, `L -5 -3` → `L-5-3`, `M .5 .3` → `M.5.3`
+  result = result.replace(/([MLHVCSQTAZmlhvcsqtaz])\s+(?=-?\.?\d)/g, '$1');
 
   // Safe to remove space before command letter when preceded by a number
-  // `0 L` → `0L`, `20 M` → `20M`
-  result = result.replace(/(\d)\s+([MLHVCSQTAZmlhvcsqtaz])/g, '$1$2');
+  // `0 L` → `0L`, `20 M` → `20M`, `.5 L` → `.5L`
+  result = result.replace(/([\d.])\s+([MLHVCSQTAZmlhvcsqtaz])/g, '$1$2');
 
   // Safe to remove space before negative number when preceded by a number
-  // `10 -20` → `10-20` (numbers are separated by the minus sign)
-  result = result.replace(/(\d)\s+(-\d)/g, '$1$2');
+  // `10 -20` → `10-20`, `.5 -.3` → `.5-.3` (minus sign is always a separator)
+  result = result.replace(/([\d.])\s+(-)/g, '$1$2');
+
+  // Safe to remove space between two decimal numbers (decimal point acts as separator)
+  // `.5 .3` → `.5.3` (only when previous char is `.`, indicating a complete decimal)
+  // Note: `0 .3` must not become `0.3` (that would change two numbers into one)
+  result = result.replace(/(\.\d*)\s+(\.)/g, '$1$2');
 
   return result;
 }
