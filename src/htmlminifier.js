@@ -97,6 +97,105 @@ const cssMinifyCache = new LRU(500);
 const jsMinifyCache = new LRU(500);
 const urlMinifyCache = new LRU(500);
 
+// Script merging
+
+/**
+ * Merge consecutive inline script tags into one.
+ * Only merges scripts that are compatible:
+ * - Both inline (no `src` attribute)
+ * - Same `type` (or both default JavaScript)
+ * - No conflicting attributes (`async`, `defer`, `nomodule`, different `nonce`)
+ *
+ * @param {string} html - The HTML string to process
+ * @returns {string} HTML with consecutive scripts merged
+ */
+function mergeConsecutiveScripts(html) {
+  // Regex to match consecutive `</script>` followed by `<script…>`
+  // Captures: (1) first script content, (2) closing tag, (3) whitespace between,
+  //           (4) opening tag with attrs, (5) second script attrs, (6) second script content
+  const pattern = /<script([^>]*)>([\s\S]*?)<\/script>([\s]*)<script([^>]*)>([\s\S]*?)<\/script>/gi;
+
+  let result = html;
+  let changed = true;
+
+  // Keep merging until no more changes (handles chains of 3+ scripts)
+  while (changed) {
+    changed = false;
+    result = result.replace(pattern, (match, attrs1, content1, whitespace, attrs2, content2) => {
+      // Parse attributes from both script tags
+      const parseAttrs = (attrStr) => {
+        const attrs = {};
+        const attrRegex = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+        let m;
+        while ((m = attrRegex.exec(attrStr)) !== null) {
+          const name = m[1].toLowerCase();
+          const value = m[2] ?? m[3] ?? m[4] ?? '';
+          attrs[name] = value;
+        }
+        return attrs;
+      };
+
+      const a1 = parseAttrs(attrs1);
+      const a2 = parseAttrs(attrs2);
+
+      // Check for `src`—cannot merge external scripts
+      if ('src' in a1 || 'src' in a2) {
+        return match;
+      }
+
+      // Check `type` compatibility (both must be same, or both default JS)
+      const type1 = a1.type || '';
+      const type2 = a2.type || '';
+      const isDefaultJS = (t) => !t || t === 'text/javascript' || t === 'application/javascript';
+
+      if (isDefaultJS(type1) && isDefaultJS(type2)) {
+        // Both are default JavaScript—compatible
+      } else if (type1 === type2) {
+        // Same explicit type—compatible
+      } else {
+        // Incompatible types
+        return match;
+      }
+
+      // Check for conflicting boolean attributes
+      const boolAttrs = ['async', 'defer', 'nomodule'];
+      for (const attr of boolAttrs) {
+        const has1 = attr in a1;
+        const has2 = attr in a2;
+        if (has1 !== has2) {
+          // One has it, one doesn't - incompatible
+          return match;
+        }
+      }
+
+      // Check `nonce`—must be same or both absent
+      if (a1.nonce !== a2.nonce) {
+        return match;
+      }
+
+      // Scripts are compatible—merge them
+      changed = true;
+
+      // Combine content with semicolon separator (safe for JS)
+      // Trim content and add semicolon between non-empty parts
+      const c1 = content1.trim();
+      const c2 = content2.trim();
+      let mergedContent;
+      if (c1 && c2) {
+        // Ensure first part ends with semicolon for safety
+        mergedContent = (c1.endsWith(';') ? c1 : c1 + ';') + c2;
+      } else {
+        mergedContent = c1 || c2;
+      }
+
+      // Use first script’s attributes (they should be compatible)
+      return `<script${attrs1}>${mergedContent}</script>`;
+    });
+  }
+
+  return result;
+}
+
 // Type definitions
 
 /**
@@ -276,6 +375,13 @@ const urlMinifyCache = new LRU(500);
  *  output to the given number of characters where possible.
  *
  *  Default: No limit
+ *
+ * @prop {boolean} [mergeScripts]
+ *  When true, consecutive inline `<script>` elements are merged into one.
+ *  Only merges compatible scripts (same `type`, matching `async`/`defer`/
+ *  `nomodule`/`nonce` attributes). Does not merge external scripts (with `src`).
+ *
+ *  Default: `false`
  *
  * @prop {boolean | Partial<import("lightningcss").TransformOptions<import("lightningcss").CustomAtRules>> | ((text: string, type?: string) => Promise<string> | string)} [minifyCSS]
  *  When true, enables CSS minification for inline `<style>` tags or
@@ -1394,7 +1500,13 @@ export const minify = async function (value, options) {
     jsMinifyCache,
     urlMinifyCache
   });
-  const result = await minifyHTML(value, options);
+  let result = await minifyHTML(value, options);
+
+  // Post-processing: Merge consecutive inline scripts if enabled
+  if (options.mergeScripts) {
+    result = mergeConsecutiveScripts(result);
+  }
+
   options.log('minified in: ' + (Date.now() - start) + 'ms');
   return result;
 };

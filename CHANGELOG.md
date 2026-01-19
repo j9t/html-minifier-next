@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.18.0] - 2026-01-19
 
+### Added
+
+- New `mergeScripts` option to merge consecutive inline `<script>` elements into one (saves `</script><script>` overhead)
+  - Only merges compatible scripts (same `type`, matching `async`/`defer`/`nomodule`/`nonce` attributes)
+  - Does not merge external scripts (with `src` attribute)
+
 ### Changed
 
 - SVG path optimization now removes leading zeros before decimal points (e.g., `0.5` → `.5`, `-0.25` → `-.25`)

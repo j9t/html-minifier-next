@@ -81,6 +81,13 @@ const defaultOptions = [
     helpText: 'Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points'
   },
   {
+    id: 'mergeScripts',
+    type: 'checkbox',
+    label: 'Merge scripts',
+    helpText: 'Merge consecutive inline <code>script</code> elements into one',
+    checked: true
+  },
+  {
     id: 'minifyCSS',
     type: 'checkbox',
     label: 'Minify CSS',

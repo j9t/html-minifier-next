@@ -144,6 +144,7 @@ const mainOptions = {
   keepClosingSlash: 'Keep the trailing slash on void elements',
   maxInputLength: ['Maximum input length to prevent ReDoS attacks', parseValidInt('maxInputLength')],
   maxLineLength: ['Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points', parseValidInt('maxLineLength')],
+  mergeScripts: 'Merge consecutive inline `script` elements into one',
   minifyCSS: ['Minify CSS in `style` elements and attributes (uses Lightning CSS)', parseJSON],
   minifyJS: ['Minify JavaScript in `script` elements and event attributes (uses Terser or SWC; pass `{"engine": "swc"}` for SWC)', parseJSON],
   minifySVG: ['Minify SVG elements and attributes (numeric precision, default attributes, colors)', parseJSON],
