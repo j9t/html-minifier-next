@@ -92,10 +92,129 @@ async function getSwc() {
 }
 
 // Minification caches
-
 const cssMinifyCache = new LRU(500);
 const jsMinifyCache = new LRU(500);
 const urlMinifyCache = new LRU(500);
+
+// Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
+const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+const SCRIPT_BOOL_ATTRS = new Set(['async', 'defer', 'nomodule']);
+const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript']);
+
+// Pre-compiled patterns for buffer scanning
+const RE_START_TAG = /^<[^/!]/;
+const RE_END_TAG = /^<\//;
+
+// Script merging
+
+/**
+ * Merge consecutive inline script tags into one (`mergeConsecutiveScripts`).
+ * Only merges scripts that are compatible:
+ * - Both inline (no `src` attribute)
+ * - Same `type` (or both default JavaScript)
+ * - No conflicting attributes (`async`, `defer`, `nomodule`, different `nonce`)
+ *
+ * Limitation: This function uses regex-based matching (`pattern` variable below),
+ * which can produce incorrect results if a script’s content contains a literal
+ * `</script>` string (e.g., `document.write('<script>…</script>')`). In valid
+ * HTML, such strings should be escaped as `<\/script>` or split like
+ * `'</scr' + 'ipt>'`, so this limitation rarely affects real-world code. The
+ * earlier `minifyJS` step (if enabled) typically handles this escaping already.
+ *
+ * @param {string} html - The HTML string to process
+ * @returns {string} HTML with consecutive scripts merged
+ */
+function mergeConsecutiveScripts(html) {
+  // `pattern`: Regex to match consecutive `</script>` followed by `<script…>`.
+  // See function JSDoc above for known limitations with literal `</script>` in content.
+  // Captures:
+  // 1. first script attrs
+  // 2. first script content
+  // 3. whitespace between
+  // 4. second script attrs
+  // 5. second script content
+  const pattern = /<script([^>]*)>([\s\S]*?)<\/script>([\s]*)<script([^>]*)>([\s\S]*?)<\/script>/gi;
+
+  let result = html;
+  let changed = true;
+
+  // Keep merging until no more changes (handles chains of 3+ scripts)
+  while (changed) {
+    changed = false;
+    result = result.replace(pattern, (match, attrs1, content1, whitespace, attrs2, content2) => {
+      // Parse attributes from both script tags (uses pre-compiled RE_SCRIPT_ATTRS)
+      const parseAttrs = (attrStr) => {
+        const attrs = {};
+        RE_SCRIPT_ATTRS.lastIndex = 0; // Reset for reuse
+        let m;
+        while ((m = RE_SCRIPT_ATTRS.exec(attrStr)) !== null) {
+          const name = m[1].toLowerCase();
+          const value = m[2] ?? m[3] ?? m[4] ?? '';
+          attrs[name] = value;
+        }
+        return attrs;
+      };
+
+      const a1 = parseAttrs(attrs1);
+      const a2 = parseAttrs(attrs2);
+
+      // Check for `src`—cannot merge external scripts
+      if ('src' in a1 || 'src' in a2) {
+        return match;
+      }
+
+      // Check `type` compatibility (both must be same, or both default JS)
+      const type1 = a1.type || '';
+      const type2 = a2.type || '';
+
+      if (DEFAULT_JS_TYPES.has(type1) && DEFAULT_JS_TYPES.has(type2)) {
+        // Both are default JavaScript—compatible
+      } else if (type1 === type2) {
+        // Same explicit type—compatible
+      } else {
+        // Incompatible types
+        return match;
+      }
+
+      // Check for conflicting boolean attributes (uses pre-compiled SCRIPT_BOOL_ATTRS)
+      for (const attr of SCRIPT_BOOL_ATTRS) {
+        const has1 = attr in a1;
+        const has2 = attr in a2;
+        if (has1 !== has2) {
+          // One has it, one doesn't - incompatible
+          return match;
+        }
+      }
+
+      // Check `nonce`—must be same or both absent
+      if (a1.nonce !== a2.nonce) {
+        return match;
+      }
+
+      // Scripts are compatible—merge them
+      changed = true;
+
+      // Combine content—use semicolon normally, newline only for trailing `//` comments
+      const c1 = content1.trim();
+      const c2 = content2.trim();
+      let mergedContent;
+      if (c1 && c2) {
+        // Check if last line of c1 contains `//` (single-line comment)
+        // If so, use newline to terminate it; otherwise use semicolon (if not already present)
+        const lastLine = c1.slice(c1.lastIndexOf('\n') + 1);
+        const separator = lastLine.includes('//') ? '\n' : (c1.endsWith(';') ? '' : ';');
+        mergedContent = c1 + separator + c2;
+      } else {
+        mergedContent = c1 || c2;
+      }
+
+      // Use first script’s attributes (they should be compatible)
+      return `<script${attrs1}>${mergedContent}</script>`;
+    });
+  }
+
+  return result;
+}
 
 // Type definitions
 
@@ -276,6 +395,13 @@ const urlMinifyCache = new LRU(500);
  *  output to the given number of characters where possible.
  *
  *  Default: No limit
+ *
+ * @prop {boolean} [mergeScripts]
+ *  When true, consecutive inline `<script>` elements are merged into one.
+ *  Only merges compatible scripts (same `type`, matching `async`/`defer`/
+ *  `nomodule`/`nonce` attributes). Does not merge external scripts (with `src`).
+ *
+ *  Default: `false`
  *
  * @prop {boolean | Partial<import("lightningcss").TransformOptions<import("lightningcss").CustomAtRules>> | ((text: string, type?: string) => Promise<string> | string)} [minifyCSS]
  *  When true, enables CSS minification for inline `<style>` tags or
@@ -855,7 +981,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
   function removeStartTag() {
     let index = buffer.length - 1;
-    while (index > 0 && !/^<[^/!]/.test(buffer[index])) {
+    while (index > 0 && !RE_START_TAG.test(buffer[index])) {
       index--;
     }
     buffer.length = Math.max(0, index);
@@ -863,7 +989,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
   function removeEndTag() {
     let index = buffer.length - 1;
-    while (index > 0 && !/^<\//.test(buffer[index])) {
+    while (index > 0 && !RE_END_TAG.test(buffer[index])) {
       index--;
     }
     buffer.length = Math.max(0, index);
@@ -1174,8 +1300,8 @@ async function minifyHTML(value, options, partialMarkup) {
       charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
       if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         // Escape any `&` symbols that start either:
-        // 1) a legacy-named character reference (i.e., one that doesn’t end with `;`)
-        // 2) or any other character reference (i.e., one that does end with `;`)
+        // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
+        // 2. or any other character reference (i.e., one that does end with `;`)
         // Note that `&` can be escaped as `&amp`, without the semicolon.
         // https://mathiasbynens.be/notes/ambiguous-ampersands
         if (text.indexOf('&') !== -1) {
@@ -1394,7 +1520,13 @@ export const minify = async function (value, options) {
     jsMinifyCache,
     urlMinifyCache
   });
-  const result = await minifyHTML(value, options);
+  let result = await minifyHTML(value, options);
+
+  // Post-processing: Merge consecutive inline scripts if enabled
+  if (options.mergeScripts) {
+    result = mergeConsecutiveScripts(result);
+  }
+
   options.log('minified in: ' + (Date.now() - start) + 'ms');
   return result;
 };

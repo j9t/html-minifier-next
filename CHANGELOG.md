@@ -4,6 +4,20 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.18.0] - 2026-01-19
+
+### Added
+
+- New `mergeScripts` option to merge consecutive inline `<script>` elements into one (saves `</script><script>` overhead)
+  - Only merges compatible scripts (same `type`, matching `async`/`defer`/`nomodule`/`nonce` attributes)
+  - Does not merge external scripts (with `src` attribute)
+
+### Changed
+
+- SVG path optimization now removes leading zeros before decimal points (e.g., `0.5` → `.5`, `-0.25` → `-.25`)
+- Empty `crossorigin` and `contenteditable` attributes now collapse to just the attribute name (e.g., `crossorigin=""` → `crossorigin`)
+- Pre-compiled regex patterns for tag removal functions to avoid repeated allocation
+
 ## [4.17.2] - 2026-01-19
 
 ### Changed
@@ -206,7 +220,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Internal
 
-- Refactored `htmlminifier.js` into modular architecture (`src/lib/*`)
+- Refactored htmlminifier.js into modular architecture (`src/lib/*`)
   - Refactored comments for brevity and consistency
 
 ## [4.12.2] - 2025-12-18
@@ -576,7 +590,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Internal
 
-- Added TypeScript configuration file (`tsconfig.json`) with modern compiler options for declaration generation
+- Added TypeScript configuration file (tsconfig.json) with modern compiler options for declaration generation
 - Updated package exports to include TypeScript type definitions path
 
 ## [4.0.2] - 2025-11-05
@@ -594,7 +608,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Removed
 
-- Removed UMD bundles (`htmlminifier.umd.bundle.js` and minified variant) as they were undocumented and incompatible with Lightning CSS browser limitations
+- Removed UMD bundles (htmlminifier.umd.bundle.js and minified variant) as they were undocumented and incompatible with Lightning CSS browser limitations
 
 ### Internal
 
@@ -679,7 +693,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 - Added `--verbose`/`-v` flag to show active options and file statistics (also automatically enabled with `--dry`)
 - Added progress indicator for directory processing in interactive terminals (shows file count and percentage completed; auto-disabled in non-TTY environments and when using `--verbose` or `--dry`)
-- Added ESM config file support via dynamic import fallback (`.mjs` files and modules with `"type": "module"`)
+- Added ESM config file support via dynamic import fallback (.mjs files and modules with `"type": "module"`)
 - Documented and added tests for `--version`/`-V` flag
 
 ### Changed
@@ -774,12 +788,12 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 ### Changed
 
 - Added linting enforcement to pre-commit hooks to ensure code quality
-- Renamed workflow files for clarity: `main.yaml` → `tests.yml`, `pages.yml` → `github-pages.yml`
+- Renamed workflow files for clarity: main.yaml → tests.yml, pages.yml → github-pages.yml
 
 ### Removed
 
-- Removed orphaned `.lintstagedrc.yml` file left from Husky refactoring cleanup
-- Removed non-functional `.github/workflows/benchmarks.yml` workflow
+- Removed orphaned .lintstagedrc.yml file left from Husky refactoring cleanup
+- Removed non-functional .github/workflows/benchmarks.yml workflow
 
 ## [2.1.1] - 2025-09-13
 

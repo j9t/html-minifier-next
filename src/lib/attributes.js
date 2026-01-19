@@ -15,6 +15,7 @@ import {
   keepScriptsMimetypes,
   isSimpleBoolean,
   isBooleanValue,
+  emptyCollapsible,
   srcsetElements,
   reEmptyAttribute
 } from './constants.js';
@@ -147,7 +148,9 @@ function isStyleElement(tag, attrs) {
 }
 
 function isBooleanAttribute(attrName, attrValue) {
-  return isSimpleBoolean.has(attrName) || (attrName === 'draggable' && !isBooleanValue.has(attrValue));
+  return isSimpleBoolean.has(attrName) ||
+    (attrName === 'draggable' && !isBooleanValue.has(attrValue)) ||
+    (attrValue === '' && emptyCollapsible.has(attrName));
 }
 
 function isUriTypeAttribute(attrName, tag) {

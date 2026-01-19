@@ -193,7 +193,19 @@ describe('SVG', () => {
     // Scientific notation (1e-5 rounds to 0, 2e-3 = 0.002)
     assert.strictEqual(
       await minify('<svg><path d="M 1e-5 2e-3"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M0 0.002"/></svg>'
+      '<svg><path d="M0 .002"/></svg>'
+    );
+
+    // Leading zero removal
+    assert.strictEqual(
+      await minify('<svg><path d="M 0.5 0.3 L -0.25 -0.75"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><path d="M.5.3L-.25-.75"/></svg>'
+    );
+
+    // Leading zero removal in other numeric attributes
+    assert.strictEqual(
+      await minify('<svg><circle cx="0.5" cy="-0.25" r="0.125"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><circle cx=".5" cy="-.25" r=".125"/></svg>'
     );
   });
 

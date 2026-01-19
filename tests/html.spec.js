@@ -1883,6 +1883,13 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div Draggable="foo"></div>', { collapseBooleanAttributes: true }), '<div draggable></div>');
     assert.strictEqual(await minify('<div Draggable></div>', { collapseBooleanAttributes: true }), '<div draggable></div>');
     assert.strictEqual(await minify('<div draggable="Auto"></div>', { collapseBooleanAttributes: true }), '<div draggable></div>');
+    assert.strictEqual(await minify('<img crossorigin="">', { collapseBooleanAttributes: true }), '<img crossorigin>');
+    assert.strictEqual(await minify('<img crossorigin="anonymous">', { collapseBooleanAttributes: true }), '<img crossorigin="anonymous">');
+    assert.strictEqual(await minify('<img crossorigin="use-credentials">', { collapseBooleanAttributes: true }), '<img crossorigin="use-credentials">');
+    assert.strictEqual(await minify('<script crossorigin="" src="x.js"></script>', { collapseBooleanAttributes: true }), '<script crossorigin src="x.js"></script>');
+    assert.strictEqual(await minify('<div contenteditable=""></div>', { collapseBooleanAttributes: true }), '<div contenteditable></div>');
+    assert.strictEqual(await minify('<div contenteditable="true"></div>', { collapseBooleanAttributes: true }), '<div contenteditable="true"></div>');
+    assert.strictEqual(await minify('<div contenteditable="false"></div>', { collapseBooleanAttributes: true }), '<div contenteditable="false"></div>');
   });
 
   test('Keep trailing slashes in tags', async () => {
@@ -2681,6 +2688,113 @@ describe('HTML', () => {
     const input = '<script>window.jQuery || document.write(\'<script src="jquery.js"><\\/script>\')</script>';
     const output = '<script>window.jQuery||document.write(\'<script src="jquery.js"><\\/script>\')</script>';
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
+  });
+
+  test('Merge consecutive inline scripts', async () => {
+    let input, output;
+
+    // Basic merge of two inline scripts (semicolon separator)
+    input = '<script>var a=1</script><script>var b=2</script>';
+    output = '<script>var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Merge with whitespace between scripts
+    input = '<script>var a=1</script>  \n  <script>var b=2</script>';
+    output = '<script>var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Merge three consecutive scripts
+    input = '<script>var a=1</script><script>var b=2</script><script>var c=3</script>';
+    output = '<script>var a=1;var b=2;var c=3</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Don’t add extra semicolon if first script already ends with one
+    input = '<script>var a=1;</script><script>var b=2</script>';
+    output = '<script>var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Preserve attributes from first script
+    input = '<script id="main">var a=1</script><script>var b=2</script>';
+    output = '<script id="main">var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Handle trailing single-line comments (newline prevents comment bleed)
+    input = '<script>var a=1 // comment</script><script>var b=2</script>';
+    output = '<script>var a=1 // comment\nvar b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Do not merge scripts with `src` attribute (external scripts)
+    input = '<script src="a.js"></script><script>var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    input = '<script>var a=1</script><script src="b.js"></script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    // Do not merge scripts with different `type` attributes
+    input = '<script type="module">var a=1</script><script>var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    input = '<script type="application/json">{"a":1}</script><script>var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    // Merge scripts with same `type` attribute
+    input = '<script type="module">var a=1</script><script type="module">var b=2</script>';
+    output = '<script type="module">var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Merge scripts where both have default JS type (explicit vs implicit)
+    input = '<script type="text/javascript">var a=1</script><script>var b=2</script>';
+    output = '<script type="text/javascript">var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Do not merge if `async` attribute differs
+    input = '<script async>var a=1</script><script>var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    // Do merge if both have `async`
+    input = '<script async>var a=1</script><script async>var b=2</script>';
+    output = '<script async>var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Do not merge if `defer` attribute differs
+    input = '<script defer>var a=1</script><script>var b=2</script>';
+    output = '<script defer=defer>var a=1</script><script>var b=2</script>'; // Attribute normalized by parser
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Do not merge if `nomodule` attribute differs
+    input = '<script nomodule>var a=1</script><script>var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    // Do not merge if `nonce` values differ
+    input = '<script nonce="abc">var a=1</script><script nonce="xyz">var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    // Do merge if `nonce` values match
+    input = '<script nonce="abc">var a=1</script><script nonce="abc">var b=2</script>';
+    output = '<script nonce="abc">var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Handle empty scripts
+    input = '<script></script><script>var b=2</script>';
+    output = '<script>var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    input = '<script>var a=1</script><script></script>';
+    output = '<script>var a=1</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Non-adjacent scripts should not be merged
+    input = '<script>var a=1</script><div></div><script>var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    // Works with `minifyJS` (scripts minified separately, then merged with semicolon)
+    input = '<script>var a = 1;</script><script>var b = 2;</script>';
+    output = '<script>var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true, minifyJS: true }), output);
+
+    // Disabled by default
+    input = '<script>var a=1</script><script>var b=2</script>';
+    assert.strictEqual(await minify(input), input);
   });
 
   test('Minification of `style` element with custom fragments', async () => {
