@@ -100,19 +100,31 @@ const urlMinifyCache = new LRU(500);
 // Script merging
 
 /**
- * Merge consecutive inline script tags into one.
+ * Merge consecutive inline script tags into one (`mergeConsecutiveScripts`).
  * Only merges scripts that are compatible:
  * - Both inline (no `src` attribute)
  * - Same `type` (or both default JavaScript)
  * - No conflicting attributes (`async`, `defer`, `nomodule`, different `nonce`)
  *
+ * Limitation: This function uses regex-based matching (`pattern` variable below),
+ * which can produce incorrect results if a script’s content contains a literal
+ * `</script>` string (e.g., `document.write('<script>…</script>')`). In valid
+ * HTML, such strings should be escaped as `<\/script>` or split like
+ * `'</scr' + 'ipt>'`, so this limitation rarely affects real-world code. The
+ * earlier `minifyJS` step (if enabled) typically handles this escaping already.
+ *
  * @param {string} html - The HTML string to process
  * @returns {string} HTML with consecutive scripts merged
  */
 function mergeConsecutiveScripts(html) {
-  // Regex to match consecutive `</script>` followed by `<script…>`
-  // Captures: (1) first script content, (2) closing tag, (3) whitespace between,
-  //           (4) opening tag with attrs, (5) second script attrs, (6) second script content
+  // `pattern`: Regex to match consecutive `</script>` followed by `<script…>`.
+  // See function JSDoc above for known limitations with literal `</script>` in content.
+  // Captures:
+  // 1. first script attrs
+  // 2. first script content
+  // 3. whitespace between
+  // 4. second script attrs
+  // 5. second script content
   const pattern = /<script([^>]*)>([\s\S]*?)<\/script>([\s]*)<script([^>]*)>([\s\S]*?)<\/script>/gi;
 
   let result = html;
@@ -1280,8 +1292,8 @@ async function minifyHTML(value, options, partialMarkup) {
       charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
       if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         // Escape any `&` symbols that start either:
-        // 1) a legacy-named character reference (i.e., one that doesn’t end with `;`)
-        // 2) or any other character reference (i.e., one that does end with `;`)
+        // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
+        // 2. or any other character reference (i.e., one that does end with `;`)
         // Note that `&` can be escaped as `&amp`, without the semicolon.
         // https://mathiasbynens.be/notes/ambiguous-ampersands
         if (text.indexOf('&') !== -1) {
