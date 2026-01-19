@@ -92,10 +92,18 @@ async function getSwc() {
 }
 
 // Minification caches
-
 const cssMinifyCache = new LRU(500);
 const jsMinifyCache = new LRU(500);
 const urlMinifyCache = new LRU(500);
+
+// Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
+const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+const SCRIPT_BOOL_ATTRS = new Set(['async', 'defer', 'nomodule']);
+const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript']);
+
+// Pre-compiled patterns for buffer scanning
+const RE_START_TAG = /^<[^/!]/;
+const RE_END_TAG = /^<\//;
 
 // Script merging
 
@@ -134,12 +142,12 @@ function mergeConsecutiveScripts(html) {
   while (changed) {
     changed = false;
     result = result.replace(pattern, (match, attrs1, content1, whitespace, attrs2, content2) => {
-      // Parse attributes from both script tags
+      // Parse attributes from both script tags (uses pre-compiled RE_SCRIPT_ATTRS)
       const parseAttrs = (attrStr) => {
         const attrs = {};
-        const attrRegex = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+        RE_SCRIPT_ATTRS.lastIndex = 0; // Reset for reuse
         let m;
-        while ((m = attrRegex.exec(attrStr)) !== null) {
+        while ((m = RE_SCRIPT_ATTRS.exec(attrStr)) !== null) {
           const name = m[1].toLowerCase();
           const value = m[2] ?? m[3] ?? m[4] ?? '';
           attrs[name] = value;
@@ -158,9 +166,8 @@ function mergeConsecutiveScripts(html) {
       // Check `type` compatibility (both must be same, or both default JS)
       const type1 = a1.type || '';
       const type2 = a2.type || '';
-      const isDefaultJS = (t) => !t || t === 'text/javascript' || t === 'application/javascript';
 
-      if (isDefaultJS(type1) && isDefaultJS(type2)) {
+      if (DEFAULT_JS_TYPES.has(type1) && DEFAULT_JS_TYPES.has(type2)) {
         // Both are default JavaScript—compatible
       } else if (type1 === type2) {
         // Same explicit type—compatible
@@ -169,9 +176,8 @@ function mergeConsecutiveScripts(html) {
         return match;
       }
 
-      // Check for conflicting boolean attributes
-      const boolAttrs = ['async', 'defer', 'nomodule'];
-      for (const attr of boolAttrs) {
+      // Check for conflicting boolean attributes (uses pre-compiled SCRIPT_BOOL_ATTRS)
+      for (const attr of SCRIPT_BOOL_ATTRS) {
         const has1 = attr in a1;
         const has2 = attr in a2;
         if (has1 !== has2) {
@@ -973,7 +979,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
   function removeStartTag() {
     let index = buffer.length - 1;
-    while (index > 0 && !/^<[^/!]/.test(buffer[index])) {
+    while (index > 0 && !RE_START_TAG.test(buffer[index])) {
       index--;
     }
     buffer.length = Math.max(0, index);
@@ -981,7 +987,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
   function removeEndTag() {
     let index = buffer.length - 1;
-    while (index > 0 && !/^<\//.test(buffer[index])) {
+    while (index > 0 && !RE_END_TAG.test(buffer[index])) {
       index--;
     }
     buffer.length = Math.max(0, index);
