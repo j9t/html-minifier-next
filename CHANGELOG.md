@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - SVG path optimization now removes leading zeros before decimal points (e.g., `0.5` → `.5`, `-0.25` → `-.25`)
 - Empty `crossorigin` and `contenteditable` attributes now collapse to just the attribute name (e.g., `crossorigin=""` → `crossorigin`)
+- Pre-compiled regex patterns for tag removal functions to avoid repeated allocation
 
 ## [4.17.2] - 2026-01-19
 
