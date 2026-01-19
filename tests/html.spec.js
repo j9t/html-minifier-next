@@ -2693,7 +2693,7 @@ describe('HTML', () => {
   test('Merge consecutive inline scripts', async () => {
     let input, output;
 
-    // Basic merge of two inline scripts
+    // Basic merge of two inline scripts (semicolon separator)
     input = '<script>var a=1</script><script>var b=2</script>';
     output = '<script>var a=1;var b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true }), output);
@@ -2716,6 +2716,11 @@ describe('HTML', () => {
     // Preserve attributes from first script
     input = '<script id="main">var a=1</script><script>var b=2</script>';
     output = '<script id="main">var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Handle trailing single-line comments (newline prevents comment bleed)
+    input = '<script>var a=1 // comment</script><script>var b=2</script>';
+    output = '<script>var a=1 // comment\nvar b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true }), output);
 
     // Do not merge scripts with `src` attribute (external scripts)
@@ -2782,7 +2787,7 @@ describe('HTML', () => {
     input = '<script>var a=1</script><div></div><script>var b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true }), input);
 
-    // Works with `minifyJS` (scripts minified separately, then merged)
+    // Works with `minifyJS` (scripts minified separately, then merged with semicolon)
     input = '<script>var a = 1;</script><script>var b = 2;</script>';
     output = '<script>var a=1;var b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true, minifyJS: true }), output);

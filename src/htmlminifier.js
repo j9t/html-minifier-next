@@ -194,14 +194,16 @@ function mergeConsecutiveScripts(html) {
       // Scripts are compatible—merge them
       changed = true;
 
-      // Combine content with semicolon separator (safe for JS)
-      // Trim content and add semicolon between non-empty parts
+      // Combine content—use semicolon normally, newline only for trailing `//` comments
       const c1 = content1.trim();
       const c2 = content2.trim();
       let mergedContent;
       if (c1 && c2) {
-        // Ensure first part ends with semicolon for safety
-        mergedContent = (c1.endsWith(';') ? c1 : c1 + ';') + c2;
+        // Check if last line of c1 contains `//` (single-line comment)
+        // If so, use newline to terminate it; otherwise use semicolon (if not already present)
+        const lastLine = c1.slice(c1.lastIndexOf('\n') + 1);
+        const separator = lastLine.includes('//') ? '\n' : (c1.endsWith(';') ? '' : ';');
+        mergedContent = c1 + separator + c2;
       } else {
         mergedContent = c1 || c2;
       }
