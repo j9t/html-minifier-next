@@ -401,7 +401,7 @@ if (process.argv.length > 2 || !process.send) {
               // Successful completion—clean up and unregister handlers
               await cleanup();
 
-              // Unregister cleanup handlers to prevent duplicate clean-up
+              // Unregister clean-up handlers to prevent duplicate clean-up
               process.removeListener('SIGINT', sigintHandler);
               process.removeListener('SIGTERM', sigtermHandler);
               process.removeListener('uncaughtException', uncaughtExceptionHandler);

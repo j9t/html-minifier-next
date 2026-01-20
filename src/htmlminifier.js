@@ -91,10 +91,9 @@ async function getSwc() {
   return swcPromise;
 }
 
-// Minification caches
-const cssMinifyCache = new LRU(500);
-const jsMinifyCache = new LRU(500);
-const urlMinifyCache = new LRU(500);
+// Minification caches (initialized on first use with configurable sizes)
+let cssMinifyCache = null;
+let jsMinifyCache = null;
 
 // Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
@@ -246,6 +245,24 @@ function mergeConsecutiveScripts(html) {
  *  the element may be trimmed.
  *
  *  Default: Built-in `canTrimWhitespace` function
+ *
+ * @prop {number} [cacheCSS]
+ *  The maximum number of entries for the CSS minification cache. Higher values
+ *  improve performance for inputs with repeated CSS (e.g., batch processing).
+ *  - Cache is created on first `minify()` call and persists for the process lifetime
+ *  - Cache size is locked after first call—subsequent calls reuse the same cache
+ *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
+ *
+ *  Default: `500` (or `1000` when `CI=true` environment variable is set)
+ *
+ * @prop {number} [cacheJS]
+ *  The maximum number of entries for the JavaScript minification cache. Higher
+ *  values improve performance for inputs with repeated JavaScript.
+ *  - Cache is created on first `minify()` call and persists for the process lifetime
+ *  - Cache size is locked after first call—subsequent calls reuse the same cache
+ *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
+ *
+ *  Default: `500` (or `1000` when `CI=true` environment variable is set)
  *
  * @prop {boolean} [caseSensitive]
  *  When true, tag and attribute names are treated as case-sensitive.
@@ -1506,19 +1523,64 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
 }
 
 /**
+ * Initialize minification caches with configurable sizes.
+ *
+ * Important behavior notes:
+ * - Caches are created on the first `minify()` call and persist for the lifetime of the process
+ * - Cache sizes are locked after first initialization—subsequent calls use the same caches
+ *   even if different `cacheCSS`/`cacheJS` options are provided
+ * - The first call’s options determine the cache sizes for subsequent calls
+ * - Explicit `0` values are coerced to `1` (minimum functional cache size)
+ */
+function initCaches(options) {
+  // Only create caches once (on first call)—sizes are locked after this
+  if (!cssMinifyCache) {
+    // Determine default size based on environment
+    const defaultSize = process.env.CI === 'true' ? 1000 : 500;
+
+    // Helper to parse env var—returns parsed number (including 0) or undefined if absent, invalid, or negative
+    const parseEnvCacheSize = (envVar) => {
+      if (envVar === undefined) return undefined;
+      const parsed = Number(envVar);
+      if (Number.isNaN(parsed) || !Number.isFinite(parsed) || parsed < 0) {
+        return undefined;
+      }
+      return parsed;
+    };
+
+    // Get cache sizes with precedence: Options > env > default
+    const cssSize = options.cacheCSS !== undefined ? options.cacheCSS
+                 : (parseEnvCacheSize(process.env.HMN_CACHE_CSS) ?? defaultSize);
+    const jsSize = options.cacheJS !== undefined ? options.cacheJS
+                 : (parseEnvCacheSize(process.env.HMN_CACHE_JS) ?? defaultSize);
+
+    // Coerce `0` to `1` (minimum functional cache size) to avoid immediate eviction
+    const cssFinalSize = cssSize === 0 ? 1 : cssSize;
+    const jsFinalSize = jsSize === 0 ? 1 : jsSize;
+
+    cssMinifyCache = new LRU(cssFinalSize);
+    jsMinifyCache = new LRU(jsFinalSize);
+  }
+
+  return { cssMinifyCache, jsMinifyCache };
+}
+
+/**
  * @param {string} value
  * @param {MinifierOptions} [options]
  * @returns {Promise<string>}
  */
 export const minify = async function (value, options) {
   const start = Date.now();
+
+  // Initialize caches on first use with configurable sizes
+  const caches = initCaches(options || {});
+
   options = processOptions(options || {}, {
     getLightningCSS,
     getTerser,
     getSwc,
-    cssMinifyCache,
-    jsMinifyCache,
-    urlMinifyCache
+    ...caches
   });
   let result = await minifyHTML(value, options);
 

@@ -130,6 +130,8 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 | Option (config/CLI) | Description | Default |
 | --- | --- | --- |
+| `cacheCSS`<br>`--cache-css` | Set CSS minification cache size; higher values improve performance for batch processing | `500` (or `1000` when `CI=true`) |
+| `cacheJS`<br>`--cache-js` | Set JavaScript minification cache size; higher values improve performance for batch processing | `500` (or `1000` when `CI=true`) |
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
@@ -284,6 +286,75 @@ const result = await minify(html, {
 });
 ```
 
+### CSS and JavaScript cache configuration
+
+HTML Minifier Next uses in-memory caches to improve performance when processing multiple files or repeated content. The cache sizes can be configured for optimal performance based on your use case:
+
+```javascript
+const result = await minify(html, {
+  minifyCSS: true,
+  minifyJS: true,
+  // Configure cache sizes (in number of entries)
+  cacheCSS: 750,  // CSS cache size, default: 500 (1000 in CI mode)
+  cacheJS: 250    // JS cache size, default: 500 (1000 in CI mode)
+});
+```
+
+**Via CLI flags:**
+
+```shell
+html-minifier-next --minify-css --cache-css 750 --minify-js --cache-js 250 input.html
+```
+
+**Via environment variables:**
+
+```shell
+export HMN_CACHE_CSS=750
+export HMN_CACHE_JS=250
+html-minifier-next --minify-css --minify-js input.html
+```
+
+**Configuration file:**
+
+```json
+{
+  "minifyCSS": true,
+  "cacheCSS": 750,
+  "minifyJS": true,
+  "cacheJS": 250
+}
+```
+
+**For batch/CI processing:**
+
+Set `CI=true` to double default cache sizes (optimal for processing many files):
+
+```shell
+# Single command
+CI=true html-minifier-next --minify-css --minify-js input.html
+
+# Or export for multiple commands
+export CI=true
+html-minifier-next --minify-css --minify-js file1.html
+html-minifier-next --minify-css --minify-js file2.html
+```
+
+This is particularly useful in CI/CD pipelines where you’re processing multiple files and want better performance without manually tuning cache sizes.
+
+**When to adjust cache sizes:**
+
+* Single file processing: Default `500` is sufficient
+* Batch processing (CI/CD): Increase to `1000` or higher for better cache hit rates
+* Memory-constrained environments: Reduce to `200`–`300` to save memory
+* Hundreds/thousands of files: Increase to `1000`–`2000` for optimal performance
+
+**Important:**
+
+* Cache locking: Caches are created on the first `minify()` call and persist for the process lifetime. Cache sizes are locked after first initialization—subsequent calls reuse the same caches even if different `cacheCSS`/`cacheJS` options are provided. The first call’s options determine the cache sizes.
+* Zero values: Explicit `0` values are coerced to `1` (minimum functional cache size) to avoid immediate eviction. If you want to minimize memory usage, use a small number like `10` or `50` instead of `0`.
+
+The caches persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
+
 ### SVG minification
 
 When `minifySVG` is set to `true`, HTML Minifier Next applies SVG-specific optimizations to SVG elements and their attributes. These optimizations are lightweight, fast, and safe:
@@ -345,38 +416,38 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next) ([config](https://github.com/j9t/html-minifier-next/blob/main/benchmarks/html-minifier.json))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 59 | **49** | 51 | 52 | 51 | 54 | 52 |
-| [Apple](https://www.apple.com/) | 124 | **108** | 115 | 116 | 118 | 119 | 119 |
-| [BBC](https://www.bbc.co.uk/) | 618 | **561** | 580 | 581 | 582 | 613 | n/a |
+| [Apple](https://www.apple.com/) | 255 | **197** | 226 | 230 | 231 | 233 | 233 |
+| [BBC](https://www.bbc.co.uk/) | 620 | **562** | 582 | 583 | 584 | 615 | n/a |
 | [CERN](https://home.cern/) | 151 | **82** | 90 | 90 | 91 | 93 | 95 |
-| [CSS-Tricks](https://css-tricks.com/) | 161 | **119** | 126 | 141 | 142 | 147 | 143 |
+| [CSS-Tricks](https://css-tricks.com/) | 161 | **119** | 126 | 142 | 142 | 147 | 143 |
 | [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6401** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 70 | 70 | 71 | 75 | 73 |
-| [EFF](https://www.eff.org/) | 54 | **45** | 49 | 47 | 48 | 49 | 49 |
+| [EFF](https://www.eff.org/) | 54 | **45** | 48 | 47 | 48 | 49 | 49 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1595 | 1456 | **1428** | 1519 | 1530 | 1540 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1596 | 1458 | **1430** | 1520 | 1531 | 1542 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 153 | **122** | 126 | 126 | 126 | 132 | 127 |
-| [Frontend Dogma](https://frontenddogma.com/) | 228 | **220** | 242 | 227 | 228 | 247 | 228 |
+| [Frontend Dogma](https://frontenddogma.com/) | 228 | **220** | 241 | 226 | 228 | 247 | 228 |
 | [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 18 | 18 |
-| [Ground News](https://ground.news/) | 2212 | **1945** | 2040 | 2068 | 2069 | 2198 | n/a |
+| [Ground News](https://ground.news/) | 1658 | **1431** | 1526 | 1548 | 1553 | 1645 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 49 | **33** | 36 | 35 | 36 | 36 | 36 |
-| [Leanpub](https://leanpub.com/) | 250 | **218** | 233 | 233 | 234 | 245 | 247 |
+| [Leanpub](https://leanpub.com/) | 233 | **204** | 219 | 219 | 219 | 228 | 230 |
 | [Mastodon](https://mastodon.social/explore) | 38 | **28** | 32 | 35 | 35 | 36 | 36 |
 | [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | 64 | 65 | 65 | 68 | 68 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 221 | **195** | 201 | 200 | 199 | 201 | 202 |
+| [Middle East Eye](https://www.middleeasteye.net/) | 222 | **196** | 202 | 200 | 200 | 201 | 202 |
 | [Mistral AI](https://mistral.ai/) | 364 | **319** | 326 | 329 | 330 | 360 | n/a |
-| [Mozilla](https://www.mozilla.org/) | 54 | **36** | 42 | 42 | 41 | 43 | 43 |
-| [Nielsen Norman Group](https://www.nngroup.com/) | 93 | 70 | **57** | 75 | 77 | 78 | 77 |
-| [SitePoint](https://www.sitepoint.com/) | 483 | **352** | 424 | 457 | 462 | 480 | n/a |
+| [Mozilla](https://www.mozilla.org/) | 45 | **31** | 35 | 34 | 34 | 35 | 35 |
+| [Nielsen Norman Group](https://www.nngroup.com/) | 93 | 70 | **57** | 76 | 77 | 78 | 78 |
+| [SitePoint](https://www.sitepoint.com/) | 522 | **391** | 463 | 496 | 501 | 519 | n/a |
 | [Startup-Verband](https://startupverband.de/) | 43 | **30** | 31 | **30** | 31 | 31 | 31 |
-| [TetraLogical](https://tetralogical.com/) | 44 | 38 | **36** | 38 | 39 | 39 | 39 |
+| [TetraLogical](https://tetralogical.com/) | 48 | **22** | 39 | 41 | 42 | 42 | 42 |
 | [TPGi](https://www.tpgi.com/) | 173 | **157** | 159 | 163 | 164 | 170 | 170 |
 | [United Nations](https://www.un.org/en/) | 151 | **112** | 121 | 125 | 125 | 130 | 123 |
 | [Vivaldi](https://vivaldi.com/) | 93 | **74** | n/a | 79 | 81 | 84 | 82 |
-| [W3C](https://www.w3.org/) | 51 | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 98 ms (30/30) | 152 ms (29/30) | 48 ms (30/30) | **14 ms (30/30)** | 274 ms (30/30) | 1437 ms (24/30) |
+| [W3C](https://www.w3.org/) | 51 | **36** | 39 | 39 | 39 | 41 | 39 |
+| **Average processing time** |  | 95 ms (30/30) | 143 ms (29/30) | 46 ms (30/30) | **14 ms (30/30)** | 274 ms (30/30) | 1297 ms (24/30) |
 
-(Last updated: Jan 19, 2026)
+(Last updated: Jan 20, 2026)
 <!-- End auto-generated -->
 
 Notes: Minimize does not minify CSS and JS. [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to issues around whitespace collapsing and removal of code using modern CSS features, issues which appeared to distort the data.
