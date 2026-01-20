@@ -415,19 +415,20 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 <!-- Auto-generated benchmarks, don’t edit -->
 | Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next) ([config](https://github.com/j9t/html-minifier-next/blob/main/benchmarks/html-minifier.json))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| [A List Apart](https://alistapart.com/) | 59 | **49** | 51 | 52 | 51 | 54 | 52 |
 | [Apple](https://www.apple.com/) | 255 | **197** | 226 | 230 | 231 | 233 | 233 |
-| [BBC](https://www.bbc.co.uk/) | 619 | **561** | 581 | 581 | 582 | 614 | n/a |
+| [BBC](https://www.bbc.co.uk/) | 620 | **562** | 582 | 583 | 584 | 615 | n/a |
 | [CERN](https://home.cern/) | 151 | **82** | 90 | 90 | 91 | 93 | 95 |
 | [CSS-Tricks](https://css-tricks.com/) | 161 | **119** | 126 | 142 | 142 | 147 | 143 |
 | [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6401** | 6573 | 6455 | 6578 | 6626 | n/a |
 | [EDRi](https://edri.org/) | 80 | **59** | 70 | 70 | 71 | 75 | 73 |
 | [EFF](https://www.eff.org/) | 54 | **45** | 48 | 47 | 48 | 49 | 49 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1606 | 1468 | **1439** | 1530 | 1541 | 1551 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1596 | 1458 | **1430** | 1520 | 1531 | 1542 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 153 | **122** | 126 | 126 | 126 | 132 | 127 |
 | [Frontend Dogma](https://frontenddogma.com/) | 228 | **220** | 241 | 226 | 228 | 247 | 228 |
-| [Google](https://www.google.com/) | 18 | **16** | 17 | **16** | 17 | 18 | 18 |
-| [Ground News](https://ground.news/) | 2359 | **2074** | 2171 | 2195 | 2198 | 2345 | n/a |
+| [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 18 | 18 |
+| [Ground News](https://ground.news/) | 1658 | **1431** | 1526 | 1548 | 1553 | 1645 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 49 | **33** | 36 | 35 | 36 | 36 | 36 |
 | [Leanpub](https://leanpub.com/) | 233 | **204** | 219 | 219 | 219 | 228 | 230 |
@@ -444,7 +445,7 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | [United Nations](https://www.un.org/en/) | 151 | **112** | 121 | 125 | 125 | 130 | 123 |
 | [Vivaldi](https://vivaldi.com/) | 93 | **74** | n/a | 79 | 81 | 84 | 82 |
 | [W3C](https://www.w3.org/) | 51 | **36** | 39 | 39 | 39 | 41 | 39 |
-| **Average processing time** |  | 102 ms (29/29) | 161 ms (28/29) | 52 ms (29/29) | **14 ms (29/29)** | 284 ms (29/29) | 1238 ms (23/29) |
+| **Average processing time** |  | 95 ms (30/30) | 143 ms (29/30) | 46 ms (30/30) | **14 ms (30/30)** | 274 ms (30/30) | 1297 ms (24/30) |
 
 (Last updated: Jan 20, 2026)
 <!-- End auto-generated -->
