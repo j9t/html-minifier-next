@@ -31,7 +31,7 @@ const singleAttrValues = [
   // Attr value, single quotes
   /'([^']*)'+/.source,
   // Attr value, no quotes
-  /([^ \t\n\f\r"'`=<>,]+)/.source
+  /([^ \t\n\f\r"'`=<>]+)/.source
 ];
 // https://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-QName
 const qnameCapture = (function () {
