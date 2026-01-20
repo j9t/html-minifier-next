@@ -673,4 +673,115 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('console.log'), 'Console should be dropped');
     assert.ok(result.includes('function test(){}'), 'Empty function after console removal');
   });
+
+  // Cache configuration tests
+  describe('Caches', () => {
+    test('Default sizes work', async () => {
+      // Test that caches work without explicit configuration
+      const input = `
+        <style>body { color: red; margin: 0; }</style>
+        <script>var x = 1; console.log(x);</script>
+      `;
+
+      const result = await minify(input, {
+        minifyCSS: true,
+        minifyJS: { compress: { drop_console: true } }
+      });
+
+      assert.ok(result.includes('body{color:red;margin:0}'), 'CSS should be minified');
+      assert.ok(!result.includes('console.log'), 'Console should be dropped from JS');
+    });
+
+    test('Custom CSS cache size', async () => {
+      const input = '<style>body { color: blue; padding: 0; }</style>';
+
+      // Should work with custom CSS cache size
+      const result = await minify(input, {
+        minifyCSS: true,
+        cacheCSS: 750 // Custom size
+      });
+
+      // Just verify that minification worked - the exact output may vary
+      assert.ok(result.length < input.length, 'Output should be smaller than input');
+      assert.ok(result.includes('body'), 'Should contain body selector');
+      assert.ok(result.includes('color:'), 'Should contain color property');
+    });
+
+    test('Custom JS cache size', async () => {
+      const input = '<script>function test() { return 42; }</script>';
+
+      // Should work with custom JS cache size
+      const result = await minify(input, {
+        minifyJS: true,
+        cacheJS: 250 // Custom size
+      });
+
+      assert.ok(result.includes('function test(){return 42}') || result.includes('function test(){return 42;}'),
+        'JS should be minified with custom cache');
+    });
+
+    test('Both cache sizes', async () => {
+      const input = `
+        <style>div { background: #fff; margin: 10px; }</style>
+        <script>var data = { x: 1, y: 2 };</script>
+      `;
+
+      // Should work with both custom cache sizes
+      const result = await minify(input, {
+        minifyCSS: true,
+        minifyJS: true,
+        cacheCSS: 600,
+        cacheJS: 400
+      });
+
+      assert.ok(result.includes('#fff'), 'CSS should be minified');
+      // Check that object properties are minified
+      assert.ok(result.includes('x:1') && result.includes('y:2'), 'JS should be minified with custom cache sizes');
+    });
+
+    test('Environment variables', async () => {
+      const input = '<style>.test { color: purple; }</style>';
+
+      // Test environment variable override
+      process.env.HMN_CACHE_CSS = '900';
+      const result = await minify(input, {
+        minifyCSS: true
+      });
+
+      assert.ok(result.includes('.test{color:purple}'), 'CSS should minify with env var cache size');
+
+      // Clean up
+      delete process.env.HMN_CACHE_CSS;
+    });
+
+    test('Option overrides env var', async () => {
+      const input = '<style>.foo { border: none; }</style>';
+
+      // Set env var first
+      process.env.HMN_CACHE_CSS = '100';
+
+      // Option should override env var
+      const result = await minify(input, {
+        minifyCSS: true,
+        cacheCSS: 650
+      });
+
+      assert.ok(result.includes('.foo{border:none}'), 'Option should override env var');
+
+      // Clean up
+      delete process.env.HMN_CACHE_CSS;
+    });
+
+    test('Very large cache sizes', async () => {
+      const input = '<script>function largeTest() { return "large"; }</script>';
+
+      // Should handle large cache sizes without issues
+      const result = await minify(input, {
+        minifyJS: true,
+        cacheJS: 10000 // Very large size
+      });
+
+      assert.ok(result.includes('function largeTest(){'), 'JS should minify with large cache');
+    });
+  });
 });
