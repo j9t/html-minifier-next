@@ -130,6 +130,8 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 | Option (config/CLI) | Description | Default |
 | --- | --- | --- |
+| `cacheCSS`<br>`--cache-css` | Set CSS minification cache size; higher values improve performance for batch processing | `500` (or `1000` when `CI=true`) |
+| `cacheJS`<br>`--cache-js` | Set JavaScript minification cache size; higher values improve performance for batch processing | `500` (or `1000` when `CI=true`) |
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
@@ -283,6 +285,54 @@ const result = await minify(html, {
   }
 });
 ```
+
+### CSS and JavaScript cache configuration
+
+HTML Minifier Next uses in-memory caches to improve performance when processing multiple files or repeated content. The cache sizes can be configured for optimal performance based on your use case:
+
+```javascript
+const result = await minify(html, {
+  minifyCSS: true,
+  minifyJS: true,
+  // Configure cache sizes (in number of entries)
+  cacheCSS: 750,  // CSS cache size, default: 500 (1000 in CI mode)
+  cacheJS: 250    // JS cache size, default: 500 (1000 in CI mode)
+});
+```
+
+**Via CLI flags:**
+
+```shell
+html-minifier-next --minify-css --cache-css 750 --minify-js --cache-js 250 input.html
+```
+
+**Via environment variables:**
+
+```shell
+export HMN_CACHE_CSS=750
+export HMN_CACHE_JS=250
+html-minifier-next --minify-css --minify-js input.html
+```
+
+**Configuration file:**
+
+```json
+{
+  "minifyCSS": true,
+  "cacheCSS": 750,
+  "minifyJS": true,
+  "cacheJS": 250
+}
+```
+
+When to adjust cache sizes:
+
+* Single file processing: Default `500` is sufficient
+* Batch processing (CI/CD): Increase to `1000` or higher for better cache hit rates
+* Memory-constrained environments: Reduce to `200`–`300` to save memory
+* Hundreds/thousands of files: Increase to `1000`–`2000` for optimal performance
+
+The caches are created on first use and persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
 
 ### SVG minification
 
