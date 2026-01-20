@@ -1538,11 +1538,18 @@ function initCaches(options) {
     // Determine default size based on environment
     const defaultSize = process.env.CI === 'true' ? 1000 : 500;
 
-    // Get cache sizes with precedence: options > env > default
+    // Helper to parse env var: returns parsed number (including 0) or undefined if absent/invalid
+    const parseEnvCacheSize = (envVar) => {
+      if (envVar === undefined) return undefined;
+      const parsed = Number(envVar);
+      return Number.isNaN(parsed) ? undefined : parsed;
+    };
+
+    // Get cache sizes with precedence: Options > env > default
     const cssSize = options.cacheCSS !== undefined ? options.cacheCSS
-                 : (Number(process.env.HMN_CACHE_CSS) || defaultSize);
+                 : (parseEnvCacheSize(process.env.HMN_CACHE_CSS) ?? defaultSize);
     const jsSize = options.cacheJS !== undefined ? options.cacheJS
-                 : (Number(process.env.HMN_CACHE_JS) || defaultSize);
+                 : (parseEnvCacheSize(process.env.HMN_CACHE_JS) ?? defaultSize);
 
     // Coerce `0` to `1` (minimum functional cache size) to avoid immediate eviction
     const cssFinalSize = cssSize === 0 ? 1 : cssSize;
