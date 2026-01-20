@@ -1,7 +1,7 @@
 // Imports
 
 import RelateURL from 'relateurl';
-import { stableStringify, identity, identityAsync, replaceAsync } from './utils.js';
+import { LRU, stableStringify, identity, identityAsync, replaceAsync } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -32,10 +32,9 @@ function shouldMinifyInnerHTML(options) {
  * @param {Function} deps.getSwc - Function to lazily load @swc/core
  * @param {LRU} deps.cssMinifyCache - CSS minification cache
  * @param {LRU} deps.jsMinifyCache - JS minification cache
- * @param {LRU} deps.urlMinifyCache - URL minification cache
  * @returns {MinifierOptions} Normalized options with defaults applied
  */
-const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssMinifyCache, jsMinifyCache, urlMinifyCache } = {}) => {
+const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssMinifyCache, jsMinifyCache } = {}) => {
   const options = {
     name: function (name) {
       return name.toLowerCase();
@@ -329,7 +328,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
       const relateUrlInstance = new RelateURL(relateUrlOptions.site || '', relateUrlOptions);
 
       // Create instance-specific cache (results depend on site configuration)
-      const instanceCache = urlMinifyCache ? new (urlMinifyCache.constructor)(500) : null;
+      const instanceCache = new LRU(500);
 
       options.minifyURLs = function (text) {
         // Fast-path: Skip if text doesn’t look like a URL that needs processing

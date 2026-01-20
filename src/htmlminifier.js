@@ -94,7 +94,6 @@ async function getSwc() {
 // Minification caches (initialized on first use with configurable sizes)
 let cssMinifyCache = null;
 let jsMinifyCache = null;
-let urlMinifyCache = null;
 
 // Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
@@ -1551,11 +1550,9 @@ function initCaches(options) {
 
     cssMinifyCache = new LRU(cssFinalSize);
     jsMinifyCache = new LRU(jsFinalSize);
-    // URL cache factory with default size (not configurable)
-    urlMinifyCache = new LRU(1);
   }
 
-  return { cssMinifyCache, jsMinifyCache, urlMinifyCache };
+  return { cssMinifyCache, jsMinifyCache };
 }
 
 /**
