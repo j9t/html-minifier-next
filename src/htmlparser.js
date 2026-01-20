@@ -430,6 +430,42 @@ export class HTMLParser {
             }
           }
 
+          if (!attr && isLimited) {
+            // If we limited the input and got no match, try manual extraction
+            // This handles cases where quoted attributes exceed `MAX_ATTR_PARSE_LENGTH`
+            const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
+            if (manualMatch) {
+              const quoteChar = searchStr[manualMatch[0].length];
+              if (quoteChar === '"' || quoteChar === "'") {
+                // Search in the full HTML (not limited substring) for closing quote
+                const closeQuote = fullHtml.indexOf(quoteChar, currentPos + manualMatch[0].length + 1);
+                if (closeQuote !== -1) {
+                  const fullAttrLen = closeQuote - currentPos + 1;
+                  const numCustomParts = handler.customAttrSurround
+                    ? handler.customAttrSurround.length * NCP
+                    : 0;
+                  const baseIndex = 1 + numCustomParts;
+
+                  attr = [];
+                  attr[0] = fullHtml.substring(currentPos, closeQuote + 1);
+                  attr[baseIndex] = manualMatch[1]; // Attribute name
+                  attr[baseIndex + 1] = '='; // customAssign
+                  const value = fullHtml.substring(currentPos + manualMatch[0].length + 1, closeQuote);
+                  // Place value at correct index based on quote type
+                  if (quoteChar === '"') {
+                    attr[baseIndex + 2] = value; // Double-quoted value
+                  } else {
+                    attr[baseIndex + 3] = value; // Single-quoted value
+                  }
+                  currentPos += fullAttrLen;
+                  consumed += fullAttrLen;
+                  match.attrs.push(attr);
+                  continue;
+                }
+              }
+            }
+          }
+
           if (!attr) {
             break;
           }
