@@ -325,7 +325,23 @@ html-minifier-next --minify-css --minify-js input.html
 }
 ```
 
-When to adjust cache sizes:
+**For batch/CI processing:**
+
+Set `CI=true` to double default cache sizes (optimal for processing many files):
+
+```shell
+# Single command
+CI=true html-minifier-next --minify-css --minify-js input.html
+
+# Or export for multiple commands
+export CI=true
+html-minifier-next --minify-css --minify-js file1.html
+html-minifier-next --minify-css --minify-js file2.html
+```
+
+This is particularly useful in CI/CD pipelines where you’re processing multiple files and want better performance without manually tuning cache sizes.
+
+**When to adjust cache sizes:**
 
 * Single file processing: Default `500` is sufficient
 * Batch processing (CI/CD): Increase to `1000` or higher for better cache hit rates
