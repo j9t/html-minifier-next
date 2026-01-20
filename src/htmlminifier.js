@@ -250,14 +250,18 @@ function mergeConsecutiveScripts(html) {
  * @prop {number} [cacheCSS]
  *  The maximum number of entries for the CSS minification cache. Higher values
  *  improve performance for inputs with repeated CSS (e.g., batch processing).
- *  The cache is created on first use with the configured size.
+ *  - Cache is created on first `minify()` call and persists for the process lifetime
+ *  - Cache size is locked after first call—subsequent calls reuse the same cache
+ *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
  *
  *  Default: `500` (or `1000` when `CI=true` environment variable is set)
  *
  * @prop {number} [cacheJS]
  *  The maximum number of entries for the JavaScript minification cache. Higher
  *  values improve performance for inputs with repeated JavaScript.
- *  The cache is created on first use with the configured size.
+ *  - Cache is created on first `minify()` call and persists for the process lifetime
+ *  - Cache size is locked after first call—subsequent calls reuse the same cache
+ *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
  *
  *  Default: `500` (or `1000` when `CI=true` environment variable is set)
  *
@@ -1520,11 +1524,17 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
 }
 
 /**
- * Initialize minification caches with configurable sizes
- * Caches are created on first use and reused for subsequent calls
+ * Initialize minification caches with configurable sizes.
+ *
+ * Important behavior notes:
+ * - Caches are created on the first `minify()` call and persist for the lifetime of the process
+ * - Cache sizes are locked after first initialization—subsequent calls use the same caches
+ *   even if different `cacheCSS`/`cacheJS` options are provided
+ * - The first call’s options determine the cache sizes for subsequent calls
+ * - Explicit `0` values are coerced to `1` (minimum functional cache size)
  */
 function initCaches(options) {
-  // Only create caches once (on first call)
+  // Only create caches once (on first call)—sizes are locked after this
   if (!cssMinifyCache) {
     // Determine default size based on environment
     const defaultSize = process.env.CI === 'true' ? 1000 : 500;
@@ -1535,8 +1545,12 @@ function initCaches(options) {
     const jsSize = options.cacheJS !== undefined ? options.cacheJS
                  : (Number(process.env.HMN_CACHE_JS) || defaultSize);
 
-    cssMinifyCache = new LRU(cssSize);
-    jsMinifyCache = new LRU(jsSize);
+    // Coerce `0` to `1` (minimum functional cache size) to avoid immediate eviction
+    const cssFinalSize = cssSize === 0 ? 1 : cssSize;
+    const jsFinalSize = jsSize === 0 ? 1 : jsSize;
+
+    cssMinifyCache = new LRU(cssFinalSize);
+    jsMinifyCache = new LRU(jsFinalSize);
     // URL cache factory with default size (not configurable)
     urlMinifyCache = new LRU(1);
   }

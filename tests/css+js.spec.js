@@ -783,5 +783,17 @@ describe('CSS and JS', () => {
 
       assert.ok(result.includes('function largeTest(){'), 'JS should minify with large cache');
     });
+
+    test('Zero cache size coerces to `1`', async () => {
+      const input = '<style>.zero { margin: 0; }</style>';
+
+      // Should coerce `0` to `1` and still work
+      const result = await minify(input, {
+        minifyCSS: true,
+        cacheCSS: 0 // Should be coerced to `1`
+      });
+
+      assert.ok(result.includes('.zero{margin:0}'), 'CSS should minify even with `cacheCSS: 0`');
+    });
   });
 });
