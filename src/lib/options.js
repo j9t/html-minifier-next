@@ -337,20 +337,15 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
           return text;
         }
 
-        // Check instance-specific cache
-        if (instanceCache) {
-          const cached = instanceCache.get(text);
-          if (cached !== undefined) {
-            return cached;
-          }
+        // Check cache
+        const cached = instanceCache.get(text);
+        if (cached !== undefined) {
+          return cached;
         }
 
         try {
           const result = relateUrlInstance.relate(text);
-          // Cache successful results
-          if (instanceCache) {
-            instanceCache.set(text, result);
-          }
+          instanceCache.set(text, result);
           return result;
         } catch (err) {
           // Don’t cache errors
