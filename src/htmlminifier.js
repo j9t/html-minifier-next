@@ -91,10 +91,10 @@ async function getSwc() {
   return swcPromise;
 }
 
-// Minification caches
-const cssMinifyCache = new LRU(500);
-const jsMinifyCache = new LRU(500);
-const urlMinifyCache = new LRU(500);
+// Minification caches (initialized on first use with configurable sizes)
+let cssMinifyCache = null;
+let jsMinifyCache = null;
+let urlMinifyCache = null;
 
 // Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
@@ -246,6 +246,20 @@ function mergeConsecutiveScripts(html) {
  *  the element may be trimmed.
  *
  *  Default: Built-in `canTrimWhitespace` function
+ *
+ * @prop {number} [cacheCSS]
+ *  The maximum number of entries for the CSS minification cache. Higher values
+ *  improve performance for inputs with repeated CSS (e.g., batch processing).
+ *  The cache is created on first use with the configured size.
+ *
+ *  Default: `500` (or `1000` when `CI=true` environment variable is set)
+ *
+ * @prop {number} [cacheJS]
+ *  The maximum number of entries for the JavaScript minification cache. Higher
+ *  values improve performance for inputs with repeated JavaScript.
+ *  The cache is created on first use with the configured size.
+ *
+ *  Default: `500` (or `1000` when `CI=true` environment variable is set)
  *
  * @prop {boolean} [caseSensitive]
  *  When true, tag and attribute names are treated as case-sensitive.
@@ -1506,19 +1520,46 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
 }
 
 /**
+ * Initialize minification caches with configurable sizes
+ * Caches are created on first use and reused for subsequent calls
+ */
+function initCaches(options) {
+  // Only create caches once (on first call)
+  if (!cssMinifyCache) {
+    // Determine default size based on environment
+    const defaultSize = process.env.CI === 'true' ? 1000 : 500;
+
+    // Get cache sizes with precedence: options > env > default
+    const cssSize = options.cacheCSS !== undefined ? options.cacheCSS
+                 : (Number(process.env.HMN_CACHE_CSS) || defaultSize);
+    const jsSize = options.cacheJS !== undefined ? options.cacheJS
+                 : (Number(process.env.HMN_CACHE_JS) || defaultSize);
+
+    cssMinifyCache = new LRU(cssSize);
+    jsMinifyCache = new LRU(jsSize);
+    // URL cache factory with default size (not configurable)
+    urlMinifyCache = new LRU(1);
+  }
+
+  return { cssMinifyCache, jsMinifyCache, urlMinifyCache };
+}
+
+/**
  * @param {string} value
  * @param {MinifierOptions} [options]
  * @returns {Promise<string>}
  */
 export const minify = async function (value, options) {
   const start = Date.now();
+
+  // Initialize caches on first use with configurable sizes
+  const caches = initCaches(options || {});
+
   options = processOptions(options || {}, {
     getLightningCSS,
     getTerser,
     getSwc,
-    cssMinifyCache,
-    jsMinifyCache,
-    urlMinifyCache
+    ...caches
   });
   let result = await minifyHTML(value, options);
 
