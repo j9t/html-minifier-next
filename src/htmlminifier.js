@@ -1538,11 +1538,14 @@ function initCaches(options) {
     // Determine default size based on environment
     const defaultSize = process.env.CI === 'true' ? 1000 : 500;
 
-    // Helper to parse env var: returns parsed number (including 0) or undefined if absent/invalid
+    // Helper to parse env var—returns parsed number (including 0) or undefined if absent, invalid, or negative
     const parseEnvCacheSize = (envVar) => {
       if (envVar === undefined) return undefined;
       const parsed = Number(envVar);
-      return Number.isNaN(parsed) ? undefined : parsed;
+      if (Number.isNaN(parsed) || !Number.isFinite(parsed) || parsed < 0) {
+        return undefined;
+      }
+      return parsed;
     };
 
     // Get cache sizes with precedence: Options > env > default

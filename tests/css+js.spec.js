@@ -799,5 +799,59 @@ describe('CSS and JS', () => {
 
       assert.ok(result.includes('.zero{margin:0}'), 'CSS should minify even with `cacheCSS: 0`');
     });
+
+    test('Negative env var returns undefined (uses default)', async () => {
+      const input = '<style>.test { color: red; }</style>';
+
+      // Set negative env var—should be ignored
+      process.env.HMN_CACHE_CSS = '-100';
+      try {
+        const result = await minify(input, {
+          minifyCSS: true
+        });
+
+        // Should work with default cache size (check for selector and minified format)
+        assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is negative');
+        assert.ok(result.includes('color:'), 'Should contain color property');
+      } finally {
+        delete process.env.HMN_CACHE_CSS;
+      }
+    });
+
+    test('Infinity env var returns undefined (uses default)', async () => {
+      const input = '<style>.test { color: blue; }</style>';
+
+      // Set `Infinity` env var—should be ignored
+      process.env.HMN_CACHE_CSS = 'Infinity';
+      try {
+        const result = await minify(input, {
+          minifyCSS: true
+        });
+
+        // Should work with default cache size (Lightning CSS converts blue to hex)
+        assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is Infinity');
+        assert.ok(result.includes('color:'), 'Should contain color property');
+      } finally {
+        delete process.env.HMN_CACHE_CSS;
+      }
+    });
+
+    test('Invalid string env var returns undefined (uses default)', async () => {
+      const input = '<style>.test { color: green; }</style>';
+
+      // Set invalid string env var—should be ignored
+      process.env.HMN_CACHE_CSS = 'not-a-number';
+      try {
+        const result = await minify(input, {
+          minifyCSS: true
+        });
+
+        // Should work with default cache size (Lightning CSS converts green to hex)
+        assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is invalid string');
+        assert.ok(result.includes('color:'), 'Should contain color property');
+      } finally {
+        delete process.env.HMN_CACHE_CSS;
+      }
+    });
   });
 });
