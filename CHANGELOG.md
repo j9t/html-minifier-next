@@ -16,6 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * Refactored HTML parser to reduce string slicing operations, improving memory efficiency for large files
+* Made HTML parser correctly handle quoted attributes exceeding 20 KB (e.g., large data URIs, inline assets) by searching the full document for attribute boundaries instead of the limited substring
 
 ## [4.18.0] - 2026-01-19
 
