@@ -744,14 +744,16 @@ describe('CSS and JS', () => {
 
       // Test environment variable override
       process.env.HMN_CACHE_CSS = '900';
-      const result = await minify(input, {
-        minifyCSS: true
-      });
+      try {
+        const result = await minify(input, {
+          minifyCSS: true
+        });
 
-      assert.ok(result.includes('.test{color:purple}'), 'CSS should minify with env var cache size');
-
-      // Clean up
-      delete process.env.HMN_CACHE_CSS;
+        assert.ok(result.includes('.test{color:purple}'), 'CSS should minify with env var cache size');
+      } finally {
+        // Clean-up always runs, even if assertion fails
+        delete process.env.HMN_CACHE_CSS;
+      }
     });
 
     test('Option overrides env var', async () => {
@@ -760,16 +762,18 @@ describe('CSS and JS', () => {
       // Set env var first
       process.env.HMN_CACHE_CSS = '100';
 
-      // Option should override env var
-      const result = await minify(input, {
-        minifyCSS: true,
-        cacheCSS: 650
-      });
+      try {
+        // Option should override env var
+        const result = await minify(input, {
+          minifyCSS: true,
+          cacheCSS: 650
+        });
 
-      assert.ok(result.includes('.foo{border:none}'), 'Option should override env var');
-
-      // Clean up
-      delete process.env.HMN_CACHE_CSS;
+        assert.ok(result.includes('.foo{border:none}'), 'Option should override env var');
+      } finally {
+        // Clean-up always runs, even if assertion fails
+        delete process.env.HMN_CACHE_CSS;
+      }
     });
 
     test('Very large cache sizes', async () => {
