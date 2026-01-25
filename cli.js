@@ -6,9 +6,7 @@
  * The MIT License (MIT)
  *
  *  Copyright 2014–2016 Zoltan Frombach
- *
  *  Copyright Juriy “kangax” Zaytsev
- *
  *  Copyright 2025 Jens Oliver Meiert
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy of
