@@ -101,8 +101,8 @@ See [the original blog post](https://perfectionkills.com/experimenting-with-html
 
 HTML Minifier Next provides presets for common use cases. Presets are pre-configured option sets that can be used as a starting point:
 
-* `conservative`: Safe minification suitable for most projects. Includes whitespace collapsing, comment removal, and doctype normalization.
-* `comprehensive`: More aggressive minification for better file size reduction. Includes relevant conservative options plus attribute quote removal, optional tag removal, and more.
+* `conservative`: Basic minification with whitespace collapsing, comment removal, and removal of select attributes.
+* `comprehensive`: More advanced minification for better file size reduction, including relevant conservative options plus attribute quote removal, optional tag removal, and more.
 
 To review the specific options set, [presets.js](https://github.com/j9t/html-minifier-next/blob/main/src/presets.js) lists them in an accessible manner.
 
@@ -183,7 +183,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 ### Sorting attributes and style classes
 
-Minifier options like `sortAttributes` and `sortClassName` won’t impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for gzip and Brotli used over HTTP.
+Minifier options like `sortAttributes` and `sortClassName` won’t impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for Gzip and Brotli used over HTTP.
 
 ### CSS minification
 
