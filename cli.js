@@ -281,8 +281,8 @@ program.option('--input-dir <dir>', 'Specify an input directory');
 program.option('--ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 program.option('--output-dir <dir>', 'Specify an output directory');
 program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated), e.g., “html” or “html,htm,php”');
-program.option('--cache-css <size>', 'Set CSS minification cache size (number of entries, default: 500 [1000 in CI])', parseValidInt('cacheCSS'));
-program.option('--cache-js <size>', 'Set JavaScript minification cache size (number of entries, default: 500 [1000 in CI])', parseValidInt('cacheJS'));
+program.option('--cache-css <size>', 'Set CSS minification cache size (number of entries, default: 500)', parseValidInt('cacheCSS'));
+program.option('--cache-js <size>', 'Set JavaScript minification cache size (number of entries, default: 500)', parseValidInt('cacheJS'));
 
 (async () => {
   let content;
