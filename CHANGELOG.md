@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.1] - 2026-01-29
+
+### Changed
+
+* Removed `CI=true` environment variable detection for cache size defaults; use `cacheCSS`/`cacheJS` options or `HMN_CACHE_CSS`/`HMN_CACHE_JS` environment variables instead
+* Documented SVG leading and trailing zero removal
+
+### Fixed
+
+* Updated CommonJS preset example to use `{ preset: 'comprehensive' }` instead of `getPreset()`
+
 ## [4.19.0] - 2026-01-20
 
 ### Added
@@ -11,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Introduced configurable minification cache sizes for CSS and JavaScript
   - New `cacheCSS` and `cacheJS` options in config file and programmatic API, `--cache-css` and `--cache-js` CLI flags
   - Environment variable support: `HMN_CACHE_CSS` and `HMN_CACHE_JS`
-  - Smart defaults: 500 entries (CSS/JS), auto-increases to 1000 in CI mode (`CI=true`)
+  - Default: 500 entries (CSS/JS)
 
 ### Changed
 
