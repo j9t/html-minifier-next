@@ -253,7 +253,7 @@ function mergeConsecutiveScripts(html) {
  *  - Cache size is locked after first call—subsequent calls reuse the same cache
  *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
  *
- *  Default: `500` (or `1000` when `CI=true` environment variable is set)
+ *  Default: `500`
  *
  * @prop {number} [cacheJS]
  *  The maximum number of entries for the JavaScript minification cache. Higher
@@ -262,7 +262,7 @@ function mergeConsecutiveScripts(html) {
  *  - Cache size is locked after first call—subsequent calls reuse the same cache
  *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
  *
- *  Default: `500` (or `1000` when `CI=true` environment variable is set)
+ *  Default: `500`
  *
  * @prop {boolean} [caseSensitive]
  *  When true, tag and attribute names are treated as case-sensitive.
@@ -1535,8 +1535,7 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
 function initCaches(options) {
   // Only create caches once (on first call)—sizes are locked after this
   if (!cssMinifyCache) {
-    // Determine default size based on environment
-    const defaultSize = process.env.CI === 'true' ? 1000 : 500;
+    const defaultSize = 500;
 
     // Helper to parse env var—returns parsed number (including 0) or undefined if absent, invalid, or negative
     const parseEnvCacheSize = (envVar) => {
