@@ -87,10 +87,10 @@ console.log(result); // “<p title=example id=moo>foo”
 CommonJS:
 
 ```javascript
-const { minify, getPreset } = require('html-minifier-next');
+const { minify } = require('html-minifier-next');
 
 (async () => {
-  const result = await minify('<p title="example" id="moo">foo</p>', getPreset('comprehensive'));
+  const result = await minify('<p title="example" id="moo">foo</p>', { preset: 'comprehensive' });
   console.log(result); // “<p id=moo title=example>foo”
 })();
 ```
@@ -130,8 +130,8 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 | Option (config/CLI) | Description | Default |
 | --- | --- | --- |
-| `cacheCSS`<br>`--cache-css` | Set CSS minification cache size; higher values improve performance for batch processing | `500` (or `1000` when `CI=true`) |
-| `cacheJS`<br>`--cache-js` | Set JavaScript minification cache size; higher values improve performance for batch processing | `500` (or `1000` when `CI=true`) |
+| `cacheCSS`<br>`--cache-css` | Set CSS minification cache size; higher values improve performance for batch processing | `500` |
+| `cacheJS`<br>`--cache-js` | Set JavaScript minification cache size; higher values improve performance for batch processing | `500` |
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
@@ -295,8 +295,8 @@ const result = await minify(html, {
   minifyCSS: true,
   minifyJS: true,
   // Configure cache sizes (in number of entries)
-  cacheCSS: 750,  // CSS cache size, default: 500 (1000 in CI mode)
-  cacheJS: 250    // JS cache size, default: 500 (1000 in CI mode)
+  cacheCSS: 750,  // CSS cache size, default: 500
+  cacheJS: 250    // JS cache size, default: 500
 });
 ```
 
@@ -325,26 +325,10 @@ html-minifier-next --minify-css --minify-js input.html
 }
 ```
 
-**For batch/CI processing:**
-
-Set `CI=true` to double default cache sizes (optimal for processing many files):
-
-```shell
-# Single command
-CI=true html-minifier-next --minify-css --minify-js input.html
-
-# Or export for multiple commands
-export CI=true
-html-minifier-next --minify-css --minify-js file1.html
-html-minifier-next --minify-css --minify-js file2.html
-```
-
-This is particularly useful in CI/CD pipelines where you’re processing multiple files and want better performance without manually tuning cache sizes.
-
 **When to adjust cache sizes:**
 
 * Single file processing: Default `500` is sufficient
-* Batch processing (CI/CD): Increase to `1000` or higher for better cache hit rates
+* Batch processing: Increase to `1000` or higher for better cache hit rates
 * Memory-constrained environments: Reduce to `200`–`300` to save memory
 * Hundreds/thousands of files: Increase to `1000`–`2000` for optimal performance
 
@@ -382,6 +366,10 @@ What gets optimized:
 4. Default attribute removal: Well-documented SVG default attributes are removed
    - `fill-opacity="1"` → removed
    - `stroke-linecap="butt"` → removed
+
+5. Leading and trailing zero removal: Unnecessary zeros are stripped from numeric values
+   - `0.5` → `.5`, `-0.3` → `-.3` (leading zeros)
+   - `1.0` → `1`, `10.500` → `10.5` (trailing zeros)
 
 You can customize the optimization behavior by providing an options object:
 
