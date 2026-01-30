@@ -41,6 +41,8 @@ import { getPreset, getPresetNames } from './src/presets.js';
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
 
+const DEFAULT_FILE_EXTENSIONS = ['html', 'htm', 'xhtml', 'shtml'];
+
 const program = new Command();
 program.name(pkg.name);
 program.version(pkg.version);
@@ -275,12 +277,12 @@ function normalizeConfig(config) {
 }
 
 let config = {};
-program.option('-c --config-file <file>', 'Use config file');
-program.option('--preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('--input-dir <dir>', 'Specify an input directory');
 program.option('--ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 program.option('--output-dir <dir>', 'Specify an output directory');
-program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated), e.g., “html” or “html,htm,php”');
+program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to “html,htm,xhtml,shtml”; use “*” for all files');
+program.option('--preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
+program.option('-c --config-file <file>', 'Use config file');
 program.option('--cache-css <size>', 'Set CSS minification cache size (number of entries, default: 500)', parseValidInt('cacheCSS'));
 program.option('--cache-js <size>', 'Set JavaScript minification cache size (number of entries, default: 500)', parseValidInt('cacheJS'));
 
@@ -404,6 +406,7 @@ program.option('--cache-js <size>', 'Set JavaScript minification cache size (num
 
   function parseFileExtensions(fileExt) {
     if (!fileExt) return [];
+    if (fileExt.trim() === '*') return ['*'];
     const list = fileExt
       .split(',')
       .map(ext => ext.trim().replace(/^\.+/, '').toLowerCase())
@@ -412,8 +415,9 @@ program.option('--cache-js <size>', 'Set JavaScript minification cache size (num
   }
 
   function shouldProcessFile(filename, fileExtensions) {
-    if (!fileExtensions || fileExtensions.length === 0) {
-      return true; // No extensions specified, process all files
+    // Wildcard: process all files
+    if (fileExtensions.includes('*')) {
+      return true;
     }
 
     const fileExt = path.extname(filename).replace(/^\.+/, '').toLowerCase();
@@ -639,9 +643,9 @@ program.option('--cache-js <size>', 'Set JavaScript minification cache size (num
 
   const { inputDir, outputDir, fileExt, ignoreDir } = programOptions;
 
-  // Resolve file extensions: CLI argument takes priority over config file, even if empty string
+  // Resolve file extensions: CLI argument > config file > defaults
   const hasCliFileExt = program.getOptionValueSource('fileExt') === 'cli';
-  const resolvedFileExt = hasCliFileExt ? fileExt : config.fileExt;
+  const resolvedFileExt = hasCliFileExt ? (fileExt || '*') : (config.fileExt || DEFAULT_FILE_EXTENSIONS);
 
   // Resolve ignore patterns: CLI argument takes priority over config file
   const hasCliIgnoreDir = program.getOptionValueSource('ignoreDir') === 'cli';

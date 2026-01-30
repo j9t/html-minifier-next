@@ -355,16 +355,35 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/spaced-ext/extension.txt'), false);
   });
 
-  test('Should process all files when no extension specified', () => {
+  test('Should process only default extensions when no extension specified', () => {
     const cliArguments = [
       '--input-dir=./',
-      '--output-dir=./tmp/all-files',
+      '--output-dir=./tmp/default-ext',
       '--collapse-whitespace'
     ];
 
     execCli(cliArguments);
 
-    // Should process all files when no --file-ext is specified
+    // Should process default HTML extensions
+    assert.strictEqual(existsFixture('tmp/default-ext/extension.html'), true);
+    assert.strictEqual(existsFixture('tmp/default-ext/extension.htm'), true);
+
+    // Should not process non-default extensions
+    assert.strictEqual(existsFixture('tmp/default-ext/extension.php'), false);
+    assert.strictEqual(existsFixture('tmp/default-ext/extension.txt'), false);
+  });
+
+  test('Should process all files with --file-ext=*', () => {
+    const cliArguments = [
+      '--input-dir=./',
+      '--output-dir=./tmp/all-files',
+      '--file-ext=*',
+      '--collapse-whitespace'
+    ];
+
+    execCli(cliArguments);
+
+    // Should process all files when wildcard is specified
     assert.strictEqual(existsFixture('tmp/all-files/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/all-files/extension.htm'), true);
     assert.strictEqual(existsFixture('tmp/all-files/extension.php'), true);
@@ -400,7 +419,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/verify-output/extension.php'), false);
   });
 
-  test('Should handle empty extension list gracefully', () => {
+  test('Should process all files when `--file-ext` is empty string', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/empty-ext',
@@ -410,7 +429,7 @@ describe('CLI', () => {
 
     execCli(cliArguments);
 
-    // Should process all files when empty string is provided
+    // Empty `--file-ext=` is treated as wildcard (all files)
     assert.strictEqual(existsFixture('tmp/empty-ext/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/empty-ext/extension.htm'), true);
     assert.strictEqual(existsFixture('tmp/empty-ext/extension.php'), true);
@@ -502,7 +521,7 @@ describe('CLI', () => {
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-override.json'));
   });
 
-  test('Should override config file extensions with empty CLI argument', () => {
+  test('Should override config file extensions with empty CLI argument (wildcard)', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     const configContent = JSON.stringify({
       fileExt: 'html', // Config restricts to HTML only
@@ -514,12 +533,12 @@ describe('CLI', () => {
       '--config-file=./tmp/test-config-empty-override.json',
       '--input-dir=./',
       '--output-dir=./tmp/config-empty-override',
-      '--file-ext=' // Empty CLI argument should override config and process ALL files
+      '--file-ext=' // Empty CLI argument overrides config; treated as wildcard
     ];
 
     execCli(cliArguments);
 
-    // Should process ALL files when CLI provides empty string (overriding config restriction)
+    // Should process ALL files (empty `--file-ext=` is treated as wildcard)
     assert.strictEqual(existsFixture('tmp/config-empty-override/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/config-empty-override/extension.htm'), true);
     assert.strictEqual(existsFixture('tmp/config-empty-override/extension.php'), true);

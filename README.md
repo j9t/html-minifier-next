@@ -34,11 +34,11 @@ Use `html-minifier-next --help` to check all available options:
 
 | Option | Description | Example |
 | --- | --- | --- |
-| `--input-dir <dir>` | Specify an input directory (best restricted with `--file-ext`) | `--input-dir=src` |
+| `--input-dir <dir>` | Specify an input directory | `--input-dir=src` |
 | `--ignore-dir <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>` | Specify an output directory | `--output-dir=dist` |
-| `--file-ext <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
 | `-o <file>`, `--output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
+| `--file-ext <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,xhtml,shtml`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
 | `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
 | `-v`, `--verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
@@ -54,7 +54,7 @@ You can use a configuration file to specify options. The file can be either JSON
 {
   "collapseWhitespace": true,
   "removeComments": true,
-  "fileExt": "html,htm",
+  "fileExt": "html,php",
   "ignoreDir": "libs,vendor"
 }
 ```
@@ -65,7 +65,7 @@ You can use a configuration file to specify options. The file can be either JSON
 module.exports = {
   collapseWhitespace: true,
   removeComments: true,
-  fileExt: "html,htm",
+  fileExt: "html,php",
   ignoreDir: ["libs", "vendor"]
 };
 ```
@@ -453,25 +453,23 @@ html-minifier-next --collapse-whitespace --remove-comments --minify-js --input-d
 Example using npx:
 
 ```shell
-npx html-minifier-next --input-dir=test --file-ext html --preset comprehensive --output-dir example
+npx html-minifier-next --input-dir=test --preset comprehensive --output-dir example
 ```
 
 **Process specific files and directories:**
 
 ```shell
-# Process only HTML files
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html
+# Process default extensions (html, htm, xhtml, shtml)
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 
-# Process multiple file extensions
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,htm,php
+# Process only specific extensions
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,php
 
-# Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,htm"`)
+# Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,php"`)
 html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir=dist
 
-# Process all files (default behavior)
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
-# When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier
-# Consider restricting with `--file-ext` to avoid touching binaries (e.g., images, archives)
+# Process all files (explicit wildcard)
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext='*'
 ```
 
 **Exclude directories from processing:**
