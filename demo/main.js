@@ -232,7 +232,7 @@ const defaultOptions = [
     unsafe: true
   },
   {
-    id: 'sortClassName',
+    id: 'sortClassNames',
     type: 'checkbox',
     label: 'Sort class name',
     helpText: 'Sort style classes by frequency',

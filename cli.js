@@ -167,7 +167,7 @@ const mainOptions = {
   removeStyleLinkTypeAttributes: 'Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact',
   removeTagWhitespace: 'Remove space between attributes whenever possible; note that this will result in invalid HTML',
   sortAttributes: 'Sort attributes by frequency',
-  sortClassName: 'Sort style classes by frequency',
+  sortClassNames: 'Sort style classes by frequency',
   trimCustomFragments: 'Trim whitespace around custom fragments (`--ignore-custom-fragments`)',
   useShortDoctype: 'Replaces the doctype with the short HTML doctype'
 };

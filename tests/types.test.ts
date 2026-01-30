@@ -199,7 +199,7 @@ async function testFunctionOptions() {
     sortAttributes: (tag: string, attrs: HTMLAttribute[]) => {
       attrs.sort((a, b) => a.name.localeCompare(b.name));
     },
-    sortClassName: (value: string) => {
+    sortClassNames: (value: string) => {
       return value.split(' ').sort().join(' ');
     },
   };
@@ -316,7 +316,7 @@ async function testRealWorldUsage() {
         drop_console: false,
       },
     },
-    sortClassName: true,
+    sortClassNames: true,
   });
 
   return result;

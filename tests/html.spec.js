@@ -381,8 +381,8 @@ describe('HTML', () => {
 
     // Preserve hair space in class names when deduplicating and reordering
     input = '<a class="0 1\u200a3 2 3"></a>';
-    assert.strictEqual(await minify(input, { sortClassName: false }), input);
-    assert.strictEqual(await minify(input, { sortClassName: true }), input);
+    assert.strictEqual(await minify(input, { sortClassNames: false }), input);
+    assert.strictEqual(await minify(input, { sortClassNames: true }), input);
   });
 
   test('Doctype normalization', async () => {
@@ -4025,55 +4025,55 @@ describe('HTML', () => {
       '<s class="baz foo moo"></s>' +
       '<u class="moo baz"></u>';
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, { sortClassName: false }), input);
+    assert.strictEqual(await minify(input, { sortClassNames: false }), input);
     output = '<a class="foo moo"></a>' +
       '<b class="foo bar"></b>' +
       '<i class="foo bar baz"></i>' +
       '<s class="foo baz moo"></s>' +
       '<u class="baz moo"></u>';
-    assert.strictEqual(await minify(input, { sortClassName: true }), output);
+    assert.strictEqual(await minify(input, { sortClassNames: true }), output);
 
     input = '<a class="moo <!-- htmlmin:ignore -->bar<!-- htmlmin:ignore --> foo baz"></a>';
     output = '<a class="moo bar foo baz"></a>';
     assert.strictEqual(await minify(input), output);
-    assert.strictEqual(await minify(input, { sortClassName: false }), output);
+    assert.strictEqual(await minify(input, { sortClassNames: false }), output);
     // When all classes have equal frequency, alphabetical order is used
     output = '<a class="bar baz foo moo"></a>';
-    assert.strictEqual(await minify(input, { sortClassName: true }), output);
+    assert.strictEqual(await minify(input, { sortClassNames: true }), output);
 
     input = '<div class="nav_sv_fo_v_column <#=(j === 0) ? \'nav_sv_fo_v_first\' : \'\' #> foo_bar"></div>';
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/<#[\s\S]*?#>/] }), input);
-    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/<#[\s\S]*?#>/], sortClassName: false }), input);
-    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/<#[\s\S]*?#>/], sortClassName: true }), input);
+    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/<#[\s\S]*?#>/], sortClassNames: false }), input);
+    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/<#[\s\S]*?#>/], sortClassNames: true }), input);
 
     input = '<a class="0 1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z"></a>';
-    assert.strictEqual(await minify(input, { sortClassName: false }), input);
-    assert.strictEqual(await minify(input, { sortClassName: true }), input);
+    assert.strictEqual(await minify(input, { sortClassNames: false }), input);
+    assert.strictEqual(await minify(input, { sortClassNames: true }), input);
 
     input = '<a class="add sort keys createSorter"></a>';
-    assert.strictEqual(await minify(input, { sortClassName: false }), input);
+    assert.strictEqual(await minify(input, { sortClassNames: false }), input);
     output = '<a class="add createSorter keys sort"></a>';
-    assert.strictEqual(await minify(input, { sortClassName: true }), output);
+    assert.strictEqual(await minify(input, { sortClassNames: true }), output);
 
     input = '<span class="sprite sprite-{{sprite}}"></span>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassName: true }), input);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassNames: true }), input);
 
     input = '<span class="{{sprite}}-sprite sprite"></span>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassName: true }), input);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassNames: true }), input);
 
     input = '<span class="sprite-{{sprite}}-sprite"></span>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassName: true }), input);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassNames: true }), input);
 
     input = '<span class="{{sprite}}"></span>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassName: true }), input);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassNames: true }), input);
 
     input = '<span class={{sprite}}></span>';
     output = '<span class="{{sprite}}"></span>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassName: true }), output);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassNames: true }), output);
 
     input = '<div class></div>';
-    assert.strictEqual(await minify(input, { sortClassName: false }), input);
-    assert.strictEqual(await minify(input, { sortClassName: true }), input);
+    assert.strictEqual(await minify(input, { sortClassNames: false }), input);
+    assert.strictEqual(await minify(input, { sortClassNames: true }), input);
   });
 
   test('Collapse attribute whitespace', async () => {
@@ -4108,10 +4108,10 @@ describe('HTML', () => {
     output = '<div title="hello world"></div>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
 
-    // Should work with `sortClassName` (correct alphabetical expectation)
+    // Should work with `sortClassNames` (correct alphabetical expectation)
     input = '<article class="lg:border-grey-700 lg:dark:border-grey-700-dark mb-[40px] cursor-pointer sm:mx-[40px] lg:flex lg:flex-row lg:border-[1px] lg:border-solid" data-selector="teaser-object parent-image-label picture-article" data-external-selector="\n      teaser-object parent-image-label \n        \n    "></article>';
     output = '<article class="cursor-pointer lg:border-[1px] lg:border-grey-700 lg:border-solid lg:dark:border-grey-700-dark lg:flex lg:flex-row mb-[40px] sm:mx-[40px]" data-selector="teaser-object parent-image-label picture-article" data-external-selector="teaser-object parent-image-label"></article>';
-    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, sortClassName: true }), output);
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, sortClassNames: true }), output);
 
     // Complex `script`/`div` example with whitespace
     input = '<script>  avenga.snacks.init()</script><div id="personalisation" data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null">  <div data-snacks-3:filterslider="_tracking.inview { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'View\', label = \'Meine FAZ\' }, _tracking.click { type = \'Filterslider\', subType = \'faz.net Startseite\', action = \'Click\', label = \'Meine FAZ\' }, register_button { text = \'Kostenfrei aktivieren\'}, _load { type = auth, loggedin = false }, id = \'no-reload\', criteria { groupids [1] }, headline = \'Meine F.A.Z.\', introtext = \'Wählen Sie Ihre Lieblingsthemen und wir zeigen Ihnen an dieser Stelle passende Beiträge.\', count = 35, client_title = \'faznet\', _plugins [login-reload, [auth-track, { regtype = \'Filterslider\', regsubtype = \'faz.net Startseite\', logintype = \'Filterslider\', loginsubtype = \'faz.net Startseite\'}]], shape = square"></div></div>';
@@ -4756,7 +4756,7 @@ describe('HTML', () => {
       removeStyleLinkTypeAttributes: true,
       removeTagWhitespace: true,
       sortAttributes: true,
-      sortClassName: false,
+      sortClassNames: false,
       trimCustomFragments: true,
       useShortDoctype: true
     };
@@ -4812,7 +4812,7 @@ describe('HTML', () => {
 
     const result = await minify(input, {
       sortAttributes: true,
-      sortClassName: true,
+      sortClassNames: true,
       processScripts: ['text/html', 'application/ld+json'],
       collapseWhitespace: true,
       minifyJS: true
@@ -4847,7 +4847,7 @@ describe('HTML', () => {
 
     const result = await minify(input, {
       sortAttributes: true,
-      sortClassName: true,
+      sortClassNames: true,
       collapseWhitespace: true,
       removeTagWhitespace: true,
       removeAttributeQuotes: true,
@@ -4869,7 +4869,7 @@ describe('HTML', () => {
 
     const benchmarkConfig = {
       sortAttributes: true,
-      sortClassName: true,
+      sortClassNames: true,
       collapseWhitespace: true,
       processScripts: ['text/html', 'application/ld+json'],
       removeTagWhitespace: true
@@ -4887,13 +4887,13 @@ describe('HTML', () => {
     assert.ok(result.match(/<div[^>]*>.*<\/div>/), 'Should have valid div structure');
   });
 
-  test('`sortAttributes` with `preventAttributesEscaping` and `sortClassName` combined', async () => {
+  test('`sortAttributes` with `preventAttributesEscaping` and `sortClassNames` combined', async () => {
     // Test all three sorting/escaping options together
     const input = '<div class="bar foo" id="test" data-value=\'{"key": "value"}\' data-config="[1,2,3]">content</div>';
 
     const result = await minify(input, {
       sortAttributes: true,
-      sortClassName: true,
+      sortClassNames: true,
       preventAttributesEscaping: true,
       processScripts: ['text/html', 'application/ld+json']
     });
@@ -4953,7 +4953,7 @@ describe('HTML', () => {
       removeStyleLinkTypeAttributes: true,
       removeTagWhitespace: true,
       sortAttributes: true,
-      sortClassName: true,
+      sortClassNames: true,
       trimCustomFragments: true,
       useShortDoctype: true
     };
@@ -5298,7 +5298,7 @@ describe('HTML', () => {
       removeStyleLinkTypeAttributes: true,
       removeTagWhitespace: true,
       sortAttributes: false,
-      sortClassName: false,
+      sortClassNames: false,
       trimCustomFragments: true,
       useShortDoctype: true
     };

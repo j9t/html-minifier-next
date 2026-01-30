@@ -49,7 +49,7 @@
   "removeStyleLinkTypeAttributes": true,
   "removeTagWhitespace": false,
   "sortAttributes": false,
-  "sortClassName": false,
+  "sortClassNames": false,
   "trimCustomFragments": true,
   "useShortDoctype": true
 }

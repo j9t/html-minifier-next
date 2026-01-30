@@ -614,9 +614,9 @@ function mergeConsecutiveScripts(html) {
  *
  *  Default: `false`
  *
- * @prop {boolean | ((value: string) => string)} [sortClassName]
+ * @prop {boolean | ((value: string) => string)} [sortClassNames]
  *  When true, enables sorting of class names inside `class` attributes.
- *  If a function is provided it will be used to transform/sort the class
+ *  If a function is provided, it will be used to transform/sort the class
  *  name string. If disabled, the minifier will attempt to preserve the
  *  class-name order from the input.
  *
@@ -638,7 +638,7 @@ function mergeConsecutiveScripts(html) {
 
 async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupChunks) {
   const attrChains = options.sortAttributes && Object.create(null);
-  const classChain = options.sortClassName && new TokenChain();
+  const classChain = options.sortClassNames && new TokenChain();
 
   function attrNames(attrs) {
     return attrs.map(function (attr) {
@@ -721,7 +721,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   const firstPassOptions = Object.assign({}, options, {
     // Disable sorting for the analysis pass
     sortAttributes: false,
-    sortClassName: false,
+    sortClassNames: false,
     // Disable aggressive minification that doesn’t affect attribute analysis
     collapseWhitespace: false,
     removeAttributeQuotes: false,
@@ -811,10 +811,10 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
   if (classChain) {
     const sorter = classChain.createSorter();
-    // Memoize `sortClassName` results—class lists often repeat in templates
+    // Memoize `sortClassNames` results—class lists often repeat in templates
     const classNameCache = new LRU(500);
 
-    options.sortClassName = function (value) {
+    options.sortClassNames = function (value) {
       // Fast path: Single class (no spaces) needs no sorting
       if (value.indexOf(' ') === -1) {
         return value;
@@ -926,7 +926,7 @@ async function minifyHTML(value, options, partialMarkup) {
   // Create sort functions after `htmlmin:ignore` processing but before custom fragment UID markers
   // This allows proper frequency analysis with access to ignored content via UID tokens
   if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
-      (options.sortClassName && typeof options.sortClassName !== 'function')) {
+      (options.sortClassNames && typeof options.sortClassNames !== 'function')) {
     await createSortFns(value, options, uidIgnore, null, ignoredMarkupChunks);
   }
 
