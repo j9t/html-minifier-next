@@ -505,7 +505,7 @@ html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 ```shell
 # Show processing details while minifying
 html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace
-# Output: Options: collapseWhitespace, html5
+# Output: CLI options: collapseWhitespace
 #   ✓ src/index.html: 1,234 → 892 bytes (-342, 27.7%)
 #   ✓ src/about.html: 2,100 → 1,654 bytes (-446, 21.2%)
 # ---
