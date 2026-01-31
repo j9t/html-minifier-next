@@ -632,8 +632,8 @@ function mergeConsecutiveScripts(html) {
  */
 
 async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupChunks) {
-  const attrChains = options.sortAttributes && Object.create(null);
-  const classChain = options.sortClassNames && new TokenChain();
+  const attrChains = options.sortAttributes && typeof options.sortAttributes !== 'function' && Object.create(null);
+  const classChain = options.sortClassNames && typeof options.sortClassNames !== 'function' && new TokenChain();
 
   function attrNames(attrs) {
     return attrs.map(function (attr) {
