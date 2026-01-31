@@ -14,7 +14,6 @@
   "customEventAttributes": [],
   "customFragmentQuantifierLimit": 200,
   "decodeEntities": true,
-  "html5": true,
   "ignoreCustomComments": [],
   "ignoreCustomFragments": [
     "<#[\\s\\S]*?#>",

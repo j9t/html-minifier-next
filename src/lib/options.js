@@ -42,7 +42,6 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
     canCollapseWhitespace,
     canTrimWhitespace,
     continueOnMinifyError: true,
-    html5: true,
     ignoreCustomComments: [
       /^!/,
       /^\s*#/

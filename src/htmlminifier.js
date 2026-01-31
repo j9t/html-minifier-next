@@ -355,11 +355,6 @@ function mergeConsecutiveScripts(html) {
  *
  *  Default: `false`
  *
- * @prop {boolean} [html5]
- *  Parse and emit using HTML5 rules. Set to `false` to use non-HTML5
- *  parsing behavior.
- *
- *  Default: `true`
  *
  * @prop {RegExp[]} [ignoreCustomComments]
  *  Comments matching any pattern in this array of regexes will be
@@ -1044,7 +1039,6 @@ async function minifyHTML(value, options, partialMarkup) {
     continueOnParseError: options.continueOnParseError,
     customAttrAssign: options.customAttrAssign,
     customAttrSurround: options.customAttrSurround,
-    html5: options.html5,
     // Compute `nextTag` only when whitespace collapse features require it
     wantsNextTag: !!(options.collapseWhitespace || options.collapseInlineTagWhitespace || options.conservativeCollapse),
 

@@ -49,13 +49,6 @@ const defaultOptions = [
     checked: true
   },
   {
-    id: 'html5',
-    type: 'checkbox',
-    label: 'HTML',
-    helpText: 'Parse input according to the HTML specification',
-    checked: true
-  },
-  {
     id: 'ignoreCustomFragments',
     type: 'text',
     label: 'Ignore custom fragments',
