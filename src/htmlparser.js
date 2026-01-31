@@ -546,7 +546,7 @@ export class HTMLParser {
         lastTag = 'colgroup';
         stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
         if (handler.start) {
-          await handler.start(lastTag, [], false, '');
+          await handler.start(lastTag, [], false, '', true);
         }
       }
 
