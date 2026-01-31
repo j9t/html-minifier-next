@@ -548,6 +548,9 @@ export class HTMLParser {
         if (handler.start) {
           await handler.start(lastTag, [], false, '', true);
         }
+      } else if (tagName !== 'col' && lastTag === 'colgroup') {
+        // Auto-close synthetic `<colgroup>` when a non-`col` element starts
+        await parseEndTag('', 'colgroup');
       }
 
       if (closeSelf.has(tagName) && lastTag === tagName) {
