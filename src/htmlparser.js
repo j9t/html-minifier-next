@@ -529,7 +529,9 @@ export class HTMLParser {
       if (lastTag === 'p' && nonPhrasing.has(tagName)) {
         await parseEndTag('', lastTag);
       } else if (tagName === 'tbody') {
-        await closeIfFoundInCurrentTable('thead');
+        if (!await closeIfFoundInCurrentTable('tfoot')) {
+          await closeIfFoundInCurrentTable('thead');
+        }
       } else if (tagName === 'tfoot') {
         if (!await closeIfFoundInCurrentTable('tbody')) {
           await closeIfFoundInCurrentTable('thead');
