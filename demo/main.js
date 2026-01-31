@@ -49,13 +49,6 @@ const defaultOptions = [
     checked: true
   },
   {
-    id: 'html5',
-    type: 'checkbox',
-    label: 'HTML',
-    helpText: 'Parse input according to the HTML specification',
-    checked: true
-  },
-  {
     id: 'ignoreCustomFragments',
     type: 'text',
     label: 'Ignore custom fragments',
@@ -232,7 +225,7 @@ const defaultOptions = [
     unsafe: true
   },
   {
-    id: 'sortClassName',
+    id: 'sortClassNames',
     type: 'checkbox',
     label: 'Sort class name',
     helpText: 'Sort style classes by frequency',
@@ -313,7 +306,10 @@ const MAX_URL_LENGTH = 2000; // Conservative limit for URL hash
 // Option migration map for backward compatibility
 // When renaming options, add entries here to preserve old URLs
 // Example: `{ 'oldOptionName': 'newOptionName' }`
-const OPTION_MIGRATIONS = {};
+const OPTION_MIGRATIONS = {
+  html5: null, // Removed in 5.0.0; discard from old URLs
+  sortClassName: 'sortClassNames'
+};
 
 const encodeState = (input, options) => {
   const state = {
@@ -354,8 +350,14 @@ const decodeState = (hash) => {
     if (state.o) {
       const migratedOptions = {};
       for (const [key, value] of Object.entries(state.o)) {
-        const newKey = OPTION_MIGRATIONS[key] || key;
-        migratedOptions[newKey] = value;
+        if (key in OPTION_MIGRATIONS) {
+          // `null` means the option was removed; skip it
+          if (OPTION_MIGRATIONS[key]) {
+            migratedOptions[OPTION_MIGRATIONS[key]] = value;
+          }
+        } else {
+          migratedOptions[key] = value;
+        }
       }
       state.o = migratedOptions;
     }

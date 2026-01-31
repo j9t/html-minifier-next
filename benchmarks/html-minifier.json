@@ -14,7 +14,6 @@
   "customEventAttributes": [],
   "customFragmentQuantifierLimit": 200,
   "decodeEntities": true,
-  "html5": true,
   "ignoreCustomComments": [],
   "ignoreCustomFragments": [
     "<#[\\s\\S]*?#>",
@@ -49,7 +48,7 @@
   "removeStyleLinkTypeAttributes": true,
   "removeTagWhitespace": false,
   "sortAttributes": false,
-  "sortClassName": false,
+  "sortClassNames": false,
   "trimCustomFragments": true,
   "useShortDoctype": true
 }

@@ -42,7 +42,7 @@ export const presets = {
     removeScriptTypeAttributes: true,
     removeStyleLinkTypeAttributes: true,
     sortAttributes: true,
-    sortClassName: true,
+    sortClassNames: true,
     useShortDoctype: true
   }
 };

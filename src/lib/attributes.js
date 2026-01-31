@@ -272,8 +272,8 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     }
   } else if (attrName === 'class') {
     attrValue = trimWhitespace(attrValue);
-    if (options.sortClassName) {
-      attrValue = options.sortClassName(attrValue);
+    if (options.sortClassNames) {
+      attrValue = options.sortClassNames(attrValue);
     } else {
       attrValue = collapseWhitespaceAll(attrValue);
     }
