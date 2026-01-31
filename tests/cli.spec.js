@@ -198,8 +198,8 @@ describe('CLI', () => {
 
   test('Should write files to output directory', () => {
     const cliArguments = [
-      '--input-dir=./',
-      '--output-dir=./tmp'
+      '-I', './',
+      '-O', './tmp'
     ];
 
     execCli(cliArguments);
@@ -208,8 +208,8 @@ describe('CLI', () => {
 
   test('Should write files to output nested directory', () => {
     const cliArguments = [
-      '--input-dir=./',
-      '--output-dir=./tmp/nested'
+      '-I', './',
+      '-O', './tmp/nested'
     ];
 
     execCli(cliArguments);
@@ -305,9 +305,9 @@ describe('CLI', () => {
 
   test('Should process files with multiple extensions', () => {
     const cliArguments = [
-      '--input-dir=./',
-      '--output-dir=./tmp/multi-ext',
-      '--file-ext=html,htm,php',
+      '-I', './',
+      '-O', './tmp/multi-ext',
+      '-f', 'html,htm,php',
       '--collapse-whitespace'
     ];
 
@@ -1055,9 +1055,9 @@ describe('CLI', () => {
     assert.ok(!output.includes('  '));
   });
 
-  test('Should use “comprehensive” preset', () => {
+  test('Should use "comprehensive" preset', () => {
     const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p class="z a">  Hello  </p>  </body></html>';
-    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--preset', 'comprehensive', '--verbose'], {
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-p', 'comprehensive', '--verbose'], {
       cwd: fixturesDir,
       input: input
     });
@@ -1160,9 +1160,9 @@ describe('CLI', () => {
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/sub/c.html'), '<html><body>c</body></html>');
 
     const result = execCliWithStderr([
-      '--input-dir=tmp',
-      '--output-dir=tmp-out',
-      '--ignore-dir=libs',
+      '-I', 'tmp',
+      '-O', 'tmp-out',
+      '-X', 'libs',
       '--collapse-whitespace'
     ]);
 

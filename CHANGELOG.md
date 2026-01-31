@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - **Migration:** Remove `html5: true` from your config (it’s now the only behavior); if you relied on `html5: false`, review your output for changes in element nesting
 * **BREAKING:** `sortClassName` was renamed to `sortClassNames`
   - **Migration:** If using `sortClassName`, rename to `sortClassNames`
+* Added CLI shortcut flags for directory and preset options: `-I` (`--input-dir`), `-O` (`--output-dir`), `-X` (`--ignore-dir`), `-f` (`--file-ext`), `-p` (`--preset`)
 
 @@
 

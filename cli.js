@@ -276,11 +276,11 @@ function normalizeConfig(config) {
 }
 
 let config = {};
-program.option('--input-dir <dir>', 'Specify an input directory');
-program.option('--ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
-program.option('--output-dir <dir>', 'Specify an output directory');
-program.option('--file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to “html,htm,xhtml,shtml”; use “*” for all files');
-program.option('--preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
+program.option('-I --input-dir <dir>', 'Specify an input directory');
+program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
+program.option('-O --output-dir <dir>', 'Specify an output directory');
+program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to “html,htm,xhtml,shtml”; use “*” for all files');
+program.option('-p --preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('-c --config-file <file>', 'Use config file');
 program.option('--cache-css <size>', 'Set CSS minification cache size (number of entries, default: 500)', parseValidInt('cacheCSS'));
 program.option('--cache-js <size>', 'Set JavaScript minification cache size (number of entries, default: 500)', parseValidInt('cacheJS'));

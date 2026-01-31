@@ -34,15 +34,15 @@ Use `html-minifier-next --help` to check all available options:
 
 | Option | Description | Example |
 | --- | --- | --- |
-| `--input-dir <dir>` | Specify an input directory | `--input-dir=src` |
-| `--ignore-dir <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
-| `--output-dir <dir>` | Specify an output directory | `--output-dir=dist` |
-| `-o <file>`, `--output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
-| `--file-ext <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,xhtml,shtml`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
-| `--preset <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
-| `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
-| `-v`, `--verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
-| `-d`, `--dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
+| `--input-dir <dir>`, `-I <dir>` | Specify an input directory | `--input-dir=src` |
+| `--ignore-dir <patterns>`, `-X <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
+| `--output-dir <dir>`, `-O <dir>` | Specify an output directory | `--output-dir=dist` |
+| `--output <file>`, `-o <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
+| `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,xhtml,shtml`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
+| `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
+| `--config-file <file>`, `-c <file>` | Use a configuration file | `--config-file=html-minifier.json` |
+| `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
+| `--dry`, `-d` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
 
 ### Configuration file
 
