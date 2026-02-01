@@ -12,7 +12,8 @@ const defaultOptions = [
     id: 'collapseAttributeWhitespace',
     type: 'checkbox',
     label: 'Collapse attribute whitespace',
-    helpText: 'Trim and collapse whitespace characters within attribute values'
+    helpText: 'Trim and collapse whitespace characters within attribute values',
+    checked: true
   },
   {
     id: 'collapseBooleanAttributes',
@@ -92,19 +93,22 @@ const defaultOptions = [
     id: 'minifyJS',
     type: 'checkbox',
     label: 'Minify JavaScript',
-    helpText: 'Minify JavaScript in <code>script</code> elements and event attributes (uses Terser)'
+    helpText: 'Minify JavaScript in <code>script</code> elements and event attributes (uses Terser)',
+    checked: true
   },
   {
     id: 'minifySVG',
     type: 'checkbox',
     label: 'Minify SVG',
-    helpText: 'Minify SVG elements and attributes (numeric precision, default attributes, colors)'
+    helpText: 'Minify SVG elements and attributes (numeric precision, default attributes, colors)',
+    checked: true
   },
   {
     id: 'minifyURLs',
     type: 'checkbox',
     label: 'Minify URLs',
-    helpText: 'Minify URLs in various attributes (uses relateurl)'
+    helpText: 'Minify URLs in various attributes (uses relateurl)',
+    checked: true
   },
   {
     id: 'noNewlinesBeforeTagClose',
@@ -135,7 +139,8 @@ const defaultOptions = [
     id: 'processConditionalComments',
     type: 'checkbox',
     label: 'Process conditional comments',
-    helpText: 'Process contents of conditional comments through minifier'
+    helpText: 'Process contents of conditional comments through minifier',
+    checked: true
   },
   {
     id: 'processScripts',
@@ -168,7 +173,8 @@ const defaultOptions = [
     id: 'removeEmptyAttributes',
     type: 'checkbox',
     label: 'Remove empty attributes',
-    helpText: 'Remove all attributes with whitespace-only values'
+    helpText: 'Remove all attributes with whitespace-only values',
+    checked: true
   },
   {
     id: 'removeEmptyElements',
@@ -188,13 +194,15 @@ const defaultOptions = [
     id: 'removeOptionalTags',
     type: 'checkbox',
     label: 'Remove optional tags',
-    helpText: 'Remove optional tags'
+    helpText: 'Remove optional tags',
+    checked: true
   },
   {
     id: 'removeRedundantAttributes',
     type: 'checkbox',
     label: 'Remove redundant attributes',
-    helpText: 'Remove attributes when value matches default'
+    helpText: 'Remove attributes when value matches default',
+    checked: true
   },
   {
     id: 'removeScriptTypeAttributes',
@@ -559,7 +567,7 @@ const minifierData = () => ({
       if (option.type === 'checkbox' && option.id in preset) {
         return {
           ...option,
-          checked: preset[option.id]
+          checked: option.disabled ? false : preset[option.id]
         };
       } else if (option.type !== 'checkbox' && option.id in preset) {
         return {
@@ -567,14 +575,14 @@ const minifierData = () => ({
           value: preset[option.id]
         };
       }
-      // For options not in preset, reset to default
-      const defaultOption = defaultOptions.find(d => d.id === option.id);
+      // For options not in preset, uncheck checkboxes and reset other inputs
       if (option.type === 'checkbox') {
         return {
           ...option,
-          checked: defaultOption?.checked || false
+          checked: false
         };
       } else {
+        const defaultOption = defaultOptions.find(d => d.id === option.id);
         return {
           ...option,
           value: defaultOption?.value || ''
