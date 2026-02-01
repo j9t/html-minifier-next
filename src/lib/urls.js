@@ -135,6 +135,6 @@ export function createUrlMinifier(site) {
     const rootRelative = targetPath + suffix;
     const pathRelative = relativize(getDirectory(baseUrl.pathname), targetPath) + suffix;
 
-    return pathRelative.length < rootRelative.length ? pathRelative : rootRelative;
+    return pathRelative && pathRelative.length < rootRelative.length ? pathRelative : rootRelative;
   };
 }
