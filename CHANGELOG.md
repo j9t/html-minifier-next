@@ -17,6 +17,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - **Migration:** Remove `html5: true` from your config (it’s now the only behavior); if you relied on `html5: false`, review your output for changes in element nesting
 * **BREAKING:** `sortClassName` was renamed to `sortClassNames`
   - **Migration:** If using `sortClassName`, rename to `sortClassNames`
+* **BREAKING:** Revised `conservative` and `comprehensive` presets
+  - `conservative`: Added `caseSensitive`, `processConditionalComments`; removed `continueOnParseError`, `decodeEntities`, `minifyURLs`, `noNewlinesBeforeTagClose`
+  - `comprehensive`: Added `collapseAttributeWhitespace`; removed `caseSensitive`, `noNewlinesBeforeTagClose`, `sortAttributes`, `sortClassNames`
+  - **Migration:** If you rely on specific preset behavior, override individual options as needed (e.g., `{ preset: 'conservative', decodeEntities: true }`)
 * Added CLI shortcut flags for directory and preset options: `-I` (`--input-dir`), `-O` (`--output-dir`), `-X` (`--ignore-dir`), `-f` (`--file-ext`), `-p` (`--preset`)
 
 @@
