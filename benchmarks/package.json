@@ -2,7 +2,7 @@
   "dependencies": {
     "@minify-html/node": "^0.18.1",
     "@swc/core": "^1.15.8",
-    "@swc/html": "^1.15.8",
+    "@swc/html": "^1.15.11",
     "cli-table3": "^0.6.5",
     "cssnano": "^7.1.2",
     "htmlnano": "^3.0.0",
