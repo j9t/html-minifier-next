@@ -30,7 +30,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Replaced `change-case` dependency with inline case conversion for CLI option names
 * Added CLI shortcut flags for directory and preset options: `-I` (`--input-dir`), `-O` (`--output-dir`), `-X` (`--ignore-dir`), `-f` (`--file-ext`), `-p` (`--preset`)
 
-@@
+### Internal
+
+* Checked on and removed unused dependencies
 
 ## [4.19.1] - 2026-01-29
 
