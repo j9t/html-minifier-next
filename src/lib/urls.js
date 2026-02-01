@@ -9,7 +9,7 @@
 
 const REJECTED_SCHEMES = new Set(['data:', 'javascript:', 'mailto:']);
 
-const DIRECTORY_INDEXES = ['index.html'];
+const DIRECTORY_INDEXES = ['index.html', 'index.htm'];
 
 /**
  * Get the directory portion of a pathname (up to and including the last `/`)
