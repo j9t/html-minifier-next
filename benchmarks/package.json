@@ -8,8 +8,7 @@
     "htmlnano": "^3.0.0",
     "lzma": "^2.3.2",
     "minimize": "^2.2.0",
-    "progress": "^2.0.3",
-    "svgo": "^4.0.0"
+    "progress": "^2.0.3"
   },
   "name": "html-minifier-next-benchmarks",
   "private": true,
