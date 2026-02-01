@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - The `minifyURLs` option still accepts `true`, a string (site URL), `{ site: '…' }`, or a custom function
   - relateurl-specific options (e.g., `removeAuth`, `removeEmptyQueries`, `ignore_www`, `schemeRelative`) are no longer supported
   - **Migration:** If you passed relateurl-specific options via `minifyURLs: { site: '…', removeAuth: true, … }`, remove unsupported properties; only `site` is accepted
+* Replaced `change-case` dependency with inline case conversion for CLI option names
 * Added CLI shortcut flags for directory and preset options: `-I` (`--input-dir`), `-O` (`--output-dir`), `-X` (`--ignore-dir`), `-f` (`--file-ext`), `-p` (`--preset`)
 
 @@

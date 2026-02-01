@@ -33,8 +33,12 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import os from 'os';
 import { createRequire } from 'module';
-import { camelCase, paramCase } from 'change-case';
 import { Command } from 'commander';
+
+// Simple case conversion for CLI option names (ASCII-only, no Unicode needed)
+const paramCase = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+const camelCase = (str) => str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+
 // Lazy-load HMN to reduce CLI cold-start overhead
 import { getPreset, getPresetNames } from './src/presets.js';
 
@@ -176,7 +180,7 @@ const mainOptionKeys = Object.keys(mainOptions);
 mainOptionKeys.forEach(function (key) {
   const option = mainOptions[key];
   if (Array.isArray(option)) {
-    key = key === 'minifyURLs' ? '--minify-urls' : '--' + paramCase(key);
+    key = '--' + paramCase(key);
     key += option[1] === parseJSON ? ' [value]' : ' <value>';
     program.option(key, option[0], option[1]);
   } else if (key === 'continueOnMinifyError') {
