@@ -542,7 +542,7 @@ export class HTMLParser {
           await closeIfFoundInCurrentTable('tfoot');
         }
       }
-      if (tagName === 'col' && findTag('colgroup') < 0) {
+      if (tagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
         lastTag = 'colgroup';
         stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
         if (handler.start) {
