@@ -37,7 +37,7 @@ import { Command } from 'commander';
 
 // Simple case conversion for CLI option names (ASCII-only, no Unicode needed)
 const paramCase = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
-const camelCase = (str) => str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+const camelCase = (str) => paramCase(str).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
 // Lazy-load HMN to reduce CLI cold-start overhead
 import { getPreset, getPresetNames } from './src/presets.js';
@@ -345,7 +345,7 @@ program.option('--cache-js <size>', 'Set JavaScript minification cache size (num
 
     // 3. Apply CLI options (overrides config and preset)
     mainOptionKeys.forEach(function (key) {
-      const param = programOptions[key === 'minifyURLs' ? 'minifyUrls' : camelCase(key)];
+      const param = programOptions[camelCase(key)];
       if (typeof param !== 'undefined') {
         options[key] = param;
       }
@@ -360,7 +360,7 @@ program.option('--cache-js <size>', 'Set JavaScript minification cache size (num
       console.error(`Using preset: ${presetName}`);
     }
     const activeOptions = Object.entries(minifierOptions)
-      .filter(([k]) => program.getOptionValueSource(k === 'minifyURLs' ? 'minifyUrls' : camelCase(k)) === 'cli')
+      .filter(([k]) => program.getOptionValueSource(camelCase(k)) === 'cli')
       .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));
     if (activeOptions.length > 0) {
       console.error('CLI options: ' + activeOptions.join(', '));
