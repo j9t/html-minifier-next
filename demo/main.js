@@ -331,7 +331,7 @@ const encodeState = (input, options) => {
     if (!defaultOption) return;
 
     if (option.type === 'checkbox') {
-      if (option.checked !== defaultOption.checked) {
+      if (Boolean(option.checked) !== Boolean(defaultOption.checked)) {
         state.o[option.id] = option.checked;
       }
     } else if (option.type === 'number') {
@@ -609,7 +609,7 @@ const minifierData = () => ({
       if (option.type === 'checkbox') {
         return {
           ...option,
-          checked: defaultOption.checked || false
+          checked: Boolean(defaultOption.checked)
         };
       } else {
         return {
