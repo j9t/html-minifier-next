@@ -3019,6 +3019,14 @@ describe('HTML', () => {
     // Userinfo preservation: Same scheme, different host (scheme-relative would drop userinfo)
     input = '<a href="https://user@other.com/page.html">link</a>';
     assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), input);
+
+    // Fragment-only URLs should be preserved as-is
+    input = '<a href="#section">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/folder/' }), input);
+
+    // Query-only URLs should be preserved as-is
+    input = '<a href="?q=1">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/folder/' }), input);
   });
 
   test('`srcset` attribute minification', async () => {

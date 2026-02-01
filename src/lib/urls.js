@@ -92,6 +92,10 @@ export function createUrlMinifier(site) {
   return function relate(url) {
     if (!url || !url.trim()) return url;
 
+    // Preserve fragment-only and query-only URLs as shortest form
+    const trimmed = url.trim();
+    if (trimmed[0] === '#' || trimmed[0] === '?') return url;
+
     let targetUrl;
     try {
       targetUrl = new URL(url);
