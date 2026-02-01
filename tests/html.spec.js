@@ -2991,6 +2991,34 @@ describe('HTML', () => {
     input = '<a href="https://example.com/page.html">link</a>';
     output = '<a href="https://example.com/page.html">link</a>';
     assert.strictEqual(await minify(input, { minifyURLs: 'http://example.com/' }), output);
+
+    // Directory targets: Same directory should produce './'
+    input = '<a href="https://example.com/folder/">link</a>';
+    output = '<a href="./">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/folder/' }), output);
+
+    // Directory targets: Subdirectory
+    input = '<a href="https://example.com/folder/sub/">link</a>';
+    output = '<a href="sub/">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/folder/' }), output);
+
+    // Directory targets: Sibling directory (path-relative shorter)
+    input = '<a href="https://example.com/a/b/other/">link</a>';
+    output = '<a href="../other/">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/a/b/current/' }), output);
+
+    // Directory targets: Parent directory (path-relative shorter)
+    input = '<a href="https://example.com/a/b/">link</a>';
+    output = '<a href="../">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/a/b/c/' }), output);
+
+    // Userinfo preservation: Same origin
+    input = '<a href="https://user:pass@example.com/page.html">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), input);
+
+    // Userinfo preservation: Same scheme, different host (scheme-relative would drop userinfo)
+    input = '<a href="https://user@other.com/page.html">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), input);
   });
 
   test('`srcset` attribute minification', async () => {

@@ -30,6 +30,7 @@ function getDirectory(pathname) {
 function relativize(baseDir, targetPath) {
   const baseSegments = baseDir.split('/').filter(Boolean);
   const targetSegments = targetPath.split('/').filter(Boolean);
+  const isDirectoryTarget = targetPath.endsWith('/');
 
   // Find common prefix length
   let common = 0;
@@ -38,8 +39,8 @@ function relativize(baseDir, targetPath) {
     common < targetSegments.length &&
     baseSegments[common] === targetSegments[common]
   ) {
-    // Stop before the last target segment (the filename)
-    if (common === targetSegments.length - 1) break;
+    // Stop before the last target segment only for file targets (not directories)
+    if (!isDirectoryTarget && common === targetSegments.length - 1) break;
     common++;
   }
 
@@ -49,8 +50,13 @@ function relativize(baseDir, targetPath) {
   let relative = '../'.repeat(ups) + remaining.join('/');
 
   // Preserve trailing slash
-  if (targetPath.endsWith('/') && relative !== '' && !relative.endsWith('/')) {
+  if (isDirectoryTarget && relative !== '' && !relative.endsWith('/')) {
     relative += '/';
+  }
+
+  // For directory targets, empty result means same directory
+  if (relative === '' && isDirectoryTarget) {
+    return './';
   }
 
   return relative;
@@ -112,6 +118,11 @@ export function createUrlMinifier(site) {
 
     // No base URL—return normalized absolute URL
     if (!baseUrl) {
+      return targetUrl.href;
+    }
+
+    // Preserve userinfo—non-absolute URLs would drop username/password
+    if (targetUrl.username || targetUrl.password) {
       return targetUrl.href;
     }
 
