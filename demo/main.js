@@ -235,7 +235,7 @@ const defaultOptions = [
   {
     id: 'sortClassNames',
     type: 'checkbox',
-    label: 'Sort class name',
+    label: 'Sort class names',
     helpText: 'Sort style classes by frequency',
     unsafe: true
   },
