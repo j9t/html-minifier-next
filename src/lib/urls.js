@@ -115,13 +115,14 @@ export function createUrlMinifier(site) {
       return targetUrl.href;
     }
 
-    // Check if same origin (hostname + port)
+    // Check if same origin (protocol + hostname + port)
     const sameOrigin =
+      targetUrl.protocol === baseUrl.protocol &&
       targetUrl.hostname === baseUrl.hostname &&
       targetUrl.port === baseUrl.port;
 
     if (!sameOrigin) {
-      // Same scheme—use scheme-relative
+      // Same scheme, different host—use scheme-relative
       if (targetUrl.protocol === baseUrl.protocol) {
         return '//' + targetUrl.host + targetUrl.pathname + suffix;
       }
