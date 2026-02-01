@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.0.0] - 2026-02-@@
 
+### Added
+
+* Added CLI shortcut flags for directory and preset options: `-I` (`--input-dir`), `-O` (`--output-dir`), `-X` (`--ignore-dir`), `-f` (`--file-ext`), `-p` (`--preset`)
+
 ### Changed
 
 [The following reads worse than it is. Consider going through [the brief upgrade guide](@@).]
@@ -28,7 +32,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - relateurl-specific options (e.g., `removeAuth`, `removeEmptyQueries`, `ignore_www`, `schemeRelative`) are no longer supported
   - **Migration:** If you passed relateurl-specific options via `minifyURLs: { site: '…', removeAuth: true, … }`, remove unsupported properties; only `site` is accepted
 * Replaced `change-case` dependency with inline case conversion for CLI option names
-* Added CLI shortcut flags for directory and preset options: `-I` (`--input-dir`), `-O` (`--output-dir`), `-X` (`--ignore-dir`), `-f` (`--file-ext`), `-p` (`--preset`)
 
 ### Internal
 
