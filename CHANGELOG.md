@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
+[The following reads worse than it is. Consider going through [the brief upgrade guide](@@).]
+
 * **BREAKING:** Directory mode (`--input-dir`) now defaults to processing only `.html`, `.htm`, `.xhtml`, and `.shtml` files instead of all files
   - To process all files, use `--file-ext='*'`; to process specific extensions, use `--file-ext=html,php,twig` (replaces defaults)
   - **Migration:** If you relied on the previous “all files” default, set `fileExt` in your config or specify extensions for `--file-ext`
