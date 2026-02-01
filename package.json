@@ -5,12 +5,10 @@
   },
   "bugs": "https://github.com/j9t/html-minifier-next/issues",
   "dependencies": {
-    "@types/relateurl": "^0.2.33",
     "change-case": "^4.1.2",
     "commander": "^14.0.2",
     "entities": "^7.0.0",
     "lightningcss": "^1.28.2",
-    "relateurl": "^0.2.7",
     "terser": "^5.46.0"
   },
   "description": "Super-configurable, well-tested, JavaScript-based HTML minifier (enhanced successor of HTML Minifier)",

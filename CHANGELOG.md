@@ -21,6 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - `conservative`: Added `caseSensitive`, `processConditionalComments`; removed `continueOnParseError`, `decodeEntities`, `minifyURLs`, `noNewlinesBeforeTagClose`
   - `comprehensive`: Added `collapseAttributeWhitespace`; removed `caseSensitive`, `noNewlinesBeforeTagClose`, `sortAttributes`, `sortClassNames`
   - **Migration:** If you rely on specific preset behavior, override individual options as needed (e.g., `{ preset: 'conservative', decodeEntities: true }`)
+* **BREAKING:** Replaced `relateurl` dependency with a built-in URL minifier using Node’s WHATWG `URL` API
+  - The `minifyURLs` option still accepts `true`, a string (site URL), `{ site: '…' }`, or a custom function
+  - relateurl-specific options (e.g., `removeAuth`, `removeEmptyQueries`, `ignore_www`, `schemeRelative`) are no longer supported
+  - **Migration:** If you passed relateurl-specific options via `minifyURLs: { site: '…', removeAuth: true, … }`, remove unsupported properties; only `site` is accepted
 * Added CLI shortcut flags for directory and preset options: `-I` (`--input-dir`), `-O` (`--output-dir`), `-X` (`--ignore-dir`), `-f` (`--file-ext`), `-p` (`--preset`)
 
 @@

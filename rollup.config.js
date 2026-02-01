@@ -58,7 +58,7 @@ const config = defineConfig([
       exports: 'named',
       inlineDynamicImports: true
     },
-    external: ['lightningcss', 'terser', 'entities', 'relateurl', '@swc/core'],
+    external: ['lightningcss', 'terser', 'entities', '@swc/core'],
     onwarn
   }
 ]);

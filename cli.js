@@ -147,7 +147,7 @@ const mainOptions = {
   minifyCSS: ['Minify CSS in `style` elements and attributes (uses Lightning CSS)', parseJSON],
   minifyJS: ['Minify JavaScript in `script` elements and event attributes (uses Terser or SWC; pass `{"engine": "swc"}` for SWC)', parseJSON],
   minifySVG: ['Minify SVG elements and attributes (numeric precision, default attributes, colors)', parseJSON],
-  minifyURLs: ['Minify URLs in various attributes (uses relateurl)', parseJSON],
+  minifyURLs: ['Minify URLs in various attributes', parseJSON],
   noNewlinesBeforeTagClose: 'Never add a newline before a tag that closes an element',
   partialMarkup: 'Treat input as a partial HTML fragment, preserving stray end tags and unclosed tags',
   preserveLineBreaks: 'Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with `--collapse-whitespace`',

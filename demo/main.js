@@ -107,7 +107,7 @@ const defaultOptions = [
     id: 'minifyURLs',
     type: 'checkbox',
     label: 'Minify URLs',
-    helpText: 'Minify URLs in various attributes (uses relateurl)',
+    helpText: 'Minify URLs in various attributes',
     checked: true
   },
   {

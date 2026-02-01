@@ -127,7 +127,7 @@ async function testMinifyURLsOptions() {
   // String (site)
   await minify(html, { minifyURLs: 'https://example.com' });
 
-  // Object (relateurl options)
+  // Object (site option)
   await minify(html, {
     minifyURLs: {
       site: 'https://example.com',

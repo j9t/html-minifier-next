@@ -437,12 +437,12 @@ function mergeConsecutiveScripts(html) {
  *
  *  Default: `false`
  *
- * @prop {boolean | string | import("relateurl").Options | ((text: string) => Promise<string> | string)} [minifyURLs]
+ * @prop {boolean | string | {site?: string} | ((text: string) => Promise<string> | string)} [minifyURLs]
  *  When true, enables URL rewriting/minification. If an object is provided,
- *  it is passed to [relateurl](https://www.npmjs.com/package/relateurl)
- *  as options. If a string is provided, it is treated as an `{ site: string }`
- *  options object. If a function is provided, it will be used to perform
- *  custom URL minification. If disabled, URLs are not minified.
+ *  the `site` property sets the base URL for computing relative paths.
+ *  If a string is provided, it is treated as an `{ site: string }` options
+ *  object. If a function is provided, it will be used to perform custom URL
+ *  minification. If disabled, URLs are not minified.
  *
  *  Default: `false`
  *

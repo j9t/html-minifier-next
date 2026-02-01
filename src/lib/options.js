@@ -1,6 +1,6 @@
 // Imports
 
-import RelateURL from 'relateurl';
+import { createUrlMinifier } from './urls.js';
 import { LRU, stableStringify, identity, identityAsync, replaceAsync } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
@@ -315,16 +315,15 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
         return;
       }
 
-      let relateUrlOptions = option;
+      let urlOptions = option;
 
       if (typeof option === 'string') {
-        relateUrlOptions = { site: option };
+        urlOptions = { site: option };
       } else if (typeof option !== 'object') {
-        relateUrlOptions = {};
+        urlOptions = {};
       }
 
-      // Cache relateurl instance for reuse (expensive to create)
-      const relateUrlInstance = new RelateURL(relateUrlOptions.site || '', relateUrlOptions);
+      const relate = createUrlMinifier(urlOptions.site || '');
 
       // Create instance-specific cache (results depend on site configuration)
       const instanceCache = new LRU(500);
@@ -343,7 +342,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
         }
 
         try {
-          const result = relateUrlInstance.relate(text);
+          const result = relate(text);
           instanceCache.set(text, result);
           return result;
         } catch (err) {
