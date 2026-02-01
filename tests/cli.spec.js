@@ -238,6 +238,27 @@ describe('CLI', () => {
     assert.strictEqual(cliMinifiedHTML, minifiedHTML);
   });
 
+  test('Should handle acronym CLI flags (`--minify-js`, `--minify-css`)', async () => {
+    const input = await readFixture('default.html');
+
+    const minifyOptions = {
+      collapseWhitespace: true,
+      minifyJS: true,
+      minifyCSS: true
+    };
+
+    const cliArguments = [
+      'default.html',
+      '--collapse-whitespace',
+      '--minify-js',
+      '--minify-css'
+    ];
+
+    const cliMinifiedHTML = execCli(cliArguments);
+    const minifiedHTML = await minify(input, minifyOptions);
+    assert.strictEqual(cliMinifiedHTML, minifiedHTML);
+  });
+
   // Parsing string inputs
   test('Should set quote char correctly', async () => {
     const input = await readFixture('fragment-quote-char.html');

@@ -2976,6 +2976,21 @@ describe('HTML', () => {
     input = '<img src="http://cdn.example.com/foo.png">';
     output = '<img src="//cdn.example.com/foo.png">';
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'http://example.com/' } }), output);
+
+    // Directory index removal for index.htm
+    input = '<a href="https://example.com/folder/index.htm">link</a>';
+    output = '<a href="folder/">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), output);
+
+    // Root directory index should produce `/`, not empty string
+    input = '<a href="https://example.com/index.html">link</a>';
+    output = '<a href="/">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/' }), output);
+
+    // Different protocol, same host should not produce relative URL
+    input = '<a href="https://example.com/page.html">link</a>';
+    output = '<a href="https://example.com/page.html">link</a>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'http://example.com/' }), output);
   });
 
   test('`srcset` attribute minification', async () => {
