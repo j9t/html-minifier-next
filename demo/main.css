@@ -34,8 +34,25 @@ button {
 	cursor: pointer;
 }
 
-label:not(:has(input[type='checkbox'])) {
-	margin-left: .25rem;
+input[type='text'],
+input[type='number'],
+span.quiet {
+	display: block;
+}
+
+input[type='text'],
+input[type='number'] {
+	margin: .2rem 0;
+}
+
+input[type='text'] {
+	width: 70%;
+}
+
+input[type='checkbox'] {
+	bottom: -1px;
+	margin: 0 2px 0 0;
+	position: relative;
 }
 
 button {
@@ -59,11 +76,6 @@ code,
 
 .quiet {
 	color: #888;
-}
-
-.short {
-	display: block;
-	margin-left: .25rem;
 }
 
 .options {

@@ -28,7 +28,7 @@
 									<input type="checkbox" :id="option.id" x-model="option.checked" :disabled="option.disabled === true">
 									<label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
 									<template x-if="option.helpText">
-										<span class="quiet short" x-html="option.helpText"></span>
+										<span class="quiet" x-html="option.helpText"></span>
 									</template>
 								</div>
 							</template>
@@ -37,7 +37,7 @@
 									<label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
 									<input type="text" :id="option.id" x-model="option.value">
 									<template x-if="option.helpText">
-										<span class="quiet short" x-html="option.helpText"></span>
+										<span class="quiet" x-html="option.helpText"></span>
 									</template>
 								</div>
 							</template>
@@ -46,7 +46,7 @@
 									<label :for="option.id" x-text="option.label" :class="option.unsafe ? 'unsafe' : ''"></label>
 									<input type="number" :id="option.id" x-model="option.value">
 									<template x-if="option.helpText">
-										<span class="quiet short" x-html="option.helpText"></span>
+										<span class="quiet" x-html="option.helpText"></span>
 									</template>
 								</div>
 							</template>
