@@ -4,7 +4,7 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [5.0.0] - 2026-02-@@
+## [5.0.0] - 2026-02-02
 
 ### Added
 
@@ -13,7 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-[The following reads worse than it is. Consider going through [the brief upgrade guide](@@).]
+[The following reads more complicated than it is. Consider going through [the brief upgrade guide](https://meiert.com/blog/html-minifier-next-5/).]
 
 * **BREAKING:** Directory mode (`--input-dir`) now defaults to processing only `.html`, `.htm`, `.xhtml`, and `.shtml` files instead of all files
   - To process all files, use `--file-ext='*'`; to process specific extensions, use `--file-ext=html,php,twig` (replaces defaults)
