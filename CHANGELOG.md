@@ -34,6 +34,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - **Migration:** If you passed relateurl-specific options via `minifyURLs: { site: '…', removeAuth: true, … }`, remove unsupported properties; only `site` is accepted
 * Replaced `change-case` dependency with inline case conversion for CLI option names
 
+### Performance
+
+* Replaced string slicing with sticky (`y` flag) regex matching in the HTML parser, reducing memory allocations on large inputs
+* Added next-tag lookahead caching to avoid re-parsing the same tag twice during whitespace context detection
+
 ### Internal
 
 * Checked on and removed unused dependencies
