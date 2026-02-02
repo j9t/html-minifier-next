@@ -107,14 +107,14 @@ function getAttrRegexForHandler(handler) {
   return compiled;
 }
 
-// Cache for sticky attribute regexes (y flag for position-based matching on full string)
+// Cache for sticky attribute regexes (`y` flag for position-based matching on full string)
 const attrRegexStickyCache = new WeakMap();
 
 function getAttrRegexStickyForHandler(handler) {
   let cached = attrRegexStickyCache.get(handler);
   if (cached) return cached;
   const nonSticky = getAttrRegexForHandler(handler);
-  // Derive sticky version: remove ^ anchor, add y flag
+  // Derive sticky version: Remove `^` anchor, add `y` flag
   const compiled = new RegExp(nonSticky.source.slice(1), 'y');
   attrRegexStickyCache.set(handler, compiled);
   return compiled;
@@ -158,8 +158,8 @@ export class HTMLParser {
     const conditionalTestY = /<!\[/y;
 
     // Cached next-tag from lookahead (avoids re-parsing the same tag)
-    let cachedNextStartTag = null; // { match, pos }
-    let cachedNextEndTag = null; // { match, pos }
+    let cachedNextStartTag = null;
+    let cachedNextEndTag = null;
 
     // Index-based parsing
     let pos = 0;
@@ -433,7 +433,7 @@ export class HTMLParser {
           const isLimited = remainingLen > MAX_ATTR_PARSE_LENGTH;
 
           if (!isLimited) {
-            // Common case: use sticky regex directly on full string (no slicing)
+            // Common case: Use sticky regex directly on full string (no slicing)
             attributeY.lastIndex = currentPos;
             attr = attributeY.exec(fullHtml);
           } else {
