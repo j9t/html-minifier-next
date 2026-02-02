@@ -6,13 +6,13 @@
   "bugs": "https://github.com/j9t/html-minifier-next/issues",
   "dependencies": {
     "commander": "^14.0.2",
-    "entities": "^7.0.0",
-    "lightningcss": "^1.28.2",
+    "entities": "^7.0.1",
+    "lightningcss": "^1.31.1",
     "terser": "^5.46.0"
   },
   "description": "Super-configurable, well-tested, JavaScript-based HTML minifier (enhanced successor of HTML Minifier)",
   "devDependencies": {
-    "@commitlint/cli": "^20.3.0",
+    "@commitlint/cli": "^20.3.1",
     "@eslint/js": "^9.39.2",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
