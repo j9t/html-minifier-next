@@ -83,14 +83,24 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   }
 
   if (trimRight) {
-    // No-break space is specifically handled inside the replacer function
-    str = str.replace(/[ \n\r\t\f\xA0]+$/, function (spaces) {
+    // Find trailing whitespace boundary manually (avoids polynomial backtracking
+    // with `/[ \n\r\t\f\xA0]+$/` on strings with long internal whitespace runs)
+    let end = str.length;
+    while (end > 0 && ' \n\r\t\f\xA0'.includes(str[end - 1])) {
+      end--;
+    }
+    if (end < str.length) {
+      const spaces = str.slice(end);
       const conservative = !lineBreakAfter && options.conservativeCollapse;
+      let replacement;
       if (conservative && spaces === '\t') {
-        return '\t';
+        replacement = '\t';
+      } else {
+        // No-break space is specifically handled via the nested regexes
+        replacement = spaces.replace(RE_NBSP_TRAILING_GROUP, ' $1').replace(RE_NBSP_TRAILING_STRIP, '') || (conservative ? ' ' : '');
       }
-      return spaces.replace(RE_NBSP_TRAILING_GROUP, ' $1').replace(RE_NBSP_TRAILING_STRIP, '') || (conservative ? ' ' : '');
-    });
+      str = str.slice(0, end) + replacement;
+    }
   }
 
   if (collapseAll) {
