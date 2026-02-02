@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 * Added CLI shortcut flags for directory and preset options: `-I` (`--input-dir`), `-O` (`--output-dir`), `-X` (`--ignore-dir`), `-f` (`--file-ext`), `-p` (`--preset`)
+* Added `customAttrAssign`, `customAttrCollapse`, `ignoreCustomComments`, and `inlineCustomElements` options to the web demo
 
 ### Changed
 
