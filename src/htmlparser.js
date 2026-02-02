@@ -44,9 +44,7 @@ const qnameCapture = (function () {
   return '((?:' + ncname + '\\:)?' + ncname + ')';
 })();
 const startTagOpen = new RegExp('^<' + qnameCapture);
-const startTagClose = /^\s*(\/?)>/;
 export const endTag = new RegExp('^</' + qnameCapture + '[^>]*>');
-const doctype = /^<!DOCTYPE\s?[^>]+>/i;
 
 let IS_REGEX_CAPTURING_BROKEN = false;
 'x'.replace(/x(.)?/g, function (m, g) {
@@ -55,9 +53,6 @@ let IS_REGEX_CAPTURING_BROKEN = false;
 
 // Empty elements
 const empty = new CaseInsensitiveSet(['area', 'base', 'basefont', 'br', 'col', 'embed', 'frame', 'hr', 'img', 'input', 'isindex', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
-
-// Inline elements
-const inline = new CaseInsensitiveSet(['a', 'abbr', 'acronym', 'applet', 'b', 'basefont', 'bdo', 'big', 'br', 'button', 'cite', 'code', 'del', 'dfn', 'em', 'font', 'i', 'iframe', 'img', 'input', 'ins', 'kbd', 'label', 'map', 'noscript', 'object', 'q', 's', 'samp', 'script', 'select', 'selectedcontent', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'svg', 'textarea', 'tt', 'u', 'var']);
 
 // Elements that you can, intentionally, leave open (and which close themselves)
 const closeSelf = new CaseInsensitiveSet(['colgroup', 'dd', 'dt', 'li', 'option', 'p', 'td', 'tfoot', 'th', 'thead', 'tr', 'source']);
@@ -112,6 +107,19 @@ function getAttrRegexForHandler(handler) {
   return compiled;
 }
 
+// Cache for sticky attribute regexes (`y` flag for position-based matching on full string)
+const attrRegexStickyCache = new WeakMap();
+
+function getAttrRegexStickyForHandler(handler) {
+  let cached = attrRegexStickyCache.get(handler);
+  if (cached) return cached;
+  const nonSticky = getAttrRegexForHandler(handler);
+  // Derive sticky version: Remove `^` anchor, add `y` flag
+  const compiled = new RegExp(nonSticky.source.slice(1), 'y');
+  attrRegexStickyCache.set(handler, compiled);
+  return compiled;
+}
+
 function joinSingleAttrAssigns(handler) {
   return singleAttrAssigns.concat(
     handler.customAttrAssign || []
@@ -137,8 +145,21 @@ export class HTMLParser {
     const stack = []; let lastTag;
     // Use cached attribute regex for this handler configuration
     const attribute = getAttrRegexForHandler(handler);
+    const attributeY = getAttrRegexStickyForHandler(handler);
     let prevTag = undefined, nextTag = undefined;
     let prevAttrs = [], nextAttrs = [];
+
+    // Sticky regex versions for position-based matching (avoids string slicing)
+    const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
+    const startTagCloseY = /\s*(\/?)>/y;
+    const endTagY = new RegExp(endTag.source.slice(1), 'y');
+    const doctypeY = /<!DOCTYPE\s?[^>]+>/iy;
+    const commentTestY = /<!--/y;
+    const conditionalTestY = /<!\[/y;
+
+    // Cached next-tag from lookahead (avoids re-parsing the same tag)
+    let cachedNextStartTag = null;
+    let cachedNextEndTag = null;
 
     // Index-based parsing
     let pos = 0;
@@ -162,10 +183,9 @@ export class HTMLParser {
       return { line, column };
     };
 
-    // Helper to safely extract substring when needed for regex operations
-    const sliceFromPos = (startPos, len) => {
-      const endPos = len !== undefined ? startPos + len : fullLength;
-      return fullHtml.slice(startPos, endPos);
+    // Helper to safely extract substring when needed for stacked tag content
+    const sliceFromPos = (startPos) => {
+      return fullHtml.slice(startPos);
     };
 
     while (pos < fullLength) {
@@ -177,10 +197,33 @@ export class HTMLParser {
 
         if (textEnd === pos) {
           // We found a tag at current position
-          const remaining = sliceFromPos(pos);
+
+          // Check cache from previous lookahead (avoids re-parsing the same tag)
+          if (cachedNextStartTag && cachedNextStartTag.pos === pos) {
+            const startTagMatch = cachedNextStartTag.match;
+            cachedNextStartTag = null;
+            cachedNextEndTag = null;
+            advance(startTagMatch.advance);
+            await handleStartTag(startTagMatch);
+            prevTag = startTagMatch.tagName.toLowerCase();
+            continue;
+          }
+          if (cachedNextEndTag && cachedNextEndTag.pos === pos) {
+            const endTagMatch = cachedNextEndTag.match;
+            cachedNextStartTag = null;
+            cachedNextEndTag = null;
+            advance(endTagMatch[0].length);
+            await parseEndTag(endTagMatch[0], endTagMatch[1]);
+            prevTag = '/' + endTagMatch[1].toLowerCase();
+            prevAttrs = [];
+            continue;
+          }
+          cachedNextStartTag = null;
+          cachedNextEndTag = null;
 
           // Comment
-          if (/^<!--/.test(remaining)) {
+          commentTestY.lastIndex = pos;
+          if (commentTestY.test(fullHtml)) {
             const commentEnd = fullHtml.indexOf('-->', pos + 4);
 
             if (commentEnd >= 0) {
@@ -195,7 +238,8 @@ export class HTMLParser {
           }
 
           // https://web.archive.org/web/20241201212701/https://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
-          if (/^<!\[/.test(remaining)) {
+          conditionalTestY.lastIndex = pos;
+          if (conditionalTestY.test(fullHtml)) {
             const conditionalEnd = fullHtml.indexOf(']>', pos + 3);
 
             if (conditionalEnd >= 0) {
@@ -210,8 +254,9 @@ export class HTMLParser {
           }
 
           // Doctype
-          if (doctype.test(remaining)) {
-            const doctypeMatch = remaining.match(doctype);
+          doctypeY.lastIndex = pos;
+          const doctypeMatch = doctypeY.exec(fullHtml);
+          if (doctypeMatch) {
             if (handler.doctype) {
               handler.doctype(doctypeMatch[0]);
             }
@@ -222,8 +267,9 @@ export class HTMLParser {
           }
 
           // End tag
-          if (endTag.test(remaining)) {
-            const endTagMatch = remaining.match(endTag);
+          endTagY.lastIndex = pos;
+          const endTagMatch = endTagY.exec(fullHtml);
+          if (endTagMatch) {
             advance(endTagMatch[0].length);
             await parseEndTag(endTagMatch[0], endTagMatch[1]);
             prevTag = '/' + endTagMatch[1].toLowerCase();
@@ -232,7 +278,7 @@ export class HTMLParser {
           }
 
           // Start tag
-          const startTagMatch = parseStartTag(remaining, pos);
+          const startTagMatch = parseStartTag(pos);
           if (startTagMatch) {
             advance(startTagMatch.advance);
             await handleStartTag(startTagMatch);
@@ -256,20 +302,24 @@ export class HTMLParser {
         }
 
         // Next tag for whitespace processing context
-        const remainingAfterText = sliceFromPos(pos);
-        let nextTagMatch = parseStartTag(remainingAfterText, pos);
-        if (nextTagMatch) {
-          nextTag = nextTagMatch.tagName;
-          // Extract minimal attribute info for whitespace logic (just name/value pairs)
-          nextAttrs = extractAttrInfo(nextTagMatch.attrs);
-        } else {
-          const endTagMatch = remainingAfterText.match(endTag);
-          if (endTagMatch) {
-            nextTag = '/' + endTagMatch[1];
-            nextAttrs = [];
+        if (handler.wantsNextTag) {
+          const nextStartTagMatch = parseStartTag(pos);
+          if (nextStartTagMatch) {
+            nextTag = nextStartTagMatch.tagName;
+            // Extract minimal attribute info for whitespace logic (just name/value pairs)
+            nextAttrs = extractAttrInfo(nextStartTagMatch.attrs);
+            cachedNextStartTag = { match: nextStartTagMatch, pos };
           } else {
-            nextTag = '';
-            nextAttrs = [];
+            endTagY.lastIndex = pos;
+            const nextEndTagMatch = endTagY.exec(fullHtml);
+            if (nextEndTagMatch) {
+              nextTag = '/' + nextEndTagMatch[1];
+              nextAttrs = [];
+              cachedNextEndTag = { match: nextEndTagMatch, pos };
+            } else {
+              nextTag = '';
+              nextAttrs = [];
+            }
           }
         }
 
@@ -353,8 +403,9 @@ export class HTMLParser {
       }).filter(attr => attr.name); // Filter out invalid entries
     }
 
-    function parseStartTag(remaining, startPos) {
-      const start = remaining.match(startTagOpen);
+    function parseStartTag(startPos) {
+      startTagOpenY.lastIndex = startPos;
+      const start = startTagOpenY.exec(fullHtml);
       if (start) {
         const match = {
           tagName: start[1],
@@ -370,9 +421,9 @@ export class HTMLParser {
         const MAX_ATTR_PARSE_LENGTH = 20000; // 20 KB should be enough for any reasonable tag
 
         while (true) {
-          // Check for closing tag first
-          const remainingForEnd = sliceFromPos(currentPos);
-          end = remainingForEnd.match(startTagClose);
+          // Check for closing tag first (sticky regex—no slicing)
+          startTagCloseY.lastIndex = currentPos;
+          end = startTagCloseY.exec(fullHtml);
           if (end) {
             break;
           }
@@ -380,36 +431,83 @@ export class HTMLParser {
           // Limit the input length we pass to the regex to prevent catastrophic backtracking
           const remainingLen = fullLength - currentPos;
           const isLimited = remainingLen > MAX_ATTR_PARSE_LENGTH;
-          const extractEndPos = isLimited ? currentPos + MAX_ATTR_PARSE_LENGTH : fullLength;
 
-          // Create a temporary substring only for attribute parsing (this is limited and necessary for regex)
-          const searchStr = fullHtml.substring(currentPos, extractEndPos);
-          attr = searchStr.match(attribute);
+          if (!isLimited) {
+            // Common case: Use sticky regex directly on full string (no slicing)
+            attributeY.lastIndex = currentPos;
+            attr = attributeY.exec(fullHtml);
+          } else {
+            const extractEndPos = currentPos + MAX_ATTR_PARSE_LENGTH;
 
-          // If we limited the input and got a match, check if the value might be truncated
-          if (attr && isLimited) {
-            // Check if the attribute value extends beyond our search window
-            const attrEnd = attr[0].length;
-            // If the match ends near the limit, the value might be truncated
-            if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
-              // Manually extract this attribute to handle potentially huge value
+            // Create a temporary substring only for attribute parsing (limited for safety)
+            const searchStr = fullHtml.substring(currentPos, extractEndPos);
+            attr = searchStr.match(attribute);
+
+            // If we limited the input and got a match, check if the value might be truncated
+            if (attr) {
+              // Check if the attribute value extends beyond our search window
+              const attrEnd = attr[0].length;
+              // If the match ends near the limit, the value might be truncated
+              if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
+                // Manually extract this attribute to handle potentially huge value
+                const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
+                if (manualMatch) {
+                  const quoteChar = searchStr[manualMatch[0].length];
+                  if (quoteChar === '"' || quoteChar === "'") {
+                    const closeQuote = searchStr.indexOf(quoteChar, manualMatch[0].length + 1);
+                    if (closeQuote !== -1) {
+                      const fullAttrLen = closeQuote + 1;
+                      const numCustomParts = handler.customAttrSurround
+                        ? handler.customAttrSurround.length * NCP
+                        : 0;
+                      const baseIndex = 1 + numCustomParts;
+
+                      attr = [];
+                      attr[0] = searchStr.substring(0, fullAttrLen);
+                      attr[baseIndex] = manualMatch[1]; // Attribute name
+                      attr[baseIndex + 1] = '='; // `customAssign` (falls back to "=" for huge attributes)
+                      const value = searchStr.substring(manualMatch[0].length + 1, closeQuote);
+                      // Place value at correct index based on quote type
+                      if (quoteChar === '"') {
+                        attr[baseIndex + 2] = value; // Double-quoted value
+                      } else {
+                        attr[baseIndex + 3] = value; // Single-quoted value
+                      }
+                      currentPos += fullAttrLen;
+                      consumed += fullAttrLen;
+                      match.attrs.push(attr);
+                      continue;
+                    }
+                  }
+                  // Note: Unquoted attribute values are intentionally not handled here.
+                  // Per HTML spec, unquoted values cannot contain spaces or special chars,
+                  // making a 20 KB+ unquoted value practically impossible. If encountered,
+                  // it's malformed HTML and using the truncated regex match is acceptable.
+                }
+              }
+            }
+
+            if (!attr) {
+              // If we limited the input and got no match, try manual extraction
+              // This handles cases where quoted attributes exceed `MAX_ATTR_PARSE_LENGTH`
               const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
               if (manualMatch) {
                 const quoteChar = searchStr[manualMatch[0].length];
                 if (quoteChar === '"' || quoteChar === "'") {
-                  const closeQuote = searchStr.indexOf(quoteChar, manualMatch[0].length + 1);
+                  // Search in the full HTML (not limited substring) for closing quote
+                  const closeQuote = fullHtml.indexOf(quoteChar, currentPos + manualMatch[0].length + 1);
                   if (closeQuote !== -1) {
-                    const fullAttrLen = closeQuote + 1;
+                    const fullAttrLen = closeQuote - currentPos + 1;
                     const numCustomParts = handler.customAttrSurround
                       ? handler.customAttrSurround.length * NCP
                       : 0;
                     const baseIndex = 1 + numCustomParts;
 
                     attr = [];
-                    attr[0] = searchStr.substring(0, fullAttrLen);
+                    attr[0] = fullHtml.substring(currentPos, closeQuote + 1);
                     attr[baseIndex] = manualMatch[1]; // Attribute name
-                    attr[baseIndex + 1] = '='; // `customAssign` (falls back to "=" for huge attributes)
-                    const value = searchStr.substring(manualMatch[0].length + 1, closeQuote);
+                    attr[baseIndex + 1] = '='; // customAssign
+                    const value = fullHtml.substring(currentPos + manualMatch[0].length + 1, closeQuote);
                     // Place value at correct index based on quote type
                     if (quoteChar === '"') {
                       attr[baseIndex + 2] = value; // Double-quoted value
@@ -421,46 +519,6 @@ export class HTMLParser {
                     match.attrs.push(attr);
                     continue;
                   }
-                }
-                // Note: Unquoted attribute values are intentionally not handled here.
-                // Per HTML spec, unquoted values cannot contain spaces or special chars,
-                // making a 20 KB+ unquoted value practically impossible. If encountered,
-                // it’s malformed HTML and using the truncated regex match is acceptable.
-              }
-            }
-          }
-
-          if (!attr && isLimited) {
-            // If we limited the input and got no match, try manual extraction
-            // This handles cases where quoted attributes exceed `MAX_ATTR_PARSE_LENGTH`
-            const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
-            if (manualMatch) {
-              const quoteChar = searchStr[manualMatch[0].length];
-              if (quoteChar === '"' || quoteChar === "'") {
-                // Search in the full HTML (not limited substring) for closing quote
-                const closeQuote = fullHtml.indexOf(quoteChar, currentPos + manualMatch[0].length + 1);
-                if (closeQuote !== -1) {
-                  const fullAttrLen = closeQuote - currentPos + 1;
-                  const numCustomParts = handler.customAttrSurround
-                    ? handler.customAttrSurround.length * NCP
-                    : 0;
-                  const baseIndex = 1 + numCustomParts;
-
-                  attr = [];
-                  attr[0] = fullHtml.substring(currentPos, closeQuote + 1);
-                  attr[baseIndex] = manualMatch[1]; // Attribute name
-                  attr[baseIndex + 1] = '='; // customAssign
-                  const value = fullHtml.substring(currentPos + manualMatch[0].length + 1, closeQuote);
-                  // Place value at correct index based on quote type
-                  if (quoteChar === '"') {
-                    attr[baseIndex + 2] = value; // Double-quoted value
-                  } else {
-                    attr[baseIndex + 3] = value; // Single-quoted value
-                  }
-                  currentPos += fullAttrLen;
-                  consumed += fullAttrLen;
-                  match.attrs.push(attr);
-                  continue;
                 }
               }
             }
@@ -476,9 +534,9 @@ export class HTMLParser {
           match.attrs.push(attr);
         }
 
-        // Check for closing tag
-        const remainingForClose = sliceFromPos(currentPos);
-        end = remainingForClose.match(startTagClose);
+        // Check for closing tag (sticky regex—no slicing)
+        startTagCloseY.lastIndex = currentPos;
+        end = startTagCloseY.exec(fullHtml);
         if (end) {
           match.unarySlash = end[1];
           consumed += end[0].length;
@@ -529,34 +587,31 @@ export class HTMLParser {
       const tagName = match.tagName;
       let unarySlash = match.unarySlash;
 
-      if (handler.html5) {
-        if (lastTag === 'p' && nonPhrasing.has(tagName)) {
-          await parseEndTag('', lastTag);
-        } else if (tagName === 'tbody') {
+      if (lastTag === 'p' && nonPhrasing.has(tagName)) {
+        await parseEndTag('', lastTag);
+      } else if (tagName === 'tbody') {
+        if (!await closeIfFoundInCurrentTable('tfoot')) {
           await closeIfFoundInCurrentTable('thead');
-        } else if (tagName === 'tfoot') {
-          if (!await closeIfFoundInCurrentTable('tbody')) {
-            await closeIfFoundInCurrentTable('thead');
-          }
-        } else if (tagName === 'thead') {
-          // If a `tbody` or `tfoot` is open in the current table, close it
-          if (!await closeIfFoundInCurrentTable('tbody')) {
-            await closeIfFoundInCurrentTable('tfoot');
-          }
         }
-        if (tagName === 'col' && findTag('colgroup') < 0) {
-          lastTag = 'colgroup';
-          stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
-          if (handler.start) {
-            await handler.start(lastTag, [], false, '');
-          }
+      } else if (tagName === 'tfoot') {
+        if (!await closeIfFoundInCurrentTable('tbody')) {
+          await closeIfFoundInCurrentTable('thead');
+        }
+      } else if (tagName === 'thead') {
+        // If a `tbody` or `tfoot` is open in the current table, close it
+        if (!await closeIfFoundInCurrentTable('tbody')) {
+          await closeIfFoundInCurrentTable('tfoot');
         }
       }
-
-      if (!handler.html5 && !inline.has(tagName)) {
-        while (lastTag && inline.has(lastTag)) {
-          await parseEndTag('', lastTag);
+      if (tagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
+        lastTag = 'colgroup';
+        stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
+        if (handler.start) {
+          await handler.start(lastTag, [], false, '', true);
         }
+      } else if (tagName !== 'col' && lastTag === 'colgroup') {
+        // Auto-close synthetic `<colgroup>` when a non-`col` element starts
+        await parseEndTag('', 'colgroup');
       }
 
       if (closeSelf.has(tagName) && lastTag === tagName) {

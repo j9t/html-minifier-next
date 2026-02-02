@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/html-minifier-next.svg)](https://www.npmjs.com/package/html-minifier-next) [![Build status](https://github.com/j9t/html-minifier-next/workflows/Tests/badge.svg)](https://github.com/j9t/html-minifier-next/actions) [![Socket](https://badge.socket.dev/npm/package/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next)
 
-Your HTML precision tool: HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier** able to also handle in-document CSS, JavaScript, and SVG minification.
+Your HTML optimization precision tool: HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier** able to also handle in-document CSS, JavaScript, and SVG minification.
 
 The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier); as of 2025, both HTML Minifier Terser and HTML Minifier had been unmaintained for several years. HMN offers additional features and has been optimized for speed. While an independent project, it is still backwards-compatible with HMT and HM.
 
@@ -34,15 +34,15 @@ Use `html-minifier-next --help` to check all available options:
 
 | Option | Description | Example |
 | --- | --- | --- |
-| `--input-dir <dir>` | Specify an input directory (best restricted with `--file-ext`) | `--input-dir=src` |
-| `--ignore-dir <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
-| `--output-dir <dir>` | Specify an output directory | `--output-dir=dist` |
-| `--file-ext <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting) | `--file-ext=html`, `--file-ext=html,htm,php`, `--file-ext="html, htm, php"` |
-| `-o <file>`, `--output <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
-| `--preset <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
-| `-c <file>`, `--config-file <file>` | Use a configuration file | `--config-file=html-minifier.json` |
-| `-v`, `--verbose` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
-| `-d`, `--dry` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
+| `--input-dir <dir>`, `-I <dir>` | Specify an input directory | `--input-dir=src` |
+| `--ignore-dir <patterns>`, `-X <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
+| `--output-dir <dir>`, `-O <dir>` | Specify an output directory | `--output-dir=dist` |
+| `--output <file>`, `-o <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
+| `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,xhtml,shtml`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
+| `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
+| `--config-file <file>`, `-c <file>` | Use a configuration file | `--config-file=html-minifier.json` |
+| `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
+| `--dry`, `-d` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
 
 ### Configuration file
 
@@ -54,7 +54,7 @@ You can use a configuration file to specify options. The file can be either JSON
 {
   "collapseWhitespace": true,
   "removeComments": true,
-  "fileExt": "html,htm",
+  "fileExt": "html,php",
   "ignoreDir": "libs,vendor"
 }
 ```
@@ -65,7 +65,7 @@ You can use a configuration file to specify options. The file can be either JSON
 module.exports = {
   collapseWhitespace: true,
   removeComments: true,
-  fileExt: "html,htm",
+  fileExt: "html,php",
   ignoreDir: ["libs", "vendor"]
 };
 ```
@@ -146,11 +146,10 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `customEventAttributes`<br>`--custom-event-attributes` | Array of regexes that allow to support custom event attributes for `minifyJS` (e.g., `ng-click`) | `[ /^on[a-z]{3,}$/ ]` |
 | `customFragmentQuantifierLimit`<br>`--custom-fragment-quantifier-limit` | Set maximum quantifier limit for custom fragments to prevent ReDoS attacks | `200` |
 | `decodeEntities`<br>`--decode-entities` | Use direct Unicode characters whenever possible | `false` |
-| `html5`<br>`--no-html5` | Parse input according to the HTML specification; when `false`, enforces legacy inline/block nesting rules that may restructure modern HTML | `true` |
-| `ignoreCustomComments`<br>`--ignore-custom-comments` | Array of regexes that allow to ignore certain comments, when matched | `[ /^!/, /^\s*#/ ]` |
+| `ignoreCustomComments`<br>`--ignore-custom-comments` | Array of regexes that allow to ignore matching comments | `[ /^!/, /^\s*#/ ]` |
 | `ignoreCustomFragments`<br>`--ignore-custom-fragments` | Array of regexes that allow to ignore certain fragments, when matched (e.g., `<?php … ?>`, `{{ … }}`, etc.) | `[ /<%[\s\S]*?%>/, /<\?[\s\S]*?\?>/ ]` |
-| `includeAutoGeneratedTags`<br>`--no-include-auto-generated-tags` | Insert elements generated by HTML parser; when `false`, omits auto-generated tags | `true` |
-| `inlineCustomElements`<br>`--inline-custom-elements` | Array of names of custom elements which are inline | `[]` |
+| `includeAutoGeneratedTags`<br>`--include-auto-generated-tags` | Insert elements generated by HTML parser | `false` |
+| `inlineCustomElements`<br>`--inline-custom-elements` | Array of names of custom elements which are inline, for whitespace handling | `[]` |
 | `keepClosingSlash`<br>`--keep-closing-slash` | Keep the trailing slash on void elements | `false` |
 | `maxInputLength`<br>`--max-input-length` | Maximum input length to prevent ReDoS attacks (disabled by default) | `undefined` |
 | `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | `undefined` |
@@ -158,7 +157,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://github.com/terser/terser) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
 | `minifySVG`<br>`--minify-svg` | Minify SVG elements and attributes (numeric precision, default attributes, colors) | `false` (could be `true`, `Object`) |
-| `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes (uses [relateurl](https://github.com/stevenvachon/relateurl)) | `false` (could be `String`, `Object`, `Function(text)`, `async Function(text)`) |
+| `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
 | `preserveLineBreaks`<br>`--preserve-line-breaks` | Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with `collapseWhitespace: true` | `false` |
@@ -177,13 +176,13 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeStyleLinkTypeAttributes`<br>`--remove-style-link-type-attributes` | Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
-| `sortClassName`<br>`--sort-class-name` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
+| `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
 | `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype) | `false` |
 
 ### Sorting attributes and style classes
 
-Minifier options like `sortAttributes` and `sortClassName` won’t impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for Gzip and Brotli used over HTTP.
+Minifier options like `sortAttributes` and `sortClassNames` won’t impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for Gzip and Brotli used over HTTP.
 
 ### CSS minification
 
@@ -403,39 +402,39 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 <!-- Auto-generated benchmarks, don’t edit -->
 | Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next) ([config](https://github.com/j9t/html-minifier-next/blob/main/benchmarks/html-minifier.json))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| [A List Apart](https://alistapart.com/) | 59 | **49** | 51 | 52 | 51 | 54 | 52 |
-| [Apple](https://www.apple.com/) | 255 | **197** | 226 | 230 | 231 | 233 | 233 |
-| [BBC](https://www.bbc.co.uk/) | 620 | **562** | 582 | 583 | 584 | 615 | n/a |
-| [CERN](https://home.cern/) | 151 | **82** | 90 | 90 | 91 | 93 | 95 |
-| [CSS-Tricks](https://css-tricks.com/) | 161 | **119** | 126 | 142 | 142 | 147 | 143 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7250 | **6401** | 6573 | 6455 | 6578 | 6626 | n/a |
-| [EDRi](https://edri.org/) | 80 | **59** | 70 | 70 | 71 | 75 | 73 |
-| [EFF](https://www.eff.org/) | 54 | **45** | 48 | 47 | 48 | 49 | 49 |
+| [A List Apart](https://alistapart.com/) | 64 | **53** | 55 | 56 | 55 | 59 | 57 |
+| [Apple](https://www.apple.com/) | 233 | **174** | 206 | 209 | 210 | 212 | 212 |
+| [BBC](https://www.bbc.co.uk/) | 625 | **569** | 587 | 587 | 588 | 620 | n/a |
+| [CERN](https://home.cern/) | 151 | **82** | 90 | 90 | 91 | 92 | 95 |
+| [CSS-Tricks](https://css-tricks.com/) | 156 | **115** | 122 | 137 | 138 | 142 | 139 |
+| [ECMAScript](https://tc39.es/ecma262/) | 7261 | **6411** | 6583 | 6465 | 6589 | 6637 | n/a |
+| [EDRi](https://edri.org/) | 80 | **59** | 69 | 69 | 71 | 74 | 72 |
+| [EFF](https://www.eff.org/) | 54 | **44** | 48 | 47 | 48 | 49 | 49 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1596 | 1458 | **1430** | 1520 | 1531 | 1542 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1488 | 1361 | **1337** | 1416 | 1427 | 1436 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 153 | **122** | 126 | 126 | 126 | 132 | 127 |
-| [Frontend Dogma](https://frontenddogma.com/) | 228 | **220** | 241 | 226 | 228 | 247 | 228 |
+| [Frontend Dogma](https://frontenddogma.com/) | 227 | **219** | 241 | 226 | 227 | 246 | 227 |
 | [Google](https://www.google.com/) | 18 | **16** | 17 | 17 | 17 | 18 | 18 |
-| [Ground News](https://ground.news/) | 1658 | **1431** | 1526 | 1548 | 1553 | 1645 | n/a |
+| [Ground News](https://ground.news/) | 2093 | **1829** | 1928 | 1954 | 1957 | 2080 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | 153 | **147** | 149 | 155 | 149 |
-| [Igalia](https://www.igalia.com/) | 49 | **33** | 36 | 35 | 36 | 36 | 36 |
-| [Leanpub](https://leanpub.com/) | 233 | **204** | 219 | 219 | 219 | 228 | 230 |
+| [Igalia](https://www.igalia.com/) | 49 | **33** | 36 | 35 | 36 | 37 | 36 |
+| [Leanpub](https://leanpub.com/) | 241 | **210** | 225 | 225 | 225 | 236 | 238 |
 | [Mastodon](https://mastodon.social/explore) | 38 | **28** | 32 | 35 | 35 | 36 | 36 |
 | [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | 64 | 65 | 65 | 68 | 68 |
-| [Middle East Eye](https://www.middleeasteye.net/) | 222 | **196** | 202 | 200 | 200 | 201 | 202 |
-| [Mistral AI](https://mistral.ai/) | 364 | **319** | 326 | 329 | 330 | 360 | n/a |
-| [Mozilla](https://www.mozilla.org/) | 45 | **31** | 35 | 34 | 34 | 35 | 35 |
-| [Nielsen Norman Group](https://www.nngroup.com/) | 93 | 70 | **57** | 76 | 77 | 78 | 78 |
-| [SitePoint](https://www.sitepoint.com/) | 522 | **391** | 463 | 496 | 501 | 519 | n/a |
+| [Middle East Eye](https://www.middleeasteye.net/) | 219 | **194** | 199 | 198 | 198 | 199 | 200 |
+| [Mistral AI](https://mistral.ai/) | 343 | **301** | 307 | 310 | 311 | 340 | n/a |
+| [Mozilla](https://www.mozilla.org/) | 47 | **32** | 35 | 35 | 35 | 36 | 36 |
+| [Nielsen Norman Group](https://www.nngroup.com/) | 97 | 72 | **59** | 78 | 80 | 81 | 80 |
+| [SitePoint](https://www.sitepoint.com/) | 494 | **352** | 431 | 468 | 473 | 491 | n/a |
 | [Startup-Verband](https://startupverband.de/) | 43 | **30** | 31 | **30** | 31 | 31 | 31 |
-| [TetraLogical](https://tetralogical.com/) | 48 | **22** | 39 | 41 | 42 | 42 | 42 |
+| [TetraLogical](https://tetralogical.com/) | 59 | **23** | 49 | 51 | 53 | 53 | 53 |
 | [TPGi](https://www.tpgi.com/) | 173 | **157** | 159 | 163 | 164 | 170 | 170 |
-| [United Nations](https://www.un.org/en/) | 151 | **112** | 121 | 125 | 125 | 130 | 123 |
+| [United Nations](https://www.un.org/en/) | 151 | **113** | 121 | 125 | 125 | 130 | 123 |
 | [Vivaldi](https://vivaldi.com/) | 93 | **74** | n/a | 79 | 81 | 84 | 82 |
-| [W3C](https://www.w3.org/) | 51 | **36** | 39 | 39 | 39 | 41 | 39 |
-| **Average processing time** |  | 95 ms (30/30) | 143 ms (29/30) | 46 ms (30/30) | **14 ms (30/30)** | 274 ms (30/30) | 1297 ms (24/30) |
+| [W3C](https://www.w3.org/) | 50 | **36** | 39 | 38 | 38 | 41 | 39 |
+| **Average processing time** |  | 73 ms (30/30) | 153 ms (29/30) | 51 ms (30/30) | **14 ms (30/30)** | 289 ms (30/30) | 1214 ms (24/30) |
 
-(Last updated: Jan 20, 2026)
+(Last updated: Feb 2, 2026)
 <!-- End auto-generated -->
 
 Notes: Minimize does not minify CSS and JS. [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to issues around whitespace collapsing and removal of code using modern CSS features, issues which appeared to distort the data.
@@ -453,25 +452,23 @@ html-minifier-next --collapse-whitespace --remove-comments --minify-js --input-d
 Example using npx:
 
 ```shell
-npx html-minifier-next --input-dir=test --file-ext html --preset comprehensive --output-dir example
+npx html-minifier-next --input-dir=test --preset comprehensive --output-dir example
 ```
 
 **Process specific files and directories:**
 
 ```shell
-# Process only HTML files
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html
+# Process default extensions (html, htm, xhtml, shtml)
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 
-# Process multiple file extensions
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,htm,php
+# Process only specific extensions
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,php
 
-# Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,htm"`)
+# Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,php"`)
 html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir=dist
 
-# Process all files (default behavior)
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
-# When processing all files, non-HTML files will also be read as UTF‑8 and passed to the minifier
-# Consider restricting with `--file-ext` to avoid touching binaries (e.g., images, archives)
+# Process all files (explicit wildcard)
+html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext='*'
 ```
 
 **Exclude directories from processing:**
@@ -507,7 +504,7 @@ html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 ```shell
 # Show processing details while minifying
 html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace
-# Output: Options: collapseWhitespace, html5, includeAutoGeneratedTags
+# Output: CLI options: collapseWhitespace
 #   ✓ src/index.html: 1,234 → 892 bytes (-342, 27.7%)
 #   ✓ src/about.html: 2,100 → 1,654 bytes (-446, 21.2%)
 # ---

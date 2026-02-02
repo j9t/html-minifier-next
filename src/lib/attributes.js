@@ -272,8 +272,8 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     }
   } else if (attrName === 'class') {
     attrValue = trimWhitespace(attrValue);
-    if (options.sortClassName) {
-      attrValue = options.sortClassName(attrValue);
+    if (options.sortClassNames) {
+      attrValue = options.sortClassNames(attrValue);
     } else {
       attrValue = collapseWhitespaceAll(attrValue);
     }
@@ -305,7 +305,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
         attrValue = await options.minifyCSS(attrValue, 'inline');
         // After minification, check if CSS consists entirely of invalid properties (no values)
         // I.e., `color:` or `margin:;padding:` should be treated as empty
-        if (attrValue && /^(?:[a-z-]+:\s*;?\s*)+$/i.test(attrValue)) {
+        if (attrValue && /^(?:[a-z-]+:[;\s]*)+$/i.test(attrValue)) {
           attrValue = '';
         }
       } catch (err) {

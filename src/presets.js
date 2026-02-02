@@ -8,21 +8,19 @@
 
 export const presets = {
   conservative: {
+    caseSensitive: true,
     collapseBooleanAttributes: true,
     collapseWhitespace: true,
     conservativeCollapse: true,
-    continueOnParseError: true,
-    decodeEntities: true,
-    minifyURLs: true,
-    noNewlinesBeforeTagClose: true,
     preserveLineBreaks: true,
+    processConditionalComments: true,
     removeComments: true,
     removeScriptTypeAttributes: true,
     removeStyleLinkTypeAttributes: true,
     useShortDoctype: true
   },
   comprehensive: {
-    caseSensitive: true,
+    collapseAttributeWhitespace: true,
     collapseBooleanAttributes: true,
     collapseWhitespace: true,
     continueOnParseError: true,
@@ -32,7 +30,6 @@ export const presets = {
     minifyJS: true,
     minifySVG: true,
     minifyURLs: true,
-    noNewlinesBeforeTagClose: true,
     processConditionalComments: true,
     removeAttributeQuotes: true,
     removeComments: true,
@@ -41,8 +38,6 @@ export const presets = {
     removeRedundantAttributes: true,
     removeScriptTypeAttributes: true,
     removeStyleLinkTypeAttributes: true,
-    sortAttributes: true,
-    sortClassName: true,
     useShortDoctype: true
   }
 };

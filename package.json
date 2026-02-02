@@ -5,12 +5,9 @@
   },
   "bugs": "https://github.com/j9t/html-minifier-next/issues",
   "dependencies": {
-    "@types/relateurl": "^0.2.33",
-    "change-case": "^4.1.2",
     "commander": "^14.0.2",
     "entities": "^7.0.1",
     "lightningcss": "^1.31.1",
-    "relateurl": "^0.2.7",
     "terser": "^5.46.0"
   },
   "description": "Super-configurable, well-tested, JavaScript-based HTML minifier (enhanced successor of HTML Minifier)",
@@ -20,8 +17,7 @@
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
-    "@rollup/plugin-terser": "^0.4.4",
-    "@swc/core": "^1.15.10",
+    "@swc/core": "^1.15.11",
     "eslint": "^9.39.2",
     "rollup": "^4.55.1",
     "rollup-plugin-polyfill-node": "^0.13.0",
@@ -98,5 +94,5 @@
   },
   "type": "module",
   "types": "./dist/types/htmlminifier.d.ts",
-  "version": "4.19.1"
+  "version": "5.0.0"
 }

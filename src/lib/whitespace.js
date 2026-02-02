@@ -62,13 +62,31 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   }
 
   if (options.preserveLineBreaks) {
-    str = str.replace(/^[ \n\r\t\f]*?[\n\r][ \n\r\t\f]*/, function () {
-      lineBreakBefore = '\n';
-      return '';
-    }).replace(/[ \n\r\t\f]*?[\n\r][ \n\r\t\f]*$/, function () {
-      lineBreakAfter = '\n';
-      return '';
-    });
+    // Find leading/trailing whitespace containing line breaks manually
+    // (avoids polynomial backtracking with end-anchored lazy quantifiers)
+    const WS_CHARS = ' \n\r\t\f';
+    let leadEnd = 0;
+    while (leadEnd < str.length && WS_CHARS.includes(str[leadEnd])) {
+      leadEnd++;
+    }
+    if (leadEnd > 0) {
+      const leading = str.slice(0, leadEnd);
+      if (/[\n\r]/.test(leading)) {
+        lineBreakBefore = '\n';
+        str = str.slice(leadEnd);
+      }
+    }
+    let trailStart = str.length;
+    while (trailStart > 0 && WS_CHARS.includes(str[trailStart - 1])) {
+      trailStart--;
+    }
+    if (trailStart < str.length) {
+      const trailing = str.slice(trailStart);
+      if (/[\n\r]/.test(trailing)) {
+        lineBreakAfter = '\n';
+        str = str.slice(0, trailStart);
+      }
+    }
   }
 
   if (trimLeft) {
@@ -83,14 +101,24 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
   }
 
   if (trimRight) {
-    // No-break space is specifically handled inside the replacer function
-    str = str.replace(/[ \n\r\t\f\xA0]+$/, function (spaces) {
+    // Find trailing whitespace boundary manually (avoids polynomial backtracking
+    // with `/[ \n\r\t\f\xA0]+$/` on strings with long internal whitespace runs)
+    let end = str.length;
+    while (end > 0 && ' \n\r\t\f\xA0'.includes(str[end - 1])) {
+      end--;
+    }
+    if (end < str.length) {
+      const spaces = str.slice(end);
       const conservative = !lineBreakAfter && options.conservativeCollapse;
+      let replacement;
       if (conservative && spaces === '\t') {
-        return '\t';
+        replacement = '\t';
+      } else {
+        // No-break space is specifically handled via the nested regexes
+        replacement = spaces.replace(RE_NBSP_TRAILING_GROUP, ' $1').replace(RE_NBSP_TRAILING_STRIP, '') || (conservative ? ' ' : '');
       }
-      return spaces.replace(RE_NBSP_TRAILING_GROUP, ' $1').replace(RE_NBSP_TRAILING_STRIP, '') || (conservative ? ' ' : '');
-    });
+      str = str.slice(0, end) + replacement;
+    }
   }
 
   if (collapseAll) {
