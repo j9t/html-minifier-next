@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import {describe, test} from 'node:test';
 import { minify } from '../src/htmlminifier.js';
 
-describe('SVG', () => {
+describe('SVG and MathML', () => {
   test('Numeric precision reduction', async () => {
     // Path data with excessive precision
     assert.strictEqual(
@@ -494,6 +494,121 @@ describe('SVG', () => {
     assert.strictEqual(
       await minify('<div></div><p>Content</p>', { removeEmptyElements: true }),
       '<p>Content</p>'
+    );
+
+    // `foreignObject` contains HTML content—empty HTML elements inside should be removed
+    assert.strictEqual(
+      await minify('<svg><foreignObject><div></div></foreignObject></svg>', { removeEmptyElements: true }),
+      '<svg><foreignObject></foreignObject></svg>'
+    );
+
+    // `foreignObject` with mixed content—empty span removed, text preserved
+    assert.strictEqual(
+      await minify('<svg><foreignObject><p>Text <span></span>here</p></foreignObject></svg>', { removeEmptyElements: true }),
+      '<svg><foreignObject><p>Text here</p></foreignObject></svg>'
+    );
+
+    // `foreignObject` with whitespace collapsing
+    assert.strictEqual(
+      await minify('<svg><foreignObject>   <div>   Hello   World   </div>   </foreignObject></svg>', { removeEmptyElements: true, collapseWhitespace: true }),
+      '<svg><foreignObject><div>Hello World</div></foreignObject></svg>'
+    );
+
+    // SVG elements after `foreignObject` should still be preserved (context restored)
+    assert.strictEqual(
+      await minify('<svg><foreignObject><div></div></foreignObject><path d="M0 0"></path></svg>', { removeEmptyElements: true }),
+      '<svg><foreignObject></foreignObject><path d="M0 0"></path></svg>'
+    );
+
+    // Deeply nested: SVG in HTML in `foreignObject` with whitespace—inner SVG elements preserved
+    assert.strictEqual(
+      await minify(`<svg>
+  <foreignObject>
+    <div>
+      <svg>
+        <path d="M0 0"></path>
+      </svg>
+    </div>
+  </foreignObject>
+</svg>`, { removeEmptyElements: true, collapseWhitespace: true }),
+      '<svg><foreignObject><div><svg><path d="M0 0"></path></svg></div></foreignObject></svg>'
+    );
+
+    // MathML inside `foreignObject` with whitespace—empty `div` removed, MathML preserved
+    assert.strictEqual(
+      await minify(`<svg>
+  <foreignObject>
+    <div>   </div>
+    <math>
+      <mi>x</mi>
+    </math>
+  </foreignObject>
+</svg>`, { removeEmptyElements: true, collapseWhitespace: true }),
+      '<svg><foreignObject><math><mi>x</mi></math></foreignObject></svg>'
+    );
+
+    // Triple nested with content and whitespace
+    assert.strictEqual(
+      await minify(`<svg>
+  <foreignObject>
+    <p>   Outer   text   </p>
+    <svg>
+      <foreignObject>
+        <span>   Inner   text   </span>
+        <div>   </div>
+      </foreignObject>
+    </svg>
+  </foreignObject>
+</svg>`, { removeEmptyElements: true, collapseWhitespace: true }),
+      '<svg><foreignObject><p>Outer text</p><svg><foreignObject><span>Inner text</span></foreignObject></svg></foreignObject></svg>'
+    );
+  });
+
+  test('MathML `annotation-xml` with HTML content', async () => {
+    // `annotation-xml` with `encoding="text/html"` contains HTML—empty elements should be removed
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><div></div></annotation-xml></math>', { removeEmptyElements: true }),
+      '<math><annotation-xml encoding="text/html"></annotation-xml></math>'
+    );
+
+    // `annotation-xml` with `encoding="application/xhtml+xml"` also contains HTML
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="application/xhtml+xml"><span></span></annotation-xml></math>', { removeEmptyElements: true }),
+      '<math><annotation-xml encoding="application/xhtml+xml"></annotation-xml></math>'
+    );
+
+    // `annotation-xml` with other encoding (e.g., MathML)—content should be preserved as foreign
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="application/mathml+xml"><mi></mi></annotation-xml></math>', { removeEmptyElements: true }),
+      '<math><annotation-xml encoding="application/mathml+xml"><mi></mi></annotation-xml></math>'
+    );
+
+    // `annotation-xml` without encoding attribute—content preserved as foreign
+    assert.strictEqual(
+      await minify('<math><annotation-xml><mi></mi></annotation-xml></math>', { removeEmptyElements: true }),
+      '<math><annotation-xml><mi></mi></annotation-xml></math>'
+    );
+
+    // `annotation-xml` with HTML content and whitespace collapsing
+    assert.strictEqual(
+      await minify(`<math>
+  <annotation-xml encoding="text/html">
+    <p>   Hello   <span></span>   World   </p>
+  </annotation-xml>
+</math>`, { removeEmptyElements: true, collapseWhitespace: true }),
+      '<math><annotation-xml encoding="text/html"><p>Hello World</p></annotation-xml></math>'
+    );
+
+    // SVG inside `annotation-xml` HTML content—inner SVG preserved
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><div><svg><path d="M0 0"></path></svg></div></annotation-xml></math>', { removeEmptyElements: true }),
+      '<math><annotation-xml encoding="text/html"><div><svg><path d="M0 0"></path></svg></div></annotation-xml></math>'
+    );
+
+    // Mixed: Empty HTML removed, SVG preserved
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><div></div><svg><rect x="0" y="0"></rect></svg></annotation-xml></math>', { removeEmptyElements: true }),
+      '<math><annotation-xml encoding="text/html"><svg><rect x="0" y="0"></rect></svg></annotation-xml></math>'
     );
   });
 });
