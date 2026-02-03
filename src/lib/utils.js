@@ -80,6 +80,15 @@ async function replaceAsync(str, regex, asyncFn) {
   return str.replace(regex, () => data.shift());
 }
 
+// String patterns to RegExp conversion (for JSON config support)
+
+function parseRegExp(value) {
+  if (typeof value === 'string') {
+    return new RegExp(value.replace(/^\/(.*)\/$/, '$1'));
+  }
+  return value;
+}
+
 // Exports
 
 export { stableStringify };
@@ -88,3 +97,4 @@ export { uniqueId };
 export { identity };
 export { identityAsync };
 export { replaceAsync };
+export { parseRegExp };
