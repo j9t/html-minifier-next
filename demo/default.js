@@ -11,7 +11,7 @@ const escapeHtml = (str) => str
 // Convert CLI-style descriptions to demo-style HTML
 // - Backticks → `<code>` elements (with HTML escaping)
 // - `--kebab-case` → `camelCase` (for option cross-references)
-const toHtml = (desc) => desc
+const toHtml = (desc = '') => String(desc)
   .replace(/`--([a-z-]+)`/g, (_, kebab) => `<code>${kebab.replace(/-([a-z])/g, (__, c) => c.toUpperCase())}</code>`)
   .replace(/`([^`]+)`/g, (_, content) => `<code>${escapeHtml(content)}</code>`);
 
@@ -194,7 +194,7 @@ const defaultOptions = demoOptionIds.map(id => {
     id,
     type: inputType,
     label: cfg.label,
-    helpText: cfg.helpText || toHtml(def.description),
+    helpText: cfg.helpText || toHtml(def?.description),
     ...(inputType === 'checkbox' ? { checked: cfg.checked || false } : { value: cfg.value ?? '' }),
     ...(cfg.unsafe && { unsafe: true }),
     ...(cfg.disabled && { disabled: true })
