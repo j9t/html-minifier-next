@@ -35,7 +35,7 @@ const browserBundlePlugins = [
 const config = defineConfig([
   // ESM bundle for browser demo (GitHub Pages)
   // Bundles all dependencies except those requiring Node.js native bindings
-  // Used by: demo/main.js
+  // Used by: demo/default.js
   {
     input: 'src/htmlminifier.js',
     output: {
