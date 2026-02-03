@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.2] - 2026-02-03
+
+### Fixed
+
+* Fixed SVG and MathML elements being incorrectly removed when `removeEmptyElements` was enabled (foreign content is now excluded from empty element removal; HTML content inside `<foreignObject>` and `<annotation-xml>` is correctly processed as HTML)
+* Fixed `parseRegExp` not extracting flags from regex strings (e.g., `/pattern/gi` now correctly creates a case-insensitive global regex)
+
+### Internal
+
+* Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (`src/lib/option-definitions.js`, `src/lib/utils.js`)
+
 ## [5.0.1] - 2026-02-02
 
 ### Fixed

@@ -4,7 +4,7 @@
 		<meta charset="utf-8">
 		<meta name="viewport" content="initial-scale=1,width=device-width">
 		<title>HTML Minifier Next · Web demo of the super-configurable, well-tested, JavaScript-based HTML minifier</title>
-		<link rel="stylesheet" href="./main.css">
+		<link rel="stylesheet" href="./default.css">
 	</head>
 	<body>
 		<h1>HTML Minifier Next <span id="minifier-version"></span></h1>
@@ -56,10 +56,11 @@
 				<div>
 					<span>Select:</span>
 					<a href="#" @click.prevent="selectAllOptions(true)">All</a>,
-					<a href="#" @click.prevent="applyPreset('comprehensive')">comprehensive</a>,
 					<a href="#" @click.prevent="applyPreset('conservative')">conservative</a>,
+					<a href="#" @click.prevent="applyPreset('comprehensive')">comprehensive</a>,
 					<a href="#" @click.prevent="selectAllOptions(false)">none</a>,
 					<a href="#" @click.prevent="resetOptions()">reset</a>
+					<p>(Cf. <a href="https://github.com/j9t/html-minifier-next?tab=readme-ov-file#options-quick-reference">README</a> or CLI for all options)</p>
 				</div>
 			</div>
 		</main>
@@ -73,7 +74,7 @@
 			</p>
 		</footer>
 		<script src="/lz-string.min.js"></script>
-		<script src="./main.js" type="module"></script>
+		<script src="./default.js" type="module"></script>
 		<script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
 	</body>
 </html>

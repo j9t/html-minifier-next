@@ -49,7 +49,7 @@ function uniqueId(value) {
   return id;
 }
 
-// Identity functions
+// Identity and transform functions
 
 function identity(value) {
   return value;
@@ -57,6 +57,10 @@ function identity(value) {
 
 function identityAsync(value) {
   return Promise.resolve(value);
+}
+
+function lowercase(value) {
+  return value.toLowerCase();
 }
 
 // Replace async helper
@@ -80,6 +84,20 @@ async function replaceAsync(str, regex, asyncFn) {
   return str.replace(regex, () => data.shift());
 }
 
+// String patterns to RegExp conversion (for JSON config support)
+
+function parseRegExp(value) {
+  if (typeof value === 'string') {
+    if (!value) return undefined; // Empty string = not configured
+    const match = value.match(/^\/(.+)\/([dgimsuvy]*)$/);
+    if (match) {
+      return new RegExp(match[1], match[2]);
+    }
+    return new RegExp(value);
+  }
+  return value;
+}
+
 // Exports
 
 export { stableStringify };
@@ -87,4 +105,6 @@ export { LRU };
 export { uniqueId };
 export { identity };
 export { identityAsync };
+export { lowercase };
 export { replaceAsync };
+export { parseRegExp };
