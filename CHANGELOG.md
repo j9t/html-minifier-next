@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.2] - 2026-02-03
+
+### Internal
+
+* Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (`src/lib/option-definitions.js`, `src/lib/utils.js`)
+
 ## [5.0.1] - 2026-02-02
 
 ### Fixed
