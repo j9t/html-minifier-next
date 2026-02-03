@@ -1051,6 +1051,7 @@ async function minifyHTML(value, options, partialMarkup) {
         options.keepClosingSlash = true;
         options.name = identity;
         options.insideSVG = lowerTag === 'svg';
+        options.insideForeignContent = true;
       }
       tag = options.name(tag);
       currentTag = tag;
@@ -1180,7 +1181,7 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalEndTagEmitted = true;
       }
 
-      if (options.removeEmptyElements && isElementEmpty && canRemoveElement(tag, attrs)) {
+      if (options.removeEmptyElements && isElementEmpty && !options.insideForeignContent && canRemoveElement(tag, attrs)) {
         let preserve = false;
         if (removeEmptyElementsExcept.length) {
           // Normalize attribute names for comparison with specs

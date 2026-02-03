@@ -449,4 +449,51 @@ describe('SVG', () => {
       '<svg><rect fill="green" stroke="navy"/></svg>'
     );
   });
+
+  test('SVG and MathML elements should not be removed by `removeEmptyElements`', async () => {
+    // SVG elements define their content via attributes (like `d`, `cx`, `r`)
+    // They should not be removed as "empty" even without text content
+
+    // Path with `d` attribute should be preserved
+    assert.strictEqual(
+      await minify('<svg><path d="M10 10 L90 90"></path></svg>', { removeEmptyElements: true }),
+      '<svg><path d="M10 10 L90 90"></path></svg>'
+    );
+
+    // Circle with dimension attributes should be preserved
+    assert.strictEqual(
+      await minify('<svg><circle cx="50" cy="50" r="40"></circle></svg>', { removeEmptyElements: true }),
+      '<svg><circle cx="50" cy="50" r="40"></circle></svg>'
+    );
+
+    // Empty SVG container elements should also be preserved
+    assert.strictEqual(
+      await minify('<svg><g></g></svg>', { removeEmptyElements: true }),
+      '<svg><g></g></svg>'
+    );
+
+    // SVG with nested elements should all be preserved
+    assert.strictEqual(
+      await minify('<svg viewBox="0 0 100 100"><g><path d="M0 0h100v100H0z"></path></g></svg>', { removeEmptyElements: true }),
+      '<svg viewBox="0 0 100 100"><g><path d="M0 0h100v100H0z"></path></g></svg>'
+    );
+
+    // MathML elements should also be preserved
+    assert.strictEqual(
+      await minify('<math><mi></mi></math>', { removeEmptyElements: true }),
+      '<math><mi></mi></math>'
+    );
+
+    // Regular HTML empty elements should still be removed
+    assert.strictEqual(
+      await minify('<p>Hello <span></span>world</p>', { removeEmptyElements: true }),
+      '<p>Hello world</p>'
+    );
+
+    // Empty `div` should still be removed
+    assert.strictEqual(
+      await minify('<div></div><p>Content</p>', { removeEmptyElements: true }),
+      '<p>Content</p>'
+    );
+  });
 });

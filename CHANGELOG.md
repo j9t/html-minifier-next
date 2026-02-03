@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
+* Fixed SVG and MathML elements being incorrectly removed when `removeEmptyElements` was enabled (foreign content is now excluded from empty element removal)
 * Fixed `parseRegExp` not extracting flags from regex strings (e.g., `/pattern/gi` now correctly creates a case-insensitive global regex)
 
 ### Internal
