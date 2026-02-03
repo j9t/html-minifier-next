@@ -84,7 +84,12 @@ async function replaceAsync(str, regex, asyncFn) {
 
 function parseRegExp(value) {
   if (typeof value === 'string') {
-    return new RegExp(value.replace(/^\/(.*)\/$/, '$1'));
+    if (!value) return undefined; // Empty string = not configured
+    const match = value.match(/^\/(.+)\/([gimsuy]*)$/);
+    if (match) {
+      return new RegExp(match[1], match[2]);
+    }
+    return new RegExp(value);
   }
   return value;
 }

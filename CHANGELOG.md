@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.0.2] - 2026-02-03
 
+### Fixed
+
+* Fixed `parseRegExp` not extracting flags from regex strings (e.g., `/pattern/gi` now correctly creates a case-insensitive global regex)
+
 ### Internal
 
 * Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (`src/lib/option-definitions.js`, `src/lib/utils.js`)
