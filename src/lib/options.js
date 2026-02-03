@@ -1,7 +1,7 @@
 // Imports
 
 import { createUrlMinifier } from './urls.js';
-import { LRU, stableStringify, identity, identityAsync, replaceAsync, parseRegExp } from './utils.js';
+import { LRU, stableStringify, identity, lowercase, identityAsync, replaceAsync, parseRegExp } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -37,9 +37,7 @@ function shouldMinifyInnerHTML(options) {
  */
 const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssMinifyCache, jsMinifyCache } = {}) => {
   const options = {
-    name: function (name) {
-      return name.toLowerCase();
-    },
+    name: lowercase,
     canCollapseWhitespace,
     canTrimWhitespace,
     ...optionDefaults,

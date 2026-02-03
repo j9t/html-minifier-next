@@ -5,7 +5,7 @@ import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, identity, uniqueId } from './lib/utils.js';
+import { LRU, identity, lowercase, uniqueId } from './lib/utils.js';
 
 import {
   RE_LEGACY_ENTITIES,
@@ -103,6 +103,9 @@ const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript
 // Pre-compiled patterns for buffer scanning
 const RE_START_TAG = /^<[^/!]/;
 const RE_END_TAG = /^<\//;
+
+// HTML encoding types for annotation-xml (MathML)
+const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 
 // Script merging
 
@@ -1058,13 +1061,13 @@ async function minifyHTML(value, options, partialMarkup) {
       let useParentNameForTag = false;
       if (options.insideForeignContent && (lowerTag === 'foreignobject' ||
           (lowerTag === 'annotation-xml' && attrs.some(a => a.name.toLowerCase() === 'encoding' &&
-            /^(text\/html|application\/xhtml\+xml)$/i.test(a.value))))) {
+            RE_HTML_ENCODING.test(a.value))))) {
         const parentName = options.name;
         options = Object.create(options);
         options.caseSensitive = false;
         options.keepClosingSlash = false;
         options.parentName = parentName; // Preserve for the element tag itself
-        options.name = options.htmlName || (s => s.toLowerCase());
+        options.name = options.htmlName || lowercase;
         options.insideForeignContent = false;
         useParentNameForTag = true;
       }

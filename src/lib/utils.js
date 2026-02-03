@@ -49,7 +49,7 @@ function uniqueId(value) {
   return id;
 }
 
-// Identity functions
+// Identity and transform functions
 
 function identity(value) {
   return value;
@@ -57,6 +57,10 @@ function identity(value) {
 
 function identityAsync(value) {
   return Promise.resolve(value);
+}
+
+function lowercase(value) {
+  return value.toLowerCase();
 }
 
 // Replace async helper
@@ -101,5 +105,6 @@ export { LRU };
 export { uniqueId };
 export { identity };
 export { identityAsync };
+export { lowercase };
 export { replaceAsync };
 export { parseRegExp };
