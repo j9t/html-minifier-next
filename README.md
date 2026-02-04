@@ -403,38 +403,38 @@ How does HTML Minifier Next compare to other minifiers? (All minification with t
 | Site | Original Size (KB) | [HTML Minifier Next](https://github.com/j9t/html-minifier-next) ([config](https://github.com/j9t/html-minifier-next/blob/main/benchmarks/html-minifier.json))<br>[![npm last update](https://img.shields.io/npm/last-update/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) | [htmlnano](https://github.com/posthtml/htmlnano)<br>[![npm last update](https://img.shields.io/npm/last-update/htmlnano)](https://socket.dev/npm/package/htmlnano) | [@swc/html](https://github.com/swc-project/swc)<br>[![npm last update](https://img.shields.io/npm/last-update/@swc/html)](https://socket.dev/npm/package/@swc/html) | [minify-html](https://github.com/wilsonzlin/minify-html)<br>[![npm last update](https://img.shields.io/npm/last-update/@minify-html/node)](https://socket.dev/npm/package/@minify-html/node) | [minimize](https://github.com/Swaagie/minimize)<br>[![npm last update](https://img.shields.io/npm/last-update/minimize)](https://socket.dev/npm/package/minimize) | [html­com­pressor.­com](https://htmlcompressor.com/) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | [A List Apart](https://alistapart.com/) | 63 | **53** | 55 | 56 | 55 | 58 | 56 |
-| [Apple](https://www.apple.com/) | 236 | **197** | 209 | 212 | 213 | 215 | 215 |
-| [BBC](https://www.bbc.co.uk/) | 647 | **601** | 607 | 608 | 609 | 642 | n/a |
-| [CERN](https://home.cern/) | 150 | **82** | 90 | 90 | 90 | 92 | 95 |
+| [Apple](https://www.apple.com/) | 236 | **198** | 209 | 212 | 213 | 215 | 215 |
+| [BBC](https://www.bbc.co.uk/) | 651 | **605** | 611 | 612 | 613 | 646 | n/a |
+| [CERN](https://home.cern/) | 150 | **80** | 90 | 90 | 90 | 92 | 95 |
 | [CSS-Tricks](https://css-tricks.com/) | 155 | 127 | **121** | 136 | 137 | 141 | 138 |
-| [ECMAScript](https://tc39.es/ecma262/) | 7261 | **6411** | 6583 | 6465 | 6589 | 6637 | n/a |
+| [ECMAScript](https://tc39.es/ecma262/) | 7261 | **6447** | 6583 | 6465 | 6589 | 6637 | n/a |
 | [EDRi](https://edri.org/) | 80 | **68** | 69 | 69 | 71 | 74 | 72 |
-| [EFF](https://www.eff.org/) | 54 | **45** | 48 | 47 | 48 | 49 | 49 |
+| [EFF](https://www.eff.org/) | 54 | **45** | 49 | 47 | 48 | 49 | 49 |
 | [European Alternatives](https://european-alternatives.eu/) | 48 | **30** | 32 | 32 | 32 | 32 | 32 |
-| [FAZ](https://www.faz.net/aktuell/) | 1545 | 1412 | **1385** | 1471 | 1482 | 1492 | n/a |
+| [FAZ](https://www.faz.net/aktuell/) | 1519 | 1389 | **1364** | 1446 | 1457 | 1467 | n/a |
 | [French Tech](https://lafrenchtech.gouv.fr/) | 153 | **122** | 126 | 126 | 126 | 132 | 127 |
-| [Frontend Dogma](https://frontenddogma.com/) | 227 | **219** | 240 | 225 | 227 | 246 | 227 |
+| [Frontend Dogma](https://frontenddogma.com/) | 227 | **219** | 240 | 225 | 227 | 246 | 226 |
 | [Google](https://www.google.com/) | 18 | **16** | **16** | **16** | 17 | 18 | 18 |
-| [Ground News](https://ground.news/) | 1513 | **1371** | 1394 | 1418 | 1424 | 1499 | n/a |
+| [Ground News](https://ground.news/) | 1465 | **1328** | 1350 | 1372 | 1377 | 1453 | n/a |
 | [HTML Living Standard](https://html.spec.whatwg.org/multipage/) | 149 | 148 | 153 | **147** | 149 | 155 | 149 |
 | [Igalia](https://www.igalia.com/) | 49 | **34** | 36 | 36 | 36 | 37 | 37 |
-| [Leanpub](https://leanpub.com/) | 243 | **226** | 229 | 228 | 229 | 239 | 240 |
+| [Leanpub](https://leanpub.com/) | 241 | **224** | 226 | 226 | 227 | 236 | 238 |
 | [Mastodon](https://mastodon.social/explore) | 38 | 35 | **32** | 35 | 36 | 37 | 37 |
-| [MDN](https://developer.mozilla.org/en-US/) | 109 | **62** | 64 | 65 | 65 | 68 | 68 |
+| [MDN](https://developer.mozilla.org/en-US/) | 109 | **63** | 64 | 65 | 65 | 68 | 68 |
 | [Middle East Eye](https://www.middleeasteye.net/) | 220 | **194** | 200 | 198 | 198 | 199 | 200 |
 | [Mistral AI](https://mistral.ai/) | 343 | **307** | **307** | 310 | 311 | 340 | n/a |
 | [Mozilla](https://www.mozilla.org/) | 47 | **32** | 35 | 35 | 35 | 36 | 36 |
 | [Nielsen Norman Group](https://www.nngroup.com/) | 97 | 73 | **59** | 78 | 80 | 81 | 81 |
-| [SitePoint](https://www.sitepoint.com/) | 495 | 456 | **431** | 468 | 473 | 491 | n/a |
+| [SitePoint](https://www.sitepoint.com/) | 494 | 456 | **431** | 468 | 473 | 491 | n/a |
 | [Startup-Verband](https://startupverband.de/) | 43 | **30** | 31 | **30** | 31 | 31 | 31 |
 | [TetraLogical](https://tetralogical.com/) | 59 | 52 | **49** | 51 | 53 | 53 | 53 |
 | [TPGi](https://www.tpgi.com/) | 173 | **157** | 159 | 163 | 164 | 170 | 170 |
 | [United Nations](https://www.un.org/en/) | 151 | **113** | 121 | 125 | 124 | 130 | 123 |
-| [Vivaldi](https://vivaldi.com/) | 93 | **75** | n/a | 79 | 81 | 84 | 82 |
+| [Vivaldi](https://vivaldi.com/) | 93 | **76** | n/a | 79 | 81 | 84 | 82 |
 | [W3C](https://www.w3.org/) | 50 | **36** | 39 | 38 | 38 | 41 | 39 |
-| **Average processing time** |  | 77 ms (30/30) | 149 ms (29/30) | 49 ms (30/30) | **17 ms (30/30)** | 330 ms (30/30) | 1513 ms (24/30) |
+| **Average processing time** |  | 83 ms (30/30) | 165 ms (29/30) | 47 ms (30/30) | **13 ms (30/30)** | 283 ms (30/30) | 1254 ms (24/30) |
 
-(Last updated: Feb 3, 2026)
+(Last updated: Feb 4, 2026)
 <!-- End auto-generated -->
 
 Notes: Minimize does not minify CSS and JS. [HTML Minifier Terser](https://github.com/terser/html-minifier-terser) is currently not included due to issues around whitespace collapsing and removal of code using modern CSS features, issues which appeared to distort the data.

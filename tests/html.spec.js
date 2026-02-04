@@ -180,6 +180,32 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<input title="bar"       id="boo"    value="hello world">'), '<input title="bar" id="boo" value="hello world">');
   });
 
+  test('Deduplicate attributes', async () => {
+    // Per HTML spec, when duplicate attributes are present, the first occurrence wins
+    // Duplicate attributes result in invalid HTML, so we deduplicate them
+
+    // Simple duplicate attribute
+    assert.strictEqual(await minify('<html data-color-mode="auto" data-color-mode="light"></html>'), '<html data-color-mode="auto"></html>');
+
+    // Multiple duplicates of same attribute
+    assert.strictEqual(await minify('<div class="a" id="x" class="b" class="c"></div>'), '<div class="a" id="x"></div>');
+
+    // Different attributes, some duplicated
+    assert.strictEqual(await minify('<p title="first" class="a" title="second"></p>'), '<p title="first" class="a"></p>');
+
+    // Duplicate data attributes (common in GitHub-style HTML)
+    assert.strictEqual(await minify('<html data-dark-theme="dark" data-dark-theme="dark_dimmed"></html>'), '<html data-dark-theme="dark"></html>');
+
+    // No duplicates—should pass through unchanged
+    assert.strictEqual(await minify('<div id="x" class="y" title="z"></div>'), '<div id="x" class="y" title="z"></div>');
+
+    // Case-insensitive deduplication in HTML mode
+    assert.strictEqual(await minify('<div Class="a" CLASS="b" class="c"></div>'), '<div class="a"></div>');
+
+    // Case-sensitive deduplication in SVG mode
+    assert.strictEqual(await minify('<svg viewBox="0 0 100 100" viewBox="0 0 200 200"></svg>'), '<svg viewBox="0 0 100 100"></svg>');
+  });
+
   test('Space normalization around text', async () => {
     let input, output;
     input = '   <p>blah</p>\n\n\n   ';
@@ -1699,6 +1725,25 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
     output = '<div>Empty<!-- NOT --></div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), output);
+
+    // Elements with `id` attribute must not be removed
+    input = '<div id="start-of-content"></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
+
+    input = '<div id="__primerPortalRoot__"></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
+
+    input = '<ul id="query-builder-results" data-action="combobox-commit"></ul>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
+
+    // Element with `id` and other attributes
+    input = '<span id="target" class="highlight" aria-hidden="true"></span>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
+
+    // Multiple elements, only those without `id` should be removed
+    input = '<div id="keep"></div><span></span><p id="also-keep"></p>';
+    output = '<div id="keep"></div><p id="also-keep"></p>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true }), output);
   });
 
   test('`removeEmptyElementsExcept`', async () => {

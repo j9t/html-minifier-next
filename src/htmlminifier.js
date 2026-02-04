@@ -38,7 +38,8 @@ import {
   isExecutableScript,
   isStyleElement,
   normalizeAttr,
-  buildAttr
+  buildAttr,
+  deduplicateAttributes
 } from './lib/attributes.js';
 
 import {
@@ -1124,6 +1125,11 @@ async function minifyHTML(value, options, partialMarkup) {
       const hasUnarySlash = unarySlash && options.keepClosingSlash;
 
       buffer.push(openTag);
+
+      // Remove duplicate attributes (per HTML spec, first occurrence wins)
+      // Duplicate attributes result in invalid HTML
+      // https://html.spec.whatwg.org/multipage/parsing.html#attribute-name-state
+      deduplicateAttributes(attrs, options.caseSensitive);
 
       if (options.sortAttributes) {
         options.sortAttributes(tag, attrs);

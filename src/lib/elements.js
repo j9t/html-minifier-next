@@ -80,6 +80,16 @@ function canRemovePrecedingTag(optionalEndTag, tag) {
 // Element removal logic
 
 function canRemoveElement(tag, attrs) {
+  // Elements with `id` attribute must never be removed—they serve as:
+  // - Navigation targets (skip links, URL fragments)
+  // - JavaScript selector targets (`getElementById`, `querySelector`)
+  // - CSS targets (`:target` pseudo-class, ID selectors)
+  // - Accessibility landmarks (ARIA references)
+  // - Portal mount points (React portals, etc.)
+  if (hasAttrName('id', attrs)) {
+    return false;
+  }
+
   switch (tag) {
     case 'textarea':
       return false;

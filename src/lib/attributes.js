@@ -65,6 +65,36 @@ function attributesInclude(attributes, attribute) {
   return false;
 }
 
+/**
+ * Remove duplicate attributes from an attribute list.
+ * Per HTML spec, when an attribute appears multiple times, the first occurrence wins.
+ * Duplicate attributes result in invalid HTML, so we keep only the first.
+ * @param {Array} attrs - Array of attribute objects with `name` property
+ * @param {boolean} caseSensitive - Whether to compare names case-sensitively (for XML/SVG)
+ * @returns {Array} Deduplicated attribute array (modifies in place and returns)
+ */
+function deduplicateAttributes(attrs, caseSensitive) {
+  if (attrs.length < 2) {
+    return attrs;
+  }
+
+  const seen = new Set();
+  let writeIndex = 0;
+
+  for (let i = 0; i < attrs.length; i++) {
+    const attr = attrs[i];
+    const key = caseSensitive ? attr.name : attr.name.toLowerCase();
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      attrs[writeIndex++] = attr;
+    }
+  }
+
+  attrs.length = writeIndex;
+  return attrs;
+}
+
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   // Fast-path: Check if this element–attribute combination can possibly be redundant
   // before doing expensive string operations
@@ -604,5 +634,6 @@ export {
   // Cleaners
   cleanAttributeValue,
   normalizeAttr,
-  buildAttr
+  buildAttr,
+  deduplicateAttributes
 };
