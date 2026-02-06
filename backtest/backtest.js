@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
 import { spawn, fork } from 'child_process';
+import { createWriteStream } from 'fs';
 import fs from 'fs/promises';
+import https from 'https';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import zlib from 'zlib';
 import Progress from 'progress';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,6 +24,92 @@ const OUTPUT_DIR = path.join(__dirname, 'backtest');
 
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
+const inputDir = path.join(__dirname, 'input');
+
+async function downloadFile(url, filePath) {
+  return new Promise((resolve) => {
+    let resolved = false;
+    function safeResolve(value) {
+      if (!resolved) {
+        resolved = true;
+        resolve(value);
+      }
+    }
+
+    const parsedUrl = new URL(url);
+    const request = https.get({
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port,
+      path: parsedUrl.pathname + parsedUrl.search,
+      headers: {
+        'Accept-Encoding': 'gzip, br, deflate',
+        'User-Agent': 'html-minifier-next-backtest/0.0'
+      }
+    }, function (res) {
+      const status = res.statusCode;
+
+      if (status === 200) {
+        let stream = res;
+        if (res.headers['content-encoding'] === 'gzip') {
+          stream = res.pipe(zlib.createGunzip());
+        } else if (res.headers['content-encoding'] === 'br') {
+          stream = res.pipe(zlib.createBrotliDecompress());
+        } else if (res.headers['content-encoding'] === 'deflate') {
+          stream = res.pipe(zlib.createInflate());
+        }
+
+        const writeStream = createWriteStream(filePath);
+        stream.on('error', () => safeResolve(false));
+        writeStream.on('error', () => safeResolve(false));
+        writeStream.on('finish', () => safeResolve(true));
+        stream.pipe(writeStream);
+      } else if (status >= 300 && status < 400 && res.headers.location) {
+        res.resume();
+        downloadFile(new URL(res.headers.location, url).href, filePath).then(safeResolve);
+      } else {
+        res.resume();
+        safeResolve(false);
+      }
+    });
+
+    request.setTimeout(30000, function () {
+      request.destroy();
+      safeResolve(false);
+    });
+    request.on('error', () => safeResolve(false));
+  });
+}
+
+async function ensureInput() {
+  await fs.mkdir(inputDir, { recursive: true });
+
+  const missing = [];
+  for (const fileName of fileNames) {
+    const filePath = path.join(inputDir, fileName + '.html');
+    try {
+      await fs.stat(filePath);
+    } catch {
+      missing.push(fileName);
+    }
+  }
+
+  if (missing.length === 0) return;
+
+  console.log(`Downloading ${missing.length} source file(s)…`);
+  const progress = new Progress('[:bar] :current/:total :etas', {
+    width: 40,
+    total: missing.length
+  });
+
+  for (const fileName of missing) {
+    const filePath = path.join(inputDir, fileName + '.html');
+    const ok = await downloadFile(urls[fileName], filePath);
+    if (!ok) {
+      console.error(`Failed to download ${fileName} from ${urls[fileName]}`);
+    }
+    progress.tick();
+  }
+}
 
 function git() {
   const args = [].concat.apply([], [].slice.call(arguments, 0, -1));
@@ -69,27 +158,12 @@ async function minify(hash, options) {
 
     for (const fileName of fileNames) {
       try {
-        const sourcesDir = path.join(__dirname, 'sources');
-        const filePath = path.join(sourcesDir, fileName + '.html');
+        const filePath = path.join(inputDir, fileName + '.html');
 
-        // Check if “sources” directory exists
-        try {
-          await fs.stat(sourcesDir);
-        } catch (err) {
-          throw new Error(
-            `Sources directory not found at “${sourcesDir}”\n` +
-            `Run “npm run benchmarks” to download benchmark HTML files`
-          );
-        }
-
-        // Check if the specific file exists
         try {
           await fs.stat(filePath);
-        } catch (err) {
-          throw new Error(
-            `Benchmark file not found: “${fileName}.html”\n` +
-            `Run “npm run benchmarks” to download all benchmark HTML files`
-          );
+        } catch {
+          throw new Error(`Source file not found: "${fileName}.html"`);
         }
 
         const data = await readText(filePath);
@@ -282,11 +356,14 @@ if (process.argv.length > 2 || !process.send) {
     const configPath = path.join(__dirname, 'html-minifier.json');
     git('status', '--porcelain', '--', srcPath, configPath, async function (code, output) {
       if (output.trim().length > 0) {
-        console.error('Error: Uncommitted changes detected in “src” directory or html-minifier.json benchmarks config');
+        console.error('Error: Uncommitted changes detected in “src” directory or html-minifier.json backtest config');
         console.error('Please commit or stash your changes before running backtest');
         console.error('This is required because backtest temporarily modifies these files for testing');
         process.exit(1);
       }
+
+      // Download missing source files before starting
+      await ensureInput();
 
       // Print backtest info after pre-flight checks pass
       if (step > 1) {

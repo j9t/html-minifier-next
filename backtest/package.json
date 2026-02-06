@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "progress": "^2.0.3"
+  },
+  "name": "html-minifier-next-backtest",
+  "private": true,
+  "scripts": {
+    "backtest": "node backtest.js"
+  },
+  "type": "module"
+}

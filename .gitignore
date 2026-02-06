@@ -1,6 +1,4 @@
-benchmarks/backtest/
-benchmarks/generated/
-benchmarks/sources/
+backtest/input/
 demo/build/
 dist/
 node_modules/

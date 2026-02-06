@@ -7,7 +7,7 @@ updates:
     schedule:
       interval: "monthly"
   - package-ecosystem: "npm"
-    directory: "/benchmarks/"
+    directory: "/backtest/"
     schedule:
       interval: "weekly"
   - package-ecosystem: "github-actions"
