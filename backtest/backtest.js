@@ -12,6 +12,7 @@ import Progress from 'progress';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const repoRoot = path.join(__dirname, '..');
 
 // Default number of commits to test when no parameter is provided
 const DEFAULT_COMMIT_COUNT = 50;
@@ -20,7 +21,7 @@ const DEFAULT_COMMIT_COUNT = 50;
 const TASK_TIMEOUT_MS = 60000;
 
 // Output directory for results
-const OUTPUT_DIR = path.join(__dirname, 'backtest');
+const OUTPUT_DIR = __dirname;
 
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
@@ -80,6 +81,38 @@ async function downloadFile(url, filePath) {
   });
 }
 
+// Historical dependencies that old source code may import (not in current package.json)
+const historicalDeps = ['relateurl', 'clean-css', 'he', 'change-case', 'camel-case', 'param-case'];
+
+async function ensureHistoricalDeps() {
+  const rootNodeModules = path.join(repoRoot, 'node_modules');
+  const missing = [];
+  for (const dep of historicalDeps) {
+    try {
+      await fs.stat(path.join(rootNodeModules, dep));
+    } catch {
+      missing.push(dep);
+    }
+  }
+  if (missing.length === 0) return;
+
+  console.log(`Installing ${missing.length} historical dependency(ies)…`);
+  await new Promise((resolve, reject) => {
+    const proc = spawn('npm', ['install', '--no-save', ...missing], {
+      cwd: repoRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        console.error('Warning: Failed to install some historical dependencies; old commits may fail');
+        resolve();
+      }
+    });
+  });
+}
+
 async function ensureInput() {
   await fs.mkdir(inputDir, { recursive: true });
 
@@ -114,7 +147,7 @@ async function ensureInput() {
 function git() {
   const args = [].concat.apply([], [].slice.call(arguments, 0, -1));
   const callback = arguments[arguments.length - 1];
-  const task = spawn('git', args, { stdio: ['ignore', 'pipe', 'ignore'] });
+  const task = spawn('git', args, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] });
   let output = '';
   task.stdout.setEncoding('utf8');
   task.stdout.on('data', function (data) {
@@ -351,12 +384,13 @@ if (process.argv.length > 2 || !process.send) {
 
   if (count > 0) {
 
-    // Check for uncommitted changes in “src” directory and html-minifier.json
+    // Check for uncommitted changes in files the backtest temporarily modifies
     const srcPath = path.join(__dirname, '..', 'src');
     const configPath = path.join(__dirname, 'html-minifier.json');
-    git('status', '--porcelain', '--', srcPath, configPath, async function (code, output) {
+    const pkgPath = path.join(repoRoot, 'package.json');
+    git('status', '--porcelain', '--', srcPath, configPath, pkgPath, async function (code, output) {
       if (output.trim().length > 0) {
-        console.error('Error: Uncommitted changes detected in “src” directory or html-minifier.json backtest config');
+        console.error('Error: Uncommitted changes detected in src, package.json, or html-minifier.json');
         console.error('Please commit or stash your changes before running backtest');
         console.error('This is required because backtest temporarily modifies these files for testing');
         process.exit(1);
@@ -364,6 +398,9 @@ if (process.argv.length > 2 || !process.send) {
 
       // Download missing source files before starting
       await ensureInput();
+
+      // Ensure historical dependencies are available for old source code
+      await ensureHistoricalDeps();
 
       // Print backtest info after pre-flight checks pass
       if (step > 1) {
@@ -387,15 +424,21 @@ if (process.argv.length > 2 || !process.send) {
           console.log(`\nCleaning up after ${reason}…`);
         }
 
-        // Restore both “src” and html-minifier.json from HEAD using Git
+        // Restore “src” folder, package.json, and html-minifier.json from HEAD using Git
         await new Promise((resolve) => {
           const srcPath = path.join(__dirname, '..', 'src');
           const configPath = path.join(__dirname, 'html-minifier.json');
-          git('checkout', 'HEAD', '--', srcPath, configPath, function (code) {
+          const pkgPath = path.join(repoRoot, 'package.json');
+          git('checkout', 'HEAD', '--', srcPath, configPath, pkgPath, function (code) {
             if (code !== 0) {
               console.error('Warning: Failed to restore modified files');
             }
-            resolve();
+            // Remove stale files that old commits added but HEAD doesn’t have
+            git('reset', 'HEAD', '--', srcPath, function () {
+              git('clean', '-fd', srcPath, function () {
+                resolve();
+              });
+            });
           });
         });
       };
@@ -503,36 +546,47 @@ if (process.argv.length > 2 || !process.send) {
   }
 } else if (process.send) {
   // Running as forked child process
-  process.on('message', function (hash) {
-    const paths = ['src', 'benchmark.conf', 'html-minifier.json'];
-    git('reset', 'HEAD', '--', paths, function () {
-      let conf = 'html-minifier.json';
 
-      function checkout() {
-        const targetPath = paths.shift();
-        git('checkout', hash, '--', targetPath, function (code) {
-          if (code === 0 && targetPath === 'benchmark.conf') {
-            conf = targetPath;
-          }
-          if (paths.length) {
-            checkout();
-          } else {
-            readText(conf).then(data => {
-              try {
-                minify(hash, JSON.parse(data));
-              } catch (err) {
-                console.error(`Invalid JSON in ${conf}: ${err.message}`);
-                process.disconnect();
-              }
-            }).catch(err => {
-              console.error(`Failed to read ${conf}: ${err.message}`);
-              process.disconnect();
-            });
-          }
-        });
+  // Config file paths (repo-root-relative), ordered newest to oldest
+  const configPaths = [
+    'backtest/html-minifier.json',
+    'benchmarks/html-minifier.json',
+    'benchmarks/html-minifier-benchmarks.json',
+    'benchmark.conf'
+  ];
+
+  function readConfigFromGit(hash, index, callback) {
+    if (index >= configPaths.length) {
+      // Fallback to current config file on disk
+      readText(path.join(__dirname, 'html-minifier.json')).then(callback).catch(err => {
+        console.error(`No config found for ${hash}: ${err.message}`);
+        process.disconnect();
+      });
+      return;
+    }
+    git('show', hash + ':' + configPaths[index], function (code, data) {
+      if (code === 0 && data.trim()) {
+        callback(data);
+      } else {
+        readConfigFromGit(hash, index + 1, callback);
       }
+    });
+  }
 
-      checkout();
+  process.on('message', function (hash) {
+    git('reset', 'HEAD', '--', ['src', 'package.json'], function () {
+      git('checkout', hash, '--', 'src', function () {
+        git('checkout', hash, '--', 'package.json', function () {
+          readConfigFromGit(hash, 0, function (data) {
+            try {
+              minify(hash, JSON.parse(data));
+            } catch (err) {
+              console.error(`Invalid JSON in config for ${hash}: ${err.message}`);
+              process.disconnect();
+            }
+          });
+        });
+      });
     });
   });
 }
