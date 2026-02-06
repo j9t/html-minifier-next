@@ -3,7 +3,7 @@ import js from '@eslint/js';
 export default [
   {
     ignores: [
-      'benchmarks/**',
+      'backtest/**',
       'build/**',
       'demo/build/**',
       'demo/public/**',

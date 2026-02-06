@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 
 import { spawn, fork } from 'child_process';
+import { createWriteStream } from 'fs';
 import fs from 'fs/promises';
+import https from 'https';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import zlib from 'zlib';
 import Progress from 'progress';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const repoRoot = path.join(__dirname, '..');
 
 // Default number of commits to test when no parameter is provided
 const DEFAULT_COMMIT_COUNT = 50;
@@ -17,15 +21,147 @@ const DEFAULT_COMMIT_COUNT = 50;
 const TASK_TIMEOUT_MS = 60000;
 
 // Output directory for results
-const OUTPUT_DIR = path.join(__dirname, 'backtest');
+const OUTPUT_DIR = __dirname;
 
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
+const inputDir = path.join(__dirname, 'input');
+
+async function downloadFile(url, filePath, redirectsLeft = 5) {
+  const tmpPath = filePath + '.tmp';
+  return new Promise((resolve) => {
+    let resolved = false;
+    function safeResolve(value) {
+      if (!resolved) {
+        resolved = true;
+        if (!value) {
+          fs.unlink(tmpPath).catch(() => {});
+        }
+        resolve(value);
+      }
+    }
+
+    const parsedUrl = new URL(url);
+    const request = https.get({
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port,
+      path: parsedUrl.pathname + parsedUrl.search,
+      headers: {
+        'Accept-Encoding': 'gzip, br, deflate',
+        'User-Agent': 'html-minifier-next-backtest/0.0'
+      }
+    }, function (res) {
+      const status = res.statusCode;
+
+      if (status === 200) {
+        let stream = res;
+        if (res.headers['content-encoding'] === 'gzip') {
+          stream = res.pipe(zlib.createGunzip());
+        } else if (res.headers['content-encoding'] === 'br') {
+          stream = res.pipe(zlib.createBrotliDecompress());
+        } else if (res.headers['content-encoding'] === 'deflate') {
+          stream = res.pipe(zlib.createInflate());
+        }
+
+        const writeStream = createWriteStream(tmpPath);
+        stream.on('error', () => safeResolve(false));
+        writeStream.on('error', () => safeResolve(false));
+        writeStream.on('finish', () => {
+          fs.rename(tmpPath, filePath).then(() => safeResolve(true), () => safeResolve(false));
+        });
+        stream.pipe(writeStream);
+      } else if (status >= 300 && status < 400 && res.headers.location) {
+        res.resume();
+        if (redirectsLeft <= 0) {
+          safeResolve(false);
+        } else {
+          downloadFile(new URL(res.headers.location, url).href, filePath, redirectsLeft - 1).then(safeResolve);
+        }
+      } else {
+        res.resume();
+        safeResolve(false);
+      }
+    });
+
+    request.setTimeout(30000, function () {
+      request.destroy();
+      safeResolve(false);
+    });
+    request.on('error', () => safeResolve(false));
+  });
+}
+
+// Historical dependencies that old source code may import (not in current package.json)
+const historicalDeps = ['relateurl', 'clean-css', 'he', 'change-case', 'camel-case', 'param-case'];
+
+async function ensureHistoricalDeps() {
+  const rootNodeModules = path.join(repoRoot, 'node_modules');
+  const missing = [];
+  for (const dep of historicalDeps) {
+    try {
+      await fs.stat(path.join(rootNodeModules, dep));
+    } catch {
+      missing.push(dep);
+    }
+  }
+  if (missing.length === 0) return;
+
+  console.log(`Installing ${missing.length} historical dependency(ies)…`);
+  await new Promise((resolve, reject) => {
+    const proc = spawn('npm', ['install', '--no-save', ...missing], {
+      cwd: repoRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    proc.on('error', (err) => {
+      console.error('Warning: Failed to spawn npm install:', err.message);
+      resolve();
+    });
+    proc.on('exit', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        console.error('Warning: Failed to install some historical dependencies; old commits may fail');
+        resolve();
+      }
+    });
+  });
+}
+
+async function ensureInput() {
+  await fs.mkdir(inputDir, { recursive: true });
+
+  const missing = [];
+  for (const fileName of fileNames) {
+    const filePath = path.join(inputDir, fileName + '.html');
+    try {
+      await fs.stat(filePath);
+    } catch {
+      missing.push(fileName);
+    }
+  }
+
+  if (missing.length === 0) return;
+
+  console.log(`Downloading ${missing.length} source file(s)…`);
+  const progress = new Progress('[:bar] :current/:total :etas', {
+    width: 40,
+    total: missing.length
+  });
+
+  for (const fileName of missing) {
+    const filePath = path.join(inputDir, fileName + '.html');
+    const ok = await downloadFile(urls[fileName], filePath);
+    if (!ok) {
+      console.error(`Failed to download ${fileName} from ${urls[fileName]}`);
+    }
+    progress.tick();
+  }
+}
 
 function git() {
   const args = [].concat.apply([], [].slice.call(arguments, 0, -1));
   const callback = arguments[arguments.length - 1];
-  const task = spawn('git', args, { stdio: ['ignore', 'pipe', 'ignore'] });
+  const task = spawn('git', args, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] });
   let output = '';
   task.stdout.setEncoding('utf8');
   task.stdout.on('data', function (data) {
@@ -69,27 +205,12 @@ async function minify(hash, options) {
 
     for (const fileName of fileNames) {
       try {
-        const sourcesDir = path.join(__dirname, 'sources');
-        const filePath = path.join(sourcesDir, fileName + '.html');
+        const filePath = path.join(inputDir, fileName + '.html');
 
-        // Check if “sources” directory exists
-        try {
-          await fs.stat(sourcesDir);
-        } catch (err) {
-          throw new Error(
-            `Sources directory not found at “${sourcesDir}”\n` +
-            `Run “npm run benchmarks” to download benchmark HTML files`
-          );
-        }
-
-        // Check if the specific file exists
         try {
           await fs.stat(filePath);
-        } catch (err) {
-          throw new Error(
-            `Benchmark file not found: “${fileName}.html”\n` +
-            `Run “npm run benchmarks” to download all benchmark HTML files`
-          );
+        } catch {
+          throw new Error(`Source file not found: "${fileName}.html"`);
         }
 
         const data = await readText(filePath);
@@ -277,16 +398,23 @@ if (process.argv.length > 2 || !process.send) {
 
   if (count > 0) {
 
-    // Check for uncommitted changes in “src” directory and html-minifier.json
+    // Check for uncommitted changes in files the backtest temporarily modifies
     const srcPath = path.join(__dirname, '..', 'src');
     const configPath = path.join(__dirname, 'html-minifier.json');
-    git('status', '--porcelain', '--', srcPath, configPath, async function (code, output) {
+    const pkgPath = path.join(repoRoot, 'package.json');
+    git('status', '--porcelain', '--', srcPath, configPath, pkgPath, async function (code, output) {
       if (output.trim().length > 0) {
-        console.error('Error: Uncommitted changes detected in “src” directory or html-minifier.json benchmarks config');
+        console.error('Error: Uncommitted changes detected in src, package.json, or html-minifier.json');
         console.error('Please commit or stash your changes before running backtest');
         console.error('This is required because backtest temporarily modifies these files for testing');
         process.exit(1);
       }
+
+      // Download missing source files before starting
+      await ensureInput();
+
+      // Ensure historical dependencies are available for old source code
+      await ensureHistoricalDeps();
 
       // Print backtest info after pre-flight checks pass
       if (step > 1) {
@@ -310,15 +438,18 @@ if (process.argv.length > 2 || !process.send) {
           console.log(`\nCleaning up after ${reason}…`);
         }
 
-        // Restore both “src” and html-minifier.json from HEAD using Git
+        // Restore “src” folder, package.json, and html-minifier.json from HEAD using Git
         await new Promise((resolve) => {
-          const srcPath = path.join(__dirname, '..', 'src');
-          const configPath = path.join(__dirname, 'html-minifier.json');
-          git('checkout', 'HEAD', '--', srcPath, configPath, function (code) {
+          git('checkout', 'HEAD', '--', srcPath, configPath, pkgPath, function (code) {
             if (code !== 0) {
               console.error('Warning: Failed to restore modified files');
             }
-            resolve();
+            // Remove stale files that old commits added but HEAD doesn’t have
+            git('reset', 'HEAD', '--', srcPath, function () {
+              git('clean', '-fd', srcPath, function () {
+                resolve();
+              });
+            });
           });
         });
       };
@@ -412,7 +543,9 @@ if (process.argv.length > 2 || !process.send) {
           });
           task.stderr.setEncoding('utf8');
           task.stderr.on('data', function (data) {
-            error += data;
+            if (error.length < 10000) {
+              error += data;
+            }
           });
           task.stdout.resume();
           task.send(hash);
@@ -426,36 +559,47 @@ if (process.argv.length > 2 || !process.send) {
   }
 } else if (process.send) {
   // Running as forked child process
-  process.on('message', function (hash) {
-    const paths = ['src', 'benchmark.conf', 'html-minifier.json'];
-    git('reset', 'HEAD', '--', paths, function () {
-      let conf = 'html-minifier.json';
 
-      function checkout() {
-        const targetPath = paths.shift();
-        git('checkout', hash, '--', targetPath, function (code) {
-          if (code === 0 && targetPath === 'benchmark.conf') {
-            conf = targetPath;
-          }
-          if (paths.length) {
-            checkout();
-          } else {
-            readText(conf).then(data => {
-              try {
-                minify(hash, JSON.parse(data));
-              } catch (err) {
-                console.error(`Invalid JSON in ${conf}: ${err.message}`);
-                process.disconnect();
-              }
-            }).catch(err => {
-              console.error(`Failed to read ${conf}: ${err.message}`);
-              process.disconnect();
-            });
-          }
-        });
+  // Config file paths (repo-root-relative), ordered newest to oldest
+  const configPaths = [
+    'backtest/html-minifier.json',
+    'benchmarks/html-minifier.json',
+    'benchmarks/html-minifier-benchmarks.json',
+    'benchmark.conf'
+  ];
+
+  function readConfigFromGit(hash, index, callback) {
+    if (index >= configPaths.length) {
+      // Fallback to current config file on disk
+      readText(path.join(__dirname, 'html-minifier.json')).then(callback).catch(err => {
+        console.error(`No config found for ${hash}: ${err.message}`);
+        process.disconnect();
+      });
+      return;
+    }
+    git('show', hash + ':' + configPaths[index], function (code, data) {
+      if (code === 0 && data.trim()) {
+        callback(data);
+      } else {
+        readConfigFromGit(hash, index + 1, callback);
       }
+    });
+  }
 
-      checkout();
+  process.on('message', function (hash) {
+    git('reset', 'HEAD', '--', ['src', 'package.json'], function () {
+      git('checkout', hash, '--', 'src', function () {
+        git('checkout', hash, '--', 'package.json', function () {
+          readConfigFromGit(hash, 0, function (data) {
+            try {
+              minify(hash, JSON.parse(data));
+            } catch (err) {
+              console.error(`Invalid JSON in config for ${hash}: ${err.message}`);
+              process.disconnect();
+            }
+          });
+        });
+      });
     });
   });
 }
