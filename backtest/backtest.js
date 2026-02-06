@@ -27,12 +27,16 @@ const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'u
 const fileNames = Object.keys(urls);
 const inputDir = path.join(__dirname, 'input');
 
-async function downloadFile(url, filePath) {
+async function downloadFile(url, filePath, redirectsLeft = 5) {
+  const tmpPath = filePath + '.tmp';
   return new Promise((resolve) => {
     let resolved = false;
     function safeResolve(value) {
       if (!resolved) {
         resolved = true;
+        if (!value) {
+          fs.unlink(tmpPath).catch(() => {});
+        }
         resolve(value);
       }
     }
@@ -59,14 +63,20 @@ async function downloadFile(url, filePath) {
           stream = res.pipe(zlib.createInflate());
         }
 
-        const writeStream = createWriteStream(filePath);
+        const writeStream = createWriteStream(tmpPath);
         stream.on('error', () => safeResolve(false));
         writeStream.on('error', () => safeResolve(false));
-        writeStream.on('finish', () => safeResolve(true));
+        writeStream.on('finish', () => {
+          fs.rename(tmpPath, filePath).then(() => safeResolve(true), () => safeResolve(false));
+        });
         stream.pipe(writeStream);
       } else if (status >= 300 && status < 400 && res.headers.location) {
         res.resume();
-        downloadFile(new URL(res.headers.location, url).href, filePath).then(safeResolve);
+        if (redirectsLeft <= 0) {
+          safeResolve(false);
+        } else {
+          downloadFile(new URL(res.headers.location, url).href, filePath, redirectsLeft - 1).then(safeResolve);
+        }
       } else {
         res.resume();
         safeResolve(false);
@@ -101,6 +111,10 @@ async function ensureHistoricalDeps() {
     const proc = spawn('npm', ['install', '--no-save', ...missing], {
       cwd: repoRoot,
       stdio: ['ignore', 'pipe', 'pipe']
+    });
+    proc.on('error', (err) => {
+      console.error('Warning: Failed to spawn npm install:', err.message);
+      resolve();
     });
     proc.on('exit', (code) => {
       if (code === 0) {
@@ -426,9 +440,6 @@ if (process.argv.length > 2 || !process.send) {
 
         // Restore “src” folder, package.json, and html-minifier.json from HEAD using Git
         await new Promise((resolve) => {
-          const srcPath = path.join(__dirname, '..', 'src');
-          const configPath = path.join(__dirname, 'html-minifier.json');
-          const pkgPath = path.join(repoRoot, 'package.json');
           git('checkout', 'HEAD', '--', srcPath, configPath, pkgPath, function (code) {
             if (code !== 0) {
               console.error('Warning: Failed to restore modified files');
