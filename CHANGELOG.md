@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Internal
 
 * Outsourced benchmarks (now handled [in separate repository](https://github.com/j9t/minifier-benchmarks)) and refactored backtest
-* Update benchmarks-related documentation
+* Updated benchmarks-related documentation
 
 ## [5.0.3] - 2026-02-04
 
