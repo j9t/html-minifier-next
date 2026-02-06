@@ -532,7 +532,9 @@ if (process.argv.length > 2 || !process.send) {
           });
           task.stderr.setEncoding('utf8');
           task.stderr.on('data', function (data) {
-            error += data;
+            if (error.length < 10000) {
+              error += data;
+            }
           });
           task.stdout.resume();
           task.send(hash);
