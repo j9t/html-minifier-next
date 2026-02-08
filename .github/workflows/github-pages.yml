@@ -11,6 +11,7 @@ permissions:
 
 concurrency:
   group: pages-${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   build:
