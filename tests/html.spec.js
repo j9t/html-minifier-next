@@ -2040,18 +2040,40 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
     input = '<md-list-item ui-sref=".app-config"><md-icon md-font-icon="mdi-settings"></md-icon><p translate>Configure</p></md-list-item>';
-    output = '<md-list-item ui-sref=".app-config"><md-icon md-font-icon="mdi-settings"></md-icon><p translate>Configure</md-list-item>';
-    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
 
-    // Optional tags should work inside custom elements
+    // Per HTML spec, `</p>` cannot be omitted at the end of a custom element parent
     input = '<my-card><p>First paragraph</p><p>Second paragraph</p></my-card>';
-    output = '<my-card><p>First paragraph<p>Second paragraph</my-card>';
+    output = '<my-card><p>First paragraph<p>Second paragraph</p></my-card>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-    // List items inside custom elements
+    // Single `</p>` at the end of a custom element must be preserved
+    input = '<my-dialog><p>Content</p></my-dialog>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+
+    // `</p>` before a block element inside a custom element can be omitted
+    input = '<my-dialog><p>Content</p><div>More</div></my-dialog>';
+    output = '<my-dialog><p>Content<div>More</div></my-dialog>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // List items inside custom elements (no custom element restriction for `</li>`)
     input = '<my-list><ul><li>Item 1</li><li>Item 2</li></ul></my-list>';
     output = '<my-list><ul><li>Item 1<li>Item 2</ul></my-list>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Sequential custom elements each containing a `<p>`
+    input = '<mpb-callout type="info"><p>First callout.</p></mpb-callout><mpb-callout type="note"><p>Second callout.</p></mpb-callout><p>Trailing paragraph.</p>';
+    output = '<mpb-callout type="info"><p>First callout.</p></mpb-callout><mpb-callout type="note"><p>Second callout.</p></mpb-callout><p>Trailing paragraph.';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Sequential custom elements with `collapseWhitespace`
+    input = '<mpb-callout type="info">\n  <p>First.</p>\n</mpb-callout>\n<mpb-callout type="note">\n  <p>Second.</p>\n</mpb-callout>\n<p>Trailing.</p>';
+    output = '<mpb-callout type="info"><p>First.</p></mpb-callout><mpb-callout type="note"><p>Second.</p></mpb-callout><p>Trailing.';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
+
+    // Nested custom elements with `</p>` preservation
+    input = '<outer-el><inner-el><p>Content</p></inner-el></outer-el>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
   });
 
   test('Remove optional tags in tables', async () => {

@@ -1200,9 +1200,10 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalStartTag = '';
         // `</html>` or `</body>` may be omitted if not followed by comment
         // `</head>` may be omitted if not followed by space or comment
-        // `</p>` may be omitted if no more content in non-`</a>` parent
+        // `</p>` may be omitted if no more content in parent, unless parent is in `pInlineElements` or is a custom element
+        // https://html.spec.whatwg.org/multipage/syntax.html#optional-tags
         // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
-        if (tag && optionalEndTag && optionalEndTagEmitted && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || !pInlineElements.has(tag))) {
+        if (tag && optionalEndTag && optionalEndTagEmitted && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || (!pInlineElements.has(tag) && !tag.includes('-')))) {
           removeEndTag();
         }
         optionalEndTag = optionalEndTags.has(tag) ? tag : '';
