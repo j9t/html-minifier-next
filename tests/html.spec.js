@@ -4920,7 +4920,7 @@ describe('HTML', () => {
 
   test('`sortAttributes` with complex attributes should not cause parse errors', async () => {
     // Real-world example from FAZ.html that triggers parse errors
-    const input = '<div id="personalisation" data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null">test</div>';
+    const input = '<div id="personalization" data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null">test</div>';
 
     const benchmarkConfig = {
       collapseWhitespace: true,
@@ -4933,7 +4933,7 @@ describe('HTML', () => {
     const result = await minify(input, benchmarkConfig);
 
     // Should successfully minify without parse errors showing escaped quotes and double spaces
-    // Parse error would look like: `<div  id=\"personalisation\"  data-snacks-3:custom=\"…`
+    // Parse error would look like: `<div  id=\"personalization\"  data-snacks-3:custom=\"…`
     assert.ok(!result.includes('\\"'), 'Should not contain escaped quotes');
     assert.ok(!result.includes('  '), 'Should not contain double spaces');
     assert.ok(result.includes('data-snacks-3:custom'), 'Should preserve custom attribute names');
@@ -5031,7 +5031,7 @@ describe('HTML', () => {
     );
 
     // Verify it’s valid HTML structure
-    assert.ok(result.match(/<div[^>]*>.*<\/div>/), 'Should have valid div structure');
+    assert.ok(result.match(/<div[^>]*>.*<\/div>/), 'Should have valid `div` structure');
   });
 
   test('`sortAttributes` with `preventAttributesEscaping` and `sortClassNames` combined', async () => {
@@ -5113,9 +5113,9 @@ describe('HTML', () => {
     // Some escaped quotes in JS/JSON-LD content are expected (~322 in 1.5 MB is normal)
     const escapedQuoteCount = (result.match(/\\"/g) || []).length;
     assert.ok(escapedQuoteCount < 500, `Should not have excessive escaped quotes (found ${escapedQuoteCount})`);
-    assert.ok(!result.includes('&lt;html'), 'Should not encode html start tag as entity');
-    assert.ok(!result.includes('&lt;div'), 'Should not encode div tags as entities');
-    assert.ok(result.includes('personalisation'), 'Should preserve the problematic personalisation div');
+    assert.ok(!result.includes('&lt;html'), 'Should not encode HTML start tag as entity');
+    assert.ok(!result.includes('&lt;div'), 'Should not encode `div` tags as entities');
+    assert.ok(result.includes('personalisation'), 'Should preserve the problematic personalization `div`');
   });
 
   test('JSON config with string regex patterns', async () => {
@@ -5131,7 +5131,7 @@ describe('HTML', () => {
       useShortDoctype: true,
       keepClosingSlash: false,
       removeAttributeQuotes: true,
-      removeComments: true, // Enable comment removal to test ignoreCustomComments
+      removeComments: true, // Enable comment removal to test `ignoreCustomComments`
       // These would be strings in JSON, not RegExp objects
       ignoreCustomFragments: [
         '<#[\\s\\S]*?#>',
