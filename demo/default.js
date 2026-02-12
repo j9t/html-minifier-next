@@ -85,7 +85,7 @@ const demoConfig = {
     label: 'Minify CSS',
     checked: false,
     disabled: true,
-    helpText: 'Minify CSS in <code>style</code> elements and attributes (disabled in web demo—Lightning CSS requires Node.js)'
+    helpText: 'Minify CSS in <code>style</code> elements and attributes (uses Lightning CSS; disabled in web demo because it requires Node.js)'
   },
   minifyJS: {
     label: 'Minify JavaScript',
@@ -94,7 +94,9 @@ const demoConfig = {
   },
   minifySVG: {
     label: 'Minify SVG',
-    checked: true
+    checked: false,
+    disabled: true,
+    helpText: 'Minify SVG elements (uses SVGO; disabled in web demo because it requires Node.js)'
   },
   minifyURLs: {
     label: 'Minify URLs',
