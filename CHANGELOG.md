@@ -6,9 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.1.0] - 2026-02-13
 
+### Added
+
+* Added `cacheSVG`/`--cache-svg` option to configure the SVG cache size
+
 ### Changed
 
-* Replaced built-in SVG optimizations with [SVGO](https://svgo.dev/) integration for `minifySVG`, producing smaller SVG output
+* Replaced built-in SVG optimizations by implementing [SVGO](https://svgo.dev/) integration for `minifySVG`, producing smaller SVG output
   - `minifySVG: true` now runs SVGO with its defaults
   - `minifySVG: { … }` passes a custom SVGO configuration object
 
