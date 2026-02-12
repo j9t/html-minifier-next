@@ -245,6 +245,7 @@ program.option('-p --preset <name>', `Use a preset configuration (${getPresetNam
 program.option('-c --config-file <file>', 'Use config file');
 program.option('--cache-css <size>', 'Set CSS minification cache size (number of entries, default: 500)', parseValidInt('cacheCSS'));
 program.option('--cache-js <size>', 'Set JavaScript minification cache size (number of entries, default: 500)', parseValidInt('cacheJS'));
+program.option('--cache-svg <size>', 'Set SVG minification cache size (number of entries, default: 500)', parseValidInt('cacheSVG'));
 program.version(pkg.version, '-V, --version', 'Output the version number');
 program.helpOption('-h, --help', 'Display help for command');
 

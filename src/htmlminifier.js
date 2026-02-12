@@ -92,9 +92,18 @@ async function getSwc() {
   return swcPromise;
 }
 
+let svgoPromise;
+async function getSvgo() {
+  if (!svgoPromise) {
+    svgoPromise = import('svgo').then(m => m.optimize);
+  }
+  return svgoPromise;
+}
+
 // Minification caches (initialized on first use with configurable sizes)
 let cssMinifyCache = null;
 let jsMinifyCache = null;
+let svgMinifyCache = null;
 
 // Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
@@ -262,6 +271,15 @@ function mergeConsecutiveScripts(html) {
  * @prop {number} [cacheJS]
  *  The maximum number of entries for the JavaScript minification cache. Higher
  *  values improve performance for inputs with repeated JavaScript.
+ *  - Cache is created on first `minify()` call and persists for the process lifetime
+ *  - Cache size is locked after first call—subsequent calls reuse the same cache
+ *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
+ *
+ *  Default: `500`
+ *
+ * @prop {number} [cacheSVG]
+ *  The maximum number of entries for the SVG minification cache. Higher
+ *  values improve performance for inputs with repeated SVG content.
  *  - Cache is created on first `minify()` call and persists for the process lifetime
  *  - Cache size is locked after first call—subsequent calls reuse the same cache
  *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
@@ -450,12 +468,10 @@ function mergeConsecutiveScripts(html) {
  *
  *  Default: `false`
  *
- * @prop {boolean | {precision?: number, removeDefaults?: boolean, minifyColors?: boolean}} [minifySVG]
- *  When true, enables SVG-specific optimizations for SVG elements and attributes.
- *  If an object is provided, it can include:
- *  - `precision`: Number of decimal places for numeric values (coordinates, path data, etc.). Default: `3`
- *  - `removeDefaults`: Remove attributes with default values (e.g., `fill="black"`). Default: `true`
- *  - `minifyColors`: Minify color values (hex shortening, rgb to hex conversion). Default: `true`
+ * @prop {boolean | Object} [minifySVG]
+ *  When true, enables SVG minification using [SVGO](https://github.com/svg/svgo).
+ *  Complete SVG subtrees are extracted and optimized as a block.
+ *  If an object is provided, it is passed to SVGO as configuration options.
  *  If disabled, SVG content is minified using standard HTML rules only.
  *
  *  Default: `false`
@@ -1039,6 +1055,11 @@ async function minifyHTML(value, options, partialMarkup) {
     trimTrailingWhitespace(charsIndex, nextTag);
   }
 
+  // SVG subtree capture: When SVGO is active, record buffer positions for post-processing
+  const svgBlocks = []; // Array of { start, end } buffer indices
+  let svgBufferStartIndex = -1;
+  let svgDepth = 0;
+
   const parser = new HTMLParser(value, {
     partialMarkup: partialMarkup ?? options.partialMarkup,
     continueOnParseError: options.continueOnParseError,
@@ -1056,6 +1077,10 @@ async function minifyHTML(value, options, partialMarkup) {
         options.name = identity;
         options.insideSVG = lowerTag === 'svg';
         options.insideForeignContent = true;
+        // Disable HTML-specific options that produce invalid XML
+        options.removeAttributeQuotes = false;
+        options.removeTagWhitespace = false;
+        options.decodeEntities = false;
       }
       // `foreignObject` in SVG and `annotation-xml` in MathML contain HTML content
       // Note: The element itself is in SVG/MathML namespace, only its children are HTML
@@ -1070,6 +1095,9 @@ async function minifyHTML(value, options, partialMarkup) {
         options.parentName = parentName; // Preserve for the element tag itself
         options.name = options.htmlName || lowercase;
         options.insideForeignContent = false;
+        // Note: `removeAttributeQuotes`, `removeTagWhitespace`, and `decodeEntities`
+        // stay disabled (inherited from SVG context) because the entire SVG block
+        // must be valid XML for SVGO processing
         useParentNameForTag = true;
       }
       tag = (useParentNameForTag ? options.parentName : options.name)(tag);
@@ -1119,6 +1147,14 @@ async function minifyHTML(value, options, partialMarkup) {
             stackNoCollapseWhitespace.push(tag);
           }
         }
+      }
+
+      // Track SVG subtree for SVGO block processing
+      if (lowerTag === 'svg' && options.minifySVG) {
+        if (svgDepth === 0) {
+          svgBufferStartIndex = buffer.length; // Record position before <svg> is pushed
+        }
+        svgDepth++;
       }
 
       const openTag = '<' + tag;
@@ -1249,6 +1285,15 @@ async function minifyHTML(value, options, partialMarkup) {
           currentChars = '';
         } else if (isElementEmpty) {
           currentChars += '|';
+        }
+      }
+
+      // SVG subtree capture: Record end position for post-processing with SVGO
+      if (lowerTag === 'svg' && options.minifySVG && svgDepth > 0) {
+        svgDepth--;
+        if (svgDepth === 0 && svgBufferStartIndex >= 0) {
+          svgBlocks.push({ start: svgBufferStartIndex, end: buffer.length });
+          svgBufferStartIndex = -1;
         }
       }
     },
@@ -1475,6 +1520,19 @@ async function minifyHTML(value, options, partialMarkup) {
 
   await parser.parse();
 
+  // Post-processing: Optimize SVG blocks with SVGO
+  // Run all SVGO calls in parallel, then splice results in reverse to preserve indices
+  if (options.minifySVG && svgBlocks.length) {
+    const optimized = await Promise.all(
+      svgBlocks.map(({ start, end }) =>
+        options.minifySVG(buffer.slice(start, end).join(''))
+      )
+    );
+    for (let i = svgBlocks.length - 1; i >= 0; i--) {
+      buffer.splice(svgBlocks[i].start, svgBlocks[i].end - svgBlocks[i].start, optimized[i]);
+    }
+  }
+
   if (options.removeOptionalTags) {
     // `<html>` may be omitted if first thing inside is not a comment
     // `<head>` or `<body>` may be omitted if empty
@@ -1561,7 +1619,7 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
  * Important behavior notes:
  * - Caches are created on the first `minify()` call and persist for the lifetime of the process
  * - Cache sizes are locked after first initialization—subsequent calls use the same caches
- *   even if different `cacheCSS`/`cacheJS` options are provided
+ *   even if different `cacheCSS`/`cacheJS`/`cacheSVG` options are provided
  * - The first call’s options determine the cache sizes for subsequent calls
  * - Explicit `0` values are coerced to `1` (minimum functional cache size)
  */
@@ -1585,16 +1643,20 @@ function initCaches(options) {
                  : (parseEnvCacheSize(process.env.HMN_CACHE_CSS) ?? defaultSize);
     const jsSize = options.cacheJS !== undefined ? options.cacheJS
                  : (parseEnvCacheSize(process.env.HMN_CACHE_JS) ?? defaultSize);
+    const svgSize = options.cacheSVG !== undefined ? options.cacheSVG
+                 : (parseEnvCacheSize(process.env.HMN_CACHE_SVG) ?? defaultSize);
 
     // Coerce `0` to `1` (minimum functional cache size) to avoid immediate eviction
     const cssFinalSize = cssSize === 0 ? 1 : cssSize;
     const jsFinalSize = jsSize === 0 ? 1 : jsSize;
+    const svgFinalSize = svgSize === 0 ? 1 : svgSize;
 
     cssMinifyCache = new LRU(cssFinalSize);
     jsMinifyCache = new LRU(jsFinalSize);
+    svgMinifyCache = new LRU(svgFinalSize);
   }
 
-  return { cssMinifyCache, jsMinifyCache };
+  return { cssMinifyCache, jsMinifyCache, svgMinifyCache };
 }
 
 /**
@@ -1612,6 +1674,7 @@ export const minify = async function (value, options) {
     getLightningCSS,
     getTerser,
     getSwc,
+    getSvgo,
     ...caches
   });
   let result = await minifyHTML(value, options);
