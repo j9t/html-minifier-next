@@ -3,158 +3,106 @@ import {describe, test} from 'node:test';
 import { minify } from '../src/htmlminifier.js';
 
 describe('SVG and MathML', () => {
+  test('SVGO basic optimization', async () => {
+    // Path data optimization (relative commands, space removal)
+    const result = await minify('<svg><path d="M 10.500 20.300 L 30.400 40.500"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.startsWith('<svg>'), 'Should start with <svg>');
+    assert.ok(result.endsWith('</svg>') || result.endsWith('/>'), 'Should end with closing tag');
+    assert.ok(result.length < '<svg><path d="M 10.500 20.300 L 30.400 40.500"/></svg>'.length, 'Should be shorter than input');
+
+    // Rect-to-path conversion (SVGO default)
+    assert.strictEqual(
+      await minify('<svg><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><path fill="red" d="M0 0h100v100H0z"/></svg>'
+    );
+  });
+
   test('Numeric precision reduction', async () => {
-    // Path data with excessive precision
-    assert.strictEqual(
-      await minify('<svg><path d="M 0.00000000 0.00000000 L 10.50000000 20.30000000"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M0 0L10.5 20.3"/></svg>'
-    );
-
-    // Custom precision
-    assert.strictEqual(
-      await minify('<svg><path d="M 10.556 20.667"/></svg>', { minifySVG: { precision: 2 }, collapseWhitespace: true }),
-      '<svg><path d="M10.56 20.67"/></svg>'
-    );
-
-    // Path with various numeric formats
-    assert.strictEqual(
-      await minify('<svg><path d="M 1.234567 2.345678 C 3.456789 4.567890 5.678901 6.789012 7.890123 8.901234"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M1.235 2.346C3.457 4.568 5.679 6.789 7.89 8.901"/></svg>'
-    );
+    // Coordinates are optimized
+    const result = await minify('<svg><circle cx="283.500" cy="487.500" rx="259.000" ry="80.000"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('283.5'), 'Trailing zeros should be removed');
+    assert.ok(!result.includes('283.500'), 'Original precision should not be preserved');
   });
 
-  test('Whitespace in numeric attributes', async () => {
-    // `transform` attribute with excess whitespace
+  test('Color optimization', async () => {
+    // RGB to hex
     assert.strictEqual(
-      await minify('<svg><rect transform="translate( 10 , 20 ) scale( 2 )"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect transform="translate(10,20) scale(2)"/></svg>'
+      await minify('<svg><rect width="10" height="10" fill="rgb(255,255,255)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><path fill="#fff" d="M0 0h10v10H0z"/></svg>'
     );
 
-    // `points` attribute
-    assert.strictEqual(
-      await minify('<svg><polygon points="100, 10  40,  198 190, 78"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><polygon points="100,10 40,198 190,78"/></svg>'
-    );
-
-    // `viewBox` attribute
-    assert.strictEqual(
-      await minify('<svg viewBox="0 0  800  600 "><rect/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg viewBox="0 0 800 600"><rect/></svg>'
-    );
-  });
-
-  test('Color minification', async () => {
-    // Hex color shortening
-    assert.strictEqual(
-      await minify('<svg><rect fill="#000000"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="#000"/></svg>'
-    );
-
-    // `rgb()` to hex conversion
-    assert.strictEqual(
-      await minify('<svg><rect fill="rgb(255,255,255)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="#fff"/></svg>'
-    );
-
-    // `rgb()` with spaces to hex
-    assert.strictEqual(
-      await minify('<svg><rect fill="rgb( 0 , 0 , 0 )"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="#000"/></svg>'
-    );
-
-    // Stroke color
-    assert.strictEqual(
-      await minify('<svg><line stroke="#aabbcc" x1="0" y1="0" x2="1" y2="1"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><line stroke="#abc" x1="0" y1="0" x2="1" y2="1"/></svg>'
-    );
+    // Black fill is default—removed by SVGO
+    const result = await minify('<svg><rect width="10" height="10" fill="#000000"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(!result.includes('#000000'), 'Long hex should be shortened or removed');
   });
 
   test('Default attribute removal', async () => {
-    // `fill-opacity` default
+    // SVGO removes default attributes
     assert.strictEqual(
-      await minify('<svg><rect fill-opacity="1"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>'
-    );
-
-    // `stroke-linecap` default
-    assert.strictEqual(
-      await minify('<svg><line stroke-linecap="butt" x1="0" y1="0" x2="1" y2="1"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><line x1="0" y1="0" x2="1" y2="1"/></svg>'
-    );
-
-    // Multiple default attributes
-    assert.strictEqual(
-      await minify('<svg><rect fill-opacity="1" stroke-width="1" opacity="1"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>'
-    );
-
-    // Don’t remove when `removeDefaults` is false
-    assert.strictEqual(
-      await minify('<svg><rect fill-opacity="1"/></svg>', { minifySVG: { removeDefaults: false }, collapseWhitespace: true }),
-      '<svg><rect fill-opacity="1"/></svg>'
+      await minify('<svg><rect width="10" height="10" fill-opacity="1"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><path d="M0 0h10v10H0z"/></svg>'
     );
   });
 
   test('Preserve case sensitivity', async () => {
-    // SVG elements and attributes should preserve case
-    assert.strictEqual(
-      await minify('<svg viewBox="0 0 100 100"><linearGradient id="grad"><stop offset="0"/></linearGradient></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg viewBox="0 0 100 100"><linearGradient id="grad"><stop offset="0"/></linearGradient></svg>'
-    );
-
-    // Preserve camelCase attributes
-    assert.strictEqual(
-      await minify('<svg><text textLength="100" lengthAdjust="spacing">Text</text></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><text textLength="100" lengthAdjust="spacing">Text</text></svg>'
-    );
+    // SVG element and attribute names preserve case (camelCase)
+    const result = await minify('<svg><text textLength="100" lengthAdjust="spacingAndGlyphs">Text</text></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('textLength="100"'), 'camelCase attribute textLength preserved');
+    assert.ok(result.includes('lengthAdjust="spacingAndGlyphs"'), 'camelCase attribute lengthAdjust preserved');
   });
 
-  test('Preserve self-closing slashes', async () => {
+  test('Preserve self-closing slashes in SVG', async () => {
     // Self-closing tags should keep slashes within SVG
-    assert.strictEqual(
-      await minify('<svg><path d="M 0 0"/><circle cx="5" cy="5" r="2"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M0 0"/><circle cx="5" cy="5" r="2"/></svg>'
-    );
+    const result = await minify('<svg><circle cx="5" cy="5" r="2"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('/>'), 'Self-closing slash should be preserved in SVG');
 
     // HTML elements outside SVG should not have slashes
-    assert.strictEqual(
-      await minify('<div><img src="test.jpg"/><svg><path d="M 0 0"/></svg><br/></div>', { minifySVG: true, collapseWhitespace: true }),
-      '<div><img src="test.jpg"><svg><path d="M0 0"/></svg><br></div>'
-    );
+    const mixed = await minify('<div><img src="test.jpg"/><svg><circle cx="5" cy="5" r="2"/></svg><br/></div>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(mixed.includes('<img src="test.jpg">'), 'HTML img should not have self-closing slash');
+    assert.ok(mixed.includes('<br>'), 'HTML `br` should not have self-closing slash');
   });
 
-  test('Nested SVG elements', async () => {
+  test('Preserve viewBox', async () => {
+    // SVGO v4 preserves `viewBox` by default
+    const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('viewBox="0 0 100 100"'), '`viewBox` should be preserved');
+  });
+
+  test('Preserve title element', async () => {
+    // SVGO v4 preserves `<title>` by default (accessibility)
+    const result = await minify('<svg><title>My SVG</title><rect width="100" height="100"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('<title>My SVG</title>'), 'Title should be preserved');
+  });
+
+  test('Text content preserved', async () => {
     assert.strictEqual(
-      await minify('<svg><g><path d="M 0.000 0.000"/><g><circle cx="5.000" cy="5.000" r="2.000"/></g></g></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><g><path d="M0 0"/><g><circle cx="5" cy="5" r="2"/></g></g></svg>'
+      await minify('<svg><text x="10" y="20">Hello World</text></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><text x="10" y="20">Hello World</text></svg>'
     );
   });
 
   test('Combined with other options', async () => {
     // SVG minification with whitespace collapse
-    assert.strictEqual(
-      await minify('<svg>\n  <path d="M 0.000 0.000"/>\n  <circle cx="5.000" cy="5.000" r="2.000"/>\n</svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M0 0"/><circle cx="5" cy="5" r="2"/></svg>'
-    );
+    const result = await minify('<svg>\n  <circle cx="50" cy="50" r="40"/>\n</svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(!result.includes('\n'), 'Whitespace should be collapsed');
+    assert.ok(result.includes('cx="50"'), '`circle` attributes should be preserved');
 
-    // SVG with comments
-    assert.strictEqual(
-      await minify('<svg><!-- comment --><path d="M 0.000 0.000"/></svg>', { minifySVG: true, removeComments: true, collapseWhitespace: true }),
-      '<svg><path d="M0 0"/></svg>'
-    );
+    // SVG with HTML comment removal
+    const withComments = await minify('<svg><!-- comment --><circle cx="50" cy="50" r="40"/></svg>', { minifySVG: true, removeComments: true, collapseWhitespace: true });
+    assert.ok(!withComments.includes('comment'), 'Comments should be removed');
   });
 
   test('Disabled', async () => {
-    // When minifySVG is false, no SVG-specific optimizations
+    // When `minifySVG` is false, no SVG-specific optimizations
     assert.strictEqual(
-      await minify('<svg><path d="M 0.00000000 0.00000000"/></svg>', { minifySVG: false, collapseWhitespace: true }),
-      '<svg><path d="M 0.00000000 0.00000000"/></svg>'
+      await minify('<svg><rect width="100" height="100" fill="red"/></svg>', { minifySVG: false, collapseWhitespace: true }),
+      '<svg><rect width="100" height="100" fill="red"/></svg>'
     );
 
-    // Standard HTML minification still applies (but not path space optimization)
+    // Standard HTML minification still applies
     assert.strictEqual(
-      await minify('<svg>  <path d="M 0 0"/>  </svg>', { minifySVG: false, collapseWhitespace: true }),
-      '<svg><path d="M 0 0"/></svg>'
+      await minify('<svg>  <rect width="100" height="100"/>  </svg>', { minifySVG: false, collapseWhitespace: true }),
+      '<svg><rect width="100" height="100"/></svg>'
     );
   });
 
@@ -169,285 +117,217 @@ describe('SVG and MathML', () => {
     </svg>
   </body></html>`;
 
-    const expected = '<html><body><svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 65.326 612 502.174" class="logo"><ellipse class="ground" cx="283.5" cy="487.5" rx="259" ry="80" fill="#000"/><polygon points="100,10 40,198 190,78 10,78 160,198" fill="#0f0"/><filter id="pictureFilter"><feGaussianBlur stdDeviation="15"/></filter></svg></body></html>';
+    const result = await minify(input, { minifySVG: true, collapseWhitespace: true });
 
+    // SVGO optimizes coordinates
+    assert.ok(result.includes('283.5'), 'Should reduce coordinate precision');
+    assert.ok(!result.includes('283.500'), 'Should remove trailing zeros');
+
+    // SVGO preserves `viewBox` and `class`
+    assert.ok(result.includes('viewBox="0 65.326 612 502.174"'), 'viewBox preserved');
+    assert.ok(result.includes('class="logo"'), 'Class preserved');
+
+    // Result should be significantly smaller
+    assert.ok(result.length < input.length, 'Output should be smaller');
+  });
+
+  test('Custom SVGO options', async () => {
+    // Disable shape-to-path conversion
     assert.strictEqual(
-      await minify(input, { minifySVG: true, collapseWhitespace: true }),
-      expected
+      await minify('<svg><rect width="100" height="100" fill="red"/></svg>', {
+        minifySVG: { plugins: [{ name: 'preset-default', params: { overrides: { convertShapeToPath: false } } }] },
+        collapseWhitespace: true
+      }),
+      '<svg><rect width="100" height="100" fill="red"/></svg>'
     );
   });
 
-  test('Edge cases', async () => {
-    // Empty path
-    assert.strictEqual(
-      await minify('<svg><path d=""/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d=""/></svg>'
-    );
-
-    // Negative numbers
-    assert.strictEqual(
-      await minify('<svg><path d="M -10.500 -20.300 L -30.400 -40.500"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M-10.5-20.3L-30.4-40.5"/></svg>'
-    );
-
-    // Scientific notation (1e-5 rounds to 0, 2e-3 = 0.002)
-    assert.strictEqual(
-      await minify('<svg><path d="M 1e-5 2e-3"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M0 .002"/></svg>'
-    );
-
-    // Leading zero removal
-    assert.strictEqual(
-      await minify('<svg><path d="M 0.5 0.3 L -0.25 -0.75"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M.5.3L-.25-.75"/></svg>'
-    );
-
-    // Leading zero removal in other numeric attributes
-    assert.strictEqual(
-      await minify('<svg><circle cx="0.5" cy="-0.25" r="0.125"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><circle cx=".5" cy="-.25" r=".125"/></svg>'
-    );
-  });
-
-  test('Color minification disabled', async () => {
-    assert.strictEqual(
-      await minify('<svg><rect fill="#aabbcc"/></svg>', { minifySVG: { minifyColors: false }, collapseWhitespace: true }),
-      '<svg><rect fill="#aabbcc"/></svg>'
-    );
-  });
-
-  test('Color references preserve case', async () => {
-    // url() references should preserve case (SVG IDs are case-sensitive)
-    assert.strictEqual(
-      await minify('<svg><rect fill="url(#MyGradient)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="url(#MyGradient)"/></svg>'
-    );
-
-    // Multiple `url()` references
-    assert.strictEqual(
-      await minify('<svg><rect fill="url(#Pattern1)" stroke="url(#Pattern2)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="url(#Pattern1)" stroke="url(#Pattern2)"/></svg>'
-    );
-
-    // `var()` CSS custom properties
-    assert.strictEqual(
-      await minify('<svg><rect fill="var(--MyColor)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="var(--MyColor)"/></svg>'
-    );
-
-    // `inherit` and `currentColor` keywords
-    assert.strictEqual(
-      await minify('<svg><rect fill="inherit" stroke="currentColor"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="inherit" stroke="currentColor"/></svg>'
-    );
-
-    // Mixed: `url()` reference alongside regular color
-    assert.strictEqual(
-      await minify('<svg><rect fill="url(#MyGradient)" stroke="#ff0000"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="url(#MyGradient)" stroke="red"/></svg>'
-    );
+  test('Error recovery', async () => {
+    // SVGO should recover gracefully with `continueOnMinifyError`
+    const result = await minify('<svg><circle cx="5" cy="5" r="2"/></svg>', { minifySVG: true, collapseWhitespace: true, continueOnMinifyError: true });
+    assert.ok(result.includes('<svg'), 'Should produce valid output');
   });
 
   test('Mixed HTML and SVG', async () => {
     // HTML elements before and after SVG
-    assert.strictEqual(
-      await minify('<div><p>Text</p><svg><path d="M 0.000 0.000"/></svg><span>More</span></div>', { minifySVG: true, collapseWhitespace: true }),
-      '<div><p>Text</p><svg><path d="M0 0"/></svg><span>More</span></div>'
-    );
+    const result = await minify('<p>Before</p><svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg><p>After</p>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.startsWith('<p>Before</p>'), 'HTML before SVG preserved');
+    assert.ok(result.endsWith('<p>After</p>'), 'HTML after SVG preserved');
+    assert.ok(result.includes('<svg'), 'SVG present in output');
+  });
 
-    // Multiple SVG elements
+  test('Multiple SVG elements', async () => {
+    const result = await minify('<div><svg><circle cx="1" cy="1" r="1"/></svg><svg><rect width="2" height="2"/></svg></div>', { minifySVG: true, collapseWhitespace: true });
+    // Both SVGs should be present
+    const svgCount = (result.match(/<svg/g) || []).length;
+    assert.strictEqual(svgCount, 2, 'Both SVG elements should be present');
+  });
+
+  test('Nested SVG elements', async () => {
+    const result = await minify('<div><svg><svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg></svg></div>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.startsWith('<div>'), 'Wrapper `div` preserved');
+    assert.ok(result.includes('<svg'), 'SVG output present');
+  });
+
+  test('SVG with style element', async () => {
+    const result = await minify('<svg><style>.cls{fill:red}</style><rect class="cls" width="100" height="100"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    // SVGO may inline styles or preserve them
+    assert.ok(result.includes('red') || result.includes('fill'), 'Style information should be preserved in some form');
+  });
+
+  test('Empty SVG', async () => {
     assert.strictEqual(
-      await minify('<div><svg><circle cx="1.000" cy="1.000" r="1.000"/></svg><svg><rect x="2.000" y="2.000"/></svg></div>', { minifySVG: true, collapseWhitespace: true }),
-      '<div><svg><circle cx="1" cy="1" r="1"/></svg><svg><rect x="2" y="2"/></svg></div>'
+      await minify('<svg></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg/>'
     );
   });
 
-  test('Named color conversion', async () => {
-    const colorTests = [
-      { hex: '#ff0000', name: 'red', attr: 'fill' },
-      { hex: '#c0c0c0', name: 'silver', attr: 'fill' },
-      { hex: '#808080', name: 'gray', attr: 'fill' },
-      { hex: '#000080', name: 'navy', attr: 'stroke' },
-      { hex: '#008080', name: 'teal', attr: 'fill' },
-      { hex: '#ffa500', name: 'orange', attr: 'fill' },
-      { hex: '#008000', name: 'green', attr: 'fill' },
-      { hex: '#800080', name: 'purple', attr: 'fill' },
-      { hex: '#800000', name: 'maroon', attr: 'fill' },
-      { hex: '#808000', name: 'olive', attr: 'fill' }
-    ];
+  test('SVG with namespace attributes', async () => {
+    // `xlink:href` should be preserved
+    const result = await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#icon"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('xlink:href="#icon"'), 'xlink:href should be preserved');
+    assert.ok(result.includes('xmlns:xlink'), 'xlink namespace declaration should be preserved');
+  });
 
-    for (const { hex, name, attr } of colorTests) {
-      const element = attr === 'stroke' ? `<line ${attr}="${hex}" x1="0" y1="0" x2="1" y2="1"/>` : `<rect ${attr}="${hex}"/>`;
-      const expectedElement = attr === 'stroke' ? `<line ${attr}="${name}" x1="0" y1="0" x2="1" y2="1"/>` : `<rect ${attr}="${name}"/>`;
+  test('SVG with `defs` and `use`', async () => {
+    // SVGO optimizes IDs (e.g., "c" → "a") but preserves the defs/use pattern
+    const result = await minify('<svg><defs><circle id="c" cx="5" cy="5" r="5"/></defs><use href="#c"/></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('<defs>'), 'defs should be preserved');
+    assert.ok(result.includes('<use'), 'use should be preserved');
+    assert.ok(result.includes('href="#'), 'href reference should be preserved');
+  });
 
-      assert.strictEqual(
-        await minify(`<svg>${element}</svg>`, { minifySVG: true, collapseWhitespace: true }),
-        `<svg>${expectedElement}</svg>`
-      );
-    }
+  test('SVG with `foreignObject`', async () => {
+    // `foreignObject` with HTML content should be preserved
+    const result = await minify('<svg><foreignObject width="100" height="100"><p>Hello</p></foreignObject></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('foreignObject'), 'foreignObject should be preserved');
+    assert.ok(result.includes('Hello'), 'HTML content inside foreignObject should be preserved');
 
-    // Black stays as `#000` (shorter than `black`)
+    // `foreignObject` with HTML entities
+    const withEntities = await minify('<svg><foreignObject width="100" height="100"><p>A &amp; B</p></foreignObject></svg>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(withEntities.includes('A &amp; B'), 'Entities inside `foreignObject` should be preserved');
+  });
+
+  test('HTML inside `foreignObject` is optimized with `minifySVG`', async () => {
+    // Whitespace collapse inside `foreignObject`
     assert.strictEqual(
-      await minify('<svg><rect fill="#000000"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="#000"/></svg>'
+      await minify('<svg><foreignObject width="100" height="100">   <div>   Hello   World   </div>   </foreignObject></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><foreignObject width="100" height="100"><div>Hello World</div></foreignObject></svg>'
     );
 
-    // White stays as `#fff` (shorter than `white`)
+    // Comment removal inside `foreignObject`
     assert.strictEqual(
-      await minify('<svg><rect fill="#ffffff"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="#fff"/></svg>'
+      await minify('<svg><foreignObject width="100" height="100"><!-- comment --><p>Text</p></foreignObject></svg>', { minifySVG: true, removeComments: true, collapseWhitespace: true }),
+      '<svg><foreignObject width="100" height="100"><p>Text</p></foreignObject></svg>'
+    );
+
+    // Empty attribute removal inside `foreignObject`
+    assert.strictEqual(
+      await minify('<svg><foreignObject width="100" height="100"><div class="">Text</div></foreignObject></svg>', { minifySVG: true, removeEmptyAttributes: true, collapseWhitespace: true }),
+      '<svg><foreignObject width="100" height="100"><div>Text</div></foreignObject></svg>'
+    );
+
+    // Empty element removal inside `foreignObject`
+    assert.strictEqual(
+      await minify('<svg><foreignObject width="100" height="100"><div></div><p>Text</p></foreignObject></svg>', { minifySVG: true, removeEmptyElements: true, collapseWhitespace: true }),
+      '<svg><foreignObject width="100" height="100"><p>Text</p></foreignObject></svg>'
+    );
+
+    // Redundant attribute removal inside `foreignObject`
+    assert.strictEqual(
+      await minify('<svg><foreignObject width="100" height="100"><form method="get"><input type="text"></form></foreignObject></svg>', { minifySVG: true, removeRedundantAttributes: true, collapseWhitespace: true }),
+      '<svg><foreignObject width="100" height="100"><form><input></form></foreignObject></svg>'
     );
   });
 
-  test('Extended default attributes', async () => {
-    // Clipping and masking defaults
-    assert.strictEqual(
-      await minify('<svg><rect clip-rule="nonzero" clip-path="none" mask="none"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>'
-    );
-
-    // Marker defaults
-    assert.strictEqual(
-      await minify('<svg><path d="M0 0" marker-start="none" marker-mid="none" marker-end="none"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M0 0"/></svg>'
-    );
-
-    // Filter default
-    assert.strictEqual(
-      await minify('<svg><rect filter="none"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>'
-    );
-
-    // Color interpolation defaults
-    assert.strictEqual(
-      await minify('<svg><rect color-interpolation="sRGB"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>'
-    );
-
-    assert.strictEqual(
-      await minify('<svg><filter><feGaussianBlur color-interpolation-filters="linearRGB"/></filter></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><filter><feGaussianBlur/></filter></svg>'
-    );
+  test('SVG with foreignObject and removeOptionalTags', async () => {
+    // When `removeOptionalTags` strips `</p>`, the SVG becomes invalid XML
+    // SVGO falls back gracefully with `continueOnMinifyError` (default: true),
+    // returning the unoptimized SVG—still valid HTML
+    const result = await minify('<svg><foreignObject width="100" height="100"><p>Text</p><p>More</p></foreignObject></svg>', {
+      minifySVG: true,
+      removeOptionalTags: true,
+      collapseWhitespace: true
+    });
+    assert.ok(result.includes('foreignObject'), '`foreignObject` should be preserved');
+    assert.ok(result.includes('Text'), 'Content should be preserved');
+    assert.ok(result.includes('More'), 'All paragraphs should be preserved');
   });
 
-  test('Overflow attribute safety', async () => {
-    // `overflow="visible"` should not be removed from root `<svg>` element
+  test('HTML-only options are disabled inside SVG for XML compatibility', async () => {
+    // `decodeEntities` must not decode inside SVG (bare `&` is invalid XML)
     assert.strictEqual(
-      await minify('<svg overflow="visible"><rect/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg overflow="visible"><rect/></svg>'
+      await minify('<svg><text>A &amp; B</text></svg>', { minifySVG: true, decodeEntities: true, collapseWhitespace: true }),
+      '<svg><text>A &amp; B</text></svg>'
     );
 
-    // `overflow="visible"` should be removed from nested SVG elements
-    assert.strictEqual(
-      await minify('<svg><rect overflow="visible"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>'
-    );
+    // `removeAttributeQuotes` must not strip quotes inside SVG (XML requires quotes)
+    const noQuotes = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, removeAttributeQuotes: true, collapseWhitespace: true });
+    assert.ok(noQuotes.includes('viewBox="0 0 100 100"'), 'SVG attribute quotes preserved');
 
-    assert.strictEqual(
-      await minify('<svg><g overflow="visible"><circle cx="5" cy="5" r="5"/></g></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><g><circle cx="5" cy="5" r="5"/></g></svg>'
-    );
-
-    assert.strictEqual(
-      await minify('<svg><path d="M0 0" overflow="visible"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M0 0"/></svg>'
-    );
+    // `removeTagWhitespace` must not remove space between SVG attributes
+    const tagWs = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, removeTagWhitespace: true, collapseWhitespace: true });
+    assert.ok(!tagWs.includes('width="100"height'), 'Whitespace between SVG attributes preserved');
   });
 
-  test('Identity transform removal', async () => {
-    const identityTransforms = [
-      'translate(0)',
-      'translate(0,0)',
-      'translate(0 0)', // Space-separated
-      'scale(1)',
-      'scale(1,1)',
-      'scale(1 1)', // Space-separated
-      'rotate(0)',
-      'skewX(0)',
-      'skewY(0)',
-      'matrix(1,0,0,1,0,0)',
-      'matrix(1 0 0 1 0 0)', // Space-separated
-      'translate( 0 , 0 )', // With whitespace
-      'translate(0.0, 0.00)', // Decimal variants
-      'translate(0.0 0.00)', // Decimal with spaces
-      'scale(1.00)',
-      'scale(1.0 1.0)', // Decimal with spaces
-      'rotate(0.000)',
-      'matrix(1.0,0.0,0.0,1.0,0.0,0.0)',
-      'matrix(1.0 0.0 0.0 1.0 0.0 0.0)' // Decimal with spaces
-    ];
+  test('HTML-only options stay disabled inside foreignObject for XML validity', async () => {
+    // The entire SVG block must be valid XML for SVGO—including `foreignObject` content
 
-    for (const transform of identityTransforms) {
-      assert.strictEqual(
-        await minify(`<svg><rect transform="${transform}"/></svg>`, { minifySVG: true, collapseWhitespace: true }),
-        '<svg><rect/></svg>',
-        `Failed to remove identity transform: ${transform}`
-      );
-    }
+    // `decodeEntities` stays disabled inside `foreignObject`
+    const encoded = await minify('<svg><foreignObject width="100" height="100"><p>A &amp; B</p></foreignObject></svg>', { minifySVG: true, decodeEntities: true, collapseWhitespace: true });
+    assert.ok(encoded.includes('&amp;'), 'Entities stay encoded inside `foreignObject`');
 
-    // Non-identity transforms should be kept
-    assert.strictEqual(
-      await minify('<svg><rect transform="translate(10,20)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect transform="translate(10,20)"/></svg>'
-    );
+    // `removeAttributeQuotes` stays disabled inside `foreignObject`
+    const quoted = await minify('<svg><foreignObject width="100" height="100"><div class="test">Text</div></foreignObject></svg>', { minifySVG: true, removeAttributeQuotes: true, collapseWhitespace: true });
+    assert.ok(quoted.includes('class="test"'), 'Attribute quotes preserved inside `foreignObject`');
 
-    // Identity rotate with valid center coordinates should be removed
-    assert.strictEqual(
-      await minify('<svg><rect transform="rotate(0, 10, 20)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>',
-      'Failed to remove identity rotate(0, cx, cy)'
-    );
-
-    assert.strictEqual(
-      await minify('<svg><rect transform="rotate(0 10 20)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>',
-      'Failed to remove identity rotate(0 cx cy) with spaces'
-    );
-
-    assert.strictEqual(
-      await minify('<svg><rect transform="rotate(0.0, 5.5, -10.25)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect/></svg>',
-      'Failed to remove identity rotate with decimal center coordinates'
-    );
-
-    // Invalid rotate transforms should be preserved (not removed)
-    assert.strictEqual(
-      await minify('<svg><rect transform="rotate(0, invalid)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect transform="rotate(0,invalid)"/></svg>',
-      'Invalid rotate transform should be preserved (with whitespace collapsed)'
-    );
+    // But HTML options outside SVG still work
+    const mixed = await minify('<div id="test"><svg><rect width="10" height="10" fill="red"/></svg><p class="x">A &amp; B</p></div>', {
+      minifySVG: true,
+      removeAttributeQuotes: true,
+      decodeEntities: true,
+      collapseWhitespace: true
+    });
+    assert.ok(mixed.includes('id=test'), 'Quotes removed in HTML before SVG');
+    assert.ok(mixed.includes('class=x'), 'Quotes removed in HTML after SVG');
+    assert.ok(mixed.includes('A & B'), 'Entities decoded in HTML after SVG');
   });
 
-  test('Path data space optimization', async () => {
-    const pathTests = [
-      { input: 'M 10 20 L 30 40', expected: 'M10 20L30 40', desc: 'basic commands' },
-      { input: 'M -10 -20 L -30 -40', expected: 'M-10-20L-30-40', desc: 'negative numbers' },
-      { input: 'M 0 0 L 10 10 H 20 V 30 C 40 50 60 70 80 90 Z', expected: 'M0 0L10 10H20V30C40 50 60 70 80 90Z', desc: 'multiple commands' },
-      { input: 'm 5 5 l 10 10 h 15', expected: 'm5 5l10 10h15', desc: 'lowercase commands' },
-      { input: 'M 10 10 A 5 5 0 0 1 20 20', expected: 'M10 10A5 5 0 0 1 20 20', desc: 'arc commands' }
-    ];
-
-    for (const { input, expected, desc } of pathTests) {
-      assert.strictEqual(
-        await minify(`<svg><path d="${input}"/></svg>`, { minifySVG: true, collapseWhitespace: true }),
-        `<svg><path d="${expected}"/></svg>`,
-        `Path space optimization failed for ${desc}: input="${input}"`
-      );
-    }
+  test('SVG inside template', async () => {
+    const result = await minify('<template><svg><rect width="10" height="10" fill="red"/></svg></template>', { minifySVG: true, collapseWhitespace: true });
+    assert.ok(result.includes('<template>'), 'template wrapper preserved');
+    assert.ok(result.includes('<svg>'), 'SVG inside template is optimized');
+    assert.ok(result.includes('fill="red"'), 'fill attribute preserved');
   });
 
-  test('Combined new optimizations', async () => {
-    // Path with spaces, named color, identity transform, and default attributes
-    assert.strictEqual(
-      await minify('<svg><path d="M 10.000 20.000 L 30.000 40.000" fill="#808080" transform="translate(0)" fill-opacity="1"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><path d="M10 20L30 40" fill="gray"/></svg>'
+  test('continueOnMinifyError: false throws on SVGO error', async () => {
+    // When `continueOnMinifyError` is false and SVGO encounters invalid XML
+    // (e.g., from `removeOptionalTags` stripping `</p>` in `foreignObject`), it should throw
+    await assert.rejects(
+      () => minify('<svg><foreignObject width="100" height="100"><p>A</p><p>B</p></foreignObject></svg>', {
+        minifySVG: true,
+        removeOptionalTags: true,
+        collapseWhitespace: true,
+        continueOnMinifyError: false
+      }),
+      /Unexpected close tag/
     );
 
-    // Multiple optimizations on one element
-    assert.strictEqual(
-      await minify('<svg><rect fill="#008000" stroke="#000080" marker-start="none" transform="scale(1)" clip-path="none"/></svg>', { minifySVG: true, collapseWhitespace: true }),
-      '<svg><rect fill="green" stroke="navy"/></svg>'
-    );
+    // Valid SVG should not throw even with `continueOnMinifyError: false`
+    const result = await minify('<svg><rect width="10" height="10" fill="red"/></svg>', {
+      minifySVG: true,
+      collapseWhitespace: true,
+      continueOnMinifyError: false
+    });
+    assert.strictEqual(result, '<svg><path fill="red" d="M0 0h10v10H0z"/></svg>');
+  });
+
+  test('Cache produces consistent results', async () => {
+    const opts = { minifySVG: true, collapseWhitespace: true };
+    const input = '<svg><circle cx="10" cy="10" r="5"/></svg>';
+    const r1 = await minify(input, opts);
+    const r2 = await minify(input, opts);
+    assert.strictEqual(r1, r2, 'Cached result should match first result');
   });
 
   test('SVG and MathML elements should not be removed by `removeEmptyElements`', async () => {
