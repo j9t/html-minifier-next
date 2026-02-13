@@ -132,13 +132,31 @@ describe('SVG and MathML', () => {
   });
 
   test('Custom SVGO options', async () => {
-    // Disable shape-to-path conversion
+    // Disable shape-to-path conversion via plugin override
     assert.strictEqual(
       await minify('<svg><rect width="100" height="100" fill="red"/></svg>', {
         minifySVG: { plugins: [{ name: 'preset-default', params: { overrides: { convertShapeToPath: false } } }] },
         collapseWhitespace: true
       }),
       '<svg><rect width="100" height="100" fill="red"/></svg>'
+    );
+
+    // Disable color conversion—preserve original color format
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10" fill="rgb(255,0,0)"/></svg>', {
+        minifySVG: { plugins: [{ name: 'preset-default', params: { overrides: { convertColors: false } } }] },
+        collapseWhitespace: true
+      }),
+      '<svg><path fill="rgb(255,0,0)" d="M0 0h10v10H0z"/></svg>'
+    );
+
+    // Control numeric precision via `floatPrecision`
+    assert.strictEqual(
+      await minify('<svg><circle cx="10.123456" cy="20.654321" r="5.111111"/></svg>', {
+        minifySVG: { floatPrecision: 1 },
+        collapseWhitespace: true
+      }),
+      '<svg><circle cx="10.1" cy="20.7" r="5.1"/></svg>'
     );
   });
 
