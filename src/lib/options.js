@@ -5,7 +5,6 @@ import { LRU, stableStringify, identity, lowercase, identityAsync, replaceAsync,
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
-import { getSVGMinifierOptions } from './svg.js';
 import { getPreset, getPresetNames } from '../presets.js';
 import { optionDefaults } from './option-definitions.js';
 
@@ -31,11 +30,13 @@ function shouldMinifyInnerHTML(options) {
  * @param {Function} deps.getLightningCSS - Function to lazily load Lightning CSS
  * @param {Function} deps.getTerser - Function to lazily load Terser
  * @param {Function} deps.getSwc - Function to lazily load @swc/core
+ * @param {Function} deps.getSvgo - Function to lazily load SVGO
  * @param {LRU} deps.cssMinifyCache - CSS minification cache
  * @param {LRU} deps.jsMinifyCache - JS minification cache
+ * @param {LRU} deps.svgMinifyCache - SVG minification cache
  * @returns {MinifierOptions} Normalized options with defaults applied
  */
-const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssMinifyCache, jsMinifyCache } = {}) => {
+const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
   const options = {
     name: lowercase,
     canCollapseWhitespace,
@@ -336,11 +337,54 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, cssM
           return text;
         }
       };
-    } else if (key === 'minifySVG') {
-      // Process SVG minification options
-      // Unlike `minifyCSS`/`minifyJS`, this is a simple options object, not a function
-      // The actual minification is applied inline during attribute processing
-      options.minifySVG = getSVGMinifierOptions(option);
+    } else if (key === 'minifySVG' && typeof option !== 'function') {
+      if (!option) {
+        return;
+      }
+
+      const svgoOptions = typeof option === 'object' ? option : {};
+
+      // Pre-compute option signature for cache keys
+      const svgSig = stableStringify({
+        ...svgoOptions,
+        cont: !!options.continueOnMinifyError
+      });
+
+      options.minifySVG = async function (svgContent) {
+        if (!svgContent || !svgContent.trim()) {
+          return svgContent;
+        }
+
+        // Cache key
+        const svgKey = svgContent.length > 2048
+          ? (svgContent.length + '|' + svgContent.slice(0, 50) + svgContent.slice(-50) + '|' + svgSig)
+          : (svgContent + '|' + svgSig);
+
+        try {
+          const cached = svgMinifyCache.get(svgKey);
+          if (cached) {
+            return await cached;
+          }
+
+          const inFlight = (async () => {
+            const optimize = await getSvgo();
+            const result = optimize(svgContent, svgoOptions);
+            return result.data;
+          })();
+
+          svgMinifyCache.set(svgKey, inFlight);
+          const resolved = await inFlight;
+          svgMinifyCache.set(svgKey, resolved);
+          return resolved;
+        } catch (err) {
+          svgMinifyCache.delete(svgKey);
+          if (!options.continueOnMinifyError) {
+            throw err;
+          }
+          options.log && options.log(err);
+          return svgContent;
+        }
+      };
     } else if (key === 'customAttrCollapse') {
       // Single regex pattern
       options[key] = parseRegExp(option);

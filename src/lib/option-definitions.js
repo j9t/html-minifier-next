@@ -98,7 +98,7 @@ const optionDefinitions = {
     type: 'json'
   },
   minifySVG: {
-    description: 'Minify SVG elements and attributes (numeric precision, default attributes, colors)',
+    description: 'Minify SVG elements (uses SVGO)',
     type: 'json'
   },
   minifyURLs: {

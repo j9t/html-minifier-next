@@ -4,6 +4,19 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] - 2026-02-13
+
+### Added
+
+* Added `cacheSVG`/`--cache-svg` option to configure the SVG cache size
+
+### Changed
+
+* Replaced built-in SVG optimizations by implementing [SVGO](https://svgo.dev/) integration for `minifySVG`, producing smaller SVG output
+  - `minifySVG: true` now runs SVGO with its defaults
+  - `minifySVG: { … }` passes a custom SVGO configuration object
+  - **Migration:** If you passed custom options to `minifySVG`, replace them with an [SVGO config](https://svgo.dev/docs/preset-default/); old options are silently ignored
+
 ## [5.0.6] - 2026-02-12
 
 ### Internal

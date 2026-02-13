@@ -43,7 +43,7 @@ const config = defineConfig([
       format: 'es',
       inlineDynamicImports: true
     },
-    external: ['lightningcss', '@swc/core'],
+    external: ['lightningcss', 'svgo', '@swc/core'],
     plugins: browserBundlePlugins,
     onwarn
   },
@@ -58,7 +58,7 @@ const config = defineConfig([
       exports: 'named',
       inlineDynamicImports: true
     },
-    external: ['lightningcss', 'terser', 'entities', '@swc/core'],
+    external: ['lightningcss', 'svgo', 'terser', 'entities', '@swc/core'],
     onwarn
   }
 ]);

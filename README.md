@@ -132,6 +132,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | --- | --- | --- |
 | `cacheCSS`<br>`--cache-css` | Set CSS minification cache size; higher values improve performance for batch processing | `500` |
 | `cacheJS`<br>`--cache-js` | Set JavaScript minification cache size; higher values improve performance for batch processing | `500` |
+| `cacheSVG`<br>`--cache-svg` | Set SVG minification cache size; higher values improve performance for batch processing | `500` |
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
@@ -155,8 +156,8 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | `undefined` |
 | `mergeScripts`<br>`--merge-scripts` | Merge consecutive inline `script` elements into one (only merges compatible scripts with same `type`, matching `async`/`defer`/`nomodule`/`nonce`) | `false` |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
-| `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://github.com/terser/terser) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
-| `minifySVG`<br>`--minify-svg` | Minify SVG elements and attributes (numeric precision, default attributes, colors) | `false` (could be `true`, `Object`) |
+| `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://terser.org/) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
+| `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/)) | `false` (could be `true`, `Object`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
@@ -225,7 +226,7 @@ const result = await minify(html, {
 
 ### JavaScript minification
 
-When `minifyJS` is set to `true`, HTML Minifier Next uses [Terser](https://github.com/terser/terser) by default to minify JavaScript in `<script>` elements and event attributes.
+When `minifyJS` is set to `true`, HTML Minifier Next uses [Terser](https://terser.org/) by default to minify JavaScript in `<script>` elements and event attributes.
 
 You can choose between different JS minifiers using the `engine` field:
 
@@ -285,7 +286,40 @@ const result = await minify(html, {
 });
 ```
 
-### CSS and JavaScript cache configuration
+### SVG minification
+
+When `minifySVG` is set to `true`, HTML Minifier Next uses [SVGO](https://svgo.dev/) to optimize inline SVG elements. Complete `<svg>` subtrees are extracted and processed as a block, enabling deep structural optimization:
+
+```javascript
+const result = await minify(html, {
+  minifySVG: true // Enable with SVGO defaults
+});
+```
+
+You can pass custom SVGO options:
+
+```javascript
+const result = await minify(html, {
+  minifySVG: {
+    plugins: [{
+      name: 'preset-default',
+      params: {
+        overrides: {
+          convertShapeToPath: false // Keep original shapes
+        }
+      }
+    }]
+  }
+});
+```
+
+**Important:**
+
+* SVG minification only applies within `<svg>` elements
+* Case sensitivity and self-closing slashes are automatically preserved in SVG (regardless of global settings)
+* For maximum compression, use `minifySVG` together with `collapseWhitespace` and other options
+
+### CSS, JavaScript, and SVG cache configuration
 
 HTML Minifier Next uses in-memory caches to improve performance when processing multiple files or repeated content. The cache sizes can be configured for optimal performance based on your use case:
 
@@ -293,16 +327,18 @@ HTML Minifier Next uses in-memory caches to improve performance when processing 
 const result = await minify(html, {
   minifyCSS: true,
   minifyJS: true,
+  minifySVG: true,
   // Configure cache sizes (in number of entries)
   cacheCSS: 750,  // CSS cache size, default: 500
-  cacheJS: 250    // JS cache size, default: 500
+  cacheJS: 250,   // JS cache size, default: 500
+  cacheSVG: 100   // SVG cache size, default: 500
 });
 ```
 
 **Via CLI flags:**
 
 ```shell
-html-minifier-next --minify-css --cache-css 750 --minify-js --cache-js 250 input.html
+html-minifier-next --minify-css --cache-css 750 --minify-js --cache-js 250 --minify-svg --cache-svg 100 input.html
 ```
 
 **Via environment variables:**
@@ -310,7 +346,8 @@ html-minifier-next --minify-css --cache-css 750 --minify-js --cache-js 250 input
 ```shell
 export HMN_CACHE_CSS=750
 export HMN_CACHE_JS=250
-html-minifier-next --minify-css --minify-js input.html
+export HMN_CACHE_SVG=100
+html-minifier-next --minify-css --minify-js --minify-svg input.html
 ```
 
 **Configuration file:**
@@ -320,7 +357,9 @@ html-minifier-next --minify-css --minify-js input.html
   "minifyCSS": true,
   "cacheCSS": 750,
   "minifyJS": true,
-  "cacheJS": 250
+  "cacheJS": 250,
+  "minifySVG": true,
+  "cacheSVG": 100
 }
 ```
 
@@ -333,67 +372,10 @@ html-minifier-next --minify-css --minify-js input.html
 
 **Important:**
 
-* Cache locking: Caches are created on the first `minify()` call and persist for the process lifetime. Cache sizes are locked after first initialization—subsequent calls reuse the same caches even if different `cacheCSS`/`cacheJS` options are provided. The first call’s options determine the cache sizes.
+* Cache locking: Caches are created on the first `minify()` call and persist for the process lifetime. Cache sizes are locked after first initialization—subsequent calls reuse the same caches even if different `cacheCSS`, `cacheJS`, or `cacheSVG` options are provided. The first call’s options determine the cache sizes.
 * Zero values: Explicit `0` values are coerced to `1` (minimum functional cache size) to avoid immediate eviction. If you want to minimize memory usage, use a small number like `10` or `50` instead of `0`.
 
 The caches persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
-
-### SVG minification
-
-When `minifySVG` is set to `true`, HTML Minifier Next applies SVG-specific optimizations to SVG elements and their attributes. These optimizations are lightweight, fast, and safe:
-
-```javascript
-const result = await minify(html, {
-  minifySVG: true // Enable with default settings
-});
-```
-
-What gets optimized:
-
-1. Numeric precision reduction: Coordinates and path data are rounded to 3 decimal places by default
-   - `<path d="M 0.00000000 0.00000000"/>` → `<path d="M 0 0"/>`
-   - `<circle cx="10.500000" cy="20.300000" r="5.000"/>` → `<circle cx="10.5" cy="20.3" r="5"/>`
-
-2. Whitespace removal: Excess whitespace in numeric attribute values is removed
-   - `transform="translate( 10 , 20 )"` → `transform="translate(10,20)"`
-   - `points="100, 10  40,  198"` → `points="100,10 40,198"`
-
-3. Color minification: Hex colors are shortened and RGB values converted to hex
-   - `fill="#000000"` → `fill="#000"`
-   - `fill="rgb(255,255,255)"` → `fill="#fff"`
-
-4. Default attribute removal: Well-documented SVG default attributes are removed
-   - `fill-opacity="1"` → removed
-   - `stroke-linecap="butt"` → removed
-
-5. Leading and trailing zero removal: Unnecessary zeros are stripped from numeric values
-   - `0.5` → `.5`, `-0.3` → `-.3` (leading zeros)
-   - `1.0` → `1`, `10.500` → `10.5` (trailing zeros)
-
-You can customize the optimization behavior by providing an options object:
-
-```javascript
-const result = await minify(html, {
-  minifySVG: {
-    precision: 2,           // Use 2 decimal places instead of 3
-    removeDefaults: true,   // Remove default attributes (default: true)
-    minifyColors: true      // Minify color values (default: true)
-  }
-});
-```
-
-Available options:
-
-* `precision`: Number of decimal places for coordinates and path data (default: `3`)
-* `removeDefaults`: Remove attributes with default values (default: `true`)
-* `minifyColors`: Minify color values with hex shortening and RGB-to-hex conversion (default: `true`)
-
-**Important:**
-
-* SVG minification only applies within `<svg>` elements
-* Case sensitivity and self-closing slashes are automatically preserved in SVG (regardless of global settings)
-* For maximum compression, use `minifySVG` together with `collapseWhitespace` and other options
-* This is a lightweight, built-in implementation; for more aggressive SVG optimization, consider using [SVGO](https://github.com/svg/svgo) as a separate build step
 
 ## Minification comparison
 

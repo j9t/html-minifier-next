@@ -8,6 +8,7 @@
     "commander": "^14.0.2",
     "entities": "^7.0.1",
     "lightningcss": "^1.31.1",
+    "svgo": "^4.0.0",
     "terser": "^5.46.0"
   },
   "description": "Super-configurable and well-tested web page minifier (enhanced successor of HTML Minifier)",
@@ -94,5 +95,5 @@
   },
   "type": "module",
   "types": "./dist/types/htmlminifier.d.ts",
-  "version": "5.0.6"
+  "version": "5.1.0"
 }
