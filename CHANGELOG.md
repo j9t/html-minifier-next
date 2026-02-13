@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Replaced built-in SVG optimizations by implementing [SVGO](https://svgo.dev/) integration for `minifySVG`, producing smaller SVG output
   - `minifySVG: true` now runs SVGO with its defaults
   - `minifySVG: { … }` passes a custom SVGO configuration object
+  - **Migration:** If you passed custom options to `minifySVG`, replace them with an [SVGO config](https://svgo.dev/docs/preset-default/); old options are silently ignored
 
 ## [5.0.6] - 2026-02-12
 
