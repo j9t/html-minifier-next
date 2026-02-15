@@ -6,9 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.1.1] - 2026-02-15
 
-### Changed
+### Performance
 
 * Lazy-loaded `entities` dependency (only loaded when `decodeEntities` is enabled), improving cold-start performance
+
+### Changed
+
 * Excluded browser demo bundle from npm package, reducing published tarball size
 
 ## [5.1.0] - 2026-02-13
