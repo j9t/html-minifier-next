@@ -1,6 +1,5 @@
 // Imports
 
-import { decodeHTMLStrict } from 'entities';
 import {
   RE_CONDITIONAL_COMMENT,
   RE_EVENT_ATTR_DEFAULT,
@@ -21,6 +20,16 @@ import {
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
+
+// Lazy-load entities only when `decodeEntities` is enabled
+
+let decodeHTMLStrictPromise;
+async function getDecodeHTMLStrict() {
+  if (!decodeHTMLStrictPromise) {
+    decodeHTMLStrictPromise = import('entities').then(m => m.decodeHTMLStrict);
+  }
+  return decodeHTMLStrictPromise;
+}
 
 // Validators
 
@@ -437,7 +446,7 @@ async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   if (options.decodeEntities && attrValue) {
     // Fast path: Only decode when entities are present
     if (attrValue.indexOf('&') !== -1) {
-      attrValue = decodeHTMLStrict(attrValue);
+      attrValue = (await getDecodeHTMLStrict())(attrValue);
     }
   }
 

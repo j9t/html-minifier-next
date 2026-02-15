@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.1] - 2026-02-15
+
+### Performance
+
+* Lazy-loaded `entities` dependency (only loaded when `decodeEntities` is enabled), improving cold-start performance
+
+### Changed
+
+* Excluded browser demo bundle from npm package, reducing published tarball size
+
 ## [5.1.0] - 2026-02-13
 
 ### Added
