@@ -31,7 +31,6 @@
       "import": "./src/htmlminifier.js",
       "require": "./dist/htmlminifier.cjs"
     },
-    "./dist/*": "./dist/*.js",
     "./package.json": "./package.json"
   },
   "files": [
