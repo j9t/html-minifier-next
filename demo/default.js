@@ -211,7 +211,7 @@ const getOptions = (options) => {
   const minifierOptions = {};
 
   options.forEach((option) => {
-    let value = null;
+    let value;
 
     if (option.type === 'checkbox') {
       value = Boolean(option.checked);
