@@ -36,7 +36,8 @@
   },
   "files": [
     "cli.js",
-    "dist/",
+    "dist/htmlminifier.cjs",
+    "dist/types/",
     "src/"
   ],
   "funding": "https://github.com/j9t/html-minifier-next?sponsor=1",
@@ -95,5 +96,5 @@
   },
   "type": "module",
   "types": "./dist/types/htmlminifier.d.ts",
-  "version": "5.1.0"
+  "version": "5.1.1"
 }
