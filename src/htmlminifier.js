@@ -1,6 +1,5 @@
 // Imports
 
-import { decodeHTML } from 'entities';
 import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
@@ -98,6 +97,14 @@ async function getSvgo() {
     svgoPromise = import('svgo').then(m => m.optimize);
   }
   return svgoPromise;
+}
+
+let decodeHTMLPromise;
+async function getDecodeHTML() {
+  if (!decodeHTMLPromise) {
+    decodeHTMLPromise = import('entities').then(m => m.decodeHTML);
+  }
+  return decodeHTMLPromise;
 }
 
 // Minification caches (initialized on first use with configurable sizes)
@@ -1304,7 +1311,7 @@ async function minifyHTML(value, options, partialMarkup) {
       nextAttrs = nextAttrs || [];
       if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
         if (text.indexOf('&') !== -1) {
-          text = decodeHTML(text);
+          text = (await getDecodeHTML())(text);
         }
       }
       // Trim outermost newline-based whitespace inside `pre`/`textarea` elements
