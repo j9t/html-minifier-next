@@ -6,12 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.1.1] - 2026-02-15
 
-### Performance
-
-* Lazy-loaded `entities` dependency (only loaded when `decodeEntities` is enabled), improving cold-start performance
-
 ### Changed
 
+* Lazy-loaded `entities` dependency (only loaded when `decodeEntities` is enabled), improving cold-start performance
 * Excluded browser demo bundle from npm package, reducing published tarball size
 
 ## [5.1.0] - 2026-02-13
@@ -29,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.0.6] - 2026-02-12
 
-### Internal
+### Changed
 
 * Tightened package documentation
 
@@ -41,7 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.0.4] - 2026-02-06
 
-### Internal
+### Changed
 
 * Outsourced benchmarks (now handled [in separate repository](https://github.com/j9t/minifier-benchmarks)) and refactored backtest
 * Updated benchmarks-related documentation
@@ -55,14 +52,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.0.2] - 2026-02-03
 
+### Changed
+
+* Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (`src/lib/option-definitions.js`, `src/lib/utils.js`)
+
 ### Fixed
 
 * Fixed SVG and MathML elements being incorrectly removed when `removeEmptyElements` was enabled (foreign content is now excluded from empty element removal; HTML content inside `<foreignObject>` and `<annotation-xml>` is correctly processed as HTML)
 * Fixed `parseRegExp` not extracting flags from regex strings (e.g., `/pattern/gi` now correctly creates a case-insensitive global regex)
-
-### Internal
-
-* Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (`src/lib/option-definitions.js`, `src/lib/utils.js`)
 
 ## [5.0.1] - 2026-02-02
 
@@ -99,14 +96,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - relateurl-specific options (e.g., `removeAuth`, `removeEmptyQueries`, `ignore_www`, `schemeRelative`) are no longer supported
   - **Migration:** If you passed relateurl-specific options via `minifyURLs: { site: '…', removeAuth: true, … }`, remove unsupported properties; only `site` is accepted
 * Replaced `change-case` dependency with inline case conversion for CLI option names
-
-### Performance
-
 * Replaced string slicing with sticky (`y` flag) regex matching in the HTML parser, reducing memory allocations on large inputs
 * Added next-tag lookahead caching to avoid re-parsing the same tag twice during whitespace context detection
-
-### Internal
-
 * Checked on and removed unused dependencies
 
 ## [4.19.1] - 2026-01-29
@@ -178,6 +169,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Smart default behavior now detects `<input type="hidden">` elements and collapses adjacent pure whitespace even in basic `collapseWhitespace` mode (safe optimization)
   - Infrastructure supports future optimizations for other non-rendering elements (`hidden` attribute, `aria-hidden="true"`, etc.)
 * More JavaScript-related `type` attributes are being removed (`executableScriptsMimetypes`)
+* Eliminated redundant filesystem call when resolving input directory paths (CLI)
+* Audited, reformatted, and optimized code and documentation
+* Optimized code, copy, and DX of web demo
+* Extended HMN benchmarks config (to reflect all settings if possible, except `customAttrCollapse`, `maxInputLength`, `quoteCharacter`) and re-ran benchmarks
+* Reworked tests
 
 ### Fixed
 
@@ -189,20 +185,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Previously, if `quoteCharacter` was set to a quote type that existed in the attribute value, the minifier would produce invalid HTML (e.g., `<p data='it's'>` where the apostrophe terminates the attribute early)
   - Now automatically switches to the opposite quote type when there’s a conflict, ensuring valid HTML output
 
-### Performance
-
-* Eliminated redundant filesystem call when resolving input directory paths (CLI)
-
-### Internal
-
-* Audited, reformatted, and optimized code and documentation
-* Optimized code, copy, and DX of web demo
-* Extended HMN benchmarks config (to reflect all settings if possible, except `customAttrCollapse`, `maxInputLength`, `quoteCharacter`) and re-ran benchmarks
-* Reworked tests
-
 ## [4.16.4] - 2025-12-31
 
-### Internal
+### Changed
 
 * Demo optimizations
   - Added `ignoreCustomFragments` field for template engine support
@@ -211,7 +196,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.16.3] - 2025-12-27
 
-### Performance
+### Changed
 
 * `collapseAttributeWhitespace` optimizations
   - Reverted to two-pass regex approach
@@ -230,7 +215,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.16.2] - 2025-12-27
 
-### Performance
+### Changed
 
 * CSS/JS minification optimizations
   - Added in-flight promise caching to CSS minification
@@ -239,7 +224,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.16.1] - 2025-12-26
 
-### Performance
+### Changed
 
 * Performance optimizations for sorting and whitespace handling
   - Optimized `sortClassName` and `sortAttributes` with single-pass algorithm
@@ -256,11 +241,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Path data space optimization: Removes unnecessary spaces in path commands (`M 10 20 L 30 40` → `M10 20L30 40`)
   - Performance: Added LRU caching for numeric values, improving minification speed on SVG-heavy documents
 
-### Internal
+### Changed
 
 * Renamed numbered tests to make them more maintainable
 
 ## [4.15.2] - 2025-12-23
+
+### Changed
+
+* Updated benchmarks
+    - Removed HTML Minifier Terser from comparison due to bugs and limitations that distort the results
+    - Refactored benchmark execution to isolate crashes and ensure fair timing measurements
+    - Added additional samples sites
+    - Re-ran benchmarks
 
 ### Fixed
 
@@ -270,14 +263,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Affected options: `ignoreCustomFragments`, `ignoreCustomComments`, `customAttrAssign`, `customAttrSurround`, `customEventAttributes`, `customAttrCollapse`
   - Added automatic string-to-RegExp conversion in `processOptions()` for consistent behavior between CLI and library
   - Added regression tests for JSON config with string regex patterns
-
-### Internal
-
-* Updated benchmarks
-  - Removed HTML Minifier Terser from comparison due to bugs and limitations that distort the results
-  - Refactored benchmark execution to isolate crashes and ensure fair timing measurements
-  - Added additional samples sites
-  - Re-ran benchmarks
 
 ## [4.15.1] - 2025-12-23
 
@@ -307,17 +292,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.14.3] - 2025-12-21
 
+### Changed
+
+* Improved installation and CLI examples
+
 ### Fixed
 
 * Fixed whitespace collapsing around inline text elements (`<a>`, `<strong>`, `<em>`, `<span>`, etc.) when using `collapseInlineTagWhitespace` option or `comprehensive` preset—meaningful spaces are now correctly preserved to prevent content changes
 
-### Documentation
-
-* Improved installation and CLI examples
-
 ## [4.14.2] - 2025-12-21
 
-### Internal
+### Changed
 
 * Disabled `removeTagWhitespace` in HTML Minifier family benchmark settings, not to invalidate the output as indicated; re-ran benchmarks
 
@@ -342,14 +327,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.13.0] - 2025-12-20
 
-### Performance
+### Changed
 
 * Improved `sortAttributes` performance with LRU caching
 * Optimized `collapseWhitespace` with fast-path checks
 
 ## [4.12.3] - 2025-12-19
 
-### Internal
+### Changed
 
 * Refactored htmlminifier.js into modular architecture (`src/lib/*`)
   - Refactored comments for brevity and consistency
@@ -378,38 +363,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.12.0] - 2025-12-17
 
-### Fixed
-
-* Fixed CLI not completing when using `--minify-css`, `--minify-js`, or `--minify-urls` with file arguments (Commander was consuming filenames as option values)
-* Fixed CLI not properly validating input directory existence, causing silent failures in dry mode
-
-### Performance
+### Changed
 
 * Implemented parallel file processing with bounded concurrency (up to 8 workers based on CPU count)
 * Added lazy-loading for minifier module to reduce CLI cold-start overhead
 * Optimized URL minification with fast-path guards and cached relateurl instances
 * Added LRU memoization for class name sorting
 * Consolidated and fine-tuned cache
-
-### Internal
-
 * Adjusted HTML Minifier benchmarks settings (`sort*` settings do not change minification outcome itself) and re-ran benchmarks
 
+### Fixed
+
+* Fixed CLI not completing when using `--minify-css`, `--minify-js`, or `--minify-urls` with file arguments (Commander was consuming filenames as option values)
+* Fixed CLI not properly validating input directory existence, causing silent failures in dry mode
+
 ## [4.11.1] - 2025-12-17
+
+### Changed
+
+* Optimized `sortAttributes` and `sortClassName` by pre-compiling regex patterns and reusing them instead of creating new patterns on every call
+* Tightened HTML Minifier benchmarks settings (in the spirit of all minifiers using the most aggressive—but valid—settings)
 
 ### Fixed
 
 * Fixed `sortAttributes` and `sortClassName` causing HTML corruption when used with `htmlmin:ignore` comments or `ignoreCustomFragments` (template syntax)
 * Prevented invalid HTML output when using `decodeEntities: true` with `preventAttributesEscaping: true` for attributes containing quotes (e.g., JSON data)
 * Fixed `preventAttributesEscaping` potentially producing invalid HTML when value contains both quote types; now forces escaping to ensure valid output (setting is ignored when necessary)
-
-### Performance
-
-* Optimized `sortAttributes` and `sortClassName` by pre-compiling regex patterns and reusing them instead of creating new patterns on every call
-
-### Internal
-
-* Tightened HTML Minifier benchmarks settings (in the spirit of all minifiers using the most aggressive—but valid—settings)
 
 ## [4.11.0] - 2025-12-17
 
@@ -419,7 +398,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.10.0] - 2025-12-16
 
-### Performance
+### Changed
 
 * Improved parser and token chain handler to speed up processing of large documents and batch processing
   - Implemented index-based parsing to eliminate string slicing overhead
@@ -428,23 +407,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Cached lowercased tag names on the stack to eliminate repeated `.toLowerCase()` calls during tag lookups
   - Replaced O(n²) algorithms in TokenChain with map-based O(n) implementations
   - Eliminated repeated `indexOf` and `splice` operations in token sorting by using position tracking and array rebuilding
-
-### Internal
-
 * Improved benchmark handling and re-ran benchmarks
 
 ## [4.9.2] - 2025-12-14
 
-### Performance
+### Changed
 
 * Improved parser
   - Compute `nextTag` only when required by whitespace-collapse features, avoiding unnecessary regex parsing on text nodes
   - Add promise-aware handler calls (only `await` when a Promise is returned) to reduce overhead in synchronous pipelines
   - Cache lowercased tag names on the stack to avoid repeated `.toLowerCase()` during comparisons
 * Improved minifier to skip entity decoding for text/attribute values that contain no `&`, avoiding needless work in the common case
-
-### Internal
-
 * Updated benchmark dependencies, extended samples, and re-ran benchmarks
 
 ## [4.9.1] - 2025-12-14
@@ -456,9 +429,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Preserves whitespace when blocks contain plain text or inline elements (e.g., `<span>`, `<b>`, `<a>`) to avoid changing semantic meaning
   - Respects existing context rules (`conservativeCollapse`, `<pre>` elements, etc.)
   - Improves compression efficiency for templates using multiple ignore blocks (e.g., Nunjucks, Jinja, ERB)
-
-### Internal
-
 * Ensured automated dependency updates for benchmarks (via Dependabot)
 
 ## [4.9.0] - 2025-12-13
@@ -474,17 +444,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.8.3] - 2025-12-12
 
+### Changed
+
+* Added additional test coverage for `removeAttributeQuotes` option
+
 ### Fixed
 
 * Fixed `removeAttributeQuotes` adding unwanted space before closing tag when unquoted attribute values end with `/` (e.g., not to result in `<a href=/path/ >` but `<a href=/path/>`)
 
-### Internal
-
-* Added additional test coverage for `removeAttributeQuotes` option
-
 ## [4.8.2] - 2025-12-10
 
-### Performance
+### Changed
 
 * Pre-compiled regexes for common special elements (`script`, `style`, `noscript`) in HTML parser to eliminate regex creation overhead during parsing
 * Lazy-load heavy dependencies (Terser, Lightning CSS) only when CSS/JS minification is enabled
@@ -494,7 +464,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.8.1] - 2025-12-10
 
-### Internal
+### Changed
 
 * Moved type definitions and JSDoc comments to follow standard practices
 * Added extra context (link to Socket overview) to benchmark comparison table
@@ -510,7 +480,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Available in API, CLI (`--remove-empty-elements-except`), and web demo
   - Addresses use cases like preserving empty table cells or framework-required empty elements (e.g., Bulma navbar burger)
 
-### Documentation
+### Changed
 
 * Made README and CLI documentation more consistent
 
@@ -524,34 +494,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.7.0] - 2025-12-07
 
-### Performance
+### Changed
 
 * Added 200-item LRU cache for CSS and JavaScript minification to avoid re-processing identical inline styles/scripts (50–90% faster for pages with repeated content or batch processing)
 * Optimized hot-path code for 5–15% faster minification: hoisted RegExp patterns, added fast-path checks for expensive operations, optimized string operations (`trimWhitespace`, whitespace detection, character escaping)
-
-### Internal
-
 * Improved benchmark code quality and test parity: extracted `TEST_TIMEOUT` constant for reuse, added `--minify-urls` flag to both CLI invocations for accurate comparison between HTML Minifier Next and HTML Minifier Terser
 
 ## [4.6.3] - 2025-12-06
 
-### Documentation
+### Changed
 
 * Added HTML Minifier Terser to benchmark comparison table for direct comparison with HMN’s original parent
 * Added average processing time metrics to benchmarks showing performance across all minifiers
   - Displays average time per successful completion with success rate (e.g., “150 ms (10/10)”)
   - Fastest tool is determined by lowest average time across successful runs
   - Success rate is shown for transparency, allowing users to make informed decisions
-
-### Internal
-
 * Added progress messages for download and processing phases
 * Added verbose logging mode (`VERBOSE=true npm run benchmarks`) for debugging
 * Updated all benchmark dependencies to latest versions
 
 ## [4.6.2] - 2025-12-05
 
-### Documentation
+### Changed
 
 * Clarified `--no-html5` option behavior: enforces legacy inline/block nesting rules that may restructure modern HTML (e.g., moving `<figure>` outside `<a>` elements)
 
@@ -583,13 +547,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - JSON is parsed and re-stringified to remove whitespace
   - When `continueOnMinifyError` is `true` (default), malformed JSON is logged and returned unchanged; when `false`, JSON parse errors throw, consistent with CSS/JS/URL minification
 
-### Internal
+### Changed
 
 * Added preset-related tests
 
 ## [4.5.2] - 2025-11-28
 
-### Internal
+### Changed
 
 * Added test coverage for bare returns with `customEventAttributes` option
   - Ensures compatibility with future JavaScript minifiers (oxc-minify, @swc/core) that may handle bare return statements differently than Terser
@@ -615,7 +579,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Added priority system: presets are applied first, then config file options, then CLI flags (allowing preset customization)
 * Exported `getPreset()`, `getPresetNames()`, and `presets` from main module for programmatic access
 
-### Documentation
+### Changed
 
 * Added “Presets” section to README with usage examples and priority explanation
 * Added `--preset` option to CLI options table in README
@@ -637,20 +601,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * Updated “Working with invalid markup” section in README to reflect new partial markup support with examples
-
-### Documentation
-
 * Added JSDoc documentation for the `partialMarkup` option
 * Added README documentation explaining partial markup use cases
 
 ## [4.3.1] - 2025-11-25
 
-### Added
-
-* Added `.editorconfig` file to standardize editor settings across the project (UTF-8 encoding, LF line endings, 2-space tabs, trailing whitespace trimming)
-
 ### Changed
 
+* Added `.editorconfig` file to standardize editor settings across the project (UTF-8 encoding, LF line endings, 2-space tabs, trailing whitespace trimming)
 * Removed redundant pre-push git hook since tests already run on every commit via pre-commit hook
 
 ### Fixed
@@ -669,9 +627,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * Enabled dynamic setting of Lightning CSS `errorRecovery` based on the `continueOnMinifyError` option (enabled when `continueOnMinifyError` is `true`, disabled when `false`)
-
-### Documentation
-
 * Added JSDoc documentation for the `continueOnMinifyError` option
 * Updated documentation of the new option and its interaction with Lightning CSS error recovery
 * Updated benchmark configuration to explicitly include the new option
@@ -684,7 +639,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.2.1] - 2025-11-20
 
-### Internal
+### Changed
 
 * Standardized error variable naming in catch blocks to consistently use `err` throughout the codebase (main source, CLI, and benchmarks)
 
@@ -696,13 +651,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.1.1] - 2025-11-11
 
+### Changed
+
+* Updated dependencies to latest versions
+
 ### Fixed
 
 * Fixed TypeScript type definition for `minifyCSS` option to indicate that all Lightning CSS options are optional (wrapped `TransformOptions` with `Partial<>` to match runtime behavior where defaults are provided)
-
-### Internal
-
-* Updated dependencies to latest versions
 
 ## [4.1.0] - 2025-11-09
 
@@ -718,9 +673,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Updated build process to clean the `dist` directory before each build via new `prebuild` script
 * Added `@types/relateurl` as a dependency to ensure proper TypeScript type resolution for the `minifyURLs` option
 * Updated test suite to include TypeScript type-checking as part of standard test run
-
-### Internal
-
 * Added TypeScript configuration file (tsconfig.json) with modern compiler options for declaration generation
 * Updated package exports to include TypeScript type definitions path
 
@@ -737,18 +689,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.0.1] - 2025-11-05
 
-### Removed
-
-* Removed UMD bundles (htmlminifier.umd.bundle.js and minified variant) as they were undocumented and incompatible with Lightning CSS browser limitations
-
-### Internal
+### Changed
 
 * Simplified build configuration to ESM bundle (for demo) and CommonJS (for npm package)
 * Fixed browser demo build by disabling CSS minification option (Lightning CSS requires Node.js native bindings and cannot run in-browser)
 
+### Removed
+
+* Removed UMD bundles (htmlminifier.umd.bundle.js and minified variant) as they were undocumented and incompatible with Lightning CSS browser limitations
+
 ## [4.0.0] - 2025-11-05
 
-### Breaking Changes
+### Changed
 
 * **BREAKING:** Replaced unmaintained clean-css with [Lightning CSS](https://lightningcss.dev/) for CSS minification. This provides better minification and active maintenance, but introduces behavioral changes in CSS output:
   - Selector merging: Identical CSS rules are now merged (e.g., `p.a{color:red}p.b{color:red}` becomes `p.a,p.b{color:red}`)
@@ -763,8 +715,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - `unusedSymbols`: Array of CSS identifiers to remove during minification
   - `errorRecovery`: Boolean to skip invalid CSS rules (disabled in Lightning CSS, but enabled by default in HMN)
   - `sourceMap`: Boolean to generate source maps
+* Relocated CSS minification tests from html.spec.js to css+js.spec.js to clean up and consolidate test suites
 
-### Migration Notes
+#### Migration Notes
 
 If you were passing configuration options to `minifyCSS`, review Lightning CSS documentation and update your configuration:
 
@@ -797,23 +750,19 @@ minify(html, {
 
 If you rely on specific CSS output formatting, review your CSS after upgrading as selector order and formatting may change due to better optimization.
 
-### Internal
-
-* Relocated CSS minification tests from html.spec.js to css+js.spec.js to clean up and consolidate test suites
-
 ## [3.2.2] - 2025-11-02
 
 ### Added
 
 * Added `search` and `selectedcontent` elements to HTML element registry for complete minification support and proper optional tag removal
 
-### Internal
+### Changed
 
 * Added additional ruby-related test
 
 ## [3.2.1] - 2025-10-29
 
-### Internal
+### Changed
 
 * Restructured tests
 * Added CSS and JS minification tests
@@ -831,18 +780,15 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 * Listed CLI options in documentation
 * Verbose mode now displays explicitly provided disabled options (e.g., `--no-html5` shows as `no-html5`)
+* Restructured README
+* Improved return value consistency in `processFile` function (now always returns stats object)
+* Added tests for edge cases: EPIPE handling when piping to `head`, output directory nested in input directory (skip traversal logic), and symbolic link handling
 
 ### Fixed
 
 * Fixed numeric option validation to reject invalid input with clear error messages: now rejects non-numeric values (e.g., `--max-line-length=abc`), values with trailing characters (e.g., `--max-line-length=12abc`), and negative numbers (e.g., `--max-line-length=-50`) instead of silently accepting partial numeric prefixes
 * Fixed JSON option parsing to properly detect and report malformed array-like inputs (e.g., `--minify-css=[bad, json]`) and JSON with leading whitespace
 * Fixed race condition in config file loading by refactoring async option parser to synchronous path capture with explicit post-parse loading, ensuring config is fully loaded and normalized before any minification operations
-
-### Internal
-
-* Restructured README
-* Improved return value consistency in `processFile` function (now always returns stats object)
-* Added tests for edge cases: EPIPE handling when piping to `head`, output directory nested in input directory (skip traversal logic), and symbolic link handling
 
 ## [3.1.0] - 2025-10-27
 
@@ -854,16 +800,13 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 * Improved CLI help text and enhanced README documentation for `-o, --output` flag, to clarify what it does and how it works
 * Refactored CLI functionality by closing `-o` file streams, skipping symlinks and the output subtree in directory mode, and handling `EPIPE`
-
-### Internal
-
 * Expanded CLI test coverage: STDIN/STDOUT piping, `-o` flag combinations, dry run error handling
 * Added minifier tests: `maxInputLength` security option, CSS/JS error handling, `<dialog>` and `<search>` elements
 * Enabled cross-platform CI testing (Ubuntu, macOS, Windows)
 
 ## [3.0.0] - 2025-10-16
 
-### Breaking Changes
+### Changed
 
 * **BREAKING:** The `removeRedundantAttributes` option now removes significantly more HTML default attribute values. This will result in more aggressive minification when this option is enabled, which may change existing output—keep an eye on CSS selectors, JavaScript queries, and tooling requirements. Newly removed default values include:
   - `autocorrect="on"`, `fetchpriority="auto"`, `loading="eager"`, `popovertargetaction="toggle"`
@@ -889,7 +832,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 * Added support for HTML Ruby Markup Extensions ([June 2024 draft](https://www.w3.org/TR/2024/WD-html-ruby-extensions-20240627/)) to handle extended ruby annotation markup
 * Added `dialog` and `search` elements to `<p>` end tag omission rules per current HTML specification
 
-### Changed/fixed
+### Changed
 
 * Updated ruby element tag omission logic to correctly handle all conforming elements: `<ruby>`, `<rp>`, `<rt>`, `<rb>`, `<rtc>`
 * Improved optional tag removal for ruby elements when `removeOptionalTags` and `collapseWhitespace` options are enabled
@@ -944,7 +887,10 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 ### Changed
 
 * Replaced Husky with native Git hooks for development workflow
+* Migrated from Husky-managed Git hooks to native `.githooks/` directory
 * Updated `prepare` script to configure Git hooks path automatically
+* Maintained identical pre-commit and pre-push test execution
+* Simplified development setup with zero external dependencies for Git hooks
 
 ### Removed
 
@@ -952,18 +898,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 * Removed `.husky/` directory in favor of `.githooks/`
 * Removed unused `commitlint-config-non-conventional` dependency
 
-### Internal
-
-* Migrated from Husky-managed Git hooks to native `.githooks/` directory
-* Maintained identical pre-commit and pre-push test execution
-* Simplified development setup with zero external dependencies for Git hooks
-
 ## [2.0.0] - 2025-09-12
-
-### Breaking Changes
-
-* **BREAKING:** Removed `HTMLtoXML` and `HTMLtoDOM` functions from the public API. These XML-related functions were outdated and no longer relevant to the library’s focus on HTML minification.
-* **BREAKING:** Deep imports to internal modules are no longer supported. Use the main export instead of importing from specific source files.
 
 ### Added
 
@@ -971,16 +906,15 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 ### Changed
 
+* **BREAKING:** Removed `HTMLtoXML` and `HTMLtoDOM` functions from the public API. These XML-related functions were outdated and no longer relevant to the library’s focus on HTML minification.
+* **BREAKING:** Deep imports to internal modules are no longer supported. Use the main export instead of importing from specific source files.
 * Updated comment references from “HTML5 elements” to “HTML elements” for accuracy
 * Streamlined codebase by removing unused utility functions
 * Updated package exports to enforce clean API boundaries
+* Cleaned up package.json by removing unused dependencies
+* Improved code maintainability by removing legacy XML-related code
 
 ### Removed
 
 * Removed unused HTML conversion functions (`HTMLtoXML`, `HTMLtoDOM`)
 * Removed deprecated development dependencies: `is-ci`, `lint-staged`
-
-### Internal
-
-* Cleaned up package.json by removing unused dependencies
-* Improved code maintainability by removing legacy XML-related code
