@@ -52,14 +52,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.0.2] - 2026-02-03
 
-### Changed
-
-* Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (`src/lib/option-definitions.js`, `src/lib/utils.js`)
-
 ### Fixed
 
 * Fixed SVG and MathML elements being incorrectly removed when `removeEmptyElements` was enabled (foreign content is now excluded from empty element removal; HTML content inside `<foreignObject>` and `<annotation-xml>` is correctly processed as HTML)
 * Fixed `parseRegExp` not extracting flags from regex strings (e.g., `/pattern/gi` now correctly creates a case-insensitive global regex)
+
+### Changed
+
+* Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (`src/lib/option-definitions.js`, `src/lib/utils.js`)
 
 ## [5.0.1] - 2026-02-02
 
@@ -102,14 +102,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.19.1] - 2026-01-29
 
+### Fixed
+
+* Updated CommonJS preset example to use `{ preset: 'comprehensive' }` instead of `getPreset()`
+
 ### Changed
 
 * Removed `CI=true` environment variable detection for cache size defaults; use `cacheCSS`/`cacheJS` options or `HMN_CACHE_CSS`/`HMN_CACHE_JS` environment variables instead
 * Documented SVG leading and trailing zero removal
-
-### Fixed
-
-* Updated CommonJS preset example to use `{ preset: 'comprehensive' }` instead of `getPreset()`
 
 ## [4.19.0] - 2026-01-20
 
@@ -151,17 +151,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.17.1] - 2026-01-14
 
-### Changed
-
-* Removed aggressive `collapseInlineTagWhitespace` setting from `comprehensive` preset
-
 ### Fixed
 
 * Fixed `preset` option in programmatic API
   - Previously, users had to manually spread preset values using `getPreset()`: `minify(html, { ...getPreset('comprehensive') })`
   - Now the simpler syntax works as documented: `minify(html, { preset: 'comprehensive' })`
 
+### Changed
+
+* Removed aggressive `collapseInlineTagWhitespace` setting from `comprehensive` preset
+
 ## [4.17.0] - 2026-01-09
+
+### Fixed
+
+* Attribute quote preservation: The minifier now preserves the original quote style of attributes by default instead of always adding quotes
+  - Quotes are added only when necessary (value contains spaces/special characters, or options like `removeTagWhitespace` require them for disambiguation)
+  - The `removeAttributeQuotes` option continues to work as expected, actively removing quotes when safe
+  - This update can change the output, but it’s not considered a breaking change in the sense that a minifier adding code is not considered typical behavior
+* Fixed invalid HTML generation when using `preventAttributesEscaping: true` with `quoteCharacter` option
+  - Previously, if `quoteCharacter` was set to a quote type that existed in the attribute value, the minifier would produce invalid HTML (e.g., `<p data='it's'>` where the apostrophe terminates the attribute early)
+  - Now automatically switches to the opposite quote type when there’s a conflict, ensuring valid HTML output
 
 ### Changed
 
@@ -174,16 +184,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Optimized code, copy, and DX of web demo
 * Extended HMN benchmarks config (to reflect all settings if possible, except `customAttrCollapse`, `maxInputLength`, `quoteCharacter`) and re-ran benchmarks
 * Reworked tests
-
-### Fixed
-
-* Attribute quote preservation: The minifier now preserves the original quote style of attributes by default instead of always adding quotes
-  - Quotes are added only when necessary (value contains spaces/special characters, or options like `removeTagWhitespace` require them for disambiguation)
-  - The `removeAttributeQuotes` option continues to work as expected, actively removing quotes when safe
-  - This update can change the output, but it’s not considered a breaking change in the sense that a minifier adding code is not considered typical behavior
-* Fixed invalid HTML generation when using `preventAttributesEscaping: true` with `quoteCharacter` option
-  - Previously, if `quoteCharacter` was set to a quote type that existed in the attribute value, the minifier would produce invalid HTML (e.g., `<p data='it's'>` where the apostrophe terminates the attribute early)
-  - Now automatically switches to the opposite quote type when there’s a conflict, ensuring valid HTML output
 
 ## [4.16.4] - 2025-12-31
 
@@ -247,14 +247,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.15.2] - 2025-12-23
 
-### Changed
-
-* Updated benchmarks
-    - Removed HTML Minifier Terser from comparison due to bugs and limitations that distort the results
-    - Refactored benchmark execution to isolate crashes and ensure fair timing measurements
-    - Added additional samples sites
-    - Re-ran benchmarks
-
 ### Fixed
 
 * Fixed library not converting string regex patterns from JSON config files to RegExp objects
@@ -264,6 +256,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Added automatic string-to-RegExp conversion in `processOptions()` for consistent behavior between CLI and library
   - Added regression tests for JSON config with string regex patterns
 
+### Changed
+
+* Updated benchmarks
+  - Removed HTML Minifier Terser from comparison due to bugs and limitations that distort the results
+  - Refactored benchmark execution to isolate crashes and ensure fair timing measurements
+  - Added additional samples sites
+  - Re-ran benchmarks
+
 ## [4.15.1] - 2025-12-23
 
 ### Fixed
@@ -272,6 +272,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Added test coverage for custom elements to ensure optional tag removal and whitespace handling work correctly within web components
 
 ## [4.15.0] - 2025-12-23
+
+### Fixed
+
+* Fixed web demo reset option
 
 ### Added
 
@@ -286,19 +290,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Added comprehensive test suite with 13 SVG-specific test cases
 * Added detailed SVG minification documentation to README
 
-### Fixed
-
-* Fixed web demo reset option
-
 ## [4.14.3] - 2025-12-21
-
-### Changed
-
-* Improved installation and CLI examples
 
 ### Fixed
 
 * Fixed whitespace collapsing around inline text elements (`<a>`, `<strong>`, `<em>`, `<span>`, etc.) when using `collapseInlineTagWhitespace` option or `comprehensive` preset—meaningful spaces are now correctly preserved to prevent content changes
+
+### Changed
+
+* Improved installation and CLI examples
 
 ## [4.14.2] - 2025-12-21
 
@@ -341,18 +341,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.12.2] - 2025-12-18
 
+### Fixed
+
+* Fixed misleading documentation about JSON-LD minification
+  - Clarified that JSON script types are minified automatically without configuration
+  - Documented that `processScripts` is only for HTML template script types, not JSON
+
 ### Added
 
 * Added automatic minification support for additional JSON MIME types:
   - `application/problem+json` (RFC 7807 error responses)
   - `application/merge-patch+json` (RFC 7396 merge patches)
   - `application/json-patch+json` (RFC 6902 JSON patches)
-
-### Fixed
-
-* Fixed misleading documentation about JSON-LD minification
-  - Clarified that JSON script types are minified automatically without configuration
-  - Documented that `processScripts` is only for HTML template script types, not JSON
 
 ## [4.12.1] - 2025-12-18
 
@@ -363,6 +363,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.12.0] - 2025-12-17
 
+### Fixed
+
+* Fixed CLI not completing when using `--minify-css`, `--minify-js`, or `--minify-urls` with file arguments (Commander was consuming filenames as option values)
+* Fixed CLI not properly validating input directory existence, causing silent failures in dry mode
+
 ### Changed
 
 * Implemented parallel file processing with bounded concurrency (up to 8 workers based on CPU count)
@@ -372,23 +377,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Consolidated and fine-tuned cache
 * Adjusted HTML Minifier benchmarks settings (`sort*` settings do not change minification outcome itself) and re-ran benchmarks
 
-### Fixed
-
-* Fixed CLI not completing when using `--minify-css`, `--minify-js`, or `--minify-urls` with file arguments (Commander was consuming filenames as option values)
-* Fixed CLI not properly validating input directory existence, causing silent failures in dry mode
-
 ## [4.11.1] - 2025-12-17
-
-### Changed
-
-* Optimized `sortAttributes` and `sortClassName` by pre-compiling regex patterns and reusing them instead of creating new patterns on every call
-* Tightened HTML Minifier benchmarks settings (in the spirit of all minifiers using the most aggressive—but valid—settings)
 
 ### Fixed
 
 * Fixed `sortAttributes` and `sortClassName` causing HTML corruption when used with `htmlmin:ignore` comments or `ignoreCustomFragments` (template syntax)
 * Prevented invalid HTML output when using `decodeEntities: true` with `preventAttributesEscaping: true` for attributes containing quotes (e.g., JSON data)
 * Fixed `preventAttributesEscaping` potentially producing invalid HTML when value contains both quote types; now forces escaping to ensure valid output (setting is ignored when necessary)
+
+### Changed
+
+* Optimized `sortAttributes` and `sortClassName` by pre-compiling regex patterns and reusing them instead of creating new patterns on every call
+* Tightened HTML Minifier benchmarks settings (in the spirit of all minifiers using the most aggressive—but valid—settings)
 
 ## [4.11.0] - 2025-12-17
 
@@ -444,13 +444,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.8.3] - 2025-12-12
 
-### Changed
-
-* Added additional test coverage for `removeAttributeQuotes` option
-
 ### Fixed
 
 * Fixed `removeAttributeQuotes` adding unwanted space before closing tag when unquoted attribute values end with `/` (e.g., not to result in `<a href=/path/ >` but `<a href=/path/>`)
+
+### Changed
+
+* Added additional test coverage for `removeAttributeQuotes` option
 
 ## [4.8.2] - 2025-12-10
 
@@ -521,12 +521,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.6.1] - 2025-12-01
 
-### Changed
-
-* Improved parser error handling
-  - Added line/column tracking for better error messages
-  - Improved `continueOnParseError` to skip problematic characters instead of failing
-
 ### Fixed
 
 * Fixed parser hang on HTML with massive attribute values (e.g., large SVG path data)
@@ -537,6 +531,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - The `scan()` function (used for attribute sorting analysis) now only recursively processes `text/html` script content
   - JSON-LD and other non-HTML script types are correctly skipped during the scan phase
   - Prevents corruption when using `sortAttributes` with `processScripts: ["application/ld+json"]`
+
+### Changed
+
+* Improved parser error handling
+  - Added line/column tracking for better error messages
+  - Improved `continueOnParseError` to skip problematic characters instead of failing
 
 ## [4.6.0] - 2025-11-29
 
@@ -606,15 +606,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.3.1] - 2025-11-25
 
-### Changed
-
-* Added `.editorconfig` file to standardize editor settings across the project (UTF-8 encoding, LF line endings, 2-space tabs, trailing whitespace trimming)
-* Removed redundant pre-push git hook since tests already run on every commit via pre-commit hook
-
 ### Fixed
 
 * Fixed CLI help text descriptions for `--no-html5`, `--no-include-auto-generated-tags`, and `--no-continue-on-minify-error` flags to correctly describe what the flags do when used, rather than describing the default behavior
 * Updated README documentation to clarify the behavior of `html5` and `includeAutoGeneratedTags` options in both enabled and disabled states
+
+### Changed
+
+* Added `.editorconfig` file to standardize editor settings across the project (UTF-8 encoding, LF line endings, 2-space tabs, trailing whitespace trimming)
+* Removed redundant pre-push git hook since tests already run on every commit via pre-commit hook
 
 ## [4.3.0] - 2025-11-24
 
@@ -651,13 +651,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.1.1] - 2025-11-11
 
-### Changed
-
-* Updated dependencies to latest versions
-
 ### Fixed
 
 * Fixed TypeScript type definition for `minifyCSS` option to indicate that all Lightning CSS options are optional (wrapped `TransformOptions` with `Partial<>` to match runtime behavior where defaults are provided)
+
+### Changed
+
+* Updated dependencies to latest versions
 
 ## [4.1.0] - 2025-11-09
 
@@ -678,14 +678,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [4.0.2] - 2025-11-05
 
-### Changed
-
-* Refreshed demo code and design
-
 ### Fixed
 
 * Fixed browser demo loading by using virtual module stub for Lightning CSS instead of externalizing
 * Fixed “Select all” functionality to skip disabled options (CSS minification remains disabled)
+
+### Changed
+
+* Refreshed demo code and design
 
 ## [4.0.1] - 2025-11-05
 
@@ -769,6 +769,12 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 ## [3.2.0] - 2025-10-29
 
+### Fixed
+
+* Fixed numeric option validation to reject invalid input with clear error messages: now rejects non-numeric values (e.g., `--max-line-length=abc`), values with trailing characters (e.g., `--max-line-length=12abc`), and negative numbers (e.g., `--max-line-length=-50`) instead of silently accepting partial numeric prefixes
+* Fixed JSON option parsing to properly detect and report malformed array-like inputs (e.g., `--minify-css=[bad, json]`) and JSON with leading whitespace
+* Fixed race condition in config file loading by refactoring async option parser to synchronous path capture with explicit post-parse loading, ensuring config is fully loaded and normalized before any minification operations
+
 ### Added
 
 * Added `--verbose`/`-v` flag to show active options and file statistics (also automatically enabled with `--dry`)
@@ -783,12 +789,6 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 * Restructured README
 * Improved return value consistency in `processFile` function (now always returns stats object)
 * Added tests for edge cases: EPIPE handling when piping to `head`, output directory nested in input directory (skip traversal logic), and symbolic link handling
-
-### Fixed
-
-* Fixed numeric option validation to reject invalid input with clear error messages: now rejects non-numeric values (e.g., `--max-line-length=abc`), values with trailing characters (e.g., `--max-line-length=12abc`), and negative numbers (e.g., `--max-line-length=-50`) instead of silently accepting partial numeric prefixes
-* Fixed JSON option parsing to properly detect and report malformed array-like inputs (e.g., `--minify-css=[bad, json]`) and JSON with leading whitespace
-* Fixed race condition in config file loading by refactoring async option parser to synchronous path capture with explicit post-parse loading, ensuring config is fully loaded and normalized before any minification operations
 
 ## [3.1.0] - 2025-10-27
 
