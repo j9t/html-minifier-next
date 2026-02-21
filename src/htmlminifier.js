@@ -895,6 +895,7 @@ async function minifyHTML(value, options, partialMarkup) {
   let currentAttrs = [];
   const stackNoTrimWhitespace = [];
   const stackNoCollapseWhitespace = [];
+  let preTextareaDepth = 0; // Count of `pre`/`textarea` entries in `stackNoTrimWhitespace`
   let optionalStartTag = '';
   let optionalEndTag = '';
   let optionalEndTagEmitted = false;
@@ -1055,7 +1056,7 @@ async function minifyHTML(value, options, partialMarkup) {
     let charsIndex = buffer.length - 1;
     if (buffer.length > 1) {
       const item = buffer[buffer.length - 1];
-      if (/^(?:<!|$)/.test(item) && item.indexOf(uidIgnore) === -1) {
+      if (/^(?:<!|$)/.test(item) && (!uidIgnore || item.indexOf(uidIgnore) === -1)) {
         charsIndex--;
       }
     }
@@ -1149,6 +1150,7 @@ async function minifyHTML(value, options, partialMarkup) {
         if (!unary) {
           if (!canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
             stackNoTrimWhitespace.push(tag);
+            if (tag === 'pre' || tag === 'textarea') preTextareaDepth++;
           }
           if (!canCollapseWhitespace(tag, attrs) || stackNoCollapseWhitespace.length) {
             stackNoCollapseWhitespace.push(tag);
@@ -1178,11 +1180,14 @@ async function minifyHTML(value, options, partialMarkup) {
         options.sortAttributes(tag, attrs);
       }
 
+      const normalizedAttrs = await Promise.all(
+        attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML))
+      );
       const parts = [];
-      for (let i = attrs.length, isLast = true; --i >= 0;) {
-        const normalized = await normalizeAttr(attrs[i], attrs, tag, options, minifyHTML);
-        if (normalized) {
-          parts.push(buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr));
+      let isLast = true;
+      for (let i = normalizedAttrs.length - 1; i >= 0; i--) {
+        if (normalizedAttrs[i]) {
+          parts.push(buildAttr(normalizedAttrs[i], hasUnarySlash, options, isLast, uidAttr));
           isLast = false;
         }
       }
@@ -1218,6 +1223,7 @@ async function minifyHTML(value, options, partialMarkup) {
       if (options.collapseWhitespace) {
         if (stackNoTrimWhitespace.length) {
           if (tag === stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1]) {
+            if (tag === 'pre' || tag === 'textarea') preTextareaDepth--;
             stackNoTrimWhitespace.pop();
           }
         } else {
@@ -1319,7 +1325,7 @@ async function minifyHTML(value, options, partialMarkup) {
       // Only trims single trailing newlines (multiple newlines are likely intentional formatting)
       if (options.collapseWhitespace && stackNoTrimWhitespace.length) {
         const topTag = stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1];
-        if (stackNoTrimWhitespace.includes('pre') || stackNoTrimWhitespace.includes('textarea')) {
+        if (preTextareaDepth > 0) {
           // Trim trailing whitespace only if it ends with a single newline (not multiple)
           // Multiple newlines are likely intentional formatting, single newline is often a template artifact
           // Treat CRLF (`\r\n`), CR (`\r`), and LF (`\n`) as single line-ending units
@@ -1332,7 +1338,7 @@ async function minifyHTML(value, options, partialMarkup) {
         if (!stackNoTrimWhitespace.length) {
           if (prevTag === 'comment') {
             const prevComment = buffer[buffer.length - 1];
-            if (prevComment.indexOf(uidIgnore) === -1) {
+            if (!uidIgnore || prevComment.indexOf(uidIgnore) === -1) {
               if (!prevComment) {
                 prevTag = charsPrevTag;
               }

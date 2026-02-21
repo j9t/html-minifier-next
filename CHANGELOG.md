@@ -4,6 +4,15 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.2] - 2026-02-21
+
+### Changed
+
+* Improved hot-path performance by replacing regex tests with `Set.has()` lookups in `canCollapseWhitespace`/`canTrimWhitespace` and converting `isUriTypeAttribute`/`isNumberTypeAttribute` to `Map`/`Set` lookup tables
+* Replaced `Array.includes()` scans in the character handler with an O(1) `pre`/`textarea` depth counter
+* Parallelized per-attribute normalization with `Promise.all`, benefiting HTML with inline CSS/JS/URL minification enabled
+* Fixed spurious `indexOf("undefined")` searches when no `htmlmin:ignore` blocks are present
+
 ## [5.1.1] - 2026-02-15
 
 ### Changed
