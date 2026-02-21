@@ -211,12 +211,15 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
 
 // Collapse/trim whitespace for given tag
 
+const noCollapseWsTags = new Set(['script', 'style', 'pre', 'textarea']);
+const noTrimWsTags = new Set(['pre', 'textarea']);
+
 function canCollapseWhitespace(tag) {
-  return !/^(?:script|style|pre|textarea)$/.test(tag);
+  return !noCollapseWsTags.has(tag);
 }
 
 function canTrimWhitespace(tag) {
-  return !/^(?:pre|textarea)$/.test(tag);
+  return !noTrimWsTags.has(tag);
 }
 
 // Exports

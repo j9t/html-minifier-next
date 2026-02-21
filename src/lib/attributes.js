@@ -191,31 +191,45 @@ function isBooleanAttribute(attrName, attrValue) {
     (attrValue === '' && emptyCollapsible.has(attrName));
 }
 
+const uriTypeAttributes = new Map([
+  ['a', new Set(['href'])],
+  ['area', new Set(['href'])],
+  ['link', new Set(['href'])],
+  ['base', new Set(['href'])],
+  ['img', new Set(['src', 'longdesc', 'usemap'])],
+  ['object', new Set(['classid', 'codebase', 'data', 'usemap'])],
+  ['q', new Set(['cite'])],
+  ['blockquote', new Set(['cite'])],
+  ['ins', new Set(['cite'])],
+  ['del', new Set(['cite'])],
+  ['form', new Set(['action'])],
+  ['input', new Set(['src', 'usemap'])],
+  ['head', new Set(['profile'])],
+  ['script', new Set(['src', 'for'])]
+]);
+
 function isUriTypeAttribute(attrName, tag) {
-  return (
-    (/^(?:a|area|link|base)$/.test(tag) && attrName === 'href') ||
-    (tag === 'img' && /^(?:src|longdesc|usemap)$/.test(attrName)) ||
-    (tag === 'object' && /^(?:classid|codebase|data|usemap)$/.test(attrName)) ||
-    (tag === 'q' && attrName === 'cite') ||
-    (tag === 'blockquote' && attrName === 'cite') ||
-    ((tag === 'ins' || tag === 'del') && attrName === 'cite') ||
-    (tag === 'form' && attrName === 'action') ||
-    (tag === 'input' && (attrName === 'src' || attrName === 'usemap')) ||
-    (tag === 'head' && attrName === 'profile') ||
-    (tag === 'script' && (attrName === 'src' || attrName === 'for'))
-  );
+  const set = uriTypeAttributes.get(tag);
+  return set ? set.has(attrName) : false;
 }
 
+const numberTypeAttributes = new Map([
+  ['a', new Set(['tabindex'])],
+  ['area', new Set(['tabindex'])],
+  ['object', new Set(['tabindex'])],
+  ['button', new Set(['tabindex'])],
+  ['input', new Set(['maxlength', 'tabindex'])],
+  ['select', new Set(['size', 'tabindex'])],
+  ['textarea', new Set(['rows', 'cols', 'tabindex'])],
+  ['colgroup', new Set(['span'])],
+  ['col', new Set(['span'])],
+  ['th', new Set(['rowspan', 'colspan'])],
+  ['td', new Set(['rowspan', 'colspan'])]
+]);
+
 function isNumberTypeAttribute(attrName, tag) {
-  return (
-    (/^(?:a|area|object|button)$/.test(tag) && attrName === 'tabindex') ||
-    (tag === 'input' && (attrName === 'maxlength' || attrName === 'tabindex')) ||
-    (tag === 'select' && (attrName === 'size' || attrName === 'tabindex')) ||
-    (tag === 'textarea' && /^(?:rows|cols|tabindex)$/.test(attrName)) ||
-    (tag === 'colgroup' && attrName === 'span') ||
-    (tag === 'col' && attrName === 'span') ||
-    ((tag === 'th' || tag === 'td') && (attrName === 'rowspan' || attrName === 'colspan'))
-  );
+  const set = numberTypeAttributes.get(tag);
+  return set ? set.has(attrName) : false;
 }
 
 function isLinkType(tag, attrs, value) {
