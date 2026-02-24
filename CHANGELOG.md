@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.3] - 2026-02-24
+
+### Changed
+
+* Eliminated Promise overhead for synchronous attribute normalization: `cleanAttributeValue` and `normalizeAttr` now return direct values instead of Promises when no async work (CSS/JS/URL minification, entity decoding) is required, and the start handler skips `Promise.all` entirely in that case
+
 ## [5.1.2] - 2026-02-21
 
 ### Changed
