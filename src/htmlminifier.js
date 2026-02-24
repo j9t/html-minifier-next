@@ -4,7 +4,7 @@ import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, identity, lowercase, uniqueId } from './lib/utils.js';
+import { LRU, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
 
 import {
   RE_LEGACY_ENTITIES,
@@ -1180,9 +1180,8 @@ async function minifyHTML(value, options, partialMarkup) {
         options.sortAttributes(tag, attrs);
       }
 
-      const normalizedAttrs = await Promise.all(
-        attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML))
-      );
+      const attrResults = attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML));
+      const normalizedAttrs = attrResults.some(isThenable) ? await Promise.all(attrResults) : attrResults;
       const parts = [];
       let isLast = true;
       for (let i = normalizedAttrs.length - 1; i >= 0; i--) {

@@ -1,7 +1,7 @@
 // Imports
 
 import { createUrlMinifier } from './urls.js';
-import { LRU, stableStringify, identity, lowercase, identityAsync, replaceAsync, parseRegExp } from './utils.js';
+import { LRU, stableStringify, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -16,7 +16,7 @@ function shouldMinifyInnerHTML(options) {
     options.removeComments ||
     options.removeOptionalTags ||
     options.minifyJS !== identity ||
-    options.minifyCSS !== identityAsync ||
+    options.minifyCSS !== identity ||
     options.minifyURLs !== identity ||
     options.minifySVG
   );
@@ -43,7 +43,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     canTrimWhitespace,
     ...optionDefaults,
     log: identity,
-    minifyCSS: identityAsync,
+    minifyCSS: identity,
     minifyJS: identity,
     minifyURLs: identity,
     minifySVG: null
