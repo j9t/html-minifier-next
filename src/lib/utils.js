@@ -44,7 +44,7 @@ class LRU {
 function uniqueId(value) {
   let id;
   do {
-    id = Math.random().toString(36).replace(/^0\.[0-9]*/, '');
+    id = 'u' + crypto.randomUUID().replace(/-/g, '');
   } while (~value.indexOf(id));
   return id;
 }
@@ -55,8 +55,8 @@ function identity(value) {
   return value;
 }
 
-function identityAsync(value) {
-  return Promise.resolve(value);
+function isThenable(value) {
+  return value != null && typeof value === 'object' && typeof value.then === 'function';
 }
 
 function lowercase(value) {
@@ -104,7 +104,7 @@ export { stableStringify };
 export { LRU };
 export { uniqueId };
 export { identity };
-export { identityAsync };
+export { isThenable };
 export { lowercase };
 export { replaceAsync };
 export { parseRegExp };

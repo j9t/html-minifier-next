@@ -20,6 +20,7 @@ import {
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
+import { isThenable } from './utils.js';
 
 // Lazy-load entities only when `decodeEntities` is enabled
 
@@ -298,7 +299,9 @@ function hasAttrName(name, attrs) {
 
 // Cleaners
 
-async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
+// Returns the cleaned attribute value directly (sync) or as a Promise (async);
+// callers must handle both cases—use `isThenable()` to distinguish
+function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
   // Apply early whitespace normalization if enabled
   // Preserves special spaces (no-break space, hair space, etc.) for consistency with `collapseWhitespace`
   if (options.collapseAttributeWhitespace) {
@@ -313,16 +316,18 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
 
   if (isEventAttribute(attrName, options)) {
     attrValue = trimWhitespace(attrValue).replace(/^javascript:\s*/i, '');
-    try {
-      return await options.minifyJS(attrValue, true);
-    } catch (err) {
-      if (!options.continueOnMinifyError) {
-        throw err;
-      }
-      options.log && options.log(err);
-      return attrValue;
+    const result = options.minifyJS(attrValue, true);
+    if (isThenable(result)) {
+      return result.catch(err => {
+        if (!options.continueOnMinifyError) throw err;
+        options.log && options.log(err);
+        return attrValue;
+      });
     }
-  } else if (attrName === 'class') {
+    return result;
+  }
+
+  if (attrName === 'class') {
     attrValue = trimWhitespace(attrValue);
     if (options.sortClassNames) {
       attrValue = options.sortClassNames(attrValue);
@@ -330,47 +335,63 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
       attrValue = collapseWhitespaceAll(attrValue);
     }
     return attrValue;
-  } else if (isUriTypeAttribute(attrName, tag)) {
+  }
+
+  if (isUriTypeAttribute(attrName, tag)) {
     attrValue = trimWhitespace(attrValue);
     if (isLinkType(tag, attrs, 'canonical')) {
       return attrValue;
     }
-    try {
-      const out = await options.minifyURLs(attrValue);
-      return typeof out === 'string' ? out : attrValue;
-    } catch (err) {
-      if (!options.continueOnMinifyError) {
-        throw err;
-      }
-      options.log && options.log(err);
-      return attrValue;
+    const result = options.minifyURLs(attrValue);
+    if (isThenable(result)) {
+      return result
+        .then(out => typeof out === 'string' ? out : attrValue)
+        .catch(err => {
+          if (!options.continueOnMinifyError) throw err;
+          options.log && options.log(err);
+          return attrValue;
+        });
     }
-  } else if (isNumberTypeAttribute(attrName, tag)) {
+    return typeof result === 'string' ? result : attrValue;
+  }
+
+  if (isNumberTypeAttribute(attrName, tag)) {
     return trimWhitespace(attrValue);
-  } else if (attrName === 'style') {
+  }
+
+  if (attrName === 'style') {
     attrValue = trimWhitespace(attrValue);
     if (attrValue) {
       if (attrValue.endsWith(';') && !/&#?[0-9a-zA-Z]+;$/.test(attrValue)) {
         attrValue = attrValue.replace(/\s*;$/, ';');
       }
-      try {
-        attrValue = await options.minifyCSS(attrValue, 'inline');
-        // After minification, check if CSS consists entirely of invalid properties (no values)
-        // I.e., `color:` or `margin:;padding:` should be treated as empty
-        if (attrValue && /^(?:[a-z-]+:[;\s]*)+$/i.test(attrValue)) {
-          attrValue = '';
-        }
-      } catch (err) {
-        if (!options.continueOnMinifyError) {
-          throw err;
-        }
-        options.log && options.log(err);
+      const originalAttrValue = attrValue;
+      const cssResult = options.minifyCSS(attrValue, 'inline');
+      if (isThenable(cssResult)) {
+        return cssResult
+          .then(minified => {
+            // After minification, check if CSS consists entirely of invalid properties (no values)
+            // I.e., `color:` or `margin:;padding:` should be treated as empty
+            if (minified && /^(?:[a-z-]+:[;\s]*)+$/i.test(minified)) return '';
+            return minified;
+          })
+          .catch(err => {
+            if (!options.continueOnMinifyError) throw err;
+            options.log && options.log(err);
+            return originalAttrValue;
+          });
       }
+      // Sync path (`minifyCSS` disabled—identity function)
+      if (cssResult && /^(?:[a-z-]+:[;\s]*)+$/i.test(cssResult)) return '';
+      return cssResult != null ? cssResult : attrValue;
     }
     return attrValue;
-  } else if (isSrcset(attrName, tag)) {
+  }
+
+  if (isSrcset(attrName, tag)) {
     // https://html.spec.whatwg.org/multipage/embedded-content.html#attr-img-srcset
-    attrValue = (await Promise.all(trimWhitespace(attrValue).split(/\s*,\s*/).map(async function (candidate) {
+    const candidates = trimWhitespace(attrValue).split(/\s*,\s*/);
+    const processed = candidates.map(candidate => {
       let url = candidate;
       let descriptor = '';
       const match = candidate.match(/\s+([1-9][0-9]*w|[0-9]+(?:\.[0-9]+)?x)$/);
@@ -382,47 +403,65 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
           descriptor = ' ' + num + suffix;
         }
       }
-      try {
-        const out = await options.minifyURLs(url);
-        return (typeof out === 'string' ? out : url) + descriptor;
-      } catch (err) {
-        if (!options.continueOnMinifyError) {
-          throw err;
-        }
-        options.log && options.log(err);
-        return url + descriptor;
+      const out = options.minifyURLs(url);
+      if (isThenable(out)) {
+        return out
+          .then(result => (typeof result === 'string' ? result : url) + descriptor)
+          .catch(err => {
+            if (!options.continueOnMinifyError) throw err;
+            options.log && options.log(err);
+            return url + descriptor;
+          });
       }
-    }))).join(', ');
-  } else if (isMetaViewport(tag, attrs) && attrName === 'content') {
-    attrValue = attrValue.replace(/\s+/g, '').replace(/[0-9]+\.[0-9]+/g, function (numString) {
+      return (typeof out === 'string' ? out : url) + descriptor;
+    });
+    if (processed.some(isThenable)) {
+      return Promise.all(processed).then(results => results.join(', '));
+    }
+    return processed.join(', ');
+  }
+
+  if (isMetaViewport(tag, attrs) && attrName === 'content') {
+    return attrValue.replace(/\s+/g, '').replace(/[0-9]+\.[0-9]+/g, function (numString) {
       // 0.90000 → 0.9
       // 1.0 → 1
       // 1.0001 → 1.0001 (unchanged)
       return (+numString).toString();
     });
-  } else if (isContentSecurityPolicy(tag, attrs) && attrName.toLowerCase() === 'content') {
+  }
+
+  if (isContentSecurityPolicy(tag, attrs) && attrName.toLowerCase() === 'content') {
     return collapseWhitespaceAll(attrValue);
-  } else if (options.customAttrCollapse && options.customAttrCollapse.test(attrName)) {
-    attrValue = trimWhitespace(attrValue.replace(/ ?[\n\r]+ ?/g, '').replace(/\s{2,}/g, options.conservativeCollapse ? ' ' : ''));
-  } else if (tag === 'script' && attrName === 'type') {
-    attrValue = trimWhitespace(attrValue.replace(/\s*;\s*/g, ';'));
-  } else if (isMediaQuery(tag, attrs, attrName)) {
+  }
+
+  if (options.customAttrCollapse && options.customAttrCollapse.test(attrName)) {
+    return trimWhitespace(attrValue.replace(/ ?[\n\r]+ ?/g, '').replace(/\s{2,}/g, options.conservativeCollapse ? ' ' : ''));
+  }
+
+  if (tag === 'script' && attrName === 'type') {
+    return trimWhitespace(attrValue.replace(/\s*;\s*/g, ';'));
+  }
+
+  if (isMediaQuery(tag, attrs, attrName)) {
     attrValue = trimWhitespace(attrValue);
     // Only minify actual media queries (those with features in parentheses)
     // Skip simple media types like `all`, `screen`, `print` which are already minimal
     if (!/[()]/.test(attrValue)) {
       return attrValue;
     }
-    try {
-      return await options.minifyCSS(attrValue, 'media');
-    } catch (err) {
-      if (!options.continueOnMinifyError) {
-        throw err;
-      }
-      options.log && options.log(err);
-      return attrValue;
+    const originalAttrValue = attrValue;
+    const cssResult = options.minifyCSS(attrValue, 'media');
+    if (isThenable(cssResult)) {
+      return cssResult.catch(err => {
+        if (!options.continueOnMinifyError) throw err;
+        options.log && options.log(err);
+        return originalAttrValue;
+      });
     }
-  } else if (tag === 'iframe' && attrName === 'srcdoc') {
+    return cssResult != null ? cssResult : attrValue;
+  }
+
+  if (tag === 'iframe' && attrName === 'srcdoc') {
     // Recursively minify HTML content within `srcdoc` attribute
     // Fast-path: Skip if nothing would change
     if (!shouldMinifyInnerHTML(options)) {
@@ -430,6 +469,7 @@ async function cleanAttributeValue(tag, attrName, attrValue, options, attrs, min
     }
     return minifyHTMLSelf(attrValue, options, true);
   }
+
   return attrValue;
 }
 
@@ -453,17 +493,24 @@ function chooseAttributeQuote(attrValue, options) {
   return apos < quot ? '\'' : '"';
 }
 
-async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
+// Returns the normalized attribute object directly (sync) or as a Promise (async);
+// callers must handle both cases—use `isThenable()` to distinguish
+function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   const attrName = options.name(attr.name);
   let attrValue = attr.value;
 
-  if (options.decodeEntities && attrValue) {
-    // Fast path: Only decode when entities are present
-    if (attrValue.indexOf('&') !== -1) {
-      attrValue = (await getDecodeHTMLStrict())(attrValue);
-    }
+  // Entity decoding requires a lazy import—async only when `&` is present
+  if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
+    return getDecodeHTMLStrict().then(decode => {
+      return normalizeAttrContinue(attrName, decode(attrValue), attr, attrs, tag, options, minifyHTML);
+    });
   }
 
+  return normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML);
+}
+
+// Internal: Handles attribute normalization after entity decoding (if any)
+function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML) {
   if ((options.removeRedundantAttributes &&
        isAttributeRedundant(tag, attrName, attrValue, attrs)) ||
       (options.removeScriptTypeAttributes && tag === 'script' &&
@@ -474,9 +521,18 @@ async function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   }
 
   if (attrValue) {
-    attrValue = await cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML);
+    const cleaned = cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML);
+    if (isThenable(cleaned)) {
+      return cleaned.then(v => normalizeAttrFinish(attrName, v, attr, tag, options));
+    }
+    return normalizeAttrFinish(attrName, cleaned, attr, tag, options);
   }
 
+  return normalizeAttrFinish(attrName, attrValue, attr, tag, options);
+}
+
+// Internal: Final checks and result assembly after value cleaning
+function normalizeAttrFinish(attrName, attrValue, attr, tag, options) {
   if (options.removeEmptyAttributes &&
       canDeleteEmptyAttribute(tag, attrName, attrValue, options)) {
     return;

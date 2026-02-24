@@ -5,6 +5,8 @@
  * http://erik.eae.net/simplehtmlparser/simplehtmlparser.js
  */
 
+import { isThenable } from './lib/utils.js';
+
 /*
  * Use like so:
  *
@@ -228,7 +230,8 @@ export class HTMLParser {
 
             if (commentEnd >= 0) {
               if (handler.comment) {
-                await handler.comment(fullHtml.substring(pos + 4, commentEnd));
+                const result = handler.comment(fullHtml.substring(pos + 4, commentEnd));
+                if (isThenable(result)) await result;
               }
               advance(commentEnd + 3 - pos);
               prevTag = '';
@@ -244,7 +247,8 @@ export class HTMLParser {
 
             if (conditionalEnd >= 0) {
               if (handler.comment) {
-                await handler.comment(fullHtml.substring(pos + 2, conditionalEnd + 1), true /* Non-standard */);
+                const result = handler.comment(fullHtml.substring(pos + 2, conditionalEnd + 1), true /* Non-standard */);
+                if (isThenable(result)) await result;
               }
               advance(conditionalEnd + 2 - pos);
               prevTag = '';
@@ -324,7 +328,8 @@ export class HTMLParser {
         }
 
         if (handler.chars) {
-          await handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs);
+          const result = handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs);
+          if (isThenable(result)) await result;
         }
         prevTag = '';
         prevAttrs = [];
@@ -343,7 +348,8 @@ export class HTMLParser {
               .replace(/<!\[CDATA\[([\s\S]*?)]]>/g, '$1');
           }
           if (handler.chars) {
-            await handler.chars(text);
+            const result = handler.chars(text);
+            if (isThenable(result)) await result;
           }
           // Advance HTML past the matched special tag content and its closing tag
           advance(m[0].length);
@@ -351,7 +357,8 @@ export class HTMLParser {
         } else {
           // No closing tag found; to avoid infinite loop, break similarly to previous behavior
           if (handler.continueOnParseError && handler.chars && pos < fullLength) {
-            await handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
+            const result = handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
+            if (isThenable(result)) await result;
             advance(1);
           } else {
             break;
@@ -363,7 +370,8 @@ export class HTMLParser {
         if (handler.continueOnParseError) {
           // Skip the problematic character and continue
           if (handler.chars) {
-            await handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
+            const result = handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
+            if (isThenable(result)) await result;
           }
           advance(1);
           prevTag = '';

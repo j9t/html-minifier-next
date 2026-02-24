@@ -4,7 +4,7 @@ import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, identity, lowercase, uniqueId } from './lib/utils.js';
+import { LRU, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
 
 import {
   RE_LEGACY_ENTITIES,
@@ -921,31 +921,33 @@ async function minifyHTML(value, options, partialMarkup) {
   let removeEmptyElementsExcept;
   if (options.removeEmptyElementsExcept && !Array.isArray(options.removeEmptyElementsExcept)) {
     if (options.log) {
-      options.log('Warning: “removeEmptyElementsExcept” option must be an array, received: ' + typeof options.removeEmptyElementsExcept);
+      options.log('Warning: `removeEmptyElementsExcept` option must be an array, received: ' + typeof options.removeEmptyElementsExcept);
     }
     removeEmptyElementsExcept = [];
   } else {
     removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
   }
 
-  // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there.
-  // For all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
-  value = value.replace(/<!-- htmlmin:ignore -->([\s\S]*?)<!-- htmlmin:ignore -->/g, function (match, group1) {
-    if (!uidIgnore) {
-      uidIgnore = uniqueId(value);
-      const pattern = new RegExp('^' + uidIgnore + '([0-9]+)$');
-      uidIgnorePlaceholderPattern = new RegExp('^<!--' + uidIgnore + '(\\d+)-->$');
-      if (options.ignoreCustomComments) {
-        options.ignoreCustomComments = options.ignoreCustomComments.slice();
-      } else {
-        options.ignoreCustomComments = [];
+  // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there;
+  // for all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
+  if (value.indexOf('<!-- htmlmin:ignore -->') !== -1) {
+    value = value.replace(/<!-- htmlmin:ignore -->([\s\S]*?)<!-- htmlmin:ignore -->/g, function (match, group1) {
+      if (!uidIgnore) {
+        uidIgnore = uniqueId(value);
+        const pattern = new RegExp('^' + uidIgnore + '([0-9]+)$');
+        uidIgnorePlaceholderPattern = new RegExp('^<!--' + uidIgnore + '(\\d+)-->$');
+        if (options.ignoreCustomComments) {
+          options.ignoreCustomComments = options.ignoreCustomComments.slice();
+        } else {
+          options.ignoreCustomComments = [];
+        }
+        options.ignoreCustomComments.push(pattern);
       }
-      options.ignoreCustomComments.push(pattern);
-    }
-    const token = '<!--' + uidIgnore + ignoredMarkupChunks.length + '-->';
-    ignoredMarkupChunks.push(group1);
-    return token;
-  });
+      const token = '<!--' + uidIgnore + ignoredMarkupChunks.length + '-->';
+      ignoredMarkupChunks.push(group1);
+      return token;
+    });
+  }
 
   // Create sort functions after `htmlmin:ignore` processing but before custom fragment UID markers
   // This allows proper frequency analysis with access to ignored content via UID tokens
@@ -1180,9 +1182,8 @@ async function minifyHTML(value, options, partialMarkup) {
         options.sortAttributes(tag, attrs);
       }
 
-      const normalizedAttrs = await Promise.all(
-        attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML))
-      );
+      const attrResults = attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML));
+      const normalizedAttrs = attrResults.some(isThenable) ? await Promise.all(attrResults) : attrResults;
       const parts = [];
       let isLast = true;
       for (let i = normalizedAttrs.length - 1; i >= 0; i--) {
@@ -1310,207 +1311,225 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
     },
-    chars: async function (text, prevTag, nextTag, prevAttrs, nextAttrs) {
+    chars: function (text, prevTag, nextTag, prevAttrs, nextAttrs) {
       prevTag = prevTag === '' ? 'comment' : prevTag;
       nextTag = nextTag === '' ? 'comment' : nextTag;
       prevAttrs = prevAttrs || [];
       nextAttrs = nextAttrs || [];
-      if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
-        if (text.indexOf('&') !== -1) {
+
+      // Detect whether any async work is actually needed for this text node
+      const needsDecode = options.decodeEntities && text && !specialContentElements.has(currentTag) && text.indexOf('&') !== -1;
+      const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
+      const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
+      const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
+
+      // Whitespace collapsing phase (sync); captures `prevTag`/`nextTag`/`prevAttrs`/`nextAttrs` from outer scope
+      function charsCollapse(text) {
+        // Trim outermost newline-based whitespace inside `pre`/`textarea` elements
+        // This removes trailing newlines often added by template engines before closing tags
+        // Only trims single trailing newlines (multiple newlines are likely intentional formatting)
+        if (options.collapseWhitespace && stackNoTrimWhitespace.length) {
+          const topTag = stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1];
+          if (preTextareaDepth > 0) {
+            // Trim trailing whitespace only if it ends with a single newline (not multiple)
+            // Multiple newlines are likely intentional formatting, single newline is often a template artifact
+            // Treat CRLF (`\r\n`), CR (`\r`), and LF (`\n`) as single line-ending units
+            if (nextTag && nextTag === '/' + topTag && /[^\r\n](?:\r\n|\r|\n)[ \t]*$/.test(text)) {
+              text = text.replace(/(?:\r\n|\r|\n)[ \t]*$/, '');
+            }
+          }
+        }
+        if (options.collapseWhitespace) {
+          if (!stackNoTrimWhitespace.length) {
+            if (prevTag === 'comment') {
+              const prevComment = buffer[buffer.length - 1];
+              if (!uidIgnore || prevComment.indexOf(uidIgnore) === -1) {
+                if (!prevComment) {
+                  prevTag = charsPrevTag;
+                }
+                if (buffer.length > 1 && (!prevComment || (!options.conservativeCollapse && / $/.test(currentChars)))) {
+                  const charsIndex = buffer.length - 2;
+                  buffer[charsIndex] = buffer[charsIndex].replace(/\s+$/, function (trailingSpaces) {
+                    text = trailingSpaces + text;
+                    return '';
+                  });
+                }
+              }
+            }
+            if (prevTag) {
+              if (prevTag === '/nobr' || prevTag === 'wbr') {
+                if (/^\s/.test(text)) {
+                  let tagIndex = buffer.length - 1;
+                  while (tagIndex > 0 && buffer[tagIndex].lastIndexOf('<' + prevTag) !== 0) {
+                    tagIndex--;
+                  }
+                  trimTrailingWhitespace(tagIndex - 1, 'br');
+                }
+              } else if (inlineTextSet.has(prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag)) {
+                text = collapseWhitespace(text, options, /(?:^|\s)$/.test(currentChars));
+              }
+            }
+            if (prevTag || nextTag) {
+              text = collapseWhitespaceSmart(text, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet);
+            } else {
+              text = collapseWhitespace(text, options, true, true);
+            }
+            if (!text && /\s$/.test(currentChars) && prevTag && prevTag.charAt(0) === '/') {
+              trimTrailingWhitespace(buffer.length - 1, nextTag);
+            }
+          }
+          if (!stackNoCollapseWhitespace.length && nextTag !== 'html' && !(prevTag && nextTag)) {
+            text = collapseWhitespace(text, options, false, false, true);
+          }
+        }
+        return text;
+      }
+
+      // Finalization phase (sync): Optional tag handling, entity re-encoding, buffer push
+      function charsFinalize(text) {
+        if (options.removeOptionalTags && text) {
+          // `<html>` may be omitted if first thing inside is not a comment
+          // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
+          if (optionalStartTag === 'html' || (optionalStartTag === 'body' && !/^\s/.test(text))) {
+            removeStartTag();
+          }
+          optionalStartTag = '';
+          // `</html>` or `</body>` may be omitted if not followed by comment
+          // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
+          if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(text)))) {
+            removeEndTag();
+          }
+          // Don’t reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
+          if (!/^\s+$/.test(text) || !options.collapseWhitespace || options.conservativeCollapse) {
+            optionalEndTag = '';
+            optionalEndTagEmitted = false;
+          }
+        }
+        charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
+        if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
+          // Escape any `&` symbols that start either:
+          // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
+          // 2. or any other character reference (i.e., one that does end with `;`)
+          // Note that `&` can be escaped as `&amp`, without the semicolon.
+          // https://mathiasbynens.be/notes/ambiguous-ampersands
+          if (text.indexOf('&') !== -1) {
+            text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
+          }
+          if (text.indexOf('<') !== -1) {
+            text = text.replace(RE_ESCAPE_LT, '&lt;');
+          }
+        }
+        if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
+          text = text.replace(uidPattern, function (match, prefix, index) {
+            return ignoredCustomMarkupChunks[+index][0];
+          });
+        }
+        currentChars += text;
+        if (text) {
+          hasChars = true;
+        }
+        buffer.push(text);
+      }
+
+      // Fast path: All work is sync—skip async machinery entirely
+      if (!needsDecode && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
+        charsFinalize(charsCollapse(text));
+        return;
+      }
+
+      // Slow path: At least one async step required
+      return (async () => {
+        if (needsDecode) {
           text = (await getDecodeHTML())(text);
         }
-      }
-      // Trim outermost newline-based whitespace inside `pre`/`textarea` elements
-      // This removes trailing newlines often added by template engines before closing tags
-      // Only trims single trailing newlines (multiple newlines are likely intentional formatting)
-      if (options.collapseWhitespace && stackNoTrimWhitespace.length) {
-        const topTag = stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1];
-        if (preTextareaDepth > 0) {
-          // Trim trailing whitespace only if it ends with a single newline (not multiple)
-          // Multiple newlines are likely intentional formatting, single newline is often a template artifact
-          // Treat CRLF (`\r\n`), CR (`\r`), and LF (`\n`) as single line-ending units
-          if (nextTag && nextTag === '/' + topTag && /[^\r\n](?:\r\n|\r|\n)[ \t]*$/.test(text)) {
-            text = text.replace(/(?:\r\n|\r|\n)[ \t]*$/, '');
-          }
+        text = charsCollapse(text);
+        if (needsProcessScript) {
+          text = await processScript(text, options, currentAttrs, minifyHTML);
         }
-      }
-      if (options.collapseWhitespace) {
-        if (!stackNoTrimWhitespace.length) {
-          if (prevTag === 'comment') {
-            const prevComment = buffer[buffer.length - 1];
-            if (!uidIgnore || prevComment.indexOf(uidIgnore) === -1) {
-              if (!prevComment) {
-                prevTag = charsPrevTag;
-              }
-              if (buffer.length > 1 && (!prevComment || (!options.conservativeCollapse && / $/.test(currentChars)))) {
-                const charsIndex = buffer.length - 2;
-                buffer[charsIndex] = buffer[charsIndex].replace(/\s+$/, function (trailingSpaces) {
-                  text = trailingSpaces + text;
-                  return '';
-                });
-              }
-            }
-          }
-          if (prevTag) {
-            if (prevTag === '/nobr' || prevTag === 'wbr') {
-              if (/^\s/.test(text)) {
-                let tagIndex = buffer.length - 1;
-                while (tagIndex > 0 && buffer[tagIndex].lastIndexOf('<' + prevTag) !== 0) {
-                  tagIndex--;
-                }
-                trimTrailingWhitespace(tagIndex - 1, 'br');
-              }
-            } else if (inlineTextSet.has(prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag)) {
-              text = collapseWhitespace(text, options, /(?:^|\s)$/.test(currentChars));
-            }
-          }
-          if (prevTag || nextTag) {
-            text = collapseWhitespaceSmart(text, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet);
-          } else {
-            text = collapseWhitespace(text, options, true, true);
-          }
-          if (!text && /\s$/.test(currentChars) && prevTag && prevTag.charAt(0) === '/') {
-            trimTrailingWhitespace(buffer.length - 1, nextTag);
-          }
+        if (needsMinifyJS) {
+          text = await options.minifyJS(text);
         }
-        if (!stackNoCollapseWhitespace.length && nextTag !== 'html' && !(prevTag && nextTag)) {
-          text = collapseWhitespace(text, options, false, false, true);
+        if (needsMinifyCSS) {
+          text = await options.minifyCSS(text);
         }
-      }
-      if (specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs))) {
-        text = await processScript(text, options, currentAttrs, minifyHTML);
-      }
-      if (isExecutableScript(currentTag, currentAttrs)) {
-        text = await options.minifyJS(text);
-      }
-      if (isStyleElement(currentTag, currentAttrs)) {
-        text = await options.minifyCSS(text);
-      }
-      if (options.removeOptionalTags && text) {
-        // `<html>` may be omitted if first thing inside is not a comment
-        // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
-        if (optionalStartTag === 'html' || (optionalStartTag === 'body' && !/^\s/.test(text))) {
-          removeStartTag();
-        }
-        optionalStartTag = '';
-        // `</html>` or `</body>` may be omitted if not followed by comment
-        // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
-        if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(text)))) {
-          removeEndTag();
-        }
-        // Don't reset optionalEndTag if text is only whitespace and will be collapsed (not conservatively)
-        if (!/^\s+$/.test(text) || !options.collapseWhitespace || options.conservativeCollapse) {
+        charsFinalize(text);
+      })();
+    },
+    comment: function (text, nonStandard) {
+      const prefix = nonStandard ? '<!' : '<!--';
+      const suffix = nonStandard ? '>' : '-->';
+
+      // Finalization phase (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
+      function commentFinalize(comment) {
+        if (options.removeOptionalTags && comment) {
+          // Preceding comments suppress tag omissions
+          optionalStartTag = '';
           optionalEndTag = '';
           optionalEndTagEmitted = false;
         }
-      }
-      charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
-      if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
-        // Escape any `&` symbols that start either:
-        // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
-        // 2. or any other character reference (i.e., one that does end with `;`)
-        // Note that `&` can be escaped as `&amp`, without the semicolon.
-        // https://mathiasbynens.be/notes/ambiguous-ampersands
-        if (text.indexOf('&') !== -1) {
-          text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
-        }
-        if (text.indexOf('<') !== -1) {
-          text = text.replace(RE_ESCAPE_LT, '&lt;');
-        }
-      }
-      if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
-        text = text.replace(uidPattern, function (match, prefix, index) {
-          return ignoredCustomMarkupChunks[+index][0];
-        });
-      }
-      currentChars += text;
-      if (text) {
-        hasChars = true;
-      }
-      buffer.push(text);
-    },
-    comment: async function (text, nonStandard) {
-      const prefix = nonStandard ? '<!' : '<!--';
-      const suffix = nonStandard ? '>' : '-->';
-      if (isConditionalComment(text)) {
-        text = prefix + await cleanConditionalComment(text, options, minifyHTML) + suffix;
-      } else if (options.removeComments) {
-        if (isIgnoredComment(text, options)) {
-          text = '<!--' + text + '-->';
-        } else {
-          text = '';
-        }
-      } else {
-        text = prefix + text + suffix;
-      }
-      if (options.removeOptionalTags && text) {
-        // Preceding comments suppress tag omissions
-        optionalStartTag = '';
-        optionalEndTag = '';
-        optionalEndTagEmitted = false;
-      }
 
-      // Optimize whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
-      if (options.collapseWhitespace && text && uidIgnorePlaceholderPattern) {
-        if (uidIgnorePlaceholderPattern.test(text)) {
-          // Check if previous buffer items are: [ignore-placeholder, whitespace-only text]
-          if (buffer.length >= 2) {
-            const prevText = buffer[buffer.length - 1];
-            const prevComment = buffer[buffer.length - 2];
+        // Optimize whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
+        if (options.collapseWhitespace && comment && uidIgnorePlaceholderPattern) {
+          if (uidIgnorePlaceholderPattern.test(comment)) {
+            // Check if previous buffer items are: [ignore-placeholder, whitespace-only text]
+            if (buffer.length >= 2) {
+              const prevText = buffer[buffer.length - 1];
+              const prevComment = buffer[buffer.length - 2];
 
-            // Check if previous item is whitespace-only and item before that is ignore-placeholder
-            if (prevText && /^\s+$/.test(prevText) && prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
-              // Extract the index from both placeholders to check their content
-              const currentMatch = text.match(uidIgnorePlaceholderPattern);
-              const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
+              // Check if previous item is whitespace-only and item before that is ignore-placeholder
+              if (prevText && /^\s+$/.test(prevText) && prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
+                // Extract the index from both placeholders to check their content
+                const currentMatch = comment.match(uidIgnorePlaceholderPattern);
+                const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
 
-              if (currentMatch && prevMatch) {
-                const currentIndex = +currentMatch[1];
-                const prevIndex = +prevMatch[1];
+                if (currentMatch && prevMatch) {
+                  const currentIndex = +currentMatch[1];
+                  const prevIndex = +prevMatch[1];
 
-                // Defensive bounds check to ensure indices are valid
-                if (currentIndex < ignoredMarkupChunks.length && prevIndex < ignoredMarkupChunks.length) {
-                  const currentContent = ignoredMarkupChunks[currentIndex];
-                  const prevContent = ignoredMarkupChunks[prevIndex];
+                  // Defensive bounds check to ensure indices are valid
+                  if (currentIndex < ignoredMarkupChunks.length && prevIndex < ignoredMarkupChunks.length) {
+                    const currentContent = ignoredMarkupChunks[currentIndex];
+                    const prevContent = ignoredMarkupChunks[prevIndex];
 
-                  // Only collapse whitespace if both blocks contain HTML (start with `<`)
-                  // Don’t collapse if either contains plain text, as that would change meaning
-                  // Note: This check will match HTML comments (`<!-- … -->`), but the tag name
-                  // regex below requires starting with a letter, so comments are intentionally
-                  // excluded by the `currentTagMatch && prevTagMatch` guard
-                  if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
-                    // Extract tag names from the HTML content (excludes comments, processing instructions, etc.)
-                    const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
-                    const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                    // Only collapse whitespace if both blocks contain HTML (start with `<`)
+                    // Don’t collapse if either contains plain text, as that would change meaning
+                    // Note: This check will match HTML comments (`<!-- … -->`), but the tag name
+                    // regex below requires starting with a letter, so comments are intentionally
+                    // excluded by the `currentTagMatch && prevTagMatch` guard
+                    if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
+                      // Extract tag names from the HTML content (excludes comments, processing instructions, etc.)
+                      const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                      const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
 
-                    // Only collapse if both matched valid element tags (not comments/text)
-                    // and both tags are block-level (inline elements need whitespace preserved)
-                    if (currentTagMatch && prevTagMatch) {
-                      const currentTag = options.name(currentTagMatch[1]);
-                      const prevTag = options.name(prevTagMatch[1]);
+                      // Only collapse if both matched valid element tags (not comments/text)
+                      // and both tags are block-level (inline elements need whitespace preserved)
+                      if (currentTagMatch && prevTagMatch) {
+                        const currentTag = options.name(currentTagMatch[1]);
+                        const prevTag = options.name(prevTagMatch[1]);
 
-                      // Don’t collapse between inline elements
-                      if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
-                        // Collapse whitespace respecting context rules
-                        let collapsedText = prevText;
+                        // Don’t collapse between inline elements
+                        if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
+                          // Collapse whitespace respecting context rules
+                          let collapsedText = prevText;
 
-                        // Apply `collapseWhitespace` with appropriate context
-                        if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
-                          // Not in pre or other no-collapse context
-                          if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
-                            // Preserve line break as single newline
-                            collapsedText = '\n';
-                          } else if (options.conservativeCollapse) {
-                            // Conservative mode: keep single space
-                            collapsedText = ' ';
-                          } else {
-                            // Aggressive mode: remove all whitespace
-                            collapsedText = '';
+                          // Apply `collapseWhitespace` with appropriate context
+                          if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
+                            // Not in pre or other no-collapse context
+                            if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
+                              // Preserve line break as single newline
+                              collapsedText = '\n';
+                            } else if (options.conservativeCollapse) {
+                              // Conservative mode: Keep single space
+                              collapsedText = ' ';
+                            } else {
+                              // Aggressive mode: Remove all whitespace
+                              collapsedText = '';
+                            }
                           }
-                        }
 
-                        // Replace the whitespace in buffer
-                        buffer[buffer.length - 1] = collapsedText;
+                          // Replace the whitespace in buffer
+                          buffer[buffer.length - 1] = collapsedText;
+                        }
                       }
                     }
                   }
@@ -1519,9 +1538,27 @@ async function minifyHTML(value, options, partialMarkup) {
             }
           }
         }
+
+        buffer.push(comment);
       }
 
-      buffer.push(text);
+      // Only conditional comments require async work (recursive minification)
+      if (isConditionalComment(text)) {
+        return cleanConditionalComment(text, options, minifyHTML).then(cleaned => {
+          commentFinalize(prefix + cleaned + suffix);
+        });
+      }
+
+      if (options.removeComments) {
+        if (isIgnoredComment(text, options)) {
+          text = '<!--' + text + '-->';
+        } else {
+          text = '';
+        }
+      } else {
+        text = prefix + text + suffix;
+      }
+      commentFinalize(text);
     },
     doctype: function (doctype) {
       buffer.push(options.useShortDoctype
