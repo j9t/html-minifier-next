@@ -19,6 +19,7 @@ export default [
       globals: {
         Buffer: 'readonly',
         console: 'readonly',
+        crypto: 'readonly',
         document: 'readonly',
         process: 'readonly',
         URL: 'readonly',

@@ -44,7 +44,7 @@ class LRU {
 function uniqueId(value) {
   let id;
   do {
-    id = Math.random().toString(36).replace(/^0\.[0-9]*/, '');
+    id = 'u' + crypto.randomUUID().replace(/-/g, '');
   } while (~value.indexOf(id));
   return id;
 }
