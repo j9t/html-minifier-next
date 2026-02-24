@@ -55,10 +55,6 @@ function identity(value) {
   return value;
 }
 
-function identityAsync(value) {
-  return Promise.resolve(value);
-}
-
 function isThenable(value) {
   return value != null && typeof value === 'object' && typeof value.then === 'function';
 }
@@ -108,7 +104,6 @@ export { stableStringify };
 export { LRU };
 export { uniqueId };
 export { identity };
-export { identityAsync };
 export { isThenable };
 export { lowercase };
 export { replaceAsync };
