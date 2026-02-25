@@ -82,6 +82,23 @@ const preCompiledStackedTags = {
 // Cache for compiled attribute regexes per handler configuration
 const attrRegexCache = new WeakMap();
 
+// O(n) helper: Strip all occurrences of `open…close` delimiters, keeping inner content
+// Used instead of a regex replace to avoid O(n²) behavior on adversarial inputs
+function stripDelimited(str, open, close) {
+  let result = '';
+  let i = 0;
+  while (i < str.length) {
+    const start = str.indexOf(open, i);
+    if (start === -1) { result += str.slice(i); break; }
+    result += str.slice(i, start);
+    const end = str.indexOf(close, start + open.length);
+    if (end === -1) { result += str.slice(start); break; }
+    result += str.slice(start + open.length, end);
+    i = end + close.length;
+  }
+  return result;
+}
+
 function buildAttrRegex(handler) {
   let pattern = singleAttrIdentifier.source +
     '(?:\\s*(' + joinSingleAttrAssigns(handler) + ')' +
@@ -153,9 +170,10 @@ export class HTMLParser {
 
     // Sticky regex versions for position-based matching (avoids string slicing)
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
+    // `\s*` with sticky flag is O(n) at worst—no retry from different positions possible
     const startTagCloseY = /\s*(\/?)>/y;
     const endTagY = new RegExp(endTag.source.slice(1), 'y');
-    const doctypeY = /<!DOCTYPE\s?[^>]+>/iy;
+    const doctypeY = /<!DOCTYPE[^>]+>/iy;
     const commentTestY = /<!--/y;
     const conditionalTestY = /<!\[/y;
 
@@ -343,9 +361,7 @@ export class HTMLParser {
         if (m && m.index === 0) {
           let text = m[1];
           if (stackedTag !== 'script' && stackedTag !== 'style' && stackedTag !== 'noscript') {
-            text = text
-              .replace(/<!--([\s\S]*?)-->/g, '$1')
-              .replace(/<!\[CDATA\[([\s\S]*?)]]>/g, '$1');
+            text = stripDelimited(stripDelimited(text, '<!--', '-->'), '<![CDATA[', ']]>');
           }
           if (handler.chars) {
             const result = handler.chars(text);
