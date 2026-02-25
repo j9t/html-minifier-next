@@ -931,7 +931,19 @@ async function minifyHTML(value, options, partialMarkup) {
   // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there;
   // for all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
   if (value.indexOf('<!-- htmlmin:ignore -->') !== -1) {
-    value = value.replace(/<!-- htmlmin:ignore -->([\s\S]*?)<!-- htmlmin:ignore -->/g, function (match, group1) {
+    // Use `indexOf`-based O(n) loop instead of a global regex with [\s\S]*? to avoid O(n²)
+    // backtracking on adversarial HTML with many `<!--` prefixes but no closing marker
+    const ignoreMarker = '<!-- htmlmin:ignore -->';
+    const ignoreMarkerLen = ignoreMarker.length;
+    let ignoreResult = '';
+    let ignorePos = 0;
+    while (ignorePos < value.length) {
+      const ignoreStart = value.indexOf(ignoreMarker, ignorePos);
+      if (ignoreStart === -1) { ignoreResult += value.slice(ignorePos); break; }
+      ignoreResult += value.slice(ignorePos, ignoreStart);
+      const ignoreEnd = value.indexOf(ignoreMarker, ignoreStart + ignoreMarkerLen);
+      if (ignoreEnd === -1) { ignoreResult += value.slice(ignoreStart); break; }
+      const group1 = value.slice(ignoreStart + ignoreMarkerLen, ignoreEnd);
       if (!uidIgnore) {
         uidIgnore = uniqueId(value);
         const pattern = new RegExp('^' + uidIgnore + '([0-9]+)$');
@@ -945,8 +957,10 @@ async function minifyHTML(value, options, partialMarkup) {
       }
       const token = '<!--' + uidIgnore + ignoredMarkupChunks.length + '-->';
       ignoredMarkupChunks.push(group1);
-      return token;
-    });
+      ignoreResult += token;
+      ignorePos = ignoreEnd + ignoreMarkerLen;
+    }
+    value = ignoreResult;
   }
 
   // Create sort functions after `htmlmin:ignore` processing but before custom fragment UID markers
