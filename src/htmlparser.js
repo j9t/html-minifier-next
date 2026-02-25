@@ -173,7 +173,7 @@ export class HTMLParser {
     // `\s*` with sticky flag is O(n) at worst—no retry from different positions possible
     const startTagCloseY = /\s*(\/?)>/y;
     const endTagY = new RegExp(endTag.source.slice(1), 'y');
-    const doctypeY = /<!DOCTYPE[^>]+>/iy;
+    const doctypeY = /<!DOCTYPE[^<>]+>/iy;
     const commentTestY = /<!--/y;
     const conditionalTestY = /<!\[/y;
 
