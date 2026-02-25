@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [5.1.4] - 2026-02-25
 
-### Fixed
+### Changed
 
 * Replaced O(n²) global regex replacements (`[\s\S]*?` between fixed string delimiters) with O(n) `indexOf`-based loops in `htmlparser.js` (HTML comment and CDATA stripping inside stacked tags) and `htmlminifier.js` (`htmlmin:ignore` block extraction)
 * Removed redundant `\s?` from the doctype regex
