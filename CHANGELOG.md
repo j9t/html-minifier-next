@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.4] - 2026-02-25
+
+### Fixed
+
+* Replaced O(n²) global regex replacements (`[\s\S]*?` between fixed string delimiters) with O(n) `indexOf`-based loops in `htmlparser.js` (HTML comment and CDATA stripping inside stacked tags) and `htmlminifier.js` (`htmlmin:ignore` block extraction)
+* Removed redundant `\s?` from the doctype regex
+
 ## [5.1.3] - 2026-02-24
 
 ### Changed
