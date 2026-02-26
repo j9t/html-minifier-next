@@ -66,19 +66,21 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     });
   };
 
-  // Apply preset first if specified (so user options can override preset values)
+  // Merge preset with user options so all values go through normalization
+  // User options take precedence over preset values
+  let effectiveInput = inputOptions;
   if (inputOptions.preset) {
     const preset = getPreset(inputOptions.preset);
     if (preset) {
-      Object.assign(options, preset);
+      effectiveInput = { ...preset, ...inputOptions };
     } else {
       const available = getPresetNames().join(', ');
       console.warn(`HTML Minifier Next: Unknown preset “${inputOptions.preset}”. Available presets: ${available}`);
     }
   }
 
-  Object.keys(inputOptions).forEach(function (key) {
-    const option = inputOptions[key];
+  Object.keys(effectiveInput).forEach(function (key) {
+    const option = effectiveInput[key];
 
     // Skip preset key—it’s already been processed
     if (key === 'preset') {
