@@ -5543,7 +5543,7 @@ describe('HTML', () => {
     await assert.doesNotReject(() => minify(input, { preset: 'comprehensive' }));
 
     // `minifySVG: true` via the comprehensive preset must not throw “is not a function”
-    input = '<svg><rect width=”100” height=”100” fill=”red”/></svg>';
+    input = '<svg><rect width="100" height="100" fill="red"/></svg>';
     await assert.doesNotReject(() => minify(input, { preset: 'comprehensive' }));
 
     // Conservative preset must also work
