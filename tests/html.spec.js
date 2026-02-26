@@ -5524,4 +5524,37 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { collapseWhitespace: false }), input);
   });
+
+  test('Normalize options that require conversion when coming from a preset', async () => {
+    // Regression: Preset options were applied via `Object.assign`, bypassing normalization
+    // Options like `minifyURLs`, `minifyCSS`, `minifyJS`, and `minifySVG` must be converted to
+    // functions even when set to `true` via a preset
+
+    // `minifyURLs: true` via the comprehensive preset must not throw “is not a function”
+    let input = '<a href="https://example.com/foo/../bar">link</a>';
+    await assert.doesNotReject(() => minify(input, { preset: 'comprehensive' }));
+
+    // `minifyCSS: true` via the comprehensive preset must not throw “is not a function”
+    input = '<style>  p  {  color:  red;  }  </style>';
+    await assert.doesNotReject(() => minify(input, { preset: 'comprehensive' }));
+
+    // `minifyJS: true` via the comprehensive preset must not throw “is not a function”
+    input = '<script>  var x = 1;  </script>';
+    await assert.doesNotReject(() => minify(input, { preset: 'comprehensive' }));
+
+    // `minifySVG: true` via the comprehensive preset must not throw “is not a function”
+    input = '<svg><rect width="100" height="100" fill="red"/></svg>';
+    await assert.doesNotReject(() => minify(input, { preset: 'comprehensive' }));
+
+    // Conservative preset must also work
+    input = '<p class="">Hello</p>';
+    await assert.doesNotReject(() => minify(input, { preset: 'conservative' }));
+
+    // User options must still override preset options
+    input = '<div>Hello  world</div>';
+    const withPreset = await minify(input, { preset: 'comprehensive' });
+    const withOverride = await minify(input, { preset: 'comprehensive', collapseWhitespace: false });
+    assert.notStrictEqual(withPreset, withOverride);
+    assert.strictEqual(withOverride, input);
+  });
 });
