@@ -509,4 +509,15 @@ describe('SVG and MathML', () => {
       '<math><annotation-xml encoding="text/html"><svg><rect x="0" y="0"></rect></svg></annotation-xml></math>'
     );
   });
+
+  test('Preset normalization: `minifySVG` override', async () => {
+    // Regression: `minifySVG: true` from a preset was not normalized to a function
+    // Verify that the option is actually applied (SVGO converts `rect` to `path`) and
+    // that passing `minifySVG: false` overrides the preset, leaving the SVG unchanged
+    const input = '<svg><rect width="100" height="100" fill="red"/></svg>';
+    const withSVGMin = await minify(input, { preset: 'comprehensive' });
+    const withSVGOff = await minify(input, { preset: 'comprehensive', minifySVG: false });
+    assert.ok(withSVGMin.includes('<path'), 'SVGO should convert `rect` to `path` when `minifySVG` is enabled');
+    assert.ok(!withSVGOff.includes('<path'), '`rect` should be preserved when `minifySVG` is overridden to false');
+  });
 });
