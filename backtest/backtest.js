@@ -234,7 +234,9 @@ async function minify(hash, options) {
           times.push(performance.now() - t0);
         }
         times.sort((a, b) => a - b);
-        const duration = Math.round(times[Math.floor(times.length / 2)]);
+        const mid = Math.floor(times.length / 2);
+        const median = times.length % 2 === 1 ? times[mid] : (times[mid - 1] + times[mid]) / 2;
+        const duration = Math.round(median);
 
         if (minified != null) {
           process.send({ name: fileName, size: minified.length, time: duration });
