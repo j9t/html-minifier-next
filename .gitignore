@@ -1,6 +1,6 @@
 backtest/input/
 backtest/errors.log
-backtest/results.*
+backtest/results.json
 demo/build/
 dist/
 node_modules/

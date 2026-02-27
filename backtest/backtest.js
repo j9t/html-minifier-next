@@ -17,6 +17,10 @@ const repoRoot = path.join(__dirname, '..');
 // Default number of commits to test when no parameter is provided
 const DEFAULT_COMMIT_COUNT = 50;
 
+// Timing: One warm-up run (discarded) plus this many timed iterations; median is reported
+const BENCH_WARMUP = 1;
+const BENCH_ITERATIONS = 3;
+
 // Timeout per commit in milliseconds (increase if testing large files with slow minification)
 const TASK_TIMEOUT_MS = 60000;
 
@@ -214,10 +218,26 @@ async function minify(hash, options) {
         }
 
         const data = await readText(filePath);
-        const startTime = performance.now();
-        const minified = await minifyFn(data, getOptions(fileName, options));
-        const endTime = performance.now();
-        const duration = Math.round(endTime - startTime);
+        const opts = getOptions(fileName, options);
+
+        // Warm-up (result discarded)
+        for (let i = 0; i < BENCH_WARMUP; i++) {
+          await minifyFn(data, opts);
+        }
+
+        // Timed iterations
+        const times = [];
+        let minified;
+        for (let i = 0; i < BENCH_ITERATIONS; i++) {
+          const t0 = performance.now();
+          minified = await minifyFn(data, opts);
+          times.push(performance.now() - t0);
+        }
+        times.sort((a, b) => a - b);
+        const mid = Math.floor(times.length / 2);
+        const median = times.length % 2 === 1 ? times[mid] : (times[mid - 1] + times[mid]) / 2;
+        const duration = Math.round(median);
+
         if (minified != null) {
           process.send({ name: fileName, size: minified.length, time: duration });
         } else {
@@ -241,7 +261,6 @@ async function print(table, step = 1) {
   // Ensure output directory exists
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
 
-  const output = [];
   const errors = [];
 
   // Sort hashes by date (most recent first)
@@ -252,30 +271,11 @@ async function print(table, step = 1) {
     return dateB - dateA; // Descending order (newest first)
   });
 
-  // CSV output
-  let row = fileNames.slice(0);
-  row.unshift('hash', 'date');
-  output.push(row.join(','));
   for (const hash of hashes) {
-    const data = table[hash];
-    row = [hash, '"' + data.date + '"'];
-    let hasData = false;
-    fileNames.forEach(function (fileName) {
-      const sizeData = data[fileName];
-      row.push(sizeData ? sizeData.size : '');
-      if (sizeData) {
-        hasData = true;
-      }
-    });
-    // Only include rows that have at least one data point
-    if (hasData) {
-      output.push(row.join(','));
-    }
-    if (data.error) {
-      errors.push(hash + ' - ' + data.error);
+    if (table[hash].error) {
+      errors.push(hash + ' - ' + table[hash].error);
     }
   }
-  await writeText(path.join(OUTPUT_DIR, 'results.csv'), output.join('\n'));
 
   // Only write errors.log if there are errors
   const errorsPath = path.join(OUTPUT_DIR, 'errors.log');
