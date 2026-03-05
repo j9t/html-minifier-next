@@ -95,10 +95,14 @@ const isSimpleBoolean = new Set(['allowfullscreen', 'async', 'autofocus', 'autop
 
 const isBooleanValue = new Set(['true', 'false']);
 
-// Attributes where empty value can be collapsed to just the attribute name
-// `crossorigin=""` → `crossorigin` (empty string equals anonymous mode)
-// `contenteditable=""` → `contenteditable` (empty string equals `true`)
-const emptyCollapsible = new Set(['crossorigin', 'contenteditable']);
+// Attributes where certain values can be collapsed to just the attribute name;
+// maps each attribute name to the set of values that collapse to the bare attribute:
+// - `crossorigin=""` and `crossorigin="anonymous"` → `crossorigin` (anonymous is the default)
+// - `contenteditable=""` → `contenteditable` (empty string means inherit/true)
+const collapsibleValues = new Map([
+  ['crossorigin', new Set(['', 'anonymous'])],
+  ['contenteditable', new Set([''])]
+]);
 
 // `srcset` elements
 
@@ -208,7 +212,7 @@ export {
   // Boolean sets
   isSimpleBoolean,
   isBooleanValue,
-  emptyCollapsible,
+  collapsibleValues,
 
   // Misc
   srcsetElements,
