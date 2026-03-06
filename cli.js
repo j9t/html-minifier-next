@@ -266,7 +266,7 @@ program.helpOption('-h, --help', 'Display help for command');
   const jsonOptionKeys = ['minifyCss', 'minifyJs', 'minifyUrls'];
   for (const key of jsonOptionKeys) {
     const value = programOptions[key];
-    if (typeof value === 'string' && /\.(html?|php|xml|svg|xhtml|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
+    if (typeof value === 'string' && /\.(html?|shtml?|xhtml?|php|xml|svg|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
       // The option consumed a filename - inject it back
       programOptions[key] = true;
       capturedFiles.push(value);
