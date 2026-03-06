@@ -47,7 +47,7 @@ import { optionDefinitions } from './src/lib/option-definitions.js';
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
 
-const DEFAULT_FILE_EXTENSIONS = ['html', 'htm', 'xhtml', 'shtml'];
+const DEFAULT_FILE_EXTENSIONS = ['html', 'htm', 'shtml', 'shtm'];
 
 const program = new Command();
 program.name(pkg.name);
@@ -240,7 +240,7 @@ let config = {};
 program.option('-I --input-dir <dir>', 'Specify an input directory');
 program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
-program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to “html,htm,xhtml,shtml”; use “*” for all files');
+program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to “html,htm,shtml,shtm”; use “*” for all files');
 program.option('-p --preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('-c --config-file <file>', 'Use config file');
 program.option('--cache-css <size>', 'Set CSS minification cache size (number of entries, default: 500)', parseValidInt('cacheCSS'));
@@ -266,7 +266,7 @@ program.helpOption('-h, --help', 'Display help for command');
   const jsonOptionKeys = ['minifyCss', 'minifyJs', 'minifyUrls'];
   for (const key of jsonOptionKeys) {
     const value = programOptions[key];
-    if (typeof value === 'string' && /\.(html?|php|xml|svg|xhtml|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
+    if (typeof value === 'string' && /\.(html?|shtml?|xhtml?|php|xml|svg|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
       // The option consumed a filename - inject it back
       programOptions[key] = true;
       capturedFiles.push(value);

@@ -38,7 +38,7 @@ Use `html-minifier-next --help` to check all available options:
 | `--ignore-dir <patterns>`, `-X <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>`, `-O <dir>` | Specify an output directory | `--output-dir=dist` |
 | `--output <file>`, `-o <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
-| `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,xhtml,shtml`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
+| `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
 | `--config-file <file>`, `-c <file>` | Use a configuration file | `--config-file=html-minifier.json` |
 | `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
@@ -400,7 +400,7 @@ npx html-minifier-next --input-dir=test --preset comprehensive --output-dir exam
 **Process specific files and directories:**
 
 ```shell
-# Process default extensions (html, htm, xhtml, shtml)
+# Process default extensions (html, htm, shtml, shtm)
 html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 
 # Process only specific extensions
