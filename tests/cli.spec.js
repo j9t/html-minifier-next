@@ -392,6 +392,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/default-ext/extension.shtm'), true);
 
     // Should not process non-default extensions
+    assert.strictEqual(existsFixture('tmp/default-ext/extension.xhtml'), false);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.php'), false);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.txt'), false);
   });
