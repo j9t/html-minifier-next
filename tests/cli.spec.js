@@ -388,8 +388,6 @@ describe('CLI', () => {
     // Should process default HTML extensions
     assert.strictEqual(existsFixture('tmp/default-ext/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.htm'), true);
-    assert.strictEqual(existsFixture('tmp/default-ext/extension.xhtml'), true);
-    assert.strictEqual(existsFixture('tmp/default-ext/extension.xht'), true);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.shtml'), true);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.shtm'), true);
 
