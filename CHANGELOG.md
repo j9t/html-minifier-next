@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * Changed default CLI file extensions:
-  - Removed `xhtml` (HMN’s HTML5-oriented defaults are not designed and not safe for XHTML without careful option selection; use `--file-ext` to opt in)
+  - Removed `xhtml` (HMN’s HTML-oriented defaults are not designed and not safe for XHTML without careful option selection; use `--file-ext` to opt in)
   - Added `shtm` (the short form of `shtml`, used for server-side includes)
 
 ## [5.1.6] - 2026-03-05
