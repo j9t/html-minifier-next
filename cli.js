@@ -287,7 +287,7 @@ program.helpOption('-h, --help', 'Display help for command');
       const cwd = process.cwd();
 
       process.stderr.write(
-        `This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings.\n` +
+        `This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. ` +
         `It’s recommended to do this under version control.\n` +
         `Do you want to continue? [y/N]`
       );
