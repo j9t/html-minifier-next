@@ -1020,6 +1020,22 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
+  test('Should support in-place processing when `--input-dir` and `--output-dir` are the same', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    const original = '<html>  <body>  <p>  Hello  </p>  </body>  </html>';
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/inplace.html'), original);
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp',
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    const output = await readFixture('tmp/inplace.html');
+    assert.ok(output.length < original.length, 'File should be minified');
+  });
+
   test('Should skip traversing into output directory when nested in input directory', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/in/sub'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/in/a.html'), '<html><body>a</body></html>');
