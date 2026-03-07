@@ -1404,7 +1404,7 @@ describe('CLI', () => {
     });
 
     assert.strictEqual(result.status, 0);
-    assert.ok(result.stderr.toString().includes('Aborted'));
+    assert.ok(result.stderr.toString().includes('aborted'));
     const content = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
     assert.strictEqual(content, original);
   });
@@ -1424,7 +1424,7 @@ describe('CLI', () => {
     });
 
     assert.strictEqual(result.status, 0);
-    assert.ok(result.stderr.toString().includes('Aborted'));
+    assert.ok(result.stderr.toString().includes('aborted'));
     const content = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
     assert.strictEqual(content, original);
   });
