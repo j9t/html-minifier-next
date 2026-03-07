@@ -32,6 +32,7 @@ import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import os from 'os';
+import readline from 'readline';
 import { createRequire } from 'module';
 import { Command } from 'commander';
 
@@ -237,6 +238,7 @@ function normalizeConfig(config) {
 }
 
 let config = {};
+program.option('--here', 'Minify all HTML files in the current folder and its subfolders in place, using comprehensive settings (standalone—flag is ignored when combined with other options)');
 program.option('-I --input-dir <dir>', 'Specify an input directory');
 program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
@@ -267,7 +269,7 @@ program.helpOption('-h, --help', 'Display help for command');
   for (const key of jsonOptionKeys) {
     const value = programOptions[key];
     if (typeof value === 'string' && /\.(html?|shtml?|xhtml?|php|xml|svg|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
-      // The option consumed a filename - inject it back
+      // The option consumed a filename—inject it back
       programOptions[key] = true;
       capturedFiles.push(value);
       filesProvided = true;
@@ -275,6 +277,71 @@ program.helpOption('-h, --help', 'Display help for command');
   }
 
   // Defer reading files—multi-file mode will process per-file later
+
+  // Handle `--here` mode (standalone in-place minification of the current folder)
+  if (programOptions.here) {
+    const hasOtherArgs = process.argv.slice(2).some(arg => arg !== '--here');
+    if (hasOtherArgs) {
+      console.error('Note: `--here` was ignored (can only be used on its own, to minify the current folder at comprehensive settings)');
+    } else {
+      const cwd = process.cwd();
+
+      process.stderr.write(
+        `This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings.\n` +
+        `It’s recommended to do this under version control.\n` +
+        `Do you want to continue? [y/N]`
+      );
+
+      const answer = await new Promise((resolve) => {
+        const rl = readline.createInterface({ input: process.stdin, output: null });
+        rl.once('line', (line) => {
+          resolve(line.trim().toLowerCase());
+          rl.close();
+        });
+        rl.once('close', () => resolve(''));
+      });
+
+      if (answer !== 'y') {
+        process.stderr.write('Aborted.\n');
+        process.exit(0);
+      }
+
+      // Apply comprehensive preset for all processing
+      programOptions.preset = 'comprehensive';
+
+      const inputDirResolved = await fs.promises.realpath(cwd).catch(() => cwd);
+      const extensions = DEFAULT_FILE_EXTENSIONS;
+      const ignorePatterns = [];
+
+      const showProgress = process.stderr.isTTY;
+      let progress = null;
+      if (showProgress) {
+        progress = { current: 0, total: null };
+      }
+
+      const allFiles = await collectFiles(cwd, extensions, undefined, ignorePatterns, inputDirResolved);
+      const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
+
+      if (progress) {
+        progress.total = allFiles.length;
+      }
+
+      await runWithConcurrency(allFiles, concurrency, async (file) => {
+        await processFile(file, file, false, false);
+        if (progress) {
+          progress.current++;
+          updateProgress(progress.current, progress.total);
+        }
+      });
+
+      if (progress) {
+        clearProgress();
+      }
+      console.error(`Processed ${allFiles.length.toLocaleString()} file${allFiles.length === 1 ? '' : 's'}`);
+
+      process.exit(0);
+    }
+  }
 
   // Load and normalize config if `--config-file` was specified
   if (programOptions.configFile) {

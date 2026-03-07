@@ -14,11 +14,13 @@ From npm for use as a command-line app:
 npm i -g html-minifier-next
 ```
 
-Directly with npx (no installation required):
+Directly with npx:
 
 ```shell
 npx html-minifier-next --help
 ```
+
+(For immediate use in the current folder: `npx html-minifier-next --here`)
 
 From npm for programmatic use:
 
@@ -34,6 +36,7 @@ Use `html-minifier-next --help` to check all available options:
 
 | Option | Description | Example |
 | --- | --- | --- |
+| `--here` | Minify all HTML files in the current folder and its subfolders in place, using comprehensive settings (standalone—flag is ignored when combined with other options) | `html-minifier-next --here` |
 | `--input-dir <dir>`, `-I <dir>` | Specify an input directory | `--input-dir=src` |
 | `--ignore-dir <patterns>`, `-X <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>`, `-O <dir>` | Specify an output directory | `--output-dir=dist` |
