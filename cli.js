@@ -50,11 +50,16 @@ const pkg = require('./package.json');
 
 const DEFAULT_FILE_EXTENSIONS = ['html', 'htm', 'shtml', 'shtm'];
 
+const MARK_ERROR   = process.stderr.isTTY ? '\x1b[31m' : '';
+const MARK_SUCCESS = process.stderr.isTTY ? '\x1b[32m' : '';
+const MARK_WARNING = process.stderr.isTTY ? '\x1b[33m' : '';
+const MARK_RESET   = process.stderr.isTTY ? '\x1b[0m'  : '';
+
 const program = new Command();
 program.name(pkg.name);
 
 function fatal(message) {
-  console.error(message);
+  console.error(`${MARK_ERROR}${message}${MARK_RESET}`);
   process.exit(1);
 }
 
@@ -287,9 +292,9 @@ program.helpOption('-h, --help', 'Display help for command');
       const cwd = process.cwd();
 
       process.stderr.write(
-        `This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. ` +
-        `It’s recommended to do this under version control.\n` +
-        `Do you want to continue? [y/N]`
+        `${MARK_WARNING}This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. ` +
+        `It’s recommended to do this under version control.${MARK_RESET}\n` +
+        `Do you want to continue? [y/N] `
       );
 
       const answer = await new Promise((resolve) => {
@@ -302,7 +307,7 @@ program.helpOption('-h, --help', 'Display help for command');
       });
 
       if (answer !== 'y') {
-        process.stderr.write('Aborted.\n');
+        process.stderr.write(`${MARK_ERROR}In-place minification aborted.${MARK_RESET}\n`);
         process.exit(0);
       }
 
@@ -337,7 +342,7 @@ program.helpOption('-h, --help', 'Display help for command');
       if (progress) {
         clearProgress();
       }
-      console.error(`Processed ${allFiles.length.toLocaleString()} file${allFiles.length === 1 ? '' : 's'}`);
+      console.error(`${MARK_SUCCESS}Processed ${allFiles.length.toLocaleString()} file${allFiles.length === 1 ? '' : 's'}${MARK_RESET}`);
 
       process.exit(0);
     }
@@ -420,7 +425,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
     // Show stats if dry run or verbose mode
     if (isDryRun || isVerbose) {
-      console.error(`  ✓ ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
     }
 
     if (isDryRun) {
@@ -655,7 +660,7 @@ program.helpOption('-h, --help', 'Display help for command');
     // Show stats if verbose
     if (programOptions.verbose) {
       const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
-      console.error(`  ✓ ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
     }
 
     if (programOptions.output) {
@@ -761,7 +766,7 @@ program.helpOption('-h, --help', 'Display help for command');
       // Show completion message and clear progress indicator
       if (progress) {
         clearProgress();
-        console.error(`Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}`);
+        console.error(`${MARK_SUCCESS}Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}${MARK_RESET}`);
       }
 
       if (isVerbose && stats && stats.length > 0) {
@@ -820,7 +825,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
     if (programOptions.verbose) {
       const inputSource = capturedFiles.join(', ');
-      console.error(`  ✓ ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
     }
 
     if (programOptions.output) {
