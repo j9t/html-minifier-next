@@ -290,10 +290,15 @@ program.helpOption('-h, --help', 'Display help for command');
       console.error('Note: `--here` was ignored (can only be used on its own, to minify the current folder at comprehensive settings)');
     } else {
       const cwd = process.cwd();
+      const commandName = process.env.npm_command === 'exec'
+        ? 'npx html-minifier-next'
+        : process.argv[1].endsWith('.js')
+          ? `${path.basename(process.argv[0])} ${process.argv[1]}`
+          : path.basename(process.argv[1]);
 
       process.stderr.write(
-        `${MARK_WARNING}This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. ` +
-        `It’s recommended to do this under version control.${MARK_RESET}\n` +
+        `${MARK_WARNING}This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. It’s recommended to do this under version control.${MARK_RESET}\n` +
+        `Equivalent to: ${commandName} --input-dir=. --output-dir=. --preset=comprehensive\n\n` +
         `Do you want to continue? [y/N] `
       );
 
@@ -342,7 +347,7 @@ program.helpOption('-h, --help', 'Display help for command');
       if (progress) {
         clearProgress();
       }
-      console.error(`${MARK_SUCCESS}Processed ${allFiles.length.toLocaleString()} file${allFiles.length === 1 ? '' : 's'}${MARK_RESET}`);
+      console.error(`${MARK_SUCCESS}Processed ${allFiles.length.toLocaleString()} file${allFiles.length === 1 ? '' : 's'}.${MARK_RESET}`);
 
       process.exit(0);
     }
@@ -713,8 +718,8 @@ program.helpOption('-h, --help', 'Display help for command');
         outputReal = path.resolve(outputDir);
       }
       let skipRootAbs;
-      if (inputReal && outputReal && (outputReal === inputReal || outputReal.startsWith(inputReal + path.sep))) {
-        // Instead of aborting, skip traversing into the output directory
+      if (inputReal && outputReal && outputReal !== inputReal && outputReal.startsWith(inputReal + path.sep)) {
+        // Skip traversing into the output directory when it is nested inside the input directory
         skipRootAbs = outputReal;
       }
 
@@ -766,7 +771,7 @@ program.helpOption('-h, --help', 'Display help for command');
       // Show completion message and clear progress indicator
       if (progress) {
         clearProgress();
-        console.error(`${MARK_SUCCESS}Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}${MARK_RESET}`);
+        console.error(`${MARK_SUCCESS}Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}.${MARK_RESET}`);
       }
 
       if (isVerbose && stats && stats.length > 0) {
