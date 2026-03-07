@@ -287,7 +287,7 @@ program.helpOption('-h, --help', 'Display help for command');
   if (programOptions.here) {
     const hasOtherArgs = process.argv.slice(2).some(arg => arg !== '--here');
     if (hasOtherArgs) {
-      console.error('Note: `--here` was ignored (can only be used on its own, to minify the current folder at comprehensive settings)');
+      console.error('Note: `--here` was ignored—it can only be used on its own, to minify the current folder at comprehensive settings.');
     } else {
       const cwd = process.cwd();
       const commandName = process.env.npm_command === 'exec'
