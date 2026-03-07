@@ -1470,7 +1470,7 @@ describe('CLI', () => {
     assert.ok(!b.includes('  '));
   });
 
-  test('Should show experimental confirmation prompt for `--here`', async () => {
+  test('Should show confirmation prompt for `--here`', async () => {
     const tempDir = path.resolve(fixturesDir, 'tmp/here-prompt');
     await fs.promises.mkdir(tempDir, { recursive: true });
 
