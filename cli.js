@@ -297,7 +297,7 @@ program.helpOption('-h, --help', 'Display help for command');
           : path.basename(process.argv[1]);
 
       process.stderr.write(
-        `${MARK_WARNING}This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. It’s recommended to do this under version control.${MARK_RESET}\n` +
+        `${MARK_WARNING}This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. If you want to compare results and be able to revert, do this under version control.${MARK_RESET}\n` +
         `Equivalent to: ${commandName} --input-dir=. --output-dir=. --preset=comprehensive\n\n` +
         `Do you want to continue? [y/N] `
       );
