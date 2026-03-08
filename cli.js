@@ -243,7 +243,7 @@ function normalizeConfig(config) {
 }
 
 let config = {};
-program.option('--here', 'Minify all HTML files in the current folder and its subfolders in place, using comprehensive settings (standalone—flag is ignored when combined with other options)');
+program.option('--here', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options)');
 program.option('-I --input-dir <dir>', 'Specify an input directory');
 program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
@@ -298,7 +298,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
       process.stderr.write(
         `${MARK_WARNING}This mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. If you want to compare results and be able to revert, do this under version control.${MARK_RESET}\n` +
-        `Equivalent to: ${commandName} --input-dir=. --output-dir=. --preset=comprehensive\n\n` +
+        `Equivalent to: ${commandName} --input-dir=. --output-dir=. --ignore-dir=node_modules --preset=comprehensive\n\n` +
         `Do you want to continue? [y/N] `
       );
 
@@ -321,7 +321,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
       const inputDirResolved = await fs.promises.realpath(cwd).catch(() => cwd);
       const extensions = DEFAULT_FILE_EXTENSIONS;
-      const ignorePatterns = [];
+      const ignorePatterns = ['node_modules'];
 
       const showProgress = process.stderr.isTTY;
       let progress = null;
