@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `--here` flag for zero-configuration in-place minification of all HTML files in the current folder and its subfolders, using comprehensive settings; emits a note and is ignored when combined with other options
+* Added `--zero` (`-z`) flag for zero-configuration in-place minification of all HTML files in the current folder and its subfolders, using comprehensive settings; emits a note and is ignored when combined with other options
 
 ### Changed
 

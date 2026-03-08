@@ -1392,21 +1392,21 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
-  // `--here` flag tests
-  test('Should emit note and continue normally when `--here` is combined with other options', () => {
-    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--here', '--collapse-whitespace'], {
+  // `--zero` flag tests
+  test('Should emit note and continue normally when `--zero` is combined with other options', () => {
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--zero', '--collapse-whitespace'], {
       cwd: fixturesDir,
       input: '<p>  test  </p>'
     });
 
     assert.strictEqual(status, 0);
-    assert.ok(stderr.toString().includes('`--here` was ignored'));
+    assert.ok(stderr.toString().includes('`--zero` was ignored'));
     // Normal processing still runs: STDIN is minified and written to STDOUT
     assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
   });
 
-  test('Should abort `--here` when confirmation is denied', async () => {
-    const tempDir = path.resolve(fixturesDir, 'tmp/here-abort');
+  test('Should abort `--zero` when confirmation is denied', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-abort');
     await fs.promises.mkdir(tempDir, { recursive: true });
     await fs.promises.copyFile(
       path.resolve(fixturesDir, 'default.html'),
@@ -1414,7 +1414,7 @@ describe('CLI', () => {
     );
     const original = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
 
-    const result = spawnSync('node', [cliPath, '--here'], {
+    const result = spawnSync('node', [cliPath, '--zero'], {
       cwd: tempDir,
       input: 'n\n'
     });
@@ -1425,8 +1425,8 @@ describe('CLI', () => {
     assert.strictEqual(content, original);
   });
 
-  test('Should abort `--here` when confirmation input is empty (default no)', async () => {
-    const tempDir = path.resolve(fixturesDir, 'tmp/here-empty');
+  test('Should abort `--zero` when confirmation input is empty (default no)', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-empty');
     await fs.promises.mkdir(tempDir, { recursive: true });
     await fs.promises.copyFile(
       path.resolve(fixturesDir, 'default.html'),
@@ -1434,7 +1434,7 @@ describe('CLI', () => {
     );
     const original = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
 
-    const result = spawnSync('node', [cliPath, '--here'], {
+    const result = spawnSync('node', [cliPath, '--zero'], {
       cwd: tempDir,
       input: '\n'
     });
@@ -1445,8 +1445,8 @@ describe('CLI', () => {
     assert.strictEqual(content, original);
   });
 
-  test('Should minify HTML files in place when `--here` is confirmed', async () => {
-    const tempDir = path.resolve(fixturesDir, 'tmp/here-confirm');
+  test('Should minify HTML files in place when `--zero` is confirmed', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-confirm');
     await fs.promises.mkdir(tempDir, { recursive: true });
     await fs.promises.copyFile(
       path.resolve(fixturesDir, 'default.html'),
@@ -1454,7 +1454,7 @@ describe('CLI', () => {
     );
     const original = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
 
-    const result = spawnSync('node', [cliPath, '--here'], {
+    const result = spawnSync('node', [cliPath, '--zero'], {
       cwd: tempDir,
       input: 'y\n'
     });
@@ -1466,14 +1466,14 @@ describe('CLI', () => {
     assert.ok(minified.length < original.length);
   });
 
-  test('Should process subfolders when `--here` is confirmed', async () => {
-    const tempDir = path.resolve(fixturesDir, 'tmp/here-subfolders');
+  test('Should process subfolders when `--zero` is confirmed', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-subfolders');
     const subDir = path.resolve(tempDir, 'sub');
     await fs.promises.mkdir(subDir, { recursive: true });
     await fs.promises.writeFile(path.resolve(tempDir, 'a.html'), '<html>  <body>  hello  </body>  </html>');
     await fs.promises.writeFile(path.resolve(subDir, 'b.html'), '<html>  <body>  world  </body>  </html>');
 
-    const result = spawnSync('node', [cliPath, '--here'], {
+    const result = spawnSync('node', [cliPath, '--zero'], {
       cwd: tempDir,
       input: 'y\n'
     });
@@ -1486,11 +1486,11 @@ describe('CLI', () => {
     assert.ok(!b.includes('  '));
   });
 
-  test('Should show confirmation prompt for `--here`', async () => {
-    const tempDir = path.resolve(fixturesDir, 'tmp/here-prompt');
+  test('Should show confirmation prompt for `-z`', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-prompt');
     await fs.promises.mkdir(tempDir, { recursive: true });
 
-    const result = spawnSync('node', [cliPath, '--here'], {
+    const result = spawnSync('node', [cliPath, '-z'], {
       cwd: tempDir,
       input: 'n\n'
     });

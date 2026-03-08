@@ -243,7 +243,7 @@ function normalizeConfig(config) {
 }
 
 let config = {};
-program.option('--here', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options)');
+program.option('-z, --zero', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options)');
 program.option('-I --input-dir <dir>', 'Specify an input directory');
 program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
@@ -283,11 +283,11 @@ program.helpOption('-h, --help', 'Display help for command');
 
   // Defer reading files—multi-file mode will process per-file later
 
-  // Handle `--here` mode (standalone in-place minification of the current folder)
-  if (programOptions.here) {
-    const hasOtherArgs = process.argv.slice(2).some(arg => arg !== '--here');
+  // Handle zero config mode (standalone in-place minification of the current folder)
+  if (programOptions.zero) {
+    const hasOtherArgs = process.argv.slice(2).some(arg => arg !== '--zero' && arg !== '-z');
     if (hasOtherArgs) {
-      console.error('Note: `--here` was ignored—it can only be used on its own, to minify the current folder at comprehensive settings.');
+      console.error('Note: `--zero` was ignored—it can only be used on its own, to minify the current folder at comprehensive settings.');
     } else {
       const cwd = process.cwd();
       const commandName = process.env.npm_command === 'exec'
