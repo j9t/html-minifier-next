@@ -32,6 +32,7 @@ import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import os from 'os';
+import readline from 'readline';
 import { createRequire } from 'module';
 import { Command } from 'commander';
 
@@ -49,11 +50,16 @@ const pkg = require('./package.json');
 
 const DEFAULT_FILE_EXTENSIONS = ['html', 'htm', 'shtml', 'shtm'];
 
+const MARK_ERROR   = process.stderr.isTTY ? '\x1b[31m' : '';
+const MARK_SUCCESS = process.stderr.isTTY ? '\x1b[32m' : '';
+const MARK_WARNING = process.stderr.isTTY ? '\x1b[33m' : '';
+const MARK_RESET   = process.stderr.isTTY ? '\x1b[0m'  : '';
+
 const program = new Command();
 program.name(pkg.name);
 
 function fatal(message) {
-  console.error(message);
+  console.error(`${MARK_ERROR}${message}${MARK_RESET}`);
   process.exit(1);
 }
 
@@ -237,6 +243,7 @@ function normalizeConfig(config) {
 }
 
 let config = {};
+program.option('-z, --zero', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options)');
 program.option('-I --input-dir <dir>', 'Specify an input directory');
 program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
@@ -267,7 +274,7 @@ program.helpOption('-h, --help', 'Display help for command');
   for (const key of jsonOptionKeys) {
     const value = programOptions[key];
     if (typeof value === 'string' && /\.(html?|shtml?|xhtml?|php|xml|svg|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
-      // The option consumed a filename - inject it back
+      // The option consumed a filename—inject it back
       programOptions[key] = true;
       capturedFiles.push(value);
       filesProvided = true;
@@ -275,6 +282,76 @@ program.helpOption('-h, --help', 'Display help for command');
   }
 
   // Defer reading files—multi-file mode will process per-file later
+
+  // Handle zero config mode (standalone in-place minification of the current folder)
+  if (programOptions.zero) {
+    const hasOtherArgs = process.argv.slice(2).some(arg => arg !== '--zero' && arg !== '-z');
+    if (hasOtherArgs) {
+      console.error('Note: `--zero` was ignored—it can only be used on its own, to minify the current folder at comprehensive settings.');
+    } else {
+      const cwd = process.cwd();
+      const commandName = process.env.npm_command === 'exec'
+        ? 'npx html-minifier-next'
+        : process.argv[1].endsWith('.js')
+          ? `${path.basename(process.argv[0])} ${process.argv[1]}`
+          : path.basename(process.argv[1]);
+
+      process.stderr.write(
+        `${MARK_WARNING}Zero-config mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. If you want to compare results and be able to revert, do this under version control.${MARK_RESET}\n` +
+        `Equivalent to: ${commandName} --input-dir=. --output-dir=. --ignore-dir=node_modules --preset=comprehensive\n\n` +
+        `Do you want to continue? [y/N] `
+      );
+
+      const answer = await new Promise((resolve) => {
+        const rl = readline.createInterface({ input: process.stdin, output: null });
+        rl.once('line', (line) => {
+          resolve(line.trim().toLowerCase());
+          rl.close();
+        });
+        rl.once('close', () => resolve(''));
+      });
+
+      if (answer !== 'y') {
+        process.stderr.write(`${MARK_ERROR}In-place minification aborted.${MARK_RESET}\n`);
+        process.exit(0);
+      }
+
+      // Apply comprehensive preset for all processing
+      programOptions.preset = 'comprehensive';
+
+      const inputDirResolved = await fs.promises.realpath(cwd).catch(() => cwd);
+      const extensions = DEFAULT_FILE_EXTENSIONS;
+      const ignorePatterns = ['node_modules'];
+
+      const showProgress = process.stderr.isTTY;
+      let progress = null;
+      if (showProgress) {
+        progress = { current: 0, total: null };
+      }
+
+      const allFiles = await collectFiles(cwd, extensions, undefined, ignorePatterns, inputDirResolved);
+      const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
+
+      if (progress) {
+        progress.total = allFiles.length;
+      }
+
+      await runWithConcurrency(allFiles, concurrency, async (file) => {
+        await processFile(file, file, false, false);
+        if (progress) {
+          progress.current++;
+          updateProgress(progress.current, progress.total);
+        }
+      });
+
+      if (progress) {
+        clearProgress();
+      }
+      console.error(`${MARK_SUCCESS}Processed ${allFiles.length.toLocaleString()} file${allFiles.length === 1 ? '' : 's'}.${MARK_RESET}`);
+
+      process.exit(0);
+    }
+  }
 
   // Load and normalize config if `--config-file` was specified
   if (programOptions.configFile) {
@@ -353,7 +430,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
     // Show stats if dry run or verbose mode
     if (isDryRun || isVerbose) {
-      console.error(`  ✓ ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
     }
 
     if (isDryRun) {
@@ -588,7 +665,7 @@ program.helpOption('-h, --help', 'Display help for command');
     // Show stats if verbose
     if (programOptions.verbose) {
       const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
-      console.error(`  ✓ ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
     }
 
     if (programOptions.output) {
@@ -641,8 +718,8 @@ program.helpOption('-h, --help', 'Display help for command');
         outputReal = path.resolve(outputDir);
       }
       let skipRootAbs;
-      if (inputReal && outputReal && (outputReal === inputReal || outputReal.startsWith(inputReal + path.sep))) {
-        // Instead of aborting, skip traversing into the output directory
+      if (inputReal && outputReal && outputReal !== inputReal && outputReal.startsWith(inputReal + path.sep)) {
+        // Skip traversing into the output directory when it is nested inside the input directory
         skipRootAbs = outputReal;
       }
 
@@ -694,7 +771,7 @@ program.helpOption('-h, --help', 'Display help for command');
       // Show completion message and clear progress indicator
       if (progress) {
         clearProgress();
-        console.error(`Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}`);
+        console.error(`${MARK_SUCCESS}Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}.${MARK_RESET}`);
       }
 
       if (isVerbose && stats && stats.length > 0) {
@@ -753,7 +830,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
     if (programOptions.verbose) {
       const inputSource = capturedFiles.join(', ');
-      console.error(`  ✓ ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
     }
 
     if (programOptions.output) {

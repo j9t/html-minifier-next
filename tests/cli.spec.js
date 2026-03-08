@@ -1020,6 +1020,22 @@ describe('CLI', () => {
     await removeFixture('tmp-out');
   });
 
+  test('Should support in-place processing when `--input-dir` and `--output-dir` are the same', async () => {
+    await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    const original = '<html>  <body>  <p>  Hello  </p>  </body>  </html>';
+    await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/inplace.html'), original);
+
+    const result = execCliWithStderr([
+      '--input-dir=tmp',
+      '--output-dir=tmp',
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    const output = await readFixture('tmp/inplace.html');
+    assert.ok(output.length < original.length, 'File should be minified');
+  });
+
   test('Should skip traversing into output directory when nested in input directory', async () => {
     await fs.promises.mkdir(path.resolve(fixturesDir, 'tmp/in/sub'), { recursive: true });
     await fs.promises.writeFile(path.resolve(fixturesDir, 'tmp/in/a.html'), '<html><body>a</body></html>');
@@ -1374,5 +1390,113 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
 
     await removeFixture('tmp-out');
+  });
+
+  // `--zero` flag tests
+  test('Should emit note and continue normally when `--zero` is combined with other options', () => {
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--zero', '--collapse-whitespace'], {
+      cwd: fixturesDir,
+      input: '<p>  test  </p>'
+    });
+
+    assert.strictEqual(status, 0);
+    assert.ok(stderr.toString().includes('`--zero` was ignored'));
+    // Normal processing still runs: STDIN is minified and written to STDOUT
+    assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
+  });
+
+  test('Should abort `--zero` when confirmation is denied', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-abort');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    await fs.promises.copyFile(
+      path.resolve(fixturesDir, 'default.html'),
+      path.resolve(tempDir, 'default.html')
+    );
+    const original = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
+
+    const result = spawnSync('node', [cliPath, '--zero'], {
+      cwd: tempDir,
+      input: 'n\n'
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.ok(result.stderr.toString().includes('aborted'));
+    const content = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
+    assert.strictEqual(content, original);
+  });
+
+  test('Should abort `--zero` when confirmation input is empty (default no)', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-empty');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    await fs.promises.copyFile(
+      path.resolve(fixturesDir, 'default.html'),
+      path.resolve(tempDir, 'default.html')
+    );
+    const original = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
+
+    const result = spawnSync('node', [cliPath, '--zero'], {
+      cwd: tempDir,
+      input: '\n'
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.ok(result.stderr.toString().includes('aborted'));
+    const content = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
+    assert.strictEqual(content, original);
+  });
+
+  test('Should minify HTML files in place when `--zero` is confirmed', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-confirm');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    await fs.promises.copyFile(
+      path.resolve(fixturesDir, 'default.html'),
+      path.resolve(tempDir, 'default.html')
+    );
+    const original = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
+
+    const result = spawnSync('node', [cliPath, '--zero'], {
+      cwd: tempDir,
+      input: 'y\n'
+    });
+
+    assert.strictEqual(result.status, 0);
+    assert.ok(result.stderr.toString().includes('Processed'));
+    const minified = await fs.promises.readFile(path.resolve(tempDir, 'default.html'), 'utf-8');
+    assert.notStrictEqual(minified, original);
+    assert.ok(minified.length < original.length);
+  });
+
+  test('Should process subfolders when `--zero` is confirmed', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-subfolders');
+    const subDir = path.resolve(tempDir, 'sub');
+    await fs.promises.mkdir(subDir, { recursive: true });
+    await fs.promises.writeFile(path.resolve(tempDir, 'a.html'), '<html>  <body>  hello  </body>  </html>');
+    await fs.promises.writeFile(path.resolve(subDir, 'b.html'), '<html>  <body>  world  </body>  </html>');
+
+    const result = spawnSync('node', [cliPath, '--zero'], {
+      cwd: tempDir,
+      input: 'y\n'
+    });
+
+    assert.strictEqual(result.status, 0);
+    const a = await fs.promises.readFile(path.resolve(tempDir, 'a.html'), 'utf-8');
+    const b = await fs.promises.readFile(path.resolve(subDir, 'b.html'), 'utf-8');
+    // Comprehensive preset collapses whitespace
+    assert.ok(!a.includes('  '));
+    assert.ok(!b.includes('  '));
+  });
+
+  test('Should show confirmation prompt for `-z`', async () => {
+    const tempDir = path.resolve(fixturesDir, 'tmp/zero-prompt');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+
+    const result = spawnSync('node', [cliPath, '-z'], {
+      cwd: tempDir,
+      input: 'n\n'
+    });
+
+    assert.ok(result.stderr.toString().includes('in place'));
+    assert.ok(result.stderr.toString().includes('version control'));
+    assert.ok(result.stderr.toString().includes('[y/N]'));
   });
 });
