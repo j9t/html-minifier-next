@@ -7,7 +7,7 @@
   "dependencies": {
     "commander": "^14.0.2",
     "entities": "^7.0.1",
-    "lightningcss": "^1.31.1",
+    "lightningcss": "^1.32.0",
     "svgo": "^4.0.1",
     "terser": "^5.46.0"
   },
@@ -15,7 +15,7 @@
   "devDependencies": {
     "@commitlint/cli": "^20.3.1",
     "@eslint/js": "^10.0.1",
-    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-commonjs": "^29.0.2",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@swc/core": "^1.15.11",
