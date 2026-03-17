@@ -95,5 +95,5 @@
   },
   "type": "module",
   "types": "./dist/types/htmlminifier.d.ts",
-  "version": "5.2.0"
+  "version": "5.2.1"
 }

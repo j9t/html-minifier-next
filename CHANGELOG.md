@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.1] - 2026-03-17
+
+### Changed
+
+* Removed redundant ESLint rules from config that were already covered by `eslint:recommended`
+
 ## [5.2.0] - 2026-03-08
 
 ### Added

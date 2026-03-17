@@ -25,11 +25,6 @@ export default [
         URL: 'readonly',
         window: 'readonly'
       }
-    },
-    rules: {
-      // Minimal rules to match original code style
-      'no-unused-vars': 'error',
-      'no-undef': 'error'
     }
   },
   {
