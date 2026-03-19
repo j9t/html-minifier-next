@@ -59,6 +59,7 @@
     "pack",
     "packer",
     "svg",
+    "svgo",
     "swc",
     "terser",
     "uglifier",
