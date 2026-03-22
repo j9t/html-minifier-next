@@ -296,6 +296,15 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('fill=red'), 'Simple string SVG attribute quotes removed when minifySVG is off');
   });
 
+  test('`removeAttributeQuotes` applies inside MathML', async () => {
+    // MathML is never processed by SVGO, so `removeAttributeQuotes` is never restricted
+    // inside MathML regardless of the `minifySVG` setting
+    const result = await minify('<math display="block"><mi mathvariant="normal" id="x">x</mi></math>', { removeAttributeQuotes: true, collapseWhitespace: true });
+    assert.ok(result.includes('display=block'), 'Simple string MathML attribute quotes removed');
+    assert.ok(result.includes('mathvariant=normal'), 'MathML mathvariant attribute quotes removed');
+    assert.ok(result.includes('id=x'), 'MathML id attribute quotes removed');
+  });
+
   test('HTML-only options stay disabled inside foreignObject for XML validity', async () => {
     // The entire SVG block must be valid XML for SVGO—including `foreignObject` content
 

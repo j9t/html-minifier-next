@@ -1101,11 +1101,10 @@ async function minifyHTML(value, options, partialMarkup) {
         options.name = identity;
         options.insideSVG = lowerTag === 'svg';
         options.insideForeignContent = true;
-        // Disable HTML-specific options that produce invalid XML
-        // (only when `minifySVG` is enabled, as SVGO requires valid XML input;
-        // when `minifySVG` is off, inline SVG is parsed by the HTML parser so
-        // unquoted attributes are valid and quote removal can still apply)
-        if (options.minifySVG) {
+        // Disable HTML-specific options that produce invalid XML:
+        // SVG with `minifySVG` enabled is passed to SVGO, which requires valid XML input;
+        // MathML is never processed by SVGO, so these restrictions never apply to it
+        if (lowerTag === 'svg' && options.minifySVG) {
           options.removeAttributeQuotes = false;
           options.decodeEntities = false;
         }
