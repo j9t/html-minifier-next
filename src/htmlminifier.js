@@ -1102,9 +1102,14 @@ async function minifyHTML(value, options, partialMarkup) {
         options.insideSVG = lowerTag === 'svg';
         options.insideForeignContent = true;
         // Disable HTML-specific options that produce invalid XML
-        options.removeAttributeQuotes = false;
+        // (only when `minifySVG` is enabled, as SVGO requires valid XML input;
+        // when `minifySVG` is off, inline SVG is parsed by the HTML parser so
+        // unquoted attributes are valid and quote removal can still apply)
+        if (options.minifySVG) {
+          options.removeAttributeQuotes = false;
+          options.decodeEntities = false;
+        }
         options.removeTagWhitespace = false;
-        options.decodeEntities = false;
       }
       // `foreignObject` in SVG and `annotation-xml` in MathML contain HTML content
       // Note: The element itself is in SVG/MathML namespace, only its children are HTML
