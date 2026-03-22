@@ -288,6 +288,35 @@ describe('SVG and MathML', () => {
     assert.ok(!tagWs.includes('width="100"height'), 'Whitespace between SVG attributes preserved');
   });
 
+  test('`removeAttributeQuotes` applies inside SVG when `minifySVG` is disabled', async () => {
+    // When `minifySVG` is false, SVG is parsed by the HTML parser—not an XML parser—
+    // so unquoted attributes are valid and `removeAttributeQuotes` should work normally
+    const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: false, removeAttributeQuotes: true, collapseWhitespace: true });
+    assert.ok(result.includes('width=100'), 'Simple numeric SVG attribute quotes removed when minifySVG is off');
+    assert.ok(result.includes('fill=red'), 'Simple string SVG attribute quotes removed when minifySVG is off');
+  });
+
+  test('`removeAttributeQuotes` applies inside MathML', async () => {
+    // MathML is never processed by SVGO, so `removeAttributeQuotes` is never restricted
+    // inside MathML regardless of the `minifySVG` setting
+    const result = await minify('<math display="block"><mi mathvariant="normal" id="x">x</mi></math>', { removeAttributeQuotes: true, collapseWhitespace: true });
+    assert.ok(result.includes('display=block'), 'Simple string MathML attribute quotes removed');
+    assert.ok(result.includes('mathvariant=normal'), 'MathML mathvariant attribute quotes removed');
+    assert.ok(result.includes('id=x'), 'MathML id attribute quotes removed');
+  });
+
+  test('`decodeEntities` applies inside SVG when `minifySVG` is disabled', async () => {
+    // When `minifySVG` is false, SVGO is not invoked, so bare `&` is not a problem
+    const result = await minify('<svg><text>A &amp; B</text></svg>', { minifySVG: false, decodeEntities: true, collapseWhitespace: true });
+    assert.ok(result.includes('A & B'), 'Entities decoded inside SVG when minifySVG is off');
+  });
+
+  test('`decodeEntities` applies inside MathML', async () => {
+    // MathML is never processed by SVGO, so `decodeEntities` is never restricted inside MathML
+    const result = await minify('<math><mi>A &amp; B</mi></math>', { decodeEntities: true, collapseWhitespace: true });
+    assert.ok(result.includes('A & B'), 'Entities decoded inside MathML');
+  });
+
   test('HTML-only options stay disabled inside foreignObject for XML validity', async () => {
     // The entire SVG block must be valid XML for SVGO—including `foreignObject` content
 

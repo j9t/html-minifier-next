@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.2.2] - 2026-03-22
+
+### Fixed
+
+* Fixed `removeAttributeQuotes` being incorrectly suppressed inside MathML—MathML is never processed by SVGO, so the XML validity constraint that applies to SVG does not apply here
+
+### Changed
+
+* Changed `removeAttributeQuotes` being suppressed inside inline SVG when `minifySVG` is disabled—attribute quotes are now removed from SVG elements in that case, matching the behavior in regular HTML context (since inline SVG is parsed by the HTML parser, not an XML parser)
+
 ## [5.2.1] - 2026-03-17
 
 ### Changed
