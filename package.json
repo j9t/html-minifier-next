@@ -6,7 +6,7 @@
   "bugs": "https://github.com/j9t/html-minifier-next/issues",
   "dependencies": {
     "commander": "^14.0.2",
-    "entities": "^7.0.1",
+    "entities": "^8.0.0",
     "lightningcss": "^1.32.0",
     "svgo": "^4.0.1",
     "terser": "^5.46.0"
