@@ -9,7 +9,7 @@
     "entities": "^8.0.0",
     "lightningcss": "^1.32.0",
     "svgo": "^4.0.1",
-    "terser": "^5.46.0"
+    "terser": "^5.46.1"
   },
   "description": "Super-configurable and well-tested web page minifier (enhanced successor of HTML Minifier)",
   "devDependencies": {
@@ -18,9 +18,9 @@
     "@rollup/plugin-commonjs": "^29.0.2",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
-    "@swc/core": "^1.15.11",
-    "eslint": "^10.0.0",
-    "rollup": "^4.59.0",
+    "@swc/core": "^1.15.21",
+    "eslint": "^10.1.0",
+    "rollup": "^4.60.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
     "typescript": "^5.9.3",
     "vite": "^8.0.1"
