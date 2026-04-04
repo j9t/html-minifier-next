@@ -389,6 +389,7 @@ function mergeConsecutiveScripts(html) {
  *  Comments matching any pattern in this array of regexes will be
  *  preserved when `removeComments` is enabled. The default preserves
  *  “bang” comments and comments starting with `#`.
+ *  Does not apply to Conditional Comments.
  *
  *  Default: `[/^!/, /^\s*#/]`
  *

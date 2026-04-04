@@ -58,7 +58,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   ignoreCustomComments: {
-    description: 'Array of regexes that allow to ignore matching comments',
+    description: 'Array of regexes that allow to ignore matching comments; does not apply to Conditional Comments',
     type: 'regexpArray'
   },
   ignoreCustomFragments: {
