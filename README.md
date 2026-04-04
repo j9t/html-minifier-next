@@ -166,7 +166,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
 | `preserveLineBreaks`<br>`--preserve-line-breaks` | Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with `collapseWhitespace: true` | `false` |
 | `preventAttributesEscaping`<br>`--prevent-attributes-escaping` | Prevents the escaping of the values of attributes | `false` |
-| `processConditionalComments`<br>`--process-conditional-comments` | Process contents of conditional comments through minifier | `false` |
+| `processConditionalComments`<br>`--process-conditional-comments` | Preserve Conditional Comments and process their inner content through minifier; when disabled (default) and `removeComments` is enabled, Conditional Comments are removed | `false` |
 | `processScripts`<br>`--process-scripts` | Array of strings corresponding to types of `script` elements to process through minifier (e.g., `text/ng-template`, `text/x-handlebars-template`, etc.) | `[]` |
 | `quoteCharacter`<br>`--quote-character` | Type of quote to use for attribute values (`'` or `"`) | Auto-detected (uses the quote requiring less escaping; defaults to `"` when equal) |
 | `removeAttributeQuotes`<br>`--remove-attribute-quotes` | [Remove quotes around attributes when possible](https://perfectionkills.com/experimenting-with-html-minifier/#remove_attribute_quotes) | `false` |
