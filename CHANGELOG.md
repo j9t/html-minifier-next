@@ -4,15 +4,15 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [6.0.0] - 2026-04-04
+## [6.0.0] - 2026-04-05
 
 ### Changed
 
-* **BREAKING:** `processConditionalComments` now removes Conditional Comments when `false` (default) and `removeComments` is enabled, instead of preserving them
+* **BREAKING:** Updated `processConditionalComments` to remove Conditional Comments when `false` (default) and `removeComments` is enabled (instead of preserving them)
   - Conditional Comments (`<!--[if IE]>…<![endif]-->`) were a proprietary Internet Explorer feature unsupported since IE 10 (2012) that have no effect in any current browser
   - Previously, Conditional Comments were preserved regardless of `removeComments`; now they follow the same logic as other comments when `processConditionalComments` is `false`
-  - Setting `processConditionalComments` to `true` continues to preserve Conditional Comments and process their inner content through the minifier
-  - The `comprehensive` preset no longer sets `processConditionalComments: true`, so Conditional Comments are now removed when using that preset; the `conservative` preset is unchanged
+  - The `comprehensive` preset no longer sets `processConditionalComments: true`, so Conditional Comments are now removed when using that preset
+  - **Migration:** Set `processConditionalComments` to `true` to continue preserving Conditional Comments and to process their inner content through the minifier
 
 ## [5.2.2] - 2026-03-22
 
