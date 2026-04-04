@@ -30,7 +30,6 @@ export const presets = {
     minifyJS: true,
     minifySVG: true,
     minifyURLs: true,
-    processConditionalComments: true,
     removeAttributeQuotes: true,
     removeComments: true,
     removeEmptyAttributes: true,

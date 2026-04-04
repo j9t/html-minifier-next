@@ -519,9 +519,12 @@ function mergeConsecutiveScripts(html) {
  *  Default: `false`
  *
  * @prop {boolean} [processConditionalComments]
- *  When true, conditional comments (for example `<!--[if IE]> … <![endif]-->`)
- *  will have their inner content processed by the minifier.
- *  Useful to minify HTML that appears inside conditional comments.
+ *  Controls handling of Conditional Comments (for example `<!--[if IE]> … <![endif]-->`),
+ *  which were a proprietary Internet Explorer feature unsupported since IE 10 (2012).
+ *  When `false` (default) and `removeComments` is enabled, Conditional Comments are removed.
+ *  When `false` and `removeComments` is disabled, Conditional Comments are preserved as-is.
+ *  When `true`, Conditional Comments are always preserved and their inner content is processed
+ *  by the minifier.
  *
  *  Default: `false`
  *
@@ -1560,8 +1563,13 @@ async function minifyHTML(value, options, partialMarkup) {
         buffer.push(comment);
       }
 
-      // Only conditional comments require async work (recursive minification)
+      // Conditional Comments: Remove when `processConditionalComments` is `false` and `removeComments` is `true`;
+      // otherwise process inner content when `processConditionalComments` is `true` (requires async work)
       if (isConditionalComment(text)) {
+        if (!options.processConditionalComments && options.removeComments) {
+          commentFinalize('');
+          return;
+        }
         return cleanConditionalComment(text, options, minifyHTML).then(cleaned => {
           commentFinalize(prefix + cleaned + suffix);
         });

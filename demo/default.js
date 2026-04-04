@@ -116,7 +116,7 @@ const demoConfig = {
     unsafe: true
   },
   processConditionalComments: {
-    label: 'Process conditional comments',
+    label: 'Process Conditional Comments',
     checked: true
   },
   processScripts: {

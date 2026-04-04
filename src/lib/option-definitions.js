@@ -122,7 +122,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   processConditionalComments: {
-    description: 'Process contents of conditional comments through minifier',
+    description: 'Preserve Conditional Comments and process their inner content through minifier; when disabled (default) and `--remove-comments` is enabled, Conditional Comments are removed',
     type: 'boolean'
   },
   processScripts: {
