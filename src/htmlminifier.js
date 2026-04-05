@@ -32,7 +32,6 @@ import {
 } from './lib/whitespace.js';
 
 import {
-  isConditionalComment,
   isIgnoredComment,
   isExecutableScript,
   isStyleElement,
@@ -51,7 +50,6 @@ import {
 } from './lib/elements.js';
 
 import {
-  cleanConditionalComment,
   hasJsonScriptType,
   processScript
 } from './lib/content.js';
@@ -389,7 +387,6 @@ function mergeConsecutiveScripts(html) {
  *  Comments matching any pattern in this array of regexes will be
  *  preserved when `removeComments` is enabled. The default preserves
  *  “bang” comments and comments starting with `#`.
- *  Does not apply to Conditional Comments.
  *
  *  Default: `[/^!/, /^\s*#/]`
  *
@@ -516,16 +513,6 @@ function mergeConsecutiveScripts(html) {
  * @prop {boolean} [preventAttributesEscaping]
  *  When true, attribute values will not be HTML-escaped (dangerous for
  *  untrusted input). By default, attributes are escaped.
- *
- *  Default: `false`
- *
- * @prop {boolean} [processConditionalComments]
- *  Controls handling of Conditional Comments (for example `<!--[if IE]> … <![endif]-->`),
- *  which were a proprietary Internet Explorer feature unsupported since IE 10 (2012).
- *  When `false` (default) and `removeComments` is enabled, Conditional Comments are removed.
- *  When `false` and `removeComments` is disabled, Conditional Comments are preserved as-is.
- *  When `true`, Conditional Comments are always preserved and their inner content is processed
- *  by the minifier.
  *
  *  Default: `false`
  *
@@ -1564,17 +1551,6 @@ async function minifyHTML(value, options, partialMarkup) {
         buffer.push(comment);
       }
 
-      // Conditional Comments: Remove when `processConditionalComments` is `false` and `removeComments` is `true`;
-      // otherwise process inner content when `processConditionalComments` is `true` (requires async work)
-      if (isConditionalComment(text)) {
-        if (!options.processConditionalComments && options.removeComments) {
-          commentFinalize('');
-          return;
-        }
-        return cleanConditionalComment(text, options, minifyHTML).then(cleaned => {
-          commentFinalize(prefix + cleaned + suffix);
-        });
-      }
 
       if (options.removeComments) {
         if (isIgnoredComment(text, options)) {

@@ -13,7 +13,6 @@ export const presets = {
     collapseWhitespace: true,
     conservativeCollapse: true,
     preserveLineBreaks: true,
-    processConditionalComments: true,
     removeComments: true,
     removeScriptTypeAttributes: true,
     removeStyleLinkTypeAttributes: true,

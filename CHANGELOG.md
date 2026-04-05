@@ -8,11 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* **BREAKING:** Updated `processConditionalComments` to remove Conditional Comments when `false` (default) and `removeComments` is enabled (instead of preserving them)
-  - Conditional Comments (`<!--[if IE]>…<![endif]-->`) were a proprietary Internet Explorer feature unsupported since IE 10 (2012) that have no effect in any current browser
-  - Previously, Conditional Comments were preserved regardless of `removeComments`; now they follow the same logic as other comments when `processConditionalComments` is `false`
-  - The `comprehensive` preset no longer sets `processConditionalComments: true`, so Conditional Comments are now removed when using that preset
-  - **Migration:** Set `processConditionalComments` to `true` to continue preserving Conditional Comments and to process their inner content through the minifier
+* **BREAKING:** Removed `processConditionalComments` option
+  - Conditional Comments (`<!--[if IE]>…<![endif]-->`) were a proprietary Internet Explorer feature unsupported since IE 10 (2012) with no effect in any current browser
+  - **Migration:** Conditional Comments are now treated as regular comments, that is, removed when `removeComments` is enabled, preserved as-is otherwise
 
 ## [5.2.2] - 2026-03-22
 

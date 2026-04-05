@@ -58,7 +58,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   ignoreCustomComments: {
-    description: 'Array of regexes that allow to ignore matching comments; does not apply to Conditional Comments',
+    description: 'Array of regexes that allow to ignore matching comments',
     type: 'regexpArray'
   },
   ignoreCustomFragments: {
@@ -119,10 +119,6 @@ const optionDefinitions = {
   },
   preventAttributesEscaping: {
     description: 'Prevents the escaping of the values of attributes',
-    type: 'boolean'
-  },
-  processConditionalComments: {
-    description: 'Preserve Conditional Comments and process their inner content through minifier; when disabled (default) and `--remove-comments` is enabled, Conditional Comments are removed',
     type: 'boolean'
   },
   processScripts: {

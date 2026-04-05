@@ -485,7 +485,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeComments: true }), input);
   });
 
-  test('Conditional Comments', async () => {
+  test('Handle Conditional Comments syntax (proprietary and deprecated) as regular comments', async () => {
     let input, output;
 
     input = '<![if IE 5]>test<![endif]>';
@@ -518,8 +518,6 @@ describe('HTML', () => {
       '  </body>\n' +
       '</html>';
     assert.strictEqual(await minify(input, { minifyJS: true, removeComments: true, collapseWhitespace: true, removeOptionalTags: true, removeScriptTypeAttributes: true }), '');
-    output = '<head><!--[if lte IE 8]><script>alert("ie8!")</script><![endif]-->';
-    assert.strictEqual(await minify(input, { minifyJS: true, removeComments: true, collapseWhitespace: true, removeOptionalTags: true, removeScriptTypeAttributes: true, processConditionalComments: true }), output);
 
     input = '<!DOCTYPE html>\n' +
       '<html lang="en">\n' +
@@ -545,52 +543,14 @@ describe('HTML', () => {
       '<html class="no-js">' +
       '<title>Document</title></head><body></body></html>';
     assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true }), output);
-    output = '<!DOCTYPE html>' +
-      '<html lang="en">' +
-      '<head>' +
-      '<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">' +
-      '<meta charset="utf-8">' +
-      '<!--[if lt IE 7]><html class="no-js ie6"><![endif]-->' +
-      '<!--[if IE 7]><html class="no-js ie7"><![endif]-->' +
-      '<!--[if IE 8]><html class="no-js ie8"><![endif]-->' +
-      '<!--[if gt IE 8]><!--><html class="no-js"><!--<![endif]-->' +
-      '<title>Document</title></head><body></body></html>';
-    assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, processConditionalComments: true }), output);
   });
 
-  test('Downlevel-revealed Conditional Comments', async () => {
+  test('Handle downlevel-revealed Conditional Comments', async () => {
     const input = '<![if !IE]><link href="non-ie.css" rel="stylesheet"><![endif]>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { removeComments: true }), '<link href="non-ie.css" rel="stylesheet">');
   });
 
-  test('Collapse space in Conditional Comments', async () => {
-    let input, output;
-
-    input = '<!--[if IE 7]>\n\n   \t\n   \t\t ' +
-      '<link rel="stylesheet" href="/css/ie7-fixes.css" type="text/css" />\n\t' +
-      '<![endif]-->';
-    assert.strictEqual(await minify(input, { removeComments: true }), '');
-    assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true }), '');
-    output = '<!--[if IE 7]>\n\n   \t\n   \t\t ' +
-      '<link rel="stylesheet" href="/css/ie7-fixes.css" type="text/css">\n\t' +
-      '<![endif]-->';
-    assert.strictEqual(await minify(input, { removeComments: true, processConditionalComments: true }), output);
-    output = '<!--[if IE 7]>' +
-      '<link rel="stylesheet" href="/css/ie7-fixes.css" type="text/css">' +
-      '<![endif]-->';
-    assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, processConditionalComments: true }), output);
-
-    input = '<!--[if lte IE 6]>\n    \n   \n\n\n\t' +
-      '<p title=" sigificant     whitespace   ">blah blah</p>' +
-      '<![endif]-->';
-    assert.strictEqual(await minify(input, { removeComments: true }), '');
-    assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true }), '');
-    output = '<!--[if lte IE 6]>' +
-      '<p title=" sigificant     whitespace   ">blah blah</p>' +
-      '<![endif]-->';
-    assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, processConditionalComments: true }), output);
-  });
 
   test('Remove comments from scripts', async () => {
     let input, output;
@@ -4896,7 +4856,7 @@ describe('HTML', () => {
       minifyJS: true,
       noNewlinesBeforeTagClose: true,
       preventAttributesEscaping: false,
-      processConditionalComments: true,
+
       processScripts: ['text/html', 'application/ld+json'],
       removeAttributeQuotes: true,
       removeComments: true,
@@ -5092,7 +5052,7 @@ describe('HTML', () => {
       minifyJS: true,
       noNewlinesBeforeTagClose: true,
       preventAttributesEscaping: true,
-      processConditionalComments: true,
+
       processScripts: ['text/html', 'application/ld+json'],
       removeAttributeQuotes: true,
       removeComments: true,
@@ -5436,7 +5396,7 @@ describe('HTML', () => {
       minifyJS: true,
       noNewlinesBeforeTagClose: true,
       preventAttributesEscaping: false,
-      processConditionalComments: true,
+
       removeAttributeQuotes: true,
       removeComments: true,
       removeEmptyAttributes: true,

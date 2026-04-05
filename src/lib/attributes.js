@@ -1,7 +1,6 @@
 // Imports
 
 import {
-  RE_CONDITIONAL_COMMENT,
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
   RE_AMP_ENTITY,
@@ -33,10 +32,6 @@ async function getDecodeHTMLStrict() {
 }
 
 // Validators
-
-function isConditionalComment(text) {
-  return RE_CONDITIONAL_COMMENT.test(text);
-}
 
 function isIgnoredComment(text, options) {
   for (let i = 0, len = options.ignoreCustomComments.length; i < len; i++) {
@@ -674,7 +669,6 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
 
 export {
   // Validators
-  isConditionalComment,
   isIgnoredComment,
   isEventAttribute,
   canRemoveAttributeQuotes,
