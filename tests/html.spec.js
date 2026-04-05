@@ -4857,7 +4857,6 @@ describe('HTML', () => {
       minifyJS: true,
       noNewlinesBeforeTagClose: true,
       preventAttributesEscaping: false,
-
       processScripts: ['text/html', 'application/ld+json'],
       removeAttributeQuotes: true,
       removeComments: true,
@@ -5053,7 +5052,6 @@ describe('HTML', () => {
       minifyJS: true,
       noNewlinesBeforeTagClose: true,
       preventAttributesEscaping: true,
-
       processScripts: ['text/html', 'application/ld+json'],
       removeAttributeQuotes: true,
       removeComments: true,
@@ -5397,7 +5395,6 @@ describe('HTML', () => {
       minifyJS: true,
       noNewlinesBeforeTagClose: true,
       preventAttributesEscaping: false,
-
       removeAttributeQuotes: true,
       removeComments: true,
       removeEmptyAttributes: true,
