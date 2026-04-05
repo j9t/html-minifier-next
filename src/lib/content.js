@@ -3,7 +3,6 @@
 import {
   jsonScriptTypes
 } from './constants.js';
-import { replaceAsync } from './utils.js';
 import { trimWhitespace } from './whitespace.js';
 
 // CSS processing
@@ -32,14 +31,6 @@ function unwrapCSS(text, type) {
       break;
   }
   return matches ? matches[1] : text;
-}
-
-async function cleanConditionalComment(comment, options, minifyHTML) {
-  return options.processConditionalComments
-    ? await replaceAsync(comment, /^(\[if\s[^\]]+]>)([\s\S]*?)(<!\[endif])$/, async function (match, prefix, text, suffix) {
-      return prefix + await minifyHTML(text, options, true) + suffix;
-    })
-    : comment;
 }
 
 // Script processing
@@ -95,7 +86,6 @@ export {
   // CSS
   wrapCSS,
   unwrapCSS,
-  cleanConditionalComment,
 
   // Scripts
   minifyJson,

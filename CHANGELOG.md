@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.0] - 2026-04-05
+
+### Changed
+
+* **BREAKING:** Removed `processConditionalComments` option
+  - Conditional Comments (`<!--[if IE]>…<![endif]-->`) were a proprietary Internet Explorer feature unsupported since IE 10 (2012) with no effect in any current browser
+  - **Migration:** Conditional Comments are now treated as regular comments, that is, removed when `removeComments` is enabled, preserved as-is otherwise
+
 ## [5.2.2] - 2026-03-22
 
 ### Fixed

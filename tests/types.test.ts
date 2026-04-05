@@ -45,7 +45,6 @@ async function testBooleanOptions() {
     noNewlinesBeforeTagClose: false,
     preserveLineBreaks: true,
     preventAttributesEscaping: false,
-    processConditionalComments: false,
     removeAttributeQuotes: true,
     removeComments: true,
     removeEmptyElements: false,

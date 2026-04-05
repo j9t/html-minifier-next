@@ -7,7 +7,6 @@ const RE_NBSP_LEADING_GROUP = /(^|\xA0+)[^\xA0]+/g;
 const RE_NBSP_LEAD_GROUP = /(\xA0+)[^\xA0]+/g;
 const RE_NBSP_TRAILING_GROUP = /[^\xA0]+(\xA0+)/g;
 const RE_NBSP_TRAILING_STRIP = /[^\xA0]+$/;
-const RE_CONDITIONAL_COMMENT = /^\[if\s[^\]]+]|\[endif]$/;
 const RE_EVENT_ATTR_DEFAULT = /^on[a-z]{3,}$/;
 const RE_CAN_REMOVE_ATTR_QUOTES = /^[^ \t\n\f\r"'`=<>]+$/;
 const RE_TRAILING_SEMICOLON = /;$/;
@@ -184,7 +183,6 @@ export {
   RE_NBSP_LEAD_GROUP,
   RE_NBSP_TRAILING_GROUP,
   RE_NBSP_TRAILING_STRIP,
-  RE_CONDITIONAL_COMMENT,
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
   RE_TRAILING_SEMICOLON,

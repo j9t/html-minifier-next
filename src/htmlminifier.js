@@ -32,7 +32,6 @@ import {
 } from './lib/whitespace.js';
 
 import {
-  isConditionalComment,
   isIgnoredComment,
   isExecutableScript,
   isStyleElement,
@@ -51,7 +50,6 @@ import {
 } from './lib/elements.js';
 
 import {
-  cleanConditionalComment,
   hasJsonScriptType,
   processScript
 } from './lib/content.js';
@@ -515,13 +513,6 @@ function mergeConsecutiveScripts(html) {
  * @prop {boolean} [preventAttributesEscaping]
  *  When true, attribute values will not be HTML-escaped (dangerous for
  *  untrusted input). By default, attributes are escaped.
- *
- *  Default: `false`
- *
- * @prop {boolean} [processConditionalComments]
- *  When true, conditional comments (for example `<!--[if IE]> … <![endif]-->`)
- *  will have their inner content processed by the minifier.
- *  Useful to minify HTML that appears inside conditional comments.
  *
  *  Default: `false`
  *
@@ -1560,16 +1551,9 @@ async function minifyHTML(value, options, partialMarkup) {
         buffer.push(comment);
       }
 
-      // Only conditional comments require async work (recursive minification)
-      if (isConditionalComment(text)) {
-        return cleanConditionalComment(text, options, minifyHTML).then(cleaned => {
-          commentFinalize(prefix + cleaned + suffix);
-        });
-      }
-
       if (options.removeComments) {
         if (isIgnoredComment(text, options)) {
-          text = '<!--' + text + '-->';
+          text = prefix + text + suffix;
         } else {
           text = '';
         }

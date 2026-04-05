@@ -115,10 +115,6 @@ const demoConfig = {
     label: 'Prevent attributes escaping',
     unsafe: true
   },
-  processConditionalComments: {
-    label: 'Process conditional comments',
-    checked: true
-  },
   processScripts: {
     label: 'Process scripts',
     inputType: 'text',
@@ -272,6 +268,7 @@ const MAX_URL_LENGTH = 2000; // Conservative limit for URL hash
 // Example: `{ 'oldOptionName': 'newOptionName' }`
 const OPTION_MIGRATIONS = {
   html5: null, // Removed in 5.0.0; discard from old URLs
+  processConditionalComments: null, // Removed in 6.0.0; discard from old URLs
   sortClassName: 'sortClassNames'
 };
 

@@ -121,10 +121,6 @@ const optionDefinitions = {
     description: 'Prevents the escaping of the values of attributes',
     type: 'boolean'
   },
-  processConditionalComments: {
-    description: 'Process contents of conditional comments through minifier',
-    type: 'boolean'
-  },
   processScripts: {
     description: 'Array of strings corresponding to types of `script` elements to process through minifier (e.g., `text/ng-template`, `text/x-handlebars-template`, etc.)',
     type: 'jsonArray'
