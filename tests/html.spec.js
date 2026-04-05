@@ -490,6 +490,7 @@ describe('HTML', () => {
 
     input = '<![if IE 5]>test<![endif]>';
     assert.strictEqual(await minify(input, { removeComments: true }), 'test');
+    assert.strictEqual(await minify(input, { removeComments: true, ignoreCustomComments: [/^\[/] }), input);
 
     input = '<!--[if IE 6]>test<![endif]-->';
     assert.strictEqual(await minify(input, { removeComments: true }), '');

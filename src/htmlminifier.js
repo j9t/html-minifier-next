@@ -1554,7 +1554,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
       if (options.removeComments) {
         if (isIgnoredComment(text, options)) {
-          text = '<!--' + text + '-->';
+          text = prefix + text + suffix;
         } else {
           text = '';
         }
