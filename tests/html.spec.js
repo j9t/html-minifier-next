@@ -2511,36 +2511,6 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
   });
 
-  test('Minification of scripts with different MIME types', async () => {
-    let input, output;
-
-    input = '<script type="">function f(){  return 1  }</script>';
-    output = '<script type="">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script type="text/javascript">function f(){  return 1  }</script>';
-    output = '<script type="text/javascript">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script foo="bar">function f(){  return 1  }</script>';
-    output = '<script foo="bar">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script type="text/ecmascript">function f(){  return 1  }</script>';
-    output = '<script type="text/ecmascript">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script type="application/javascript">function f(){  return 1  }</script>';
-    output = '<script type="application/javascript">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script type="boo">function f(){  return 1  }</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), input);
-
-    input = '<script type="text/html"><!-- ko if: true -->\n\n\n<div></div>\n\n\n<!-- /ko --></script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), input);
-  });
-
   test('Minification of scripts with custom fragments', async () => {
     let input, output;
 
@@ -2773,10 +2743,17 @@ describe('HTML', () => {
     input = '<script type="application/json">{"a":1}</script><script>var b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true }), input);
 
-    // Merge scripts with same `type` attribute
+    // Do not merge module scripts—each has its own lexical scope, so merging
+    // can cause errors (e.g., duplicate `let` declarations across modules)
     input = '<script type="module">var a=1</script><script type="module">var b=2</script>';
-    output = '<script type="module">var a=1;var b=2</script>';
-    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    // Do not merge same non-JS types—content is not concatenable
+    input = '<script type="application/json">{"a":1}</script><script type="application/json">{"b":2}</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    input = '<script type="application/ld+json">{"@type":"Thing"}</script><script type="application/ld+json">{"@type":"Person"}</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
 
     // Merge scripts where both have default JS type (explicit vs implicit)
     input = '<script type="text/javascript">var a=1</script><script>var b=2</script>';

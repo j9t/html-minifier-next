@@ -233,7 +233,7 @@ describe('CSS and JS', () => {
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
   });
 
-  // Tests for minifyJS configuration options
+  // Tests for `minifyJS` configuration options
   test('JS: Basic boolean true', async () => {
     const input = '<script>function myFunction() { var x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
@@ -312,6 +312,70 @@ describe('CSS and JS', () => {
 
     assert.ok(result.includes('myVar'), 'Variable names should not be mangled');
     assert.ok(result.includes('alert'), 'Function call should be preserved');
+  });
+
+  test('JS: MIME types that trigger minification', async () => {
+    let input, output;
+
+    input = '<script type="">function f(){  return 1  }</script>';
+    output = '<script type="">function f(){return 1}</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    input = '<script type="text/javascript">function f(){  return 1  }</script>';
+    output = '<script type="text/javascript">function f(){return 1}</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    input = '<script foo="bar">function f(){  return 1  }</script>';
+    output = '<script foo="bar">function f(){return 1}</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    input = '<script type="text/ecmascript">function f(){  return 1  }</script>';
+    output = '<script type="text/ecmascript">function f(){return 1}</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    input = '<script type="application/javascript">function f(){  return 1  }</script>';
+    output = '<script type="application/javascript">function f(){return 1}</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    input = '<script type="boo">function f(){  return 1  }</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), input);
+
+    input = '<script type="text/html"><!-- ko if: true -->\n\n\n<div></div>\n\n\n<!-- /ko --></script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), input);
+  });
+
+  test('JS: `type=module` enables module-specific optimizations', async () => {
+    let input, output;
+
+    // Module-specific optimization: unused variable elimination (only safe in module scope)
+    input = '<script type=module>let foo=1;console.log(foo)</script>';
+    output = '<script type=module>console.log(1)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Full-form attribute value
+    input = '<script type="module">let bar=2;console.log(bar)</script>';
+    output = '<script type="module">console.log(2)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Classic script: unused variable must be preserved (no `module:true`)
+    input = '<script>let baz=3;console.log(baz)</script>';
+    output = '<script>let baz=3;console.log(baz)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // User-supplied module:true in config is not overridden (still works)
+    input = '<script type=module>let qux=4;console.log(qux)</script>';
+    output = '<script type=module>console.log(4)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: { module: true } }), output);
+
+    // SWC engine also applies `module:true` for `type=module` scripts
+    input = '<script type=module>let foo=1;console.log(foo)</script>';
+    output = '<script type=module>console.log(1)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' } }), output);
+
+    // SWC: Classic script does not apply `module:true`
+    input = '<script>let baz=3;console.log(baz)</script>';
+    output = '<script>let baz=3;console.log(baz)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' } }), output);
   });
 
   // Engine field tests
@@ -424,40 +488,6 @@ describe('CSS and JS', () => {
 
     assert.strictEqual(result1, result2, 'Case variations should produce same result');
     assert.strictEqual(result2, result3, 'Case variations should produce same result');
-  });
-
-  test('JS: `type=module` enables module-specific optimizations', async () => {
-    let input, output;
-
-    // Module-specific optimization: unused variable elimination (only safe in module scope)
-    input = '<script type=module>let foo=1;console.log(foo)</script>';
-    output = '<script type=module>console.log(1)</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    // Full-form attribute value
-    input = '<script type="module">let bar=2;console.log(bar)</script>';
-    output = '<script type="module">console.log(2)</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    // Classic script: unused variable must be preserved (no `module:true`)
-    input = '<script>let baz=3;console.log(baz)</script>';
-    output = '<script>let baz=3;console.log(baz)</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    // User-supplied module:true in config is not overridden (still works)
-    input = '<script type=module>let qux=4;console.log(qux)</script>';
-    output = '<script type=module>console.log(4)</script>';
-    assert.strictEqual(await minify(input, { minifyJS: { module: true } }), output);
-
-    // SWC engine also applies `module:true` for `type=module` scripts
-    input = '<script type=module>let foo=1;console.log(foo)</script>';
-    output = '<script type=module>console.log(1)</script>';
-    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' } }), output);
-
-    // SWC: Classic script does not apply `module:true`
-    input = '<script>let baz=3;console.log(baz)</script>';
-    output = '<script>let baz=3;console.log(baz)</script>';
-    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' } }), output);
   });
 
   test('JavaScript minification error handling', async () => {

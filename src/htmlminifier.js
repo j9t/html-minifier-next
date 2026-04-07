@@ -180,16 +180,16 @@ function mergeConsecutiveScripts(html) {
         return match;
       }
 
-      // Check `type` compatibility (both must be same, or both default JS)
-      const type1 = a1.type || '';
-      const type2 = a2.type || '';
+      // Check `type` compatibility (both must be default JS)
+      const type1 = (a1.type || '').toLowerCase();
+      const type2 = (a2.type || '').toLowerCase();
 
       if (DEFAULT_JS_TYPES.has(type1) && DEFAULT_JS_TYPES.has(type2)) {
         // Both are default JavaScript—compatible
-      } else if (type1 === type2) {
-        // Same explicit type—compatible
       } else {
-        // Incompatible types
+        // Non-JS types (modules, JSON, etc.) must not be merged:
+        // Module scripts have per-script lexical scope, and non-JS content (e.g., JSON)
+        // is not concatenable. Even identical non-JS types are incompatible.
         return match;
       }
 
