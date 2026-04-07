@@ -8,13 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-* `mergeScripts` no longer merges `<script type=module>` elements (each module has its own lexical scope, so merging can produce syntax errors) or other non-JS script types like `application/json` (whose content is not concatenable)
+* Fixed `mergeScripts` to no longer merge `<script type=module>` elements (each module has its own lexical scope, so merging can produce syntax errors) or other non-JS script types like `application/json` (whose content is not concatenable)
 
 ## [6.1.0] - 2026-04-07
 
 ### Added
 
-* `<script type=module>` now automatically enables Terser’s and SWC’s `module: true` option, unlocking ES module–specific optimizations (e.g., unused variable elimination) that are only safe in module scope; classic scripts are unaffected
+* Updated `<script type=module>` to automatically enable Terser’s and SWC’s `module: true` option, unlocking ES module–specific optimizations (e.g., unused variable elimination) that are only safe in module scope; classic scripts are unaffected
 
 ## [6.0.0] - 2026-04-05
 
