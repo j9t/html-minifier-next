@@ -181,8 +181,8 @@ function mergeConsecutiveScripts(html) {
       }
 
       // Check `type` compatibility (both must be default JS)
-      const type1 = a1.type || '';
-      const type2 = a2.type || '';
+      const type1 = (a1.type || '').toLowerCase();
+      const type2 = (a2.type || '').toLowerCase();
 
       if (DEFAULT_JS_TYPES.has(type1) && DEFAULT_JS_TYPES.has(type2)) {
         // Both are default JavaScript—compatible
