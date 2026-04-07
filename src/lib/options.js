@@ -265,7 +265,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
                   ...terserOptions.parse,
                   bare_returns: inline
                 },
-                ...(isModule ? { module: true } : {}) // Overrides user options: module detection takes precedence for <script type=module>
+                ...(isModule ? { module: true } : {}) // Overrides user options: module detection takes precedence for `<script type=module>`
               };
               const terser = await getTerser();
               const result = await terser(code, terserCallOptions);
@@ -277,7 +277,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
                 compress: true,
                 mangle: true,
                 ...swcOptions,
-                ...(isModule ? { module: true } : {}) // Overrides user options: module detection takes precedence for <script type=module>
+                ...(isModule ? { module: true } : {}) // Overrides user options: module detection takes precedence for `<script type=module>`
               });
               return result.code.replace(RE_TRAILING_SEMICOLON, '');
             }
