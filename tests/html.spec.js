@@ -2773,10 +2773,17 @@ describe('HTML', () => {
     input = '<script type="application/json">{"a":1}</script><script>var b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true }), input);
 
-    // Merge scripts with same `type` attribute
+    // Do not merge module scripts—each has its own lexical scope, so merging
+    // can cause errors (e.g., duplicate `let` declarations across modules)
     input = '<script type="module">var a=1</script><script type="module">var b=2</script>';
-    output = '<script type="module">var a=1;var b=2</script>';
-    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    // Do not merge same non-JS types—content is not concatenable
+    input = '<script type="application/json">{"a":1}</script><script type="application/json">{"b":2}</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
+    input = '<script type="application/ld+json">{"@type":"Thing"}</script><script type="application/ld+json">{"@type":"Person"}</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
 
     // Merge scripts where both have default JS type (explicit vs implicit)
     input = '<script type="text/javascript">var a=1</script><script>var b=2</script>';
