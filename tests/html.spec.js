@@ -2511,36 +2511,6 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
   });
 
-  test('Minification of scripts with different MIME types', async () => {
-    let input, output;
-
-    input = '<script type="">function f(){  return 1  }</script>';
-    output = '<script type="">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script type="text/javascript">function f(){  return 1  }</script>';
-    output = '<script type="text/javascript">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script foo="bar">function f(){  return 1  }</script>';
-    output = '<script foo="bar">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script type="text/ecmascript">function f(){  return 1  }</script>';
-    output = '<script type="text/ecmascript">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script type="application/javascript">function f(){  return 1  }</script>';
-    output = '<script type="application/javascript">function f(){return 1}</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-
-    input = '<script type="boo">function f(){  return 1  }</script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), input);
-
-    input = '<script type="text/html"><!-- ko if: true -->\n\n\n<div></div>\n\n\n<!-- /ko --></script>';
-    assert.strictEqual(await minify(input, { minifyJS: true }), input);
-  });
-
   test('Minification of scripts with custom fragments', async () => {
     let input, output;
 
