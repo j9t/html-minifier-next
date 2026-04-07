@@ -1331,7 +1331,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
       const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(
-        a => a.name.toLowerCase() === 'type' && a.value.trim().toLowerCase() === 'module'
+        a => a.name.toLowerCase() === 'type' && (a.value ?? '').trim().toLowerCase() === 'module'
       );
       const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
 
