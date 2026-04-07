@@ -228,7 +228,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         cont: !!options.continueOnMinifyError
       });
 
-      options.minifyJS = async function (text, inline) {
+      options.minifyJS = async function (text, inline, isModule) {
         const start = text.match(/^\s*<!--.*/);
         const code = start ? text.slice(start[0].length).replace(/\n\s*-->\s*$/, '') : text;
 
@@ -248,7 +248,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
           // For large inputs, use length and content fingerprint to prevent collisions
           jsKey = (code.length > 2048 ? (code.length + '|' + code.slice(0, 50) + code.slice(-50) + '|') : (code + '|'))
-            + (inline ? '1' : '0') + '|' + useEngine + '|' + optsSig;
+            + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
 
           const cached = jsMinifyCache.get(jsKey);
           if (cached) {
@@ -264,7 +264,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
                 parse: {
                   ...terserOptions.parse,
                   bare_returns: inline
-                }
+                },
+                ...(isModule ? { module: true } : {})
               };
               const terser = await getTerser();
               const result = await terser(code, terserCallOptions);
@@ -276,6 +277,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
                 compress: true,
                 mangle: true,
                 ...swcOptions, // User options override defaults
+                ...(isModule ? { module: true } : {})
               });
               return result.code.replace(RE_TRAILING_SEMICOLON, '');
             }
