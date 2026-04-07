@@ -426,6 +426,40 @@ describe('CSS and JS', () => {
     assert.strictEqual(result2, result3, 'Case variations should produce same result');
   });
 
+  test('JS: `type=module` enables module-specific optimizations', async () => {
+    let input, output;
+
+    // Module-specific optimization: unused variable elimination (only safe in module scope)
+    input = '<script type=module>let foo=1;console.log(foo)</script>';
+    output = '<script type=module>console.log(1)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Full-form attribute value
+    input = '<script type="module">let bar=2;console.log(bar)</script>';
+    output = '<script type="module">console.log(2)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // Classic script: unused variable must be preserved (no `module:true`)
+    input = '<script>let baz=3;console.log(baz)</script>';
+    output = '<script>let baz=3;console.log(baz)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), output);
+
+    // User-supplied module:true in config is not overridden (still works)
+    input = '<script type=module>let qux=4;console.log(qux)</script>';
+    output = '<script type=module>console.log(4)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: { module: true } }), output);
+
+    // SWC engine also applies `module:true` for `type=module` scripts
+    input = '<script type=module>let foo=1;console.log(foo)</script>';
+    output = '<script type=module>console.log(1)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' } }), output);
+
+    // SWC: Classic script does not apply `module:true`
+    input = '<script>let baz=3;console.log(baz)</script>';
+    output = '<script>let baz=3;console.log(baz)</script>';
+    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' } }), output);
+  });
+
   test('JavaScript minification error handling', async () => {
     // Test invalid JavaScript syntax
     let input = '<script>function foo( { syntax error</script>';

@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.1.0] - 2026-04-07
+
+### Added
+
+* `<script type=module>` now automatically enables Terser’s and SWC’s `module: true` option, unlocking ES module–specific optimizations (e.g., unused variable elimination) that are only safe in module scope; classic scripts are unaffected
+
 ## [6.0.0] - 2026-04-05
 
 ### Changed

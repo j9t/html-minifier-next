@@ -1003,11 +1003,11 @@ async function minifyHTML(value, options, partialMarkup) {
 
         if (options.minifyJS) {
           options.minifyJS = (function (fn) {
-            return function (text, type) {
+            return function (text, inline, isModule) {
               return fn(text.replace(uidPattern, function (match, prefix, index) {
                 const chunks = ignoredCustomMarkupChunks[+index];
                 return chunks[1] + uidAttr + index + uidAttr + chunks[2];
-              }), type);
+              }), inline, isModule);
             };
           })(options.minifyJS);
         }
@@ -1330,6 +1330,9 @@ async function minifyHTML(value, options, partialMarkup) {
       const needsDecode = options.decodeEntities && text && !specialContentElements.has(currentTag) && text.indexOf('&') !== -1;
       const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
       const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
+      const isModuleScript = needsMinifyJS && currentAttrs.some(
+        a => a.name.toLowerCase() === 'type' && (a.value ?? '').trim().toLowerCase() === 'module'
+      );
       const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
 
       // Whitespace collapsing phase (sync); captures `prevTag`/`nextTag`/`prevAttrs`/`nextAttrs` from outer scope
@@ -1456,7 +1459,7 @@ async function minifyHTML(value, options, partialMarkup) {
           text = await processScript(text, options, currentAttrs, minifyHTML);
         }
         if (needsMinifyJS) {
-          text = await options.minifyJS(text);
+          text = await options.minifyJS(text, false, isModuleScript);
         }
         if (needsMinifyCSS) {
           text = await options.minifyCSS(text);
