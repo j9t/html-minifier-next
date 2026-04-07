@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [6.1.0] - 2026-04-07
 
-### Added
+### Changed
 
 * Updated `<script type=module>` to automatically enable Terser’s and SWC’s `module: true` option, unlocking ES module–specific optimizations (e.g., unused variable elimination) that are only safe in module scope; classic scripts are unaffected
 
