@@ -184,33 +184,33 @@ async function loadConfigFromPath(configPath) {
   const ext = path.extname(configPath).toLowerCase();
 
   if (ext === '.json') {
-    try { return JSON.parse(readFile(configPath)); }
+    try { return JSON.parse(readFile(abs)); }
     catch (err) { fatal(`Cannot parse config file as JSON: ${err.message}`); }
   }
 
   if (ext === '.cjs') {
     try {
       const result = require(abs);
-      return (result && result.__esModule && result.default) ? result.default : result;
+      return 'default' in result ? result.default : result;
     } catch (err) { fatal(`Cannot load config file: ${err.message}`); }
   }
 
   if (ext === '.mjs') {
-    try { const mod = await import(pathToFileURL(abs).href); return mod.default || mod; }
+    try { const mod = await import(pathToFileURL(abs).href); return 'default' in mod ? mod.default : mod; }
     catch (err) { fatal(`Cannot load config file: ${err.message}`); }
   }
 
   // For .js or extension-less files, try JSON first, then CJS, then ESM
   let jsonErr;
-  try { return JSON.parse(readFile(configPath)); }
+  try { return JSON.parse(readFile(abs)); }
   catch (err) { jsonErr = err; }
 
   try {
     const result = require(abs);
     // Handle ESM interop: If `require()` loads an ESM file, it may return `{__esModule: true, default: …}`
-    return (result && result.__esModule && result.default) ? result.default : result;
+    return 'default' in result ? result.default : result;
   } catch (cjsErr) {
-    try { const mod = await import(pathToFileURL(abs).href); return mod.default || mod; }
+    try { const mod = await import(pathToFileURL(abs).href); return 'default' in mod ? mod.default : mod; }
     catch (esmErr) {
       fatal(ext === '.js'
         ? `Cannot load config file: ${cjsErr.message}\nAs module: ${esmErr.message}`
