@@ -13,7 +13,7 @@
     // JavaScript support
     "allowJs": true,
 
-    // Don't emit files, just check types
+    // Don’t emit files, just check types
     "noEmit": true,
 
     // Recommended options

@@ -88,7 +88,7 @@ async function testMinifyCSSOptions() {
 
 // `minifyJS` option types
 async function testMinifyJSOptions() {
-  const html = '<script>var x = 1;</script>';
+  const html = '<script>let x = 1;</script>';
 
   // Boolean
   await minify(html, { minifyJS: true });

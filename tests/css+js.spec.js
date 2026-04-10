@@ -235,7 +235,7 @@ describe('CSS and JS', () => {
 
   // Tests for `minifyJS` configuration options
   test('JS: Basic boolean true', async () => {
-    const input = '<script>function myFunction() { var x = 1; return x; }</script>';
+    const input = '<script>function myFunction() { let x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
@@ -244,7 +244,7 @@ describe('CSS and JS', () => {
   test('JS: Mangle disabled (`mangle: false`)', async () => {
     // Note: Even with `mangle: false`, Terser still applies compress optimizations by default
     // To truly preserve variable names, need to disable both mangle and compress
-    const input = '<script>function myFunction(myParam) { var myVariable = myParam + 1; return myVariable; }</script>';
+    const input = '<script>function myFunction(myParam) { let myVariable = myParam + 1; return myVariable; }</script>';
     const result = await minify(input, { minifyJS: { mangle: false } });
 
     // Function and variable names should not be mangled (shortened)
@@ -254,7 +254,7 @@ describe('CSS and JS', () => {
   });
 
   test('JS: Top-level mangling (`mangle: { toplevel: true }`)', async () => {
-    const input = '<script>function myFunction() { var myVariable = 123; return myVariable; }</script>';
+    const input = '<script>function myFunction() { let myVariable = 123; return myVariable; }</script>';
     const result = await minify(input, { minifyJS: { mangle: { toplevel: true } } });
 
     // With top-level mangling, function name should be mangled (shortened)
@@ -265,7 +265,7 @@ describe('CSS and JS', () => {
   });
 
   test('JS: Reserved names (`mangle: { reserved: ["myFunction"] }`)', async () => {
-    const input = '<script>function myFunction() { var myVariable = 123; return myVariable; }</script>';
+    const input = '<script>function myFunction() { let myVariable = 123; return myVariable; }</script>';
     const result = await minify(input, {
       minifyJS: {
         mangle: {
@@ -292,7 +292,7 @@ describe('CSS and JS', () => {
   });
 
   test('JS: Combined mangle and compress options', async () => {
-    const input = '<script>function calculate() { console.log("calculating"); var result = 10 + 20; return result; }</script>';
+    const input = '<script>function calculate() { console.log("calculating"); let result = 10 + 20; return result; }</script>';
     const result = await minify(input, {
       minifyJS: {
         mangle: { toplevel: true },
@@ -307,7 +307,7 @@ describe('CSS and JS', () => {
   });
 
   test('JS: Event attribute with mangle disabled', async () => {
-    const input = '<button onclick="var myVar = 42; alert(myVar);">Click</button>';
+    const input = '<button onclick="let myVar = 42; alert(myVar);">Click</button>';
     const result = await minify(input, { minifyJS: { mangle: false } });
 
     assert.ok(result.includes('myVar'), 'Variable names should not be mangled');
@@ -380,7 +380,7 @@ describe('CSS and JS', () => {
 
   // Engine field tests
   test('JS: Default engine (Terser)', async () => {
-    const input = '<script>function myFunction() { var x = 1; return x; }</script>';
+    const input = '<script>function myFunction() { let x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
     // Should use Terser by default
@@ -388,7 +388,7 @@ describe('CSS and JS', () => {
   });
 
   test('JS: Explicit Terser engine', async () => {
-    const input = '<script>function myFunction() { var x = 1; return x; }</script>';
+    const input = '<script>function myFunction() { let x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
     // Explicitly specify terser engine
@@ -396,14 +396,14 @@ describe('CSS and JS', () => {
   });
 
   test('JS: SWC engine for script blocks', async () => {
-    const input = '<script>function myFunction() { var x = 1; return x; }</script>';
+    const input = '<script>function myFunction() { let x = 1; return x; }</script>';
 
     // SWC should minify the code (exact output may differ from Terser)
     const result = await minify(input, { minifyJS: { engine: 'swc' } });
     assert.ok(result.startsWith('<script>'), 'Should start with script tag');
     assert.ok(result.endsWith('</script>'), 'Should end with script tag');
     assert.ok(result.length < input.length, 'Should be minified (shorter)');
-    assert.ok(!result.includes('var x'), 'Variable should be optimized away');
+    assert.ok(!result.includes('let x'), 'Variable should be optimized away');
   });
 
   test('JS: Hybrid behavior with Terser processing inline handlers', async () => {
@@ -418,8 +418,8 @@ describe('CSS and JS', () => {
 
   test('JS: Hybrid behavior—complex example', async () => {
     const input = `
-      <script>function calculate() { var x = 10; var y = 20; return x + y; }</script>
-      <button onclick="var result = calculate(); alert(result); return false;">Test</button>
+      <script>function calculate() { let x = 10; let y = 20; return x + y; }</script>
+      <button onclick="let result = calculate(); alert(result); return false;">Test</button>
     `;
 
     // Script block uses SWC, inline handler uses Terser
@@ -445,7 +445,7 @@ describe('CSS and JS', () => {
   });
 
   test('JS: Engine-specific options for Terser', async () => {
-    const input = '<script>function myFunction() { console.log("test"); var x = 1; return x; }</script>';
+    const input = '<script>function myFunction() { console.log("test"); let x = 1; return x; }</script>';
 
     const result = await minify(input, {
       minifyJS: {
@@ -462,7 +462,7 @@ describe('CSS and JS', () => {
   });
 
   test('JS: Engine-specific options for SWC', async () => {
-    const input = '<script>function myFunction() { var unused = "test"; var x = 1; return x; }</script>';
+    const input = '<script>function myFunction() { let unused = "test"; let x = 1; return x; }</script>';
 
     const result = await minify(input, {
       minifyJS: {
@@ -744,7 +744,7 @@ describe('CSS and JS', () => {
       // Test that caches work without explicit configuration
       const input = `
         <style>body { color: red; margin: 0; }</style>
-        <script>var x = 1; console.log(x);</script>
+        <script>let x = 1; console.log(x);</script>
       `;
 
       const result = await minify(input, {
@@ -787,7 +787,7 @@ describe('CSS and JS', () => {
     test('Both cache sizes', async () => {
       const input = `
         <style>div { background: #fff; margin: 10px; }</style>
-        <script>var data = { x: 1, y: 2 };</script>
+        <script>let data = { x: 1, y: 2 };</script>
       `;
 
       // Should work with both custom cache sizes

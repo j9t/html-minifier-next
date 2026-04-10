@@ -580,7 +580,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
         attrValue = attrValue.replace(/'/g, '&#39;');
       }
     } else {
-      // `preventAttributesEscaping` mode: Choose safe quotes but don't escape
+      // `preventAttributesEscaping` mode: Choose safe quotes but don’t escape
       // except when both quote types are present—then escape to prevent invalid HTML
       const hasDoubleQuote = attrValue.indexOf('"') !== -1;
       const hasSingleQuote = attrValue.indexOf("'") !== -1;
