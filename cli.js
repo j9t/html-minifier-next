@@ -214,7 +214,7 @@ async function loadConfigFromPath(configPath) {
     catch (esmErr) {
       fatal(ext === '.js'
         ? `Cannot load config file: ${cjsErr.message}\nAs module: ${esmErr.message}`
-        : `Cannot read the specified config file.\nAs JSON: ${jsonErr.message}\nAs module: ${esmErr.message}`);
+        : `Cannot read the specified config file.\nAs JSON: ${jsonErr.message}\nAs CJS: ${cjsErr.message}\nAs module: ${esmErr.message}`);
     }
   }
 }
