@@ -112,9 +112,8 @@ let svgMinifyCache = null;
 
 // Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
-const RE_SCRIPT_OPEN = /<script([^>]*)>/gi;
+const RE_SCRIPT_OPEN = /<script(?=[\s>])/gi; // Finds tag start; use `findTagEnd()` for the actual closing `>`
 const RE_SCRIPT_CLOSE = /<\/script\s*>/gi;
-const RE_SCRIPT_GAP = /(\s*)<script([^>]*)>/iy; // sticky: must match at lastIndex
 const SCRIPT_BOOL_ATTRS = new Set(['async', 'defer', 'nomodule']);
 const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript']);
 
@@ -126,6 +125,28 @@ const RE_END_TAG = /^<\//;
 const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 
 // Script merging
+
+/**
+ * Find the index of the `>` that closes an opening tag, correctly skipping
+ * over quoted attribute values (which may contain `>`).
+ * @param {string} html
+ * @param {number} pos - Start position (just after the tag name)
+ * @returns {number} Index of the closing `>`, or -1 if not found
+ */
+function findTagEnd(html, pos) {
+  let i = pos;
+  while (i < html.length) {
+    const ch = html[i];
+    if (ch === '>') return i;
+    if (ch === '"' || ch === "'") {
+      const q = ch;
+      i++;
+      while (i < html.length && html[i] !== q) i++;
+    }
+    i++;
+  }
+  return -1;
+}
 
 /**
  * Merge consecutive inline script tags into one (`mergeConsecutiveScripts`).
@@ -164,36 +185,46 @@ function mergeConsecutiveScripts(html) {
     let m1;
 
     while ((m1 = RE_SCRIPT_OPEN.exec(html)) !== null) {
-      const contentStart = RE_SCRIPT_OPEN.lastIndex;
+      // Use findTagEnd() to get the real closing '>', skipping quoted attribute values
+      const tagEnd1 = findTagEnd(html, m1.index + 7);
+      if (tagEnd1 === -1) break;
 
-      // Find end of this script’s content (first `</script>`—per HTML spec, raw text ends here)
-      RE_SCRIPT_CLOSE.lastIndex = contentStart;
+      const attrs1Str = html.slice(m1.index + 7, tagEnd1);
+      const contentStart1 = tagEnd1 + 1;
+
+      // Find end of this script's content (first `</script>`—per HTML spec, raw text ends here)
+      RE_SCRIPT_CLOSE.lastIndex = contentStart1;
       const close1 = RE_SCRIPT_CLOSE.exec(html);
       if (!close1) break;
 
-      const content1 = html.slice(contentStart, close1.index);
+      const content1 = html.slice(contentStart1, close1.index);
       const afterClose1 = close1.index + close1[0].length;
 
-      // Check for optional whitespace immediately followed by another `<script>`
-      RE_SCRIPT_GAP.lastIndex = afterClose1;
-      const gapMatch = RE_SCRIPT_GAP.exec(html);
-      if (!gapMatch) {
+      // Skip optional whitespace and check for a consecutive <script> tag
+      let i = afterClose1;
+      while (i < html.length && (html[i] === ' ' || html[i] === '\t' || html[i] === '\n' || html[i] === '\r' || html[i] === '\f')) i++;
+      if (html.slice(i, i + 7).toLowerCase() !== '<script' || (html[i + 7] !== '>' && !/\s/.test(html[i + 7]))) {
         RE_SCRIPT_OPEN.lastIndex = afterClose1;
         continue;
       }
 
-      const content2Start = RE_SCRIPT_GAP.lastIndex;
+      const tagStart2 = i;
+      const tagEnd2 = findTagEnd(html, tagStart2 + 7);
+      if (tagEnd2 === -1) break;
 
-      // Find end of second script’s content
-      RE_SCRIPT_CLOSE.lastIndex = content2Start;
+      const attrs2Str = html.slice(tagStart2 + 7, tagEnd2);
+      const contentStart2 = tagEnd2 + 1;
+
+      // Find end of second script's content
+      RE_SCRIPT_CLOSE.lastIndex = contentStart2;
       const close2 = RE_SCRIPT_CLOSE.exec(html);
       if (!close2) break;
 
-      const content2 = html.slice(content2Start, close2.index);
+      const content2 = html.slice(contentStart2, close2.index);
       const afterClose2 = close2.index + close2[0].length;
 
-      const a1 = parseAttrs(m1[1]);
-      const a2 = parseAttrs(gapMatch[2]);
+      const a1 = parseAttrs(attrs1Str);
+      const a2 = parseAttrs(attrs2Str);
 
       // Check for `src`—cannot merge external scripts
       if ('src' in a1 || 'src' in a2) {
@@ -241,8 +272,8 @@ function mergeConsecutiveScripts(html) {
         mergedContent = c1 || c2;
       }
 
-      // Use first script’s attributes (they should be compatible)
-      html = html.slice(0, m1.index) + `<script${m1[1]}>${mergedContent}</script>` + html.slice(afterClose2);
+      // Use first script's attributes (they should be compatible)
+      html = html.slice(0, m1.index) + `<script${attrs1Str}>${mergedContent}</script>` + html.slice(afterClose2);
       break; // Restart scanning (outer while loop)
     }
   }
@@ -473,7 +504,7 @@ function mergeConsecutiveScripts(html) {
  *  event handler attributes. If an object is provided, it can include:
  *  - `engine`: The minifier to use (`terser` or `swc`). Default: `terser`.
  *    Note: Inline event handlers (e.g., `onclick="…"`) always use Terser
- *    regardless of engine setting, as SWC doesn’t support bare return statements.
+ *    regardless of engine setting, as SWC doesn't support bare return statements.
  *  - Engine-specific options (e.g., Terser options if `engine: 'terser'`,
  *    SWC options if `engine: 'swc'`).
  *  If a function is provided, it will be used to perform
@@ -609,7 +640,7 @@ function mergeConsecutiveScripts(html) {
  *  Default: `false`
  *
  * @prop {boolean} [removeRedundantAttributes]
- *  Remove attributes that are redundant because they match the element’s
+ *  Remove attributes that are redundant because they match the element's
  *  default values (for example `<button type="submit">`).
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_redundant_attributes
  *
@@ -737,7 +768,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     try {
       await parser.parse();
     } catch (err) {
-      // If parsing fails during analysis pass, just skip it—we’ll still have partial frequency data from what we could parse
+      // If parsing fails during analysis pass, just skip it—we'll still have partial frequency data from what we could parse
       if (!options.continueOnParseError) {
         throw err;
       }
@@ -752,7 +783,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // Disable sorting for the analysis pass
     sortAttributes: false,
     sortClassNames: false,
-    // Disable aggressive minification that doesn’t affect attribute analysis
+    // Disable aggressive minification that doesn't affect attribute analysis
     collapseWhitespace: false,
     removeAttributeQuotes: false,
     removeTagWhitespace: false,
@@ -936,7 +967,7 @@ async function minifyHTML(value, options, partialMarkup) {
     removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
   }
 
-  // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there;
+  // Temporarily replace ignored chunks with comments, so that we don't have to worry what's there;
   // for all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
   if (value.indexOf('<!-- htmlmin:ignore -->') !== -1) {
     // Use `indexOf`-based O(n) loop instead of a global regex with [\s\S]*? to avoid O(n²)
@@ -1428,7 +1459,7 @@ async function minifyHTML(value, options, partialMarkup) {
           if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(text)))) {
             removeEndTag();
           }
-          // Don’t reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
+          // Don't reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
           if (!/^\s+$/.test(text) || !options.collapseWhitespace || options.conservativeCollapse) {
             optionalEndTag = '';
             optionalEndTagEmitted = false;
@@ -1437,7 +1468,7 @@ async function minifyHTML(value, options, partialMarkup) {
         charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
         if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
           // Escape any `&` symbols that start either:
-          // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
+          // 1. a legacy-named character reference (i.e., one that doesn't end with `;`)
           // 2. or any other character reference (i.e., one that does end with `;`)
           // Note that `&` can be escaped as `&amp`, without the semicolon.
           // https://mathiasbynens.be/notes/ambiguous-ampersands
@@ -1521,7 +1552,7 @@ async function minifyHTML(value, options, partialMarkup) {
                     const prevContent = ignoredMarkupChunks[prevIndex];
 
                     // Only collapse whitespace if both blocks contain HTML (start with `<`)
-                    // Don’t collapse if either contains plain text, as that would change meaning
+                    // Don't collapse if either contains plain text, as that would change meaning
                     // Note: This check will match HTML comments (`<!-- … -->`), but the tag name
                     // regex below requires starting with a letter, so comments are intentionally
                     // excluded by the `currentTagMatch && prevTagMatch` guard
@@ -1536,7 +1567,7 @@ async function minifyHTML(value, options, partialMarkup) {
                         const currentTag = options.name(currentTagMatch[1]);
                         const prevTag = options.name(prevTagMatch[1]);
 
-                        // Don’t collapse between inline elements
+                        // Don't collapse between inline elements
                         if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
                           // Collapse whitespace respecting context rules
                           let collapsedText = prevText;
@@ -1692,7 +1723,7 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
  * - Caches are created on the first `minify()` call and persist for the lifetime of the process
  * - Cache sizes are locked after first initialization—subsequent calls use the same caches
  *   even if different `cacheCSS`/`cacheJS`/`cacheSVG` options are provided
- * - The first call’s options determine the cache sizes for subsequent calls
+ * - The first call's options determine the cache sizes for subsequent calls
  * - Explicit `0` values are coerced to `1` (minimum functional cache size)
  */
 function initCaches(options) {

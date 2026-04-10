@@ -2805,6 +2805,20 @@ describe('HTML', () => {
     output = '<script>var a=1;var b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true, minifyJS: true }), output);
 
+    // Correctly handle `>` inside quoted attribute values (e.g., data attributes)
+    input = '<script data-x="a>b">var a=1</script><script data-x="a>b">var b=2</script>';
+    output = '<script data-x="a>b">var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    // Compatibility attributes are correctly parsed even when another attribute contains `>`—
+    // matching nonce values should merge, differing nonce values should not
+    input = '<script data-x="a>b" nonce="abc">var a=1</script><script data-x="a > b" nonce="abc">var b=2</script>';
+    output = '<script data-x="a>b" nonce="abc">var a=1;var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
+    input = '<script data-x="a>b" nonce="abc">var a=1</script><script data-x="a > b" nonce="xyz">var b=2</script>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), input);
+
     // Disabled by default
     input = '<script>var a=1</script><script>var b=2</script>';
     assert.strictEqual(await minify(input), input);
