@@ -192,7 +192,7 @@ function mergeConsecutiveScripts(html) {
       const attrs1Str = html.slice(m1.index + 7, tagEnd1);
       const contentStart1 = tagEnd1 + 1;
 
-      // Find end of this script's content (first `</script>`—per HTML spec, raw text ends here)
+      // Find end of this script’s content (first `</script>`—per HTML spec, raw text ends here)
       RE_SCRIPT_CLOSE.lastIndex = contentStart1;
       const close1 = RE_SCRIPT_CLOSE.exec(html);
       if (!close1) break;
@@ -215,7 +215,7 @@ function mergeConsecutiveScripts(html) {
       const attrs2Str = html.slice(tagStart2 + 7, tagEnd2);
       const contentStart2 = tagEnd2 + 1;
 
-      // Find end of second script's content
+      // Find end of second script’s content
       RE_SCRIPT_CLOSE.lastIndex = contentStart2;
       const close2 = RE_SCRIPT_CLOSE.exec(html);
       if (!close2) break;
@@ -272,7 +272,7 @@ function mergeConsecutiveScripts(html) {
         mergedContent = c1 || c2;
       }
 
-      // Use first script's attributes (they should be compatible)
+      // Use first script’s attributes (they should be compatible)
       html = html.slice(0, m1.index) + `<script${attrs1Str}>${mergedContent}</script>` + html.slice(afterClose2);
       break; // Restart scanning (outer while loop)
     }
@@ -504,7 +504,7 @@ function mergeConsecutiveScripts(html) {
  *  event handler attributes. If an object is provided, it can include:
  *  - `engine`: The minifier to use (`terser` or `swc`). Default: `terser`.
  *    Note: Inline event handlers (e.g., `onclick="…"`) always use Terser
- *    regardless of engine setting, as SWC doesn't support bare return statements.
+ *    regardless of engine setting, as SWC doesn’t support bare return statements.
  *  - Engine-specific options (e.g., Terser options if `engine: 'terser'`,
  *    SWC options if `engine: 'swc'`).
  *  If a function is provided, it will be used to perform
@@ -640,7 +640,7 @@ function mergeConsecutiveScripts(html) {
  *  Default: `false`
  *
  * @prop {boolean} [removeRedundantAttributes]
- *  Remove attributes that are redundant because they match the element's
+ *  Remove attributes that are redundant because they match the element’s
  *  default values (for example `<button type="submit">`).
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_redundant_attributes
  *
@@ -768,7 +768,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     try {
       await parser.parse();
     } catch (err) {
-      // If parsing fails during analysis pass, just skip it—we'll still have partial frequency data from what we could parse
+      // If parsing fails during analysis pass, just skip it—we’ll still have partial frequency data from what we could parse
       if (!options.continueOnParseError) {
         throw err;
       }
@@ -783,7 +783,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // Disable sorting for the analysis pass
     sortAttributes: false,
     sortClassNames: false,
-    // Disable aggressive minification that doesn't affect attribute analysis
+    // Disable aggressive minification that doesn’t affect attribute analysis
     collapseWhitespace: false,
     removeAttributeQuotes: false,
     removeTagWhitespace: false,
@@ -967,7 +967,7 @@ async function minifyHTML(value, options, partialMarkup) {
     removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
   }
 
-  // Temporarily replace ignored chunks with comments, so that we don't have to worry what's there;
+  // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there;
   // for all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
   if (value.indexOf('<!-- htmlmin:ignore -->') !== -1) {
     // Use `indexOf`-based O(n) loop instead of a global regex with [\s\S]*? to avoid O(n²)
@@ -1459,7 +1459,7 @@ async function minifyHTML(value, options, partialMarkup) {
           if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(text)))) {
             removeEndTag();
           }
-          // Don't reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
+          // Don’t reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
           if (!/^\s+$/.test(text) || !options.collapseWhitespace || options.conservativeCollapse) {
             optionalEndTag = '';
             optionalEndTagEmitted = false;
@@ -1468,7 +1468,7 @@ async function minifyHTML(value, options, partialMarkup) {
         charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
         if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
           // Escape any `&` symbols that start either:
-          // 1. a legacy-named character reference (i.e., one that doesn't end with `;`)
+          // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
           // 2. or any other character reference (i.e., one that does end with `;`)
           // Note that `&` can be escaped as `&amp`, without the semicolon.
           // https://mathiasbynens.be/notes/ambiguous-ampersands
@@ -1552,7 +1552,7 @@ async function minifyHTML(value, options, partialMarkup) {
                     const prevContent = ignoredMarkupChunks[prevIndex];
 
                     // Only collapse whitespace if both blocks contain HTML (start with `<`)
-                    // Don't collapse if either contains plain text, as that would change meaning
+                    // Don’t collapse if either contains plain text, as that would change meaning
                     // Note: This check will match HTML comments (`<!-- … -->`), but the tag name
                     // regex below requires starting with a letter, so comments are intentionally
                     // excluded by the `currentTagMatch && prevTagMatch` guard
@@ -1567,7 +1567,7 @@ async function minifyHTML(value, options, partialMarkup) {
                         const currentTag = options.name(currentTagMatch[1]);
                         const prevTag = options.name(prevTagMatch[1]);
 
-                        // Don't collapse between inline elements
+                        // Don’t collapse between inline elements
                         if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
                           // Collapse whitespace respecting context rules
                           let collapsedText = prevText;
@@ -1723,7 +1723,7 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
  * - Caches are created on the first `minify()` call and persist for the lifetime of the process
  * - Cache sizes are locked after first initialization—subsequent calls use the same caches
  *   even if different `cacheCSS`/`cacheJS`/`cacheSVG` options are provided
- * - The first call's options determine the cache sizes for subsequent calls
+ * - The first call’s options determine the cache sizes for subsequent calls
  * - Invalid values (NaN, Infinity) fall back to the default size (500); values below `1` are clamped to `1`
  */
 function initCaches(options) {
@@ -1741,7 +1741,7 @@ function initCaches(options) {
       return parsed;
     };
 
-    // Sanitize a cache size: Non-finite/NaN falls back to defaultSize; otherwise clamped to min 1 and floored
+    // Sanitize a cache size: Non-finite/NaN falls back to `defaultSize`; otherwise clamped to min 1 and floored
     const sanitizeSize = (size) => Number.isFinite(size) ? Math.max(1, Math.floor(size)) : defaultSize;
 
     // Get cache sizes with precedence: Options > env > default

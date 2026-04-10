@@ -506,7 +506,7 @@ export class HTMLParser {
                   // Note: Unquoted attribute values are intentionally not handled here.
                   // Per HTML spec, unquoted values cannot contain spaces or special chars,
                   // making a 20 KB+ unquoted value practically impossible. If encountered,
-                  // it's malformed HTML and using the truncated regex match is acceptable.
+                  // it’s malformed HTML and using the truncated regex match is acceptable.
                 }
               }
             }
