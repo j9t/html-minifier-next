@@ -112,6 +112,9 @@ let svgMinifyCache = null;
 
 // Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+const RE_SCRIPT_OPEN = /<script([^>]*)>/gi;
+const RE_SCRIPT_CLOSE = /<\/script\s*>/gi;
+const RE_SCRIPT_GAP = /(\s*)<script([^>]*)>/iy; // sticky: must match at lastIndex
 const SCRIPT_BOOL_ATTRS = new Set(['async', 'defer', 'nomodule']);
 const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript']);
 
@@ -131,81 +134,94 @@ const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
  * - Same `type` (or both default JavaScript)
  * - No conflicting attributes (`async`, `defer`, `nomodule`, different `nonce`)
  *
- * Limitation: This function uses regex-based matching (`pattern` variable below),
- * which can produce incorrect results if a script’s content contains a literal
- * `</script>` string (e.g., `document.write('<script>…</script>')`). In valid
- * HTML, such strings should be escaped as `<\/script>` or split like
- * `'</scr' + 'ipt>'`, so this limitation rarely affects real-world code. The
- * earlier `minifyJS` step (if enabled) typically handles this escaping already.
+ * Uses a scanner rather than a regex to locate script boundaries, so literal
+ * `</script>` strings inside script content are handled correctly per the HTML
+ * spec (raw text ends at the first `</script>`).
  *
  * @param {string} html - The HTML string to process
  * @returns {string} HTML with consecutive scripts merged
  */
 function mergeConsecutiveScripts(html) {
-  // `pattern`: Regex to match consecutive `</script>` followed by `<script…>`.
-  // See function JSDoc above for known limitations with literal `</script>` in content.
-  // Captures:
-  // 1. first script attrs
-  // 2. first script content
-  // 3. whitespace between
-  // 4. second script attrs
-  // 5. second script content
-  const pattern = /<script([^>]*)>([\s\S]*?)<\/script>([\s]*)<script([^>]*)>([\s\S]*?)<\/script>/gi;
+  // Parse an attribute string into a name→value map
+  const parseAttrs = (attrStr) => {
+    const attrs = {};
+    RE_SCRIPT_ATTRS.lastIndex = 0;
+    let m;
+    while ((m = RE_SCRIPT_ATTRS.exec(attrStr)) !== null) {
+      const name = m[1].toLowerCase();
+      const value = m[2] ?? m[3] ?? m[4] ?? '';
+      attrs[name] = value;
+    }
+    return attrs;
+  };
 
-  let result = html;
   let changed = true;
 
   // Keep merging until no more changes (handles chains of 3+ scripts)
   while (changed) {
     changed = false;
-    result = result.replace(pattern, (match, attrs1, content1, whitespace, attrs2, content2) => {
-      // Parse attributes from both script tags (uses pre-compiled RE_SCRIPT_ATTRS)
-      const parseAttrs = (attrStr) => {
-        const attrs = {};
-        RE_SCRIPT_ATTRS.lastIndex = 0; // Reset for reuse
-        let m;
-        while ((m = RE_SCRIPT_ATTRS.exec(attrStr)) !== null) {
-          const name = m[1].toLowerCase();
-          const value = m[2] ?? m[3] ?? m[4] ?? '';
-          attrs[name] = value;
-        }
-        return attrs;
-      };
+    RE_SCRIPT_OPEN.lastIndex = 0;
+    let m1;
 
-      const a1 = parseAttrs(attrs1);
-      const a2 = parseAttrs(attrs2);
+    while ((m1 = RE_SCRIPT_OPEN.exec(html)) !== null) {
+      const contentStart = RE_SCRIPT_OPEN.lastIndex;
+
+      // Find end of this script’s content (first `</script>`—per HTML spec, raw text ends here)
+      RE_SCRIPT_CLOSE.lastIndex = contentStart;
+      const close1 = RE_SCRIPT_CLOSE.exec(html);
+      if (!close1) break;
+
+      const content1 = html.slice(contentStart, close1.index);
+      const afterClose1 = close1.index + close1[0].length;
+
+      // Check for optional whitespace immediately followed by another `<script>`
+      RE_SCRIPT_GAP.lastIndex = afterClose1;
+      const gapMatch = RE_SCRIPT_GAP.exec(html);
+      if (!gapMatch) {
+        RE_SCRIPT_OPEN.lastIndex = afterClose1;
+        continue;
+      }
+
+      const content2Start = RE_SCRIPT_GAP.lastIndex;
+
+      // Find end of second script’s content
+      RE_SCRIPT_CLOSE.lastIndex = content2Start;
+      const close2 = RE_SCRIPT_CLOSE.exec(html);
+      if (!close2) break;
+
+      const content2 = html.slice(content2Start, close2.index);
+      const afterClose2 = close2.index + close2[0].length;
+
+      const a1 = parseAttrs(m1[1]);
+      const a2 = parseAttrs(gapMatch[2]);
 
       // Check for `src`—cannot merge external scripts
       if ('src' in a1 || 'src' in a2) {
-        return match;
+        RE_SCRIPT_OPEN.lastIndex = afterClose1;
+        continue;
       }
 
       // Check `type` compatibility (both must be default JS)
+      // Non-JS types (modules, JSON, etc.) must not be merged:
+      // Module scripts have per-script lexical scope, and non-JS content (e.g., JSON)
+      // is not concatenable; even identical non-JS types are incompatible
       const type1 = (a1.type || '').toLowerCase();
       const type2 = (a2.type || '').toLowerCase();
-
-      if (DEFAULT_JS_TYPES.has(type1) && DEFAULT_JS_TYPES.has(type2)) {
-        // Both are default JavaScript—compatible
-      } else {
-        // Non-JS types (modules, JSON, etc.) must not be merged:
-        // Module scripts have per-script lexical scope, and non-JS content (e.g., JSON)
-        // is not concatenable. Even identical non-JS types are incompatible.
-        return match;
+      if (!DEFAULT_JS_TYPES.has(type1) || !DEFAULT_JS_TYPES.has(type2)) {
+        RE_SCRIPT_OPEN.lastIndex = afterClose1;
+        continue;
       }
 
-      // Check for conflicting boolean attributes (uses pre-compiled SCRIPT_BOOL_ATTRS)
+      // Check for conflicting boolean attributes
+      let boolConflict = false;
       for (const attr of SCRIPT_BOOL_ATTRS) {
-        const has1 = attr in a1;
-        const has2 = attr in a2;
-        if (has1 !== has2) {
-          // One has it, one doesn't - incompatible
-          return match;
-        }
+        if ((attr in a1) !== (attr in a2)) { boolConflict = true; break; }
       }
 
       // Check `nonce`—must be same or both absent
-      if (a1.nonce !== a2.nonce) {
-        return match;
+      if (boolConflict || a1.nonce !== a2.nonce) {
+        RE_SCRIPT_OPEN.lastIndex = afterClose1;
+        continue;
       }
 
       // Scripts are compatible—merge them
@@ -226,11 +242,12 @@ function mergeConsecutiveScripts(html) {
       }
 
       // Use first script’s attributes (they should be compatible)
-      return `<script${attrs1}>${mergedContent}</script>`;
-    });
+      html = html.slice(0, m1.index) + `<script${m1[1]}>${mergedContent}</script>` + html.slice(afterClose2);
+      break; // Restart scanning (outer while loop)
+    }
   }
 
-  return result;
+  return html;
 }
 
 // Type definitions
@@ -456,7 +473,7 @@ function mergeConsecutiveScripts(html) {
  *  event handler attributes. If an object is provided, it can include:
  *  - `engine`: The minifier to use (`terser` or `swc`). Default: `terser`.
  *    Note: Inline event handlers (e.g., `onclick="…"`) always use Terser
- *    regardless of engine setting, as swc doesn’t support bare return statements.
+ *    regardless of engine setting, as SWC doesn’t support bare return statements.
  *  - Engine-specific options (e.g., Terser options if `engine: 'terser'`,
  *    SWC options if `engine: 'swc'`).
  *  If a function is provided, it will be used to perform
@@ -1701,10 +1718,10 @@ function initCaches(options) {
     const svgSize = options.cacheSVG !== undefined ? options.cacheSVG
                  : (parseEnvCacheSize(process.env.HMN_CACHE_SVG) ?? defaultSize);
 
-    // Coerce `0` to `1` (minimum functional cache size) to avoid immediate eviction
-    const cssFinalSize = cssSize === 0 ? 1 : cssSize;
-    const jsFinalSize = jsSize === 0 ? 1 : jsSize;
-    const svgFinalSize = svgSize === 0 ? 1 : svgSize;
+    // Coerce values below `1` to `1` (minimum functional cache size) to avoid immediate eviction
+    const cssFinalSize = cssSize < 1 ? 1 : cssSize;
+    const jsFinalSize = jsSize < 1 ? 1 : jsSize;
+    const svgFinalSize = svgSize < 1 ? 1 : svgSize;
 
     cssMinifyCache = new LRU(cssFinalSize);
     jsMinifyCache = new LRU(jsFinalSize);
