@@ -16,7 +16,7 @@ function stableStringify(obj) {
 
 class LRU {
   constructor(limit = 200) {
-    this.limit = limit;
+    this.limit = limit < 1 ? 1 : limit;
     this.map = new Map();
   }
   get(key) {
