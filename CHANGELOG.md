@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.1.2] - 2026-04-10
+
+### Fixed
+
+* Fixed `mergeScripts` to use a scanner instead of a regex for locating `</script>` boundaries, correctly handling scripts that contain a literal `</script>` string in their content
+* Fixed CLI config file error messages to show only the relevant error for the detected file type (`.json`, `.cjs`, `.mjs`, `.js`), rather than reporting all three attempted parse errors at once
+* Fixed LRU cache size coercion to handle any value below `1` (previously only exactly `0` was coerced to `1`; negative values now also coerce correctly)
+
 ## [6.1.1] - 2026-04-07
 
 ### Fixed
