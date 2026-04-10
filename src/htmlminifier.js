@@ -1724,7 +1724,7 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
  * - Cache sizes are locked after first initialization—subsequent calls use the same caches
  *   even if different `cacheCSS`/`cacheJS`/`cacheSVG` options are provided
  * - The first call's options determine the cache sizes for subsequent calls
- * - Explicit `0` values are coerced to `1` (minimum functional cache size)
+ * - Invalid values (NaN, Infinity) fall back to the default size (500); values below `1` are clamped to `1`
  */
 function initCaches(options) {
   // Only create caches once (on first call)—sizes are locked after this
@@ -1741,6 +1741,9 @@ function initCaches(options) {
       return parsed;
     };
 
+    // Sanitize a cache size: Non-finite/NaN falls back to defaultSize; otherwise clamped to min 1 and floored
+    const sanitizeSize = (size) => Number.isFinite(size) ? Math.max(1, Math.floor(size)) : defaultSize;
+
     // Get cache sizes with precedence: Options > env > default
     const cssSize = options.cacheCSS !== undefined ? options.cacheCSS
                  : (parseEnvCacheSize(process.env.HMN_CACHE_CSS) ?? defaultSize);
@@ -1749,10 +1752,9 @@ function initCaches(options) {
     const svgSize = options.cacheSVG !== undefined ? options.cacheSVG
                  : (parseEnvCacheSize(process.env.HMN_CACHE_SVG) ?? defaultSize);
 
-    // Coerce values below `1` to `1` (minimum functional cache size) to avoid immediate eviction
-    const cssFinalSize = cssSize < 1 ? 1 : cssSize;
-    const jsFinalSize = jsSize < 1 ? 1 : jsSize;
-    const svgFinalSize = svgSize < 1 ? 1 : svgSize;
+    const cssFinalSize = sanitizeSize(cssSize);
+    const jsFinalSize = sanitizeSize(jsSize);
+    const svgFinalSize = sanitizeSize(svgSize);
 
     cssMinifyCache = new LRU(cssFinalSize);
     jsMinifyCache = new LRU(jsFinalSize);
