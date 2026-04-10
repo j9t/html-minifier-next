@@ -213,7 +213,7 @@ async function loadConfigFromPath(configPath) {
     try { const mod = await import(pathToFileURL(abs).href); return mod.default || mod; }
     catch (esmErr) {
       fatal(ext === '.js'
-        ? `Cannot load config file: ${cjsErr.message}`
+        ? `Cannot load config file: ${cjsErr.message}\nAs module: ${esmErr.message}`
         : `Cannot read the specified config file.\nAs JSON: ${jsonErr.message}\nAs module: ${esmErr.message}`);
     }
   }
