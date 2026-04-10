@@ -16,8 +16,7 @@ function stableStringify(obj) {
 
 class LRU {
   constructor(limit = 200) {
-    const n = Math.floor(limit);
-    this.limit = Number.isFinite(n) ? Math.max(1, n) : 200;
+    this.limit = limit;
     this.map = new Map();
   }
   get(key) {
