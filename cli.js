@@ -191,7 +191,7 @@ async function loadConfigFromPath(configPath) {
   if (ext === '.cjs') {
     try {
       const result = require(abs);
-      return 'default' in result ? result.default : result;
+      return (result && typeof result === 'object' && result.__esModule === true) ? result.default : result;
     } catch (err) { fatal(`Cannot load config file: ${err.message}`); }
   }
 
@@ -208,7 +208,7 @@ async function loadConfigFromPath(configPath) {
   try {
     const result = require(abs);
     // Handle ESM interop: If `require()` loads an ESM file, it may return `{__esModule: true, default: …}`
-    return 'default' in result ? result.default : result;
+    return (result && typeof result === 'object' && result.__esModule === true) ? result.default : result;
   } catch (cjsErr) {
     try { const mod = await import(pathToFileURL(abs).href); return 'default' in mod ? mod.default : mod; }
     catch (esmErr) {
