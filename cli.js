@@ -184,7 +184,7 @@ async function loadConfigFromPath(configPath) {
   const ext = path.extname(configPath).toLowerCase();
 
   if (ext === '.json') {
-    try { return JSON.parse(readFile(abs)); }
+    try { return JSON.parse(readFile(abs).replace(/^\uFEFF/, '')); }
     catch (err) { fatal(`Cannot parse config file as JSON: ${err.message}`); }
   }
 
@@ -202,7 +202,7 @@ async function loadConfigFromPath(configPath) {
 
   // For .js or extension-less files, try JSON first, then CJS, then ESM
   let jsonErr;
-  try { return JSON.parse(readFile(abs)); }
+  try { return JSON.parse(readFile(abs).replace(/^\uFEFF/, '')); }
   catch (err) { jsonErr = err; }
 
   try {
