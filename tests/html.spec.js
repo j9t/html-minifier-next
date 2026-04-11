@@ -5511,4 +5511,38 @@ describe('HTML', () => {
     assert.notStrictEqual(withPreset, withOverride);
     assert.strictEqual(withOverride, input);
   });
+
+  test('`reportObsoleteHTML` option', async () => {
+    const reports = [];
+    const collect = (type, name) => reports.push({ type, name });
+
+    // Detects obsolete element
+    reports.length = 0;
+    await minify('<center>Hello</center>', { reportObsoleteHTML: collect });
+    assert.deepStrictEqual(reports, [{ type: 'element', name: 'center' }]);
+
+    // Detects obsolete attribute
+    reports.length = 0;
+    await minify('<img src="x.jpg" align="left">', { reportObsoleteHTML: collect });
+    assert.deepStrictEqual(reports, [{ type: 'attribute', name: 'align' }]);
+
+    // Detects multiple issues in one string
+    reports.length = 0;
+    await minify('<marquee bgcolor="#000">Hello</marquee>', { reportObsoleteHTML: collect });
+    assert.ok(reports.some(r => r.type === 'element' && r.name === 'marquee'));
+    assert.ok(reports.some(r => r.type === 'attribute' && r.name === 'bgcolor'));
+
+    // Clean HTML produces no reports
+    reports.length = 0;
+    await minify('<p>Hello <strong>world</strong></p>', { reportObsoleteHTML: collect });
+    assert.deepStrictEqual(reports, []);
+
+    // Boolean true routes through `options.log`
+    const logged = [];
+    await minify('<center>Test</center>', {
+      reportObsoleteHTML: true,
+      log: (msg) => logged.push(msg)
+    });
+    assert.ok(logged.some(msg => msg.includes('center')));
+  });
 });
