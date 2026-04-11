@@ -163,6 +163,12 @@ const demoConfig = {
     label: 'Remove tag whitespace',
     unsafe: true
   },
+  reportObsoleteHTML: {
+    label: 'Report obsolete HTML',
+    checked: false,
+    disabled: true,
+    helpText: 'Report obsolete and proprietary HTML elements and attributes (uses ObsoHTML; disabled in web demo because warnings have no visible output target)'
+  },
   sortAttributes: {
     label: 'Sort attributes',
     unsafe: true
