@@ -8,6 +8,7 @@
     "commander": "^14.0.2",
     "entities": "^8.0.0",
     "lightningcss": "^1.32.0",
+    "obsohtml": "^1.10.0",
     "svgo": "^4.0.1",
     "terser": "^5.46.1"
   },
@@ -96,5 +97,5 @@
   },
   "type": "module",
   "types": "./dist/types/htmlminifier.d.ts",
-  "version": "6.1.2"
+  "version": "6.2.0"
 }
