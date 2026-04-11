@@ -5544,5 +5544,10 @@ describe('HTML', () => {
       log: (msg) => logged.push(msg)
     });
     assert.ok(logged.some(msg => msg.includes('center')));
+
+    // Does not report inside SVG/MathML foreign content
+    reports.length = 0;
+    await minify('<svg><image href="x.svg"/></svg>', { reportObsoleteHTML: collect });
+    assert.deepStrictEqual(reports, []);
   });
 });
