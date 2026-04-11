@@ -404,6 +404,13 @@ program.helpOption('-h, --help', 'Display help for command');
       }
     });
 
+    // Upgrade `reportObsoleteHTML: true` to a function that writes to STDERR
+    if (options.reportObsoleteHTML === true) {
+      options.reportObsoleteHTML = (type, name) => {
+        process.stderr.write(`${MARK_WARNING}Obsolete HTML ${type}: <${name}>${MARK_RESET}\n`);
+      };
+    }
+
     return options;
   }
 
