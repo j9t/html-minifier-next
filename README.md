@@ -178,6 +178,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeScriptTypeAttributes`<br>`--remove-script-type-attributes` | Remove `type="text/javascript"` from `script` elements; other `type` attribute values are left intact | `false` |
 | `removeStyleLinkTypeAttributes`<br>`--remove-style-link-type-attributes` | Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
+| `reportObsoleteHTML`<br>`--report-obsolete-html` | Report obsolete and proprietary HTML elements and attributes (uses [ObsoHTML](https://www.npmjs.com/package/obsohtml)); when `true`, reports via `options.log`; when a function, called with `(type: 'element' \| 'attribute', name: string)` for each occurrence | `false` |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
