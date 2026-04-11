@@ -5545,6 +5545,11 @@ describe('HTML', () => {
     });
     assert.ok(logged.some(msg => msg.includes('center')));
 
+    // Does not report for `<svg>`/`<math>` opening tags or their attributes
+    reports.length = 0;
+    await minify('<svg align="left"><rect/></svg>', { reportObsoleteHTML: collect });
+    assert.deepStrictEqual(reports, []);
+
     // Does not report inside SVG/MathML foreign content
     reports.length = 0;
     await minify('<svg><image href="x.svg"/></svg>', { reportObsoleteHTML: collect });
