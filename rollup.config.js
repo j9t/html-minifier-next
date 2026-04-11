@@ -48,7 +48,8 @@ const config = defineConfig([
     onwarn
   },
   // CommonJS build for npm package (Node.js users)
-  // All dependencies external (installed via npm)
+  // Runtime dependencies are external (installed via npm), except ObsoHTML which is
+  // ESM-only and must be bundled so that `require()` consumers can load it
   // Used by: require('html-minifier-next')
   {
     input: 'src/htmlminifier.js',
@@ -58,7 +59,8 @@ const config = defineConfig([
       exports: 'named',
       inlineDynamicImports: true
     },
-    external: ['entities', 'lightningcss', 'terser', '@swc/core', 'obsohtml', 'svgo'],
+    external: ['entities', 'lightningcss', 'terser', '@swc/core', 'svgo'],
+    plugins: [nodeResolve()],
     onwarn
   }
 ]);
