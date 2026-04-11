@@ -46,6 +46,7 @@
   "removeScriptTypeAttributes": true,
   "removeStyleLinkTypeAttributes": true,
   "removeTagWhitespace": false,
+  "reportObsoleteHTML": false,
   "sortAttributes": false,
   "sortClassNames": false,
   "trimCustomFragments": true,
