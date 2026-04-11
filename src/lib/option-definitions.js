@@ -169,6 +169,10 @@ const optionDefinitions = {
     description: 'Remove space between attributes whenever possible; note that this will result in invalid HTML',
     type: 'boolean'
   },
+  reportObsoleteHTML: {
+    description: 'Report obsolete and proprietary HTML elements and attributes (uses ObsoHTML)',
+    type: 'boolean'
+  },
   sortAttributes: {
     description: 'Sort attributes by frequency',
     type: 'boolean'
