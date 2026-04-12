@@ -5550,6 +5550,10 @@ describe('HTML', () => {
     await minify('<svg align="left"><rect/></svg>', { reportObsoleteHTML: collect });
     assert.deepStrictEqual(reports, []);
 
+    reports.length = 0;
+    await minify('<math><mi>x</mi></math>', { reportObsoleteHTML: collect });
+    assert.deepStrictEqual(reports, []);
+
     // Does not report inside SVG/MathML foreign content
     reports.length = 0;
     await minify('<svg><image href="x.svg"/></svg>', { reportObsoleteHTML: collect });
