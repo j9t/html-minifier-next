@@ -19,7 +19,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@swc/core": "^1.15.21",
-    "eslint": "^10.1.0",
+    "eslint": "^10.2.0",
     "rollup": "^4.60.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
     "typescript": "^6.0.2",
