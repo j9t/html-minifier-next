@@ -36,7 +36,7 @@ const singleAttrValues = [
   /([^ \t\n\f\r"'`=<>]+)/.source
 ];
 // Lenient unquoted value pattern for `continueOnParseError`:
-// allows `=` and `` ` `` per spec error-recovery rules
+// allows `=` and ``` per spec error-recovery rules
 // (both are parse errors in unquoted-attribute-value state but appended to the value)
 // `"` and `'` remain excluded—permitting them requires broader test coverage
 const singleAttrValueLenientUnquoted = /([^ \t\n\f\r"'<>]+)/.source;
