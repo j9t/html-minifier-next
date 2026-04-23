@@ -35,9 +35,11 @@ const singleAttrValues = [
   // Attr value, no quotes (strict: excludes `=` per HTML spec)
   /([^ \t\n\f\r"'`=<>]+)/.source
 ];
-// Lenient unquoted value pattern for `continueOnParseError`: allows `=` per error-recovery rules
-// (unexpected-character-in-unquoted-attribute-value is a parse error but the char is included in the value)
-const singleAttrValueLenientUnquoted = /([^ \t\n\f\r"'`<>]+)/.source;
+// Lenient unquoted value pattern for `continueOnParseError`:
+// allows `=` and `` ` `` per spec error-recovery rules
+// (both are parse errors in unquoted-attribute-value state but appended to the value)
+// `"` and `'` remain excluded—permitting them requires broader test coverage
+const singleAttrValueLenientUnquoted = /([^ \t\n\f\r"'<>]+)/.source;
 // https://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-QName
 const qnameCapture = (function () {
   // https://www.npmjs.com/package/ncname
