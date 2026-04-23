@@ -32,9 +32,12 @@ const singleAttrValues = [
   /"([^"]*)"+/.source,
   // Attr value, single quotes
   /'([^']*)'+/.source,
-  // Attr value, no quotes
+  // Attr value, no quotes (strict: excludes `=` per HTML spec)
   /([^ \t\n\f\r"'`=<>]+)/.source
 ];
+// Lenient unquoted value pattern for `continueOnParseError`: allows `=` per error-recovery rules
+// (unexpected-character-in-unquoted-attribute-value is a parse error but the char is included in the value)
+const singleAttrValueLenientUnquoted = /([^ \t\n\f\r"'`<>]+)/.source;
 // https://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-QName
 const qnameCapture = (function () {
   // https://www.npmjs.com/package/ncname
@@ -100,9 +103,11 @@ function stripDelimited(str, open, close) {
 }
 
 function buildAttrRegex(handler) {
+  const unquotedValue = handler.continueOnParseError ? singleAttrValueLenientUnquoted : singleAttrValues[2];
+  const attrValues = [singleAttrValues[0], singleAttrValues[1], unquotedValue];
   let pattern = singleAttrIdentifier.source +
     '(?:\\s*(' + joinSingleAttrAssigns(handler) + ')' +
-    '[ \\t\\n\\f\\r]*(?:' + singleAttrValues.join('|') + '))?';
+    '[ \\t\\n\\f\\r]*(?:' + attrValues.join('|') + '))?';
   if (handler.customAttrSurround) {
     const attrClauses = [];
     for (let i = handler.customAttrSurround.length - 1; i >= 0; i--) {
