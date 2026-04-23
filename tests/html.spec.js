@@ -156,6 +156,45 @@ describe('HTML', () => {
     assert.ok(output, 'Should produce output when continueOnParseError is true');
   });
 
+  // https://github.com/j9t/html-minifier-next/issues/257
+  test('Parse error recovery: `=` in unquoted attribute value', async () => {
+    // Without the flag, must throw
+    await assert.rejects(
+      () => minify('<a href=?b=c>d</a>e'),
+      { name: 'Error' }
+    );
+
+    // With `continueOnParseError`, the tag should be parsed (`=` included in value), structure preserved
+    assert.strictEqual(
+      await minify('<a href=?b=c>d</a>e', { continueOnParseError: true }),
+      '<a href="?b=c">d</a>e'
+    );
+
+    // Same with `decodeEntities`—closing tag must not be dropped
+    assert.strictEqual(
+      await minify('<a href=?b=c>d</a>e', { continueOnParseError: true, decodeEntities: true }),
+      '<a href="?b=c">d</a>e'
+    );
+
+    // Value with `=` cannot be unquoted, so `removeAttributeQuotes` must still quote it
+    assert.strictEqual(
+      await minify('<a href=?b=c>d</a>e', { continueOnParseError: true, removeAttributeQuotes: true }),
+      '<a href="?b=c">d</a>e'
+    );
+
+    // Multiple `=` signs in the value
+    assert.strictEqual(
+      await minify('<a href=?a=1&amp;b=2>d</a>e', { continueOnParseError: true }),
+      '<a href="?a=1&amp;b=2">d</a>e'
+    );
+
+    // Surrounding markup must be unaffected
+    assert.strictEqual(
+      await minify('<p>before</p><a href=?b=c>d</a><p>after</p>', { continueOnParseError: true }),
+      '<p>before</p><a href="?b=c">d</a><p>after</p>'
+    );
+  });
+
   test('Options', async () => {
     const input = '<p>blah<span>blah 2<span>blah 3</span></span></p>';
     assert.strictEqual(await minify(input), input);
