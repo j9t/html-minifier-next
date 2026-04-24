@@ -187,7 +187,7 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('<svg'), 'SVG output present');
   });
 
-  test('SVG with style element', async () => {
+  test('SVG with `style` element', async () => {
     const result = await minify('<svg><style>.cls{fill:red}</style><rect class="cls" width="100" height="100"/></svg>', { minifySVG: true, collapseWhitespace: true });
     // SVGO may inline styles or preserve them
     assert.ok(result.includes('red') || result.includes('fill'), 'Style information should be preserved in some form');
@@ -200,7 +200,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('SVG with namespace attributes', async () => {
+  test('SVG with `namespace` attributes', async () => {
     // `xlink:href` should be preserved
     const result = await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#icon"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('xlink:href="#icon"'), '`xlink:href` should be preserved');
