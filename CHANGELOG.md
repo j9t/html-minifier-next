@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-* Fixed `continueOnParseError` failing to parse tags whose quoted attribute values (e.g., large base64 data URLs in `src`) exceed the internal 20 KB search window—previously the parser silently dropped the value, broke on the following `=`, and fell back to treating `<img` as text, which `decodeEntities` then encoded as `&lt;img`
+* Fixed `continueOnParseError` failing to parse elements whose quoted attribute values (e.g., large base64 data URLs in `src`) exceed the internal 20 KB search window—previously the parser silently dropped the value, broke on the following `=`, and fell back to treating `<img` as text, which `decodeEntities` then encoded as `&lt;img`
 
 ## [6.1.4] - 2026-04-24
 
