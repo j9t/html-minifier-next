@@ -912,7 +912,7 @@ describe('CSS and JS', () => {
 
         // Should work with default cache size (Lightning CSS converts green to hex)
         assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is invalid string');
-        assert.ok(result.includes('color:'), 'Should `contain` color property');
+        assert.ok(result.includes('color:'), 'Should contain `color` property');
       } finally {
         delete process.env.HMN_CACHE_CSS;
       }
