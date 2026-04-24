@@ -510,10 +510,23 @@ export class HTMLParser {
                       continue;
                     }
                   }
-                  // Note: Unquoted attribute values are intentionally not handled here.
+                  // Note: Unquoted attribute values are intentionally not handled here
                   // Per HTML spec, unquoted values cannot contain spaces or special chars,
-                  // making a 20 KB+ unquoted value practically impossible. If encountered,
-                  // it’s malformed HTML and using the truncated regex match is acceptable.
+                  // making a 20 KB+ unquoted value practically impossible; if encountered,
+                  // it’s malformed HTML and using the truncated regex match is acceptable
+                }
+              } else {
+                // If attr has no value assign but `=` follows in `fullHtml`,
+                // the value would be cut off—reset to trigger manual extraction below
+                const numCustomParts = handler.customAttrSurround
+                  ? handler.customAttrSurround.length * NCP
+                  : 0;
+                const baseIndex = 1 + numCustomParts;
+                if (attr[baseIndex + 1] === undefined) {
+                  const posAfterName = currentPos + attrEnd;
+                  if (/^\s*=/.test(fullHtml.slice(posAfterName, posAfterName + 50))) {
+                    attr = null;
+                  }
                 }
               }
             }
