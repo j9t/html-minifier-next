@@ -129,7 +129,7 @@ html-minifier-next --preset conservative --remove-empty-attributes input.html
 
 Most of the options are disabled by default. Experiment and find what works best for you and your project.
 
-Options can be used in config files (camelCase) or via CLI flags (kebab-case with `--` prefix). Options that default to `true` use `--no-` prefix in CLI to disable them.
+Options can be used in config files (camelCase) or via CLI flags (kebab-case with `--` prefix). Every boolean option supports both `--option-name` to enable and `--no-option-name` to disable, so you can always override a preset or config file from the command line.
 
 | Option (config/CLI) | Description | Default |
 | --- | --- | --- |

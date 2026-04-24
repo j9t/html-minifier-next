@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.0] - 2026-04-24
+
+### Added
+
+* Implemented every boolean CLI option to support both `--option-name` (enable) and `--no-option-name` (disable), making it possible to override any option set by a preset or config file from the command line—e.g., `--preset=comprehensive --no-collapse-whitespace`
+* Added the positive CLI form `--continue-on-minify-error` (the `continueOnMinifyError` option defaults to `true`; the flag is useful for overriding a config or preset that disables it)
+
+### Fixed
+
+* Fixed `--no-newlines-before-tag-close` being silently ignored due to a Commander.js key mismatch: the flag is now correctly applied
+
 ## [6.1.5] - 2026-04-24
 
 ### Fixed

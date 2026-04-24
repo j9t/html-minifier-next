@@ -40,6 +40,15 @@ import { Command } from 'commander';
 const paramCase = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 const camelCase = (str) => paramCase(str).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
+// Commander always derives its internal option key by camelCasing the param-case flag name,
+// stripping a leading `no-` first when the flag is a negation (e.g., `--no-foo-bar` → `fooBar`);
+// option definition keys may differ from this (e.g., `minifyURLs` → Commander key `minifyUrls`,
+// Commander key the same way Commander does
+const commanderOptKey = (key) => {
+  const pc = paramCase(key);
+  return pc.startsWith('no-') ? camelCase(pc.slice(3)) : camelCase(pc);
+};
+
 // Lazy-load HMN to reduce CLI cold-start overhead
 import { getPreset, getPresetNames } from './src/presets.js';
 import { parseRegExp } from './src/lib/utils.js';
@@ -141,14 +150,24 @@ const typeParsers = {
 const mainOptionKeys = Object.keys(optionDefinitions);
 mainOptionKeys.forEach(function (key) {
   const { description, type } = optionDefinitions[key];
+  const flag = paramCase(key);
   if (type === 'invertedBoolean') {
-    program.option('--no-' + paramCase(key), description);
+    // Add both the positive form (to re-enable after a preset/config disables it)
+    // and the existing negative form (the primary way to disable a default-true option)
+    program.option('--' + flag, 'Continue on minification errors');
+    program.option('--no-' + flag, description);
   } else if (type === 'boolean') {
-    program.option('--' + paramCase(key), description);
+    program.option('--' + flag, description);
+    // Add the negation form so users can override a preset or config file that enabled
+    // the option; skip options whose flag already starts with `no-` (currently only
+    // `noNewlinesBeforeTagClose`), as `--no-no-X` is not usable
+    if (!flag.startsWith('no-')) {
+      program.option('--no-' + flag, 'Disable --' + flag);
+    }
   } else {
-    const flag = '--' + paramCase(key) + (type === 'json' ? ' [value]' : ' <value>');
+    const cliFlag = '--' + flag + (type === 'json' ? ' [value]' : ' <value>');
     const parser = type === 'int' ? typeParsers.int(key) : typeParsers[type];
-    program.option(flag, description, parser);
+    program.option(cliFlag, description, parser);
   }
 });
 program.option('-o --output <file>', 'Specify output file (reads from file arguments or STDIN; outputs to STDOUT if not specified)');
@@ -398,9 +417,14 @@ program.helpOption('-h, --help', 'Display help for command');
 
     // 3. Apply CLI options (overrides config and preset)
     mainOptionKeys.forEach(function (key) {
-      const param = programOptions[camelCase(key)];
-      if (typeof param !== 'undefined') {
-        options[key] = param;
+      const { type } = optionDefinitions[key];
+      const ck = commanderOptKey(key);
+      if (program.getOptionValueSource(ck) === 'cli') {
+        const val = programOptions[ck];
+        // For boolean options whose param-case name starts with `no-`, Commander treats
+        // the flag as a negation and stores the inverted value under the stripped key;
+        // invert back so the option definition key gets the intended value
+        options[key] = (type === 'boolean' && paramCase(key).startsWith('no-')) ? !val : val;
       }
     });
 
@@ -413,7 +437,7 @@ program.helpOption('-h, --help', 'Display help for command');
       console.error(`Using preset: ${presetName}`);
     }
     const activeOptions = Object.entries(minifierOptions)
-      .filter(([k]) => program.getOptionValueSource(camelCase(k)) === 'cli')
+      .filter(([k]) => program.getOptionValueSource(commanderOptKey(k)) === 'cli')
       .map(([k, v]) => (typeof v === 'boolean' ? (v ? k : `no-${k}`) : k));
     if (activeOptions.length > 0) {
       console.error('CLI options: ' + activeOptions.join(', '));

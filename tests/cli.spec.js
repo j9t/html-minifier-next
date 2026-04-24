@@ -1499,4 +1499,62 @@ describe('CLI', () => {
     assert.ok(result.stderr.toString().includes('version control'));
     assert.ok(result.stderr.toString().includes('[y/N]'));
   });
+
+  // Boolean flag negation tests
+  test('`--no-X` should override a boolean option enabled by a preset', () => {
+    const input = '<p>  hello  </p>';
+
+    const { stdout: withPreset } = spawnSync('node', [cliPath, '--preset=comprehensive'], {
+      cwd: fixturesDir,
+      input
+    });
+    const { stdout: withNegation } = spawnSync('node', [cliPath, '--preset=comprehensive', '--no-collapse-whitespace'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    // The comprehensive preset collapses whitespace (and removes optional tags like `</p>`)
+    assert.strictEqual(withPreset.toString().trim(), '<p>hello');
+    // `--no-collapse-whitespace` disables whitespace collapsing, so whitespace is preserved
+    assert.ok(withNegation.toString().includes('  hello  '));
+  });
+
+  test('`--no-X` should have no effect when the option is already disabled', () => {
+    const input = '<p>  hello  </p>';
+
+    const { stdout: plain } = spawnSync('node', [cliPath], {
+      cwd: fixturesDir,
+      input
+    });
+    const { stdout: withNegation } = spawnSync('node', [cliPath, '--no-collapse-whitespace'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    // `collapseWhitespace` defaults to false, so `--no-collapse-whitespace` changes nothing
+    assert.strictEqual(plain.toString().trim(), withNegation.toString().trim());
+  });
+
+  test('`--continue-on-minify-error` should be recognized as the positive form of the flag', () => {
+    const input = '<p>test</p>';
+    const { stdout, status } = spawnSync('node', [cliPath, '--continue-on-minify-error'], {
+      cwd: fixturesDir,
+      input
+    });
+    assert.strictEqual(status, 0);
+    assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
+  });
+
+  test('`--no-newlines-before-tag-close` should be applied and match the JS API', async () => {
+    // This flag was previously silently ignored due to a Commander key mismatch
+    const input = '<a title="x"href=" ">foo</a>';
+    const expected = await minify(input, { maxLineLength: 25, noNewlinesBeforeTagClose: true });
+
+    const { stdout } = spawnSync('node', [cliPath, '--max-line-length=25', '--no-newlines-before-tag-close'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    assert.strictEqual(stdout.toString().trim(), expected);
+  });
 });
