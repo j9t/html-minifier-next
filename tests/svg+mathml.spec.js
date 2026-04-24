@@ -47,8 +47,8 @@ describe('SVG and MathML', () => {
   test('Preserve case sensitivity', async () => {
     // SVG element and attribute names preserve case (camelCase)
     const result = await minify('<svg><text textLength="100" lengthAdjust="spacingAndGlyphs">Text</text></svg>', { minifySVG: true, collapseWhitespace: true });
-    assert.ok(result.includes('textLength="100"'), 'camelCase attribute textLength preserved');
-    assert.ok(result.includes('lengthAdjust="spacingAndGlyphs"'), 'camelCase attribute lengthAdjust preserved');
+    assert.ok(result.includes('textLength="100"'), 'camelCase attribute `textLength` preserved');
+    assert.ok(result.includes('lengthAdjust="spacingAndGlyphs"'), 'camelCase attribute `lengthAdjust` preserved');
   });
 
   test('Preserve self-closing slashes in SVG', async () => {
@@ -62,16 +62,16 @@ describe('SVG and MathML', () => {
     assert.ok(mixed.includes('<br>'), 'HTML `br` should not have self-closing slash');
   });
 
-  test('Preserve viewBox', async () => {
+  test('Preserve `viewBox`', async () => {
     // SVGO v4 preserves `viewBox` by default
     const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('viewBox="0 0 100 100"'), '`viewBox` should be preserved');
   });
 
-  test('Preserve title element', async () => {
+  test('Preserve `title` element', async () => {
     // SVGO v4 preserves `<title>` by default (accessibility)
     const result = await minify('<svg><title>My SVG</title><rect width="100" height="100"/></svg>', { minifySVG: true, collapseWhitespace: true });
-    assert.ok(result.includes('<title>My SVG</title>'), 'Title should be preserved');
+    assert.ok(result.includes('<title>My SVG</title>'), '`title` should be preserved');
   });
 
   test('Text content preserved', async () => {
@@ -124,8 +124,8 @@ describe('SVG and MathML', () => {
     assert.ok(!result.includes('283.500'), 'Should remove trailing zeros');
 
     // SVGO preserves `viewBox` and `class`
-    assert.ok(result.includes('viewBox="0 65.326 612 502.174"'), 'viewBox preserved');
-    assert.ok(result.includes('class="logo"'), 'Class preserved');
+    assert.ok(result.includes('viewBox="0 65.326 612 502.174"'), '`viewBox` preserved');
+    assert.ok(result.includes('class="logo"'), '`class` preserved');
 
     // Result should be significantly smaller
     assert.ok(result.length < input.length, 'Output should be smaller');
@@ -203,23 +203,23 @@ describe('SVG and MathML', () => {
   test('SVG with namespace attributes', async () => {
     // `xlink:href` should be preserved
     const result = await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#icon"/></svg>', { minifySVG: true, collapseWhitespace: true });
-    assert.ok(result.includes('xlink:href="#icon"'), 'xlink:href should be preserved');
-    assert.ok(result.includes('xmlns:xlink'), 'xlink namespace declaration should be preserved');
+    assert.ok(result.includes('xlink:href="#icon"'), '`xlink:href` should be preserved');
+    assert.ok(result.includes('xmlns:xlink'), '`xlink` namespace declaration should be preserved');
   });
 
   test('SVG with `defs` and `use`', async () => {
     // SVGO optimizes IDs (e.g., "c" → "a") but preserves the defs/use pattern
     const result = await minify('<svg><defs><circle id="c" cx="5" cy="5" r="5"/></defs><use href="#c"/></svg>', { minifySVG: true, collapseWhitespace: true });
-    assert.ok(result.includes('<defs>'), 'defs should be preserved');
-    assert.ok(result.includes('<use'), 'use should be preserved');
-    assert.ok(result.includes('href="#'), 'href reference should be preserved');
+    assert.ok(result.includes('<defs>'), '`defs` should be preserved');
+    assert.ok(result.includes('<use'), '`use` should be preserved');
+    assert.ok(result.includes('href="#'), '`href` reference should be preserved');
   });
 
   test('SVG with `foreignObject`', async () => {
     // `foreignObject` with HTML content should be preserved
     const result = await minify('<svg><foreignObject width="100" height="100"><p>Hello</p></foreignObject></svg>', { minifySVG: true, collapseWhitespace: true });
-    assert.ok(result.includes('foreignObject'), 'foreignObject should be preserved');
-    assert.ok(result.includes('Hello'), 'HTML content inside foreignObject should be preserved');
+    assert.ok(result.includes('foreignObject'), '`foreignObject` should be preserved');
+    assert.ok(result.includes('Hello'), 'HTML content inside `foreignObject` should be preserved');
 
     // `foreignObject` with HTML entities
     const withEntities = await minify('<svg><foreignObject width="100" height="100"><p>A &amp; B</p></foreignObject></svg>', { minifySVG: true, collapseWhitespace: true });
@@ -258,7 +258,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('SVG with foreignObject and removeOptionalTags', async () => {
+  test('SVG with `foreignObject` and `removeOptionalTags`', async () => {
     // When `removeOptionalTags` strips `</p>`, the SVG becomes invalid XML
     // SVGO falls back gracefully with `continueOnMinifyError` (default: true),
     // returning the unoptimized SVG—still valid HTML
@@ -292,8 +292,8 @@ describe('SVG and MathML', () => {
     // When `minifySVG` is false, SVG is parsed by the HTML parser—not an XML parser—
     // so unquoted attributes are valid and `removeAttributeQuotes` should work normally
     const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: false, removeAttributeQuotes: true, collapseWhitespace: true });
-    assert.ok(result.includes('width=100'), 'Simple numeric SVG attribute quotes removed when minifySVG is off');
-    assert.ok(result.includes('fill=red'), 'Simple string SVG attribute quotes removed when minifySVG is off');
+    assert.ok(result.includes('width=100'), 'Simple numeric SVG attribute quotes removed when `minifySVG` is off');
+    assert.ok(result.includes('fill=red'), 'Simple string SVG attribute quotes removed when `minifySVG` is off');
   });
 
   test('`removeAttributeQuotes` applies inside MathML', async () => {
@@ -301,14 +301,14 @@ describe('SVG and MathML', () => {
     // inside MathML regardless of the `minifySVG` setting
     const result = await minify('<math display="block"><mi mathvariant="normal" id="x">x</mi></math>', { removeAttributeQuotes: true, collapseWhitespace: true });
     assert.ok(result.includes('display=block'), 'Simple string MathML attribute quotes removed');
-    assert.ok(result.includes('mathvariant=normal'), 'MathML mathvariant attribute quotes removed');
-    assert.ok(result.includes('id=x'), 'MathML id attribute quotes removed');
+    assert.ok(result.includes('mathvariant=normal'), 'MathML `mathvariant` attribute quotes removed');
+    assert.ok(result.includes('id=x'), 'MathML `id` attribute quotes removed');
   });
 
   test('`decodeEntities` applies inside SVG when `minifySVG` is disabled', async () => {
     // When `minifySVG` is false, SVGO is not invoked, so bare `&` is not a problem
     const result = await minify('<svg><text>A &amp; B</text></svg>', { minifySVG: false, decodeEntities: true, collapseWhitespace: true });
-    assert.ok(result.includes('A & B'), 'Entities decoded inside SVG when minifySVG is off');
+    assert.ok(result.includes('A & B'), 'Entities decoded inside SVG when `minifySVG` is off');
   });
 
   test('`decodeEntities` applies inside MathML', async () => {
@@ -342,12 +342,12 @@ describe('SVG and MathML', () => {
 
   test('SVG inside template', async () => {
     const result = await minify('<template><svg><rect width="10" height="10" fill="red"/></svg></template>', { minifySVG: true, collapseWhitespace: true });
-    assert.ok(result.includes('<template>'), 'template wrapper preserved');
-    assert.ok(result.includes('<svg>'), 'SVG inside template is optimized');
-    assert.ok(result.includes('fill="red"'), 'fill attribute preserved');
+    assert.ok(result.includes('<template>'), '`template` wrapper preserved');
+    assert.ok(result.includes('<svg>'), 'SVG inside `template` is optimized');
+    assert.ok(result.includes('fill="red"'), '`fill` attribute preserved');
   });
 
-  test('continueOnMinifyError: false throws on SVGO error', async () => {
+  test('`continueOnMinifyError: false` throws on SVGO error', async () => {
     // When `continueOnMinifyError` is false and SVGO encounters invalid XML
     // (e.g., from `removeOptionalTags` stripping `</p>` in `foreignObject`), it should throw
     await assert.rejects(

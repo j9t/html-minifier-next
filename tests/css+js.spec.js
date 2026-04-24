@@ -412,7 +412,7 @@ describe('CSS and JS', () => {
     // Even with SWC engine, inline handlers should use Terser
     // This is because SWC doesn’t support bare return statements
     const result = await minify(input, { minifyJS: { engine: 'swc' } });
-    assert.ok(result.includes('onclick'), 'onclick attribute should be preserved');
+    assert.ok(result.includes('onclick'), '`onclick` attribute should be preserved');
     assert.ok(result.includes('return'), 'Return statement should work (via Terser)');
   });
 
@@ -428,8 +428,8 @@ describe('CSS and JS', () => {
       collapseWhitespace: true
     });
 
-    assert.ok(result.includes('<script>'), 'Script element should be present');
-    assert.ok(result.includes('onclick='), 'onclick attribute should be present');
+    assert.ok(result.includes('<script>'), '`script` element should be present');
+    assert.ok(result.includes('onclick='), '`onclick` attribute should be present');
     assert.ok(result.includes('return'), 'Inline return statement should work');
     assert.ok(result.length < input.length, 'Should be minified overall');
   });
@@ -458,7 +458,7 @@ describe('CSS and JS', () => {
 
     assert.ok(!result.includes('console'), 'Console should be dropped');
     assert.ok(result.includes('function myFunction()'), 'Function should remain');
-    assert.ok(result.includes('return'), 'Return statement should be present');
+    assert.ok(result.includes('return'), '`return` statement should be present');
   });
 
   test('JS: Engine-specific options for SWC', async () => {
@@ -658,17 +658,17 @@ describe('CSS and JS', () => {
     let input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n    <script type="application/ld+json">\n{\n  "name": "Test",\n  "url": "https://example.com/page"\n}\n    </script>\n  </head>\n</html>';
     let conservativeResult = await minify(input, getPreset('conservative'));
     // Conservative preset should: remove comments, collapse whitespace, minify JSON, use short doctype
-    assert.ok(!conservativeResult.includes('<!-- Comment -->'), 'Conservative: should remove comments');
-    assert.ok(conservativeResult.includes('<!doctype html>'), 'Conservative: should use short doctype');
-    assert.ok(conservativeResult.includes('{"name":"Test","url":"https://example.com/page"}'), 'Conservative: should minify JSON');
-    assert.ok(!conservativeResult.includes('\n{\n'), 'Conservative: should collapse whitespace in script content');
+    assert.ok(!conservativeResult.includes('<!-- Comment -->'), 'Conservative: Should remove comments');
+    assert.ok(conservativeResult.includes('<!doctype html>'), 'Conservative: Should use short doctype');
+    assert.ok(conservativeResult.includes('{"name":"Test","url":"https://example.com/page"}'), 'Conservative: Should minify JSON');
+    assert.ok(!conservativeResult.includes('\n{\n'), 'Conservative: Should collapse whitespace in script content');
 
     // Test with comprehensive preset
     input = '<script type="importmap">\n{\n  "imports": {\n    "vue": "https://cdn.example.com/vue.js"\n  }\n}\n</script>';
     let comprehensiveResult = await minify(input, getPreset('comprehensive'));
     // Comprehensive preset should: minify JSON, collapse whitespace, remove quotes from attributes where possible
-    assert.ok(comprehensiveResult.includes('{"imports":{"vue":"https://cdn.example.com/vue.js"}}'), 'Comprehensive: should minify JSON');
-    assert.ok(comprehensiveResult.includes('type=importmap'), 'Comprehensive: should remove attribute quotes');
+    assert.ok(comprehensiveResult.includes('{"imports":{"vue":"https://cdn.example.com/vue.js"}}'), 'Comprehensive: Should minify JSON');
+    assert.ok(comprehensiveResult.includes('type=importmap'), 'Comprehensive: Should remove attribute quotes');
 
     // Verify JSON minification works even with no options (automatic behavior)
     input = '<script type="application/json">{\n  "test": "value"\n}</script>';
@@ -680,7 +680,7 @@ describe('CSS and JS', () => {
     const presetOptionResult = await minify(input, { preset: 'conservative' });
     const spreadPresetResult = await minify(input, getPreset('conservative'));
     assert.strictEqual(presetOptionResult, spreadPresetResult, 'Using preset option should produce same result as spreading getPreset()');
-    assert.ok(!presetOptionResult.includes('<!-- Comment -->'), 'Preset option: should apply preset settings');
+    assert.ok(!presetOptionResult.includes('<!-- Comment -->'), 'Preset option: Should apply preset settings');
 
     // Test preset with overrides (user options should override preset)
     input = '<!DOCTYPE html>\n<html>\n  <head>\n    <!-- Comment -->\n  </head>\n</html>';
@@ -894,7 +894,7 @@ describe('CSS and JS', () => {
 
         // Should work with default cache size (Lightning CSS converts blue to hex)
         assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is Infinity');
-        assert.ok(result.includes('color:'), 'Should contain color property');
+        assert.ok(result.includes('color:'), 'Should contain `color` property');
       } finally {
         delete process.env.HMN_CACHE_CSS;
       }
@@ -912,7 +912,7 @@ describe('CSS and JS', () => {
 
         // Should work with default cache size (Lightning CSS converts green to hex)
         assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is invalid string');
-        assert.ok(result.includes('color:'), 'Should contain color property');
+        assert.ok(result.includes('color:'), 'Should `contain` color property');
       } finally {
         delete process.env.HMN_CACHE_CSS;
       }
