@@ -195,6 +195,45 @@ describe('HTML', () => {
     );
   });
 
+  // https://github.com/j9t/html-minifier-next/issues/257
+  test('Parse error recovery: `<` in unquoted attribute value', async () => {
+    // Without the flag, must throw
+    await assert.rejects(
+      () => minify('<a href=foo<bar>d</a>e'),
+      { name: 'Error' }
+    );
+
+    // With `continueOnParseError`, `<` is included in value per HTML error-recovery rules
+    assert.strictEqual(
+      await minify('<a href=foo<bar>d</a>e', { continueOnParseError: true }),
+      '<a href="foo<bar">d</a>e'
+    );
+
+    // `<` at the start of a value
+    assert.strictEqual(
+      await minify('<a href=<bar>d</a>e', { continueOnParseError: true }),
+      '<a href="<bar">d</a>e'
+    );
+
+    // Same with `decodeEntities`—closing tag must not be dropped
+    assert.strictEqual(
+      await minify('<a href=foo<bar>d</a>e', { continueOnParseError: true, decodeEntities: true }),
+      '<a href="foo<bar">d</a>e'
+    );
+
+    // Value with `<` cannot be unquoted, so `removeAttributeQuotes` must still quote it
+    assert.strictEqual(
+      await minify('<a href=foo<bar>d</a>e', { continueOnParseError: true, removeAttributeQuotes: true }),
+      '<a href="foo<bar">d</a>e'
+    );
+
+    // Surrounding markup must be unaffected
+    assert.strictEqual(
+      await minify('<p>before</p><a href=foo<bar>d</a><p>after</p>', { continueOnParseError: true }),
+      '<p>before</p><a href="foo<bar">d</a><p>after</p>'
+    );
+  });
+
   test('Options', async () => {
     const input = '<p>blah<span>blah 2<span>blah 3</span></span></p>';
     assert.strictEqual(await minify(input), input);
