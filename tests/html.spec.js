@@ -267,6 +267,28 @@ describe('HTML', () => {
     );
   });
 
+  // https://github.com/j9t/html-minifier-next/issues/262
+  test('Parse error recovery: Large base64 data URL in attribute', async () => {
+    // A quoted attribute value that exceeds the internal 20 KB search window was incorrectly
+    // parsed as a value-less attribute name, causing `parseStartTag` to fail and the opening
+    // `<` to be emitted as text—then encoded as `&lt;` when `decodeEntities` is true
+    const largeBase64 = 'iVBORw0KGgoAAAANSUhEUgAA' + 'A'.repeat(20500) + 'BJRU5ErkJggg==';
+    const input = `<div><img class="screenshot" src="data:image/png;base64,${largeBase64}"/></div>`;
+
+    // Must parse and preserve the tag, not emit `&lt;img`
+    const result = await minify(input, { continueOnParseError: true, decodeEntities: true });
+    assert.ok(result.includes('<img'), '`img` element must be preserved, not encoded as `&lt;img`');
+    assert.ok(!result.includes('&lt;img'), '`img` opening must not be entity-encoded');
+
+    // Must also work without decodeEntities
+    const result2 = await minify(input, { continueOnParseError: true });
+    assert.ok(result2.includes('<img'), '`img` element must be preserved without `decodeEntities` too');
+
+    // Attributes must be present
+    assert.ok(result.includes('class="screenshot"'), '`class` attribute must be preserved');
+    assert.ok(result.includes('data:image/png;base64,'), 'Data URL must be preserved');
+  });
+
   test('Options', async () => {
     const input = '<p>blah<span>blah 2<span>blah 3</span></span></p>';
     assert.strictEqual(await minify(input), input);
@@ -3625,13 +3647,13 @@ describe('HTML', () => {
     let input = '<script type="Text/NG-Template"><div> test </div></script>';
     // Must match exact case
     let result = await minify(input, { collapseWhitespace: true, processScripts: ['Text/NG-Template'] });
-    assert.ok(result.includes('<div>test</div>'), 'processScripts should match raw case-sensitive value');
+    assert.ok(result.includes('<div>test</div>'), '`processScripts` should match raw case-sensitive value');
 
     // `processScripts` should not match if case differs
     // Different case
     result = await minify(input, { collapseWhitespace: true, processScripts: ['text/ng-template']
     });
-    assert.ok(result.includes('<div> test </div>'), 'processScripts should not match different case');
+    assert.ok(result.includes('<div> test </div>'), '`processScripts` should not match different case');
 
     // JSON detection should use normalized value (case-insensitive)
     input = '<script type="Application/LD+JSON">{"foo": "bar"}</script>';
@@ -4034,7 +4056,7 @@ describe('HTML', () => {
       removeAttributeQuotes: true
     });
     // Quotes must remain because value contains spaces and special chars
-    assert.ok(result.includes('data-msg='), 'Should have data-msg attribute');
+    assert.ok(result.includes('data-msg='), 'Should have `data-msg` attribute');
     assert.ok(result.match(/data-msg=["']/), 'Should keep quotes on attribute with complex value');
     assert.ok(result.includes('&#34;') || result.includes('&#39;'), 'Should escape quotes');
 
@@ -4046,11 +4068,11 @@ describe('HTML', () => {
       quoteCharacter: '\''
     });
     // Simple values can have quotes removed
-    assert.ok(result.includes('href=test.html') || result.includes("href='test.html'"), 'href should be processed');
-    assert.ok(result.includes('data-safe=value') || result.includes("data-safe='value'"), 'data-safe should be processed');
+    assert.ok(result.includes('href=test.html') || result.includes("href='test.html'"), '`href` should be processed');
+    assert.ok(result.includes('data-safe=value') || result.includes("data-safe='value'"), '`data-safe` should be processed');
     // Complex value with both quotes must keep quotes and escape
     assert.ok(result.match(/data-both=["']/), 'data-both must keep quotes');
-    assert.ok(result.includes('&#34;') || result.includes('&#39;'), 'Should escape quotes in data-both');
+    assert.ok(result.includes('&#34;') || result.includes('&#39;'), 'Should escape quotes in `data-both`');
   });
 
   test('`quoteCharacter` is single quote', async () => {
@@ -4981,8 +5003,8 @@ describe('HTML', () => {
     assert.ok(!result.includes('&lt;'), 'Should not contain HTML entities for angle brackets');
     assert.ok(!result.includes('&gt;'), 'Should not contain HTML entities for angle brackets');
     assert.ok(result.startsWith('<div'), 'Should start with proper opening tag');
-    assert.ok(result.includes('id'), 'Should contain id attribute');
-    assert.ok(result.includes('class'), 'Should contain class attribute');
+    assert.ok(result.includes('id'), 'Should contain `id` attribute');
+    assert.ok(result.includes('class'), 'Should contain `class` attribute');
   });
 
   test('`sortAttributes` with complex attributes should not cause parse errors', async () => {
@@ -5033,10 +5055,10 @@ describe('HTML', () => {
     });
 
     // Verify output is valid HTML without corruption
-    assert.ok(!result.includes('&lt;'), 'Should not contain HTML entity for <');
-    assert.ok(!result.includes('&gt;'), 'Should not contain HTML entity for >');
+    assert.ok(!result.includes('&lt;'), 'Should not contain HTML entity for `<`');
+    assert.ok(!result.includes('&gt;'), 'Should not contain HTML entity for `>`');
     assert.ok(!result.includes('\\"'), 'Should not contain escaped quotes');
-    assert.ok(result.includes('<script'), 'Should contain script tags');
+    assert.ok(result.includes('<script'), 'Should contain `script` tags');
     assert.ok(result.includes('"@type"'), 'Should preserve JSON-LD content');
     assert.ok(result.includes('data-track'), 'Should preserve custom attributes');
   });
@@ -5113,13 +5135,13 @@ describe('HTML', () => {
     });
 
     // Verify all features work together
-    assert.ok(result.includes('class'), 'Should contain class attribute');
-    assert.ok(result.includes('id'), 'Should contain id attribute');
-    assert.ok(result.includes('data-value'), 'Should contain data-value attribute');
-    assert.ok(result.includes('data-config'), 'Should contain data-config attribute');
+    assert.ok(result.includes('class'), 'Should contain `class` attribute');
+    assert.ok(result.includes('id'), 'Should contain `id` attribute');
+    assert.ok(result.includes('data-value'), 'Should contain `data-value` attribute');
+    assert.ok(result.includes('data-config'), 'Should contain `data-config` attribute');
     assert.ok(result.includes('{"key": "value"}'), 'Should preserve JSON in attribute');
     assert.ok(result.includes('[1,2,3]'), 'Should preserve arrays in attribute');
-    assert.ok(!result.includes('\\"'), 'Should not escape quotes with preventAttributesEscaping');
+    assert.ok(!result.includes('\\"'), 'Should not escape quotes with `preventAttributesEscaping`');
     assert.ok(!result.includes('&lt;'), 'Should not contain HTML entities');
   });
 
@@ -5515,7 +5537,7 @@ describe('HTML', () => {
     const result = await minify(input, benchmarkConfig);
     // Should successfully minify without parse errors
     assert.ok(result.length > 0, 'Should produce non-empty output');
-    assert.ok(result.includes('data-rid-relay'), 'Should preserve data-rid-relay attribute');
+    assert.ok(result.includes('data-rid-relay'), 'Should preserve `data-rid-relay` attribute');
     assert.ok(result.includes('{"289":"itsct"}'), 'Should preserve JSON data in attribute');
   });
 
