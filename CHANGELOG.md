@@ -8,13 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-* Extended `continueOnParseError` error recovery to also include `<` in unquoted attribute values (e.g., `href=foo<bar`), consistent with HTML error-recovery rules and matching the treatment of `=` and ``` added in 6.1.3
+* Extended `continueOnParseError` error recovery to also include `<` in unquoted attribute values (e.g., `href=foo<bar`), consistent with HTML error-recovery rules and matching the treatment of `=` and ````` added in 6.1.3
 
 ## [6.1.3] - 2026-04-23
 
 ### Fixed
 
-* Fixed `continueOnParseError` incorrectly handling unquoted attribute values that contain `=` (e.g., `href=?b=c`): the parser now includes `=` in the value per HTML error-recovery rules, preserving tag structure and the closing tag instead of dropping it
+* Fixed `continueOnParseError` incorrectly handling unquoted attribute values that contain `=` (e.g., `href=?b=c`)—the parser now includes `=` (as well as `````) in the value per HTML error-recovery rules, preserving tag structure and the closing tag instead of dropping it
 
 ## [6.1.2] - 2026-04-10
 
