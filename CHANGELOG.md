@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Implemented every boolean CLI option to support both `--option-name` (enable) and `--no-option-name` (disable), making it possible to override any option set by a preset or config file from the command line—e.g., `--preset=comprehensive --no-collapse-whitespace`
+* Implemented boolean CLI options to support both `--option-name` (enable) and `--no-option-name` (disable), making it possible to override any option set by a preset or config file from the command line—e.g., `--preset=comprehensive --no-collapse-whitespace` (exception: `noNewlinesBeforeTagClose` already exposes only `--no-newlines-before-tag-close`, so no additional `--no-no-…` form is registered)
 * Added the positive CLI form `--continue-on-minify-error` (the `continueOnMinifyError` option defaults to `true`; the flag is useful for overriding a config or preset that disables it)
 
 ### Fixed
