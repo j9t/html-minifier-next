@@ -40,10 +40,11 @@ import { Command } from 'commander';
 const paramCase = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 const camelCase = (str) => paramCase(str).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
-// Commander always derives its internal option key by camelCasing the param-case flag name,
-// stripping a leading `no-` first when the flag is a negation (e.g., `--no-foo-bar` → `fooBar`);
-// option definition keys may differ from this (e.g., `minifyURLs` → Commander key `minifyUrls`,
-// Commander key the same way Commander does
+// Commander derives its internal option key by applying paramCase then camelCase to the flag name,
+// stripping a leading `no-` first for negated flags (e.g., `--no-foo-bar` → `fooBar`);
+// because option definition keys may differ from the result of that round-trip (e.g.,
+// `minifyURLs` → Commander key `minifyUrls`, `noNewlinesBeforeTagClose` → `newlinesBeforeTagClose`),
+// `commanderOptKey` uses the same paramCase + camelCase path to compute the key Commander will use
 const commanderOptKey = (key) => {
   const pc = paramCase(key);
   return pc.startsWith('no-') ? camelCase(pc.slice(3)) : camelCase(pc);
@@ -149,12 +150,12 @@ const typeParsers = {
 // Configure command-line flags from shared option definitions
 const mainOptionKeys = Object.keys(optionDefinitions);
 mainOptionKeys.forEach(function (key) {
-  const { description, type } = optionDefinitions[key];
+  const { description, positiveDescription, type } = optionDefinitions[key];
   const flag = paramCase(key);
   if (type === 'invertedBoolean') {
     // Add both the positive form (to re-enable after a preset/config disables it)
-    // and the existing negative form (the primary way to disable a default-true option)
-    program.option('--' + flag, 'Continue on minification errors');
+    // and the existing negative form (the primary way to disable a default-true option).
+    program.option('--' + flag, positiveDescription ?? 'Enable --' + flag);
     program.option('--no-' + flag, description);
   } else if (type === 'boolean') {
     program.option('--' + flag, description);
