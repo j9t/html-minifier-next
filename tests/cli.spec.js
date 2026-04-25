@@ -1504,15 +1504,17 @@ describe('CLI', () => {
   test('`--no-X` should override a boolean option enabled by a preset', () => {
     const input = '<p>  hello  </p>';
 
-    const { stdout: withPreset } = spawnSync('node', [cliPath, '--preset=comprehensive'], {
+    const { stdout: withPreset, status: presetStatus } = spawnSync('node', [cliPath, '--preset=comprehensive'], {
       cwd: fixturesDir,
       input
     });
-    const { stdout: withNegation } = spawnSync('node', [cliPath, '--preset=comprehensive', '--no-collapse-whitespace'], {
+    const { stdout: withNegation, status: negationStatus } = spawnSync('node', [cliPath, '--preset=comprehensive', '--no-collapse-whitespace'], {
       cwd: fixturesDir,
       input
     });
 
+    assert.strictEqual(presetStatus, 0);
+    assert.strictEqual(negationStatus, 0);
     // The comprehensive preset collapses whitespace (and removes optional tags like `</p>`)
     assert.strictEqual(withPreset.toString().trim(), '<p>hello');
     // `--no-collapse-whitespace` disables whitespace collapsing, so whitespace is preserved
@@ -1522,15 +1524,17 @@ describe('CLI', () => {
   test('`--no-X` should have no effect when the option is already disabled', () => {
     const input = '<p>  hello  </p>';
 
-    const { stdout: plain } = spawnSync('node', [cliPath], {
+    const { stdout: plain, status: plainStatus } = spawnSync('node', [cliPath], {
       cwd: fixturesDir,
       input
     });
-    const { stdout: withNegation } = spawnSync('node', [cliPath, '--no-collapse-whitespace'], {
+    const { stdout: withNegation, status: negationStatus } = spawnSync('node', [cliPath, '--no-collapse-whitespace'], {
       cwd: fixturesDir,
       input
     });
 
+    assert.strictEqual(plainStatus, 0);
+    assert.strictEqual(negationStatus, 0);
     // `collapseWhitespace` defaults to false, so `--no-collapse-whitespace` changes nothing
     assert.strictEqual(plain.toString().trim(), withNegation.toString().trim());
   });
@@ -1550,11 +1554,12 @@ describe('CLI', () => {
     const input = '<a title="x"href=" ">foo</a>';
     const expected = await minify(input, { maxLineLength: 25, noNewlinesBeforeTagClose: true });
 
-    const { stdout } = spawnSync('node', [cliPath, '--max-line-length=25', '--no-newlines-before-tag-close'], {
+    const { stdout, status } = spawnSync('node', [cliPath, '--max-line-length=25', '--no-newlines-before-tag-close'], {
       cwd: fixturesDir,
       input
     });
 
+    assert.strictEqual(status, 0);
     assert.strictEqual(stdout.toString().trim(), expected);
   });
 });
