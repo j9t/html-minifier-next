@@ -129,7 +129,7 @@ html-minifier-next --preset conservative --remove-empty-attributes input.html
 
 Most of the options are disabled by default. Experiment and find what works best for you and your project.
 
-Options can be used in config files (camelCase) or via CLI flags (kebab-case with `--` prefix). Options that default to `true` use `--no-` prefix in CLI to disable them.
+Options can be used in config files (camelCase) or via CLI flags (kebab-case with `--` prefix). Boolean options generally support both `--option-name` to enable and `--no-option-name` to disable, so you can override a preset or config file from the command line. (Exception: Options whose name already starts with `no-`, such as `noNewlinesBeforeTagClose`, only expose the `--no-…` CLI flag.)
 
 | Option (config/CLI) | Description | Default |
 | --- | --- | --- |
@@ -142,7 +142,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Collapse whitespace more aggressively between inline elements—use with `collapseWhitespace: true` | `false` |
 | `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace) | `false` |
 | `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with `collapseWhitespace: true` | `false` |
-| `continueOnMinifyError`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |
+| `continueOnMinifyError`<br>`--continue-on-minify-error`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |
 | `continueOnParseError`<br>`--continue-on-parse-error` | [Handle parse errors](https://html.spec.whatwg.org/multipage/parsing.html#parse-errors) instead of aborting | `false` |
 | `customAttrAssign`<br>`--custom-attr-assign` | Array of regexes that allow to support custom attribute assign expressions (e.g., `<div flex?="{{mode != cover}}"></div>`) | `[]` |
 | `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | `undefined` |

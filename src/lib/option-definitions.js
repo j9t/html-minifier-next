@@ -27,6 +27,7 @@ const optionDefinitions = {
   },
   continueOnMinifyError: {
     description: 'Abort on minification errors',
+    descriptionAffirmative: 'Continue on minification errors',
     type: 'invertedBoolean'
   },
   continueOnParseError: {

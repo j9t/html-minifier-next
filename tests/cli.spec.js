@@ -1499,4 +1499,69 @@ describe('CLI', () => {
     assert.ok(result.stderr.toString().includes('version control'));
     assert.ok(result.stderr.toString().includes('[y/N]'));
   });
+
+  // Boolean flag negation tests
+  test('`--no-X` should override a boolean option enabled by a preset', () => {
+    const input = '<p>  hello  </p>';
+
+    const { stdout: withPreset, status: presetStatus } = spawnSync('node', [cliPath, '--preset=comprehensive'], {
+      cwd: fixturesDir,
+      input
+    });
+    const { stdout: withNegation, status: negationStatus } = spawnSync('node', [cliPath, '--preset=comprehensive', '--no-collapse-whitespace'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    assert.strictEqual(presetStatus, 0);
+    assert.strictEqual(negationStatus, 0);
+    // The comprehensive preset collapses whitespace, so the original double spaces are gone
+    assert.ok(!withPreset.toString().includes('  hello  '));
+    // `--no-collapse-whitespace` disables whitespace collapsing, so whitespace is preserved
+    assert.ok(withNegation.toString().includes('  hello  '));
+    // The two runs therefore differ
+    assert.notStrictEqual(withPreset.toString().trim(), withNegation.toString().trim());
+  });
+
+  test('`--no-X` should have no effect when the option is already disabled', () => {
+    const input = '<p>  hello  </p>';
+
+    const { stdout: plain, status: plainStatus } = spawnSync('node', [cliPath], {
+      cwd: fixturesDir,
+      input
+    });
+    const { stdout: withNegation, status: negationStatus } = spawnSync('node', [cliPath, '--no-collapse-whitespace'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    assert.strictEqual(plainStatus, 0);
+    assert.strictEqual(negationStatus, 0);
+    // `collapseWhitespace` defaults to false, so `--no-collapse-whitespace` changes nothing
+    assert.strictEqual(plain.toString().trim(), withNegation.toString().trim());
+  });
+
+  test('`--continue-on-minify-error` should be recognized as the positive form of the flag', () => {
+    const input = '<p>test</p>';
+    const { stdout, status } = spawnSync('node', [cliPath, '--continue-on-minify-error'], {
+      cwd: fixturesDir,
+      input
+    });
+    assert.strictEqual(status, 0);
+    assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
+  });
+
+  test('`--no-newlines-before-tag-close` should be applied and match the JS API', async () => {
+    // This flag was previously silently ignored due to a Commander key mismatch
+    const input = '<a title="x"href=" ">foo</a>';
+    const expected = await minify(input, { maxLineLength: 25, noNewlinesBeforeTagClose: true });
+
+    const { stdout, status } = spawnSync('node', [cliPath, '--max-line-length=25', '--no-newlines-before-tag-close'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    assert.strictEqual(status, 0);
+    assert.strictEqual(stdout.toString().trim(), expected);
+  });
 });
