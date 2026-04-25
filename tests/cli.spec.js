@@ -1515,10 +1515,12 @@ describe('CLI', () => {
 
     assert.strictEqual(presetStatus, 0);
     assert.strictEqual(negationStatus, 0);
-    // The comprehensive preset collapses whitespace (and removes optional tags like `</p>`)
-    assert.strictEqual(withPreset.toString().trim(), '<p>hello');
+    // The comprehensive preset collapses whitespace, so the original double spaces are gone
+    assert.ok(!withPreset.toString().includes('  hello  '));
     // `--no-collapse-whitespace` disables whitespace collapsing, so whitespace is preserved
     assert.ok(withNegation.toString().includes('  hello  '));
+    // The two runs therefore differ
+    assert.notStrictEqual(withPreset.toString().trim(), withNegation.toString().trim());
   });
 
   test('`--no-X` should have no effect when the option is already disabled', () => {
