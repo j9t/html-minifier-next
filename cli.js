@@ -34,7 +34,7 @@ import { pathToFileURL } from 'url';
 import os from 'os';
 import readline from 'readline';
 import { createRequire } from 'module';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 
 // Simple case conversion for CLI option names (ASCII-only, no Unicode needed)
 const paramCase = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
@@ -153,17 +153,17 @@ mainOptionKeys.forEach(function (key) {
   const { description, positiveDescription, type } = optionDefinitions[key];
   const flag = paramCase(key);
   if (type === 'invertedBoolean') {
-    // Add both the positive form (to re-enable after a preset/config disables it)
-    // and the existing negative form (the primary way to disable a default-true option).
-    program.option('--' + flag, positiveDescription ?? 'Enable --' + flag);
+    // The positive form (to re-enable after a preset/config disables it) is hidden from
+    // help—the footer note covers the convention; the negative form is the primary use case
+    program.addOption(new Option('--' + flag, positiveDescription ?? 'Enable --' + flag).hideHelp());
     program.option('--no-' + flag, description);
   } else if (type === 'boolean') {
     program.option('--' + flag, description);
-    // Add the negation form so users can override a preset or config file that enabled
-    // the option; skip options whose flag already starts with `no-` (currently only
+    // The negation form is hidden from help—the footer note covers the convention;
+    // skip options whose flag already starts with `no-` (currently only
     // `noNewlinesBeforeTagClose`), as `--no-no-X` is not usable
     if (!flag.startsWith('no-')) {
-      program.option('--no-' + flag, 'Disable --' + flag);
+      program.addOption(new Option('--no-' + flag, 'Disable --' + flag).hideHelp());
     }
   } else {
     const cliFlag = '--' + flag + (type === 'json' ? ' [value]' : ' <value>');
@@ -174,6 +174,7 @@ mainOptionKeys.forEach(function (key) {
 program.option('-o --output <file>', 'Specify output file (reads from file arguments or STDIN; outputs to STDOUT if not specified)');
 program.option('-v --verbose', 'Show detailed processing information');
 program.option('-d --dry', 'Dry run: Process and report statistics without writing output');
+program.addHelpText('after', '\nBoolean options support a `--no-<flag>` form to disable them, overriding a preset or config file (e.g., `--preset=comprehensive --no-collapse-whitespace`).');
 
 // Lazy import wrapper for HMN
 let minifyFnPromise;
