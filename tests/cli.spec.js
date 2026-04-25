@@ -397,7 +397,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/default-ext/extension.txt'), false);
   });
 
-  test('Should process all files with --file-ext=*', () => {
+  test('Should process all files with `--file-ext=*`', () => {
     const cliArguments = [
       '--input-dir=./',
       '--output-dir=./tmp/all-files',
