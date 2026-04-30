@@ -299,7 +299,7 @@ function hasAttrName(name, attrs) {
 function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
   // Apply early whitespace normalization if enabled
   // Preserves special spaces (no-break space, hair space, etc.) for consistency with `collapseWhitespace`
-  if (options.collapseAttributeWhitespace) {
+  if (options.collapseAttributeWhitespace && attrName !== 'pattern' && attrName !== 'value') {
     // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
     if (RE_ATTR_WS_CHECK.test(attrValue)) {
       // Two-pass approach (faster than single-pass with callback)

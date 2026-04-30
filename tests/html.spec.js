@@ -4360,6 +4360,18 @@ describe('HTML', () => {
     input = '<div title="foo\u200Abar  baz &nbsp; @&#8202;test"></div>';
     output = '<div title="foo bar baz   @ test"></div>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, decodeEntities: true }), output);
+
+    // `pattern` whitespace is semantically significant (regex), so it must not be touched
+    input = '<input pattern="\\d  \\d">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<input pattern="  [a-z]+">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+
+    // `value` whitespace may be intentional (pre-filled form field contents), so it must not be touched
+    input = '<input value="  hello  ">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<input value="foo  bar">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
   });
 
   test('Decode entity characters', async () => {
