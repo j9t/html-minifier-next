@@ -603,7 +603,7 @@ Parameters:
 
 ## Acknowledgements
 
-With many thanks to all the previous authors of HTML Minifier, especially [Juriy “kangax” Zaytsev](https://github.com/kangax), and to everyone who helped make this new edition better, particularly [Daniel Ruf](https://github.com/DanielRuf) and [Jonas Geiler](https://github.com/jonasgeiler).
+With many thanks to the previous authors of and contributors to HTML Minifier, especially [Juriy “kangax” Zaytsev](https://github.com/kangax), and to everyone who helped make this new edition better, particularly [Daniel Ruf](https://github.com/DanielRuf), [Jonas Geiler](https://github.com/jonasgeiler), and [Chris Morgan](https://github.com/chris-morgan)!
 
 ***
 
