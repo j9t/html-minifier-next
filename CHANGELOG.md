@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-* Fixed `collapseAttributeWhitespace` incorrectly collapsing whitespace in attributes where it is semantically significant: `pattern` (regex literal spaces, e.g., `\d  \d` matching exactly two spaces), `value` (pre-filled form field contents), `title` (line breaks and spacing render visibly in browser tooltips), `placeholder` (spaces render visibly in inputs), and event handler attributes (spaces inside string literals, e.g., `onclick="alert('→     ←')"`).
+* Fixed `collapseAttributeWhitespace` incorrectly collapsing whitespace in attributes where it is semantically significant:
+  - `pattern` (regex literal spaces, e.g., `\d  \d` matching exactly two spaces)
+  - `value` on form-submission elements (`input`, `option`, `button`, `data`, `param`) where the value is used verbatim—but not on numeric elements (like `li` or `meter`) where the browser normalizes it
+  - `title` (line breaks and spacing render visibly in browser tooltips)
+  - `placeholder` (spaces render visibly in inputs)
+  - event handler attributes (spaces inside string literals, e.g., `onclick="alert('→     ←')"`).
 
 ## [6.2.0] - 2026-04-24
 

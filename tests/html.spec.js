@@ -4366,11 +4366,20 @@ describe('HTML', () => {
     input = '<input pattern="  [a-z]+">';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
 
-    // `value` whitespace may be intentional (pre-filled form field contents), so it must not be touched
+    // `value` whitespace matters on form-submission elements (used verbatim) but not on numeric ones (browser-normalized)
     input = '<input value="  hello  ">';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
     input = '<input value="foo  bar">';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<option value="  foo  "></option>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<button value="  foo  "></button>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    // Numeric `value` attributes are browser-normalized, so collapsing is safe
+    input = '<li value=" 3 ">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), '<li value="3">');
+    input = '<meter value=" 0.5 " min="0" max="1"></meter>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), '<meter value="0.5" min="0" max="1"></meter>');
 
     // `title` whitespace is significant (e.g., line breaks render as tooltip line breaks in browsers)
     input = '<div title="  hello world  "></div>';

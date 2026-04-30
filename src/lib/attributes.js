@@ -294,7 +294,9 @@ function hasAttrName(name, attrs) {
 
 // Cleaners
 
-const collapseAttributeWhitespaceExempt = new Set(['pattern', 'placeholder', 'title', 'value']);
+const collapseAttributeWhitespaceExempt = new Set(['pattern', 'placeholder', 'title']);
+// `value` whitespace matters only on form-submission and machine-readable elements
+const valueWhitespaceExemptTags = new Set(['button', 'data', 'input', 'option', 'param']);
 
 // Returns the cleaned attribute value directly (sync) or as a Promise (async);
 // callers must handle both cases—use `isThenable()` to distinguish
@@ -303,7 +305,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
 
   // Apply early whitespace normalization if enabled
   // Preserves special spaces (no-break space, hair space, etc.) for consistency with `collapseWhitespace`
-  if (options.collapseAttributeWhitespace && !collapseAttributeWhitespaceExempt.has(attrName) && !isEventAttr) {
+  if (options.collapseAttributeWhitespace && !collapseAttributeWhitespaceExempt.has(attrName) && !(attrName === 'value' && valueWhitespaceExemptTags.has(tag)) && !isEventAttr) {
     // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
     if (RE_ATTR_WS_CHECK.test(attrValue)) {
       // Two-pass approach (faster than single-pass with callback)
