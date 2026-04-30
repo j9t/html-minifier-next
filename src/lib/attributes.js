@@ -299,9 +299,11 @@ const collapseAttributeWhitespaceExempt = new Set(['pattern', 'placeholder', 'ti
 // Returns the cleaned attribute value directly (sync) or as a Promise (async);
 // callers must handle both cases—use `isThenable()` to distinguish
 function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
+  const isEventAttr = isEventAttribute(attrName, options);
+
   // Apply early whitespace normalization if enabled
   // Preserves special spaces (no-break space, hair space, etc.) for consistency with `collapseWhitespace`
-  if (options.collapseAttributeWhitespace && !collapseAttributeWhitespaceExempt.has(attrName) && !isEventAttribute(attrName, options)) {
+  if (options.collapseAttributeWhitespace && !collapseAttributeWhitespaceExempt.has(attrName) && !isEventAttr) {
     // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
     if (RE_ATTR_WS_CHECK.test(attrValue)) {
       // Two-pass approach (faster than single-pass with callback)
@@ -311,7 +313,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     }
   }
 
-  if (isEventAttribute(attrName, options)) {
+  if (isEventAttr) {
     attrValue = trimWhitespace(attrValue).replace(/^javascript:\s*/i, '');
     const result = options.minifyJS(attrValue, true);
     if (isThenable(result)) {
