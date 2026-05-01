@@ -4396,6 +4396,9 @@ describe('HTML', () => {
     // Event handler whitespace is significant (spaces inside JS string literals must not be collapsed)
     input = '<button onclick="alert(\'→     ←\')">x</button>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    // `on*` attributes are still JS-minified even when `collapseAttributeWhitespace` skips them;
+    // string-internal spaces survive because `minifyJS` preserves string literal contents
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, minifyJS: true }), '<button onclick=\'alert("→     ←")\'>x</button>');
   });
 
   test('Decode entity characters', async () => {
