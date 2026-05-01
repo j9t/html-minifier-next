@@ -131,10 +131,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           );
         }
 
-        // Cache key: Wrapped content, type, options signature
+        // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
-        // For large inputs, use length and content fingerprint (first/last 50 chars) to prevent collisions
         const cssKey = inputCSS.length > 2048
           ? (hashContent(inputCSS) + '|' + type + '|' + cssSig)
           : (inputCSS + '|' + type + '|' + cssSig);
@@ -246,7 +245,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           // Select pre-computed signature based on engine
           const optsSig = useEngine === 'terser' ? terserSig : swcSig;
 
-          // For large inputs, use length and content fingerprint to prevent collisions
+          // For large inputs, hash the full content to avoid storing huge strings as Map keys
           jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
             + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
 
@@ -359,7 +358,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return svgContent;
         }
 
-        // Cache key
+        // Cache key: Large inputs are hashed to avoid huge Map keys
         const svgKey = svgContent.length > 2048
           ? (hashContent(svgContent) + '|' + svgSig)
           : (svgContent + '|' + svgSig);
