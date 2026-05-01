@@ -1,7 +1,7 @@
 // Imports
 
 import { createUrlMinifier } from './urls.js';
-import { LRU, stableStringify, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
+import { LRU, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -136,7 +136,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
         // For large inputs, use length and content fingerprint (first/last 50 chars) to prevent collisions
         const cssKey = inputCSS.length > 2048
-          ? (inputCSS.length + '|' + inputCSS.slice(0, 50) + inputCSS.slice(-50) + '|' + type + '|' + cssSig)
+          ? (hashContent(inputCSS) + '|' + type + '|' + cssSig)
           : (inputCSS + '|' + type + '|' + cssSig);
 
         try {
@@ -247,7 +247,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           const optsSig = useEngine === 'terser' ? terserSig : swcSig;
 
           // For large inputs, use length and content fingerprint to prevent collisions
-          jsKey = (code.length > 2048 ? (code.length + '|' + code.slice(0, 50) + code.slice(-50) + '|') : (code + '|'))
+          jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
             + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
 
           const cached = jsMinifyCache.get(jsKey);
@@ -361,7 +361,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
         // Cache key
         const svgKey = svgContent.length > 2048
-          ? (svgContent.length + '|' + svgContent.slice(0, 50) + svgContent.slice(-50) + '|' + svgSig)
+          ? (hashContent(svgContent) + '|' + svgSig)
           : (svgContent + '|' + svgSig);
 
         try {

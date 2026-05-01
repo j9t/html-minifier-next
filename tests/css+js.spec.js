@@ -917,5 +917,29 @@ describe('CSS and JS', () => {
         delete process.env.HMN_CACHE_CSS;
       }
     });
+
+    test('Large inputs with identical first/last 50 chars are not confused in cache', async () => {
+      // Craft two CSS inputs that share the same length, first 50 chars, and last 50 chars
+      // but differ in the middle—previously the fingerprint key caused a cache collision
+      const first50 = 'div,p,span,section,article,main,header,footer,nav{'; // exactly 50 chars
+      const last50 = '}/*' + 'x'.repeat(45) + '*/'; // exactly 50 chars
+      const filler = '/* ' + 'f'.repeat(1970) + ' */'; // stripped by minifier
+
+      // `color:red; ` and `color:blue;` are both 11 chars—inputs are the same total length
+      const css1 = first50 + 'color:red; ' + filler + last50;
+      const css2 = first50 + 'color:blue;' + filler + last50;
+
+      assert.ok(css1.length > 2048, 'Input must exceed the 2048-char threshold');
+      assert.strictEqual(css1.length, css2.length, 'Inputs must be the same length to guarantee fingerprint collision');
+      assert.strictEqual(css1.slice(0, 50), css2.slice(0, 50), 'First 50 chars must be identical');
+      assert.strictEqual(css1.slice(-50), css2.slice(-50), 'Last 50 chars must be identical');
+
+      const result1 = await minify(`<style>${css1}</style>`, { minifyCSS: true });
+      const result2 = await minify(`<style>${css2}</style>`, { minifyCSS: true });
+
+      assert.notStrictEqual(result1, result2, 'Different large CSS inputs must not share a cache entry');
+      assert.ok(result1.includes('red'), 'First result should contain the correct color');
+      assert.ok(result2.includes('blue') || result2.includes('#00f'), 'Second result should contain the correct color');
+    });
   });
 });

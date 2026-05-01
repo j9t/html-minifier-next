@@ -39,6 +39,17 @@ class LRU {
   delete(key) { this.map.delete(key); }
 }
 
+// FNV-1a 32-bit hash—collision-resistant key for large-input caches
+
+function hashContent(str) {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 // Unique ID generator
 
 function uniqueId(value) {
@@ -102,6 +113,7 @@ function parseRegExp(value) {
 
 export { stableStringify };
 export { LRU };
+export { hashContent };
 export { uniqueId };
 export { identity };
 export { isThenable };
