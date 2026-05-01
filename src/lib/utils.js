@@ -39,7 +39,7 @@ class LRU {
   delete(key) { this.map.delete(key); }
 }
 
-// FNV-1a 32-bit hash—collision-resistant key for large-input caches
+// FNV-1a 32-bit hash for large-input cache keys
 
 function hashContent(str) {
   let hash = 2166136261;
