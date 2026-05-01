@@ -4295,8 +4295,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: false }), input);
 
-    // Should collapse with `collapseAttributeWhitespace: true`
-    output = '<article title="foo bar" data-selector="teaser-object parent-image-label picture-article" data-external-selector="teaser-object parent-image-label"></article>';
+    // Should collapse with `collapseAttributeWhitespace: true` (`title` is exempt)
+    output = '<article title="foo  bar" data-selector="teaser-object parent-image-label picture-article" data-external-selector="teaser-object parent-image-label"></article>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
 
     // Multiple spaces in `alt` attribute
@@ -4312,11 +4312,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, minifyCSS: true }), output);
 
-    // Leading and trailing whitespace
+    // Leading and trailing whitespace (`title` is exempt, so whitespace is preserved)
     input = '<div title="  hello world  "></div>';
     assert.strictEqual(await minify(input), input);
-    output = '<div title="hello world"></div>';
-    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
 
     // Should work with `sortClassNames` (correct alphabetical expectation)
     input = '<article class="lg:border-grey-700 lg:dark:border-grey-700-dark mb-[40px] cursor-pointer sm:mx-[40px] lg:flex lg:flex-row lg:border-[1px] lg:border-solid" data-selector="teaser-object parent-image-label picture-article" data-external-selector="\n      teaser-object parent-image-label \n        \n    "></article>';
@@ -4337,29 +4336,69 @@ describe('HTML', () => {
     input = '<p class="foo bar baz"></p>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
 
-    // Should work with `removeAttributeQuotes`
+    // Should work with `removeAttributeQuotes` (`title` is exempt; quotes are retained since spaces remain)
     input = '<p class=  foo title="  hello  world  "></p>';
-    output = '<p class=foo title="hello world"></p>';
+    output = '<p class=foo title="  hello  world  "></p>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, removeAttributeQuotes: true }), output);
 
-    // Should work together with `collapseWhitespace` for both text nodes and attributes
+    // Should work together with `collapseWhitespace` for text nodes (`title` attribute is exempt)
     input = '<p title="  foo   bar  ">\n  Hello   \n  world  \n</p>';
-    output = '<p title="foo bar">Hello world</p>';
+    output = '<p title="  foo   bar  ">Hello world</p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseAttributeWhitespace: true }), output);
 
     // Special Unicode whitespace (hair space, no-break space) is preserved for consistency with `collapseWhitespace`
-    input = '<div title="foo\u200Abar  baz"></div>';
-    output = '<div title="foo\u200Abar baz"></div>';
+    input = '<div data-label="foo\u200Abar  baz"></div>';
+    output = '<div data-label="foo\u200Abar baz"></div>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), output);
 
     // No-break space is preserved (consistent with `collapseWhitespace` behavior in text nodes)
-    input = '<div title="foo\u00A0\u00A0bar"></div>';
+    input = '<div data-label="foo\u00A0\u00A0bar"></div>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
 
     // Special Unicode whitespace (hair space, no-break space) is preserved for consistency with `collapseWhitespace`
-    input = '<div title="foo\u200Abar  baz &nbsp; @&#8202;test"></div>';
-    output = '<div title="foo bar baz   @ test"></div>';
+    input = '<div data-label="foo\u200Abar  baz &nbsp; @&#8202;test"></div>';
+    output = '<div data-label="foo bar baz   @ test"></div>';
     assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, decodeEntities: true }), output);
+
+    // `pattern` whitespace is semantically significant (regex), so it must not be touched
+    input = '<input pattern="\\d  \\d">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<input pattern="  [a-z]+">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+
+    // `value` whitespace matters on form-submission elements (used verbatim) but not on numeric ones (browser-normalized)
+    input = '<input value="  hello  ">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<input value="foo  bar">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<option value="  foo  "></option>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<button value="  foo  "></button>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    // Numeric `value` attributes are browser-normalized, so collapsing is safe
+    input = '<li value=" 3 ">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), '<li value="3">');
+    input = '<meter value=" 0.5 " min="0" max="1"></meter>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), '<meter value="0.5" min="0" max="1"></meter>');
+
+    // `title` whitespace is significant (e.g., line breaks render as tooltip line breaks in browsers)
+    input = '<div title="  hello world  "></div>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<abbr title="Foo  Bar\nBaz"></abbr>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+
+    // `placeholder` whitespace is significant (leading spaces are visually rendered in inputs)
+    input = '<input placeholder="  enter name">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    input = '<input placeholder="first  last">';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+
+    // Event handler whitespace is significant (spaces inside JS string literals must not be collapsed)
+    input = '<button onclick="alert(\'→     ←\')">x</button>';
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true }), input);
+    // `on*` attributes are still JS-minified even when `collapseAttributeWhitespace` skips them;
+    // string-internal spaces survive because `minifyJS` preserves string literal contents
+    assert.strictEqual(await minify(input, { collapseAttributeWhitespace: true, minifyJS: true }), '<button onclick=\'alert("→     ←")\'>x</button>');
   });
 
   test('Decode entity characters', async () => {

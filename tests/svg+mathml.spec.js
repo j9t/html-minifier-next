@@ -284,8 +284,8 @@ describe('SVG and MathML', () => {
     assert.ok(noQuotes.includes('viewBox="0 0 100 100"'), 'SVG attribute quotes preserved');
 
     // `removeTagWhitespace` must not remove space between SVG attributes
-    const tagWs = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, removeTagWhitespace: true, collapseWhitespace: true });
-    assert.ok(!tagWs.includes('width="100"height'), 'Whitespace between SVG attributes preserved');
+    const tagWhitespace = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, removeTagWhitespace: true, collapseWhitespace: true });
+    assert.ok(!tagWhitespace.includes('width="100"height'), 'Whitespace between SVG attributes preserved');
   });
 
   test('`removeAttributeQuotes` applies inside SVG when `minifySVG` is disabled', async () => {

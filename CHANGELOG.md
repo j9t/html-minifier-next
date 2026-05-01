@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.1] - 2026-05-01
+
+### Fixed
+
+* Fixed `collapseAttributeWhitespace` incorrectly collapsing whitespace in attributes where it is semantically significant:
+  - `pattern` (regex literal spaces, e.g., `\d  \d` matching exactly two spaces)
+  - `value` on form-submission elements (`input`, `option`, `button`, `data`, `param`) where the value is used verbatim—but not on numeric elements (like `li` or `meter`) where the browser normalizes it
+  - `title` (line breaks and spacing render visibly in browser tooltips)
+  - `placeholder` (spaces render visibly in inputs)
+  - event handler attributes (spaces inside string literals, e.g., `onclick="alert('→     ←')"`).
+
 ## [6.2.0] - 2026-04-24
 
 ### Added
