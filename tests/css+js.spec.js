@@ -352,6 +352,7 @@ describe('CSS and JS', () => {
     input = '<div onclick="a &amp;&amp; b()">';
     result = await minify(input, { minifyJS: true });
     assert.ok(result.includes('onclick='), '`onclick` attribute should be preserved');
+    assert.ok(result.includes('&&'), 'Decoded `&&` operator should be preserved');
     assert.ok(result.includes('b()'), 'Function call after `&amp;&amp;` should be preserved');
   });
 
