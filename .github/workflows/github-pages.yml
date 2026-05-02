@@ -32,7 +32,7 @@ jobs:
       - name: "Build site"
         run: npm run build:docs
       - name: "Upload build artifact"
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: "./demo/build"
   deploy:
