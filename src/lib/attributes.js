@@ -19,9 +19,9 @@ import {
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
-import { isThenable } from './utils.js';
+import { identity, isThenable } from './utils.js';
 
-// Lazy-load entities only when `decodeEntities` is enabled
+// Lazy-load entities (used for `decodeEntities` and event-handler attribute decode before `minifyJS`)
 
 let decodeHTMLStrictPromise;
 async function getDecodeHTMLStrict() {
@@ -317,6 +317,23 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
 
   if (isEventAttr) {
     attrValue = trimWhitespace(attrValue).replace(/^javascript:\s*/i, '');
+    // Browsers decode attribute values before running event-handler JS—
+    // decode first so the minifier gets valid JavaScript
+    if (!options.decodeEntities && options.minifyJS !== identity && attrValue.indexOf('&') !== -1) {
+      return getDecodeHTMLStrict().then(decode => {
+        const decoded = decode(attrValue);
+        const result = options.minifyJS(decoded, true);
+        const reEncode = v => (v && v.indexOf('&') !== -1) ? v.replace(RE_AMP_ENTITY, '&amp;$1') : v;
+        if (isThenable(result)) {
+          return result.then(reEncode, err => {
+            if (!options.continueOnMinifyError) throw err;
+            options.log && options.log(err);
+            return attrValue;
+          });
+        }
+        return reEncode(result);
+      });
+    }
     const result = options.minifyJS(attrValue, true);
     if (isThenable(result)) {
       return result.catch(err => {

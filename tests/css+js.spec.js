@@ -340,6 +340,22 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('alert'), 'Function call should be preserved');
   });
 
+  test('JS: Entity references in event handler attributes decoded before minification', async () => {
+    let input, result;
+
+    // `&quot;` → `"` enables bracket-to-dot notation optimization
+    input = '<body onclick="window[&quot;alert&quot;]()">';
+    result = await minify(input, { minifyJS: true });
+    assert.ok(result.includes('window.alert()'), 'Bracket notation with `&quot;` should be optimized to dot notation');
+
+    // `&amp;` as logical AND operator
+    input = '<div onclick="a &amp;&amp; b()">';
+    result = await minify(input, { minifyJS: true });
+    assert.ok(result.includes('onclick='), '`onclick` attribute should be preserved');
+    assert.ok(result.includes('&&'), 'Decoded `&&` operator should be preserved');
+    assert.ok(result.includes('b()'), 'Function call after `&amp;&amp;` should be preserved');
+  });
+
   test('JS: MIME types that trigger minification', async () => {
     let input, output;
 
