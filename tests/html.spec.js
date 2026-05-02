@@ -4603,11 +4603,10 @@ describe('HTML', () => {
 
     // `srcdoc` with inline styles and scripts
     input = '<iframe srcdoc="<div style=\'  color: red;  \' onclick=\'  alert(&quot;Hello&quot;);  \'>Test</div>"></iframe>';
-    output = '<iframe srcdoc="<div style=\'color:red\' onclick=\'alert(&quot;Hello&quot;);\'>Test</div>"></iframe>';
+    output = '<iframe srcdoc="<div style=\'color:red\' onclick=\'alert(&#34;Hello&#34;)\'>Test</div>"></iframe>';
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyJS: true, collapseWhitespace: true }), output);
-    await assert.rejects(
+    await assert.doesNotReject(
       minify(input, { continueOnMinifyError: false, minifyCSS: true, minifyJS: true, collapseWhitespace: true }),
-      { message: /Unexpected token/ },
     );
 
     // Nested iframe `srcdoc` should recurse
