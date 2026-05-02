@@ -377,6 +377,30 @@ describe('SVG and MathML', () => {
     assert.strictEqual(r1, r2, 'Cached result should match first result');
   });
 
+  test('Large SVG inputs with identical first/last 50 chars are not confused in cache', async () => {
+    const first50 = '<svg xmlns="http://www.w3.org/2000/svg" width="10"'; // exactly 50 chars
+    const last50 = '<!-- ' + 'z'.repeat(35) + ' --></svg>'; // exactly 50 chars
+    const filler = '<!-- ' + 'f'.repeat(1970) + ' -->'; // stripped by SVGO
+    assert.strictEqual(first50.length, 50, '`first50` must be exactly 50 chars');
+    assert.strictEqual(last50.length, 50, '`last50` must be exactly 50 chars');
+
+    // Both middles are 34 chars—inputs are the same total length
+    const svg1 = first50 + ' height="10"><rect fill="#f00"/>' + filler + last50;
+    const svg2 = first50 + ' height="10"><rect fill="#0f0"/>' + filler + last50;
+
+    assert.ok(svg1.length > 2048, 'Input must exceed the 2048-char threshold');
+    assert.strictEqual(svg1.length, svg2.length, 'Inputs must be the same length to guarantee fingerprint collision');
+    assert.strictEqual(svg1.slice(0, 50), svg2.slice(0, 50), 'First 50 chars must be identical');
+    assert.strictEqual(svg1.slice(-50), svg2.slice(-50), 'Last 50 chars must be identical');
+
+    const result1 = await minify(svg1, { minifySVG: true });
+    const result2 = await minify(svg2, { minifySVG: true });
+
+    assert.notStrictEqual(result1, result2, 'Different large SVG inputs must not share a cache entry');
+    assert.ok(result1.includes('#f00') || result1.includes('red'), 'First result should contain the correct fill');
+    assert.ok(result2.includes('#0f0') || result2.includes('lime'), 'Second result should contain the correct fill');
+  });
+
   test('SVG and MathML elements should not be removed by `removeEmptyElements`', async () => {
     // SVG elements define their content via attributes (like `d`, `cx`, `r`)
     // They should not be removed as "empty" even without text content

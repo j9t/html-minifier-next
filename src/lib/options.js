@@ -1,7 +1,7 @@
 // Imports
 
 import { createUrlMinifier } from './urls.js';
-import { LRU, stableStringify, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
+import { LRU, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -131,12 +131,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           );
         }
 
-        // Cache key: Wrapped content, type, options signature
+        // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
-        // For large inputs, use length and content fingerprint (first/last 50 chars) to prevent collisions
         const cssKey = inputCSS.length > 2048
-          ? (inputCSS.length + '|' + inputCSS.slice(0, 50) + inputCSS.slice(-50) + '|' + type + '|' + cssSig)
+          ? (hashContent(inputCSS) + '|' + type + '|' + cssSig)
           : (inputCSS + '|' + type + '|' + cssSig);
 
         try {
@@ -246,8 +245,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           // Select pre-computed signature based on engine
           const optsSig = useEngine === 'terser' ? terserSig : swcSig;
 
-          // For large inputs, use length and content fingerprint to prevent collisions
-          jsKey = (code.length > 2048 ? (code.length + '|' + code.slice(0, 50) + code.slice(-50) + '|') : (code + '|'))
+          // For large inputs, hash the full content to avoid storing huge strings as Map keys
+          jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
             + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
 
           const cached = jsMinifyCache.get(jsKey);
@@ -359,9 +358,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return svgContent;
         }
 
-        // Cache key
+        // Cache key: Large inputs are hashed to avoid huge Map keys
         const svgKey = svgContent.length > 2048
-          ? (svgContent.length + '|' + svgContent.slice(0, 50) + svgContent.slice(-50) + '|' + svgSig)
+          ? (hashContent(svgContent) + '|' + svgSig)
           : (svgContent + '|' + svgSig);
 
         try {

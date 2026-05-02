@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.2] - 2026-05-02
+
+### Fixed
+
+* Fixed a cache key collision for large CSS, JS, and SVG inputs (>2,048 characters):
+  - The previous fingerprint scheme (length + first/last 50 characters) could return incorrect cached minification results when two inputs shared the same length and the same first and last 50 characters
+  - Keys for large inputs now use an FNV-1a hash of the full content
+
 ## [6.2.1] - 2026-05-01
 
 ### Fixed
