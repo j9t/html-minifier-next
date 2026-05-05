@@ -121,6 +121,11 @@ const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript
 const RE_START_TAG = /^<[^/!]/;
 const RE_END_TAG = /^<\//;
 
+// Pre-compiled patterns for `htmlmin:ignore` block content analysis
+const RE_HTML_COMMENT_START = /^\s*<!--/;
+const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
+const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
+
 // HTML encoding types for annotation-xml (MathML)
 const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 
@@ -1428,7 +1433,7 @@ async function minifyHTML(value, options, partialMarkup) {
                   const idx = +match[1];
                   if (idx < ignoredMarkupChunks.length) {
                     const content = ignoredMarkupChunks[idx];
-                    const lastTagMatch = content && content.match(/[\s\S]*<(\/?[a-zA-Z][\w:-]*)/);
+                    const lastTagMatch = content && RE_LAST_HTML_TAG.exec(content);
                     if (lastTagMatch) {
                       const isClose = lastTagMatch[1].charAt(0) === '/';
                       const tagName = options.name(isClose ? lastTagMatch[1].slice(1) : lastTagMatch[1]);
@@ -1580,13 +1585,19 @@ async function minifyHTML(value, options, partialMarkup) {
                       const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
                       const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
                       // HTML comments are invisible (no block/inline nature), treat as non-inline
-                      const prevIsHtmlComment = !prevTagMatch && /^\s*<!--/.test(prevContent);
-                      const currentIsHtmlComment = !currentTagMatch && /^\s*<!--/.test(currentContent);
+                      const prevIsHtmlComment = !prevTagMatch && RE_HTML_COMMENT_START.test(prevContent);
+                      const currentIsHtmlComment = !currentTagMatch && RE_HTML_COMMENT_START.test(currentContent);
+                      // Closing tags (e.g., `</div>`)—inline-ness determines whether to collapse
+                      const prevClosingTagMatch = !prevTagMatch && RE_CLOSING_TAG_START.exec(prevContent);
+                      const currentClosingTagMatch = !currentTagMatch && RE_CLOSING_TAG_START.exec(currentContent);
 
-                      // Collapse if both sides are element tags or HTML comments, and neither is inline
-                      if ((currentTagMatch || currentIsHtmlComment) && (prevTagMatch || prevIsHtmlComment)) {
-                        const currentTag = currentTagMatch ? options.name(currentTagMatch[1]) : null;
-                        const prevTag = prevTagMatch ? options.name(prevTagMatch[1]) : null;
+                      // Collapse if both sides are element/closing tags or HTML comments, and neither is inline
+                      if ((currentTagMatch || currentIsHtmlComment || currentClosingTagMatch) &&
+                          (prevTagMatch || prevIsHtmlComment || prevClosingTagMatch)) {
+                        const currentTag = currentTagMatch ? options.name(currentTagMatch[1])
+                          : currentClosingTagMatch ? options.name(currentClosingTagMatch[1]) : null;
+                        const prevTag = prevTagMatch ? options.name(prevTagMatch[1])
+                          : prevClosingTagMatch ? options.name(prevClosingTagMatch[1]) : null;
 
                         // Don’t collapse between inline elements (HTML comments count as non-inline)
                         if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {

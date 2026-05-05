@@ -3792,6 +3792,21 @@ describe('HTML', () => {
     input = '<!doctype html><html>\n\t<!-- htmlmin:ignore --><!-- Test --><!-- htmlmin:ignore -->\n\t<!-- htmlmin:ignore --><head><!-- htmlmin:ignore -->\n\t\t<title>Test</title>\n\t<body>\n\t\t<p>Test<!-- htmlmin:ignore --></p><!-- htmlmin:ignore -->\n\t\t<a href=test>Test</a>';
     output = '<!doctype html><html><!-- Test --><head><title>Test</title><p>Test</p><a href=test>Test</a>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true, removeAttributeQuotes: true }), output);
+
+    // Closing block tag in ignore block followed by opening block tag in another ignore block: no space
+    input = '<!-- htmlmin:ignore --></div><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --><div>x</div><!-- htmlmin:ignore -->';
+    output = '</div><div>x</div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Closing inline tag followed by opening block tag: Space must be preserved
+    input = '<!-- htmlmin:ignore --></em><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --><div>x</div><!-- htmlmin:ignore -->';
+    output = '</em> <div>x</div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Closing block tag followed by closing inline tag: Space must be preserved
+    input = '<!-- htmlmin:ignore --></div><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --></em><!-- htmlmin:ignore -->';
+    output = '</div> </em>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
   test('`meta` viewport', async () => {

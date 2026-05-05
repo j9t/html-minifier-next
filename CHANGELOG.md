@@ -8,9 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-* Fixed two cases where `htmlmin:ignore` blocks caused a spurious space in the minified output when `collapseWhitespace` is enabled:
+* Fixed three cases where `htmlmin:ignore` blocks caused a spurious space in the minified output when `collapseWhitespace` is enabled:
   1. An ignore block containing an HTML comment (e.g., `<!-- note -->`) followed by a block-level element in another ignore block (e.g., `<head>`) produced `<!-- note --> <head>` instead of `<!-- note --><head>`
   2. A closing block tag (e.g., `</p>`) hidden inside an ignore block followed by an inline element (e.g., `<a>`) produced `</p> <a>` instead of `</p><a>`, because the parser never saw the closing tag and kept the block open, treating the next inline element as inline content
+  3. A closing block tag in one ignore block followed by an opening block tag in the next ignore block (e.g., `</section> … <section>`) produced `</section> <section>` instead of `</section><section>`
 
 ## [6.2.3] - 2026-05-02
 
