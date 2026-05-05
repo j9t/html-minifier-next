@@ -3777,6 +3777,21 @@ describe('HTML', () => {
     input = '<!-- htmlmin:ignore --><div>foo</div><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --><div>bar</div><!-- htmlmin:ignore -->';
     output = '<div>foo</div>\n<div>bar</div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, preserveLineBreaks: true }), output);
+
+    // HTML comment in ignore block followed by block element: no space (fix: `commentFinalize`)
+    input = '<!-- htmlmin:ignore --><!-- note --><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --><head><!-- htmlmin:ignore --><title>T</title>';
+    output = '<!-- note --><head><title>T</title>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Block element in ignore block followed by inline element outside: no space (fix: `effectivePrevTag`)
+    input = '<p><!-- htmlmin:ignore --></p><!-- htmlmin:ignore -->\n<a href="#">link</a>';
+    output = '<p></p><a href="#">link</a>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Combined: Both patterns from a single document with comprehensive settings
+    input = '<!doctype html><html>\n\t<!-- htmlmin:ignore --><!-- Test --><!-- htmlmin:ignore -->\n\t<!-- htmlmin:ignore --><head><!-- htmlmin:ignore -->\n\t\t<title>Test</title>\n\t<body>\n\t\t<p>Test<!-- htmlmin:ignore --></p><!-- htmlmin:ignore -->\n\t\t<a href=test>Test</a>';
+    output = '<!doctype html><html><!-- Test --><head><title>Test</title><p>Test</p><a href=test>Test</a>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true, removeAttributeQuotes: true }), output);
   });
 
   test('`meta` viewport', async () => {
