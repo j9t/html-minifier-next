@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.4] - 2026-05-05
+
+### Fixed
+
+* Fixed two cases where `htmlmin:ignore` blocks caused a spurious space in the minified output when `collapseWhitespace` is enabled:
+  1. An ignore block containing an HTML comment (e.g., `<!-- note -->`) followed by a block-level element in another ignore block (e.g., `<head>`) produced `<!-- note --> <head>` instead of `<!-- note --><head>`
+  2. A closing block tag (e.g., `</p>`) hidden inside an ignore block followed by an inline element (e.g., `<a>`) produced `</p> <a>` instead of `</p><a>`, because the parser never saw the closing tag and kept the block open, treating the next inline element as inline content
+
 ## [6.2.3] - 2026-05-02
 
 ### Fixed
