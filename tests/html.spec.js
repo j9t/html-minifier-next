@@ -315,7 +315,7 @@ describe('HTML', () => {
 
   test('Deduplicate attributes', async () => {
     // Per HTML spec, when duplicate attributes are present, the first occurrence wins
-    // Duplicate attributes result in invalid HTML, so we deduplicate them
+    // Duplicate attributes result in invalid HTML, so deduplicate them
 
     // Simple duplicate attribute
     assert.strictEqual(await minify('<html data-color-mode="auto" data-color-mode="light"></html>'), '<html data-color-mode="auto"></html>');

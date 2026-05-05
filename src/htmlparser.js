@@ -218,12 +218,12 @@ export class HTMLParser {
     while (pos < fullLength) {
       lastPos = pos;
 
-      // Make sure we’re not in a `script` or `style` element
+      // Make sure not to be in a `script` or `style` element
       if (!lastTag || !special.has(lastTag)) {
         const textEnd = fullHtml.indexOf('<', pos);
 
         if (textEnd === pos) {
-          // We found a tag at current position
+          // Tag found at current position
 
           // Check cache from previous lookahead (avoids re-parsing the same tag)
           if (cachedNextStartTag && cachedNextStartTag.pos === pos) {
@@ -459,7 +459,7 @@ export class HTMLParser {
             break;
           }
 
-          // Limit the input length we pass to the regex to prevent catastrophic backtracking
+          // Limit the input length to pass to the regex to prevent catastrophic backtracking
           const remainingLen = fullLength - currentPos;
           const isLimited = remainingLen > MAX_ATTR_PARSE_LENGTH;
 
@@ -474,7 +474,7 @@ export class HTMLParser {
             const searchStr = fullHtml.substring(currentPos, extractEndPos);
             attr = searchStr.match(attribute);
 
-            // If we limited the input and got a match, check if the value might be truncated
+            // If input was limited and there’s a match, check if the value might be truncated
             if (attr) {
               // Check if the attribute value extends beyond our search window
               const attrEnd = attr[0].length;
@@ -532,7 +532,7 @@ export class HTMLParser {
             }
 
             if (!attr) {
-              // If we limited the input and got no match, try manual extraction
+              // If input was limited and there’s no match, try manual extraction
               // This handles cases where quoted attributes exceed `MAX_ATTR_PARSE_LENGTH`
               const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
               if (manualMatch) {
@@ -598,7 +598,7 @@ export class HTMLParser {
         if (currentTag === needle) {
           return pos;
         }
-        // Stop searching if we hit a table boundary
+        // Stop searching if hitting a table boundary
         if (currentTag === 'table') {
           break;
         }

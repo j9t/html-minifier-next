@@ -764,7 +764,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
           await scan(text);
         }
       },
-      // We never need `nextTag` information in this scan
+      // No need for `nextTag` information in this scan
       wantsNextTag: false,
       // Continue on parse errors during analysis pass
       continueOnParseError: options.continueOnParseError
@@ -773,7 +773,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     try {
       await parser.parse();
     } catch (err) {
-      // If parsing fails during analysis pass, just skip it—we’ll still have partial frequency data from what we could parse
+      // If parsing fails during analysis pass, skip it—there’s partial frequency data from what can be parsed
       if (!options.continueOnParseError) {
         throw err;
       }
@@ -828,9 +828,9 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // First pass minification applies attribute transformations like `removeStyleLinkTypeAttributes` for accurate frequency analysis
     const firstPassOutput = await minifyHTML(expandedValue, firstPassOptions);
 
-    // For frequency analysis, we need to remove custom fragments temporarily
+    // For frequency analysis, remove custom fragments temporarily
     // because HTML comments in opening tags prevent proper attribute parsing;
-    // we remove them with a space to preserve attribute boundaries
+    // removed with a space to preserve attribute boundaries
     let scanValue = firstPassOutput;
     if (customFragmentPattern) {
       scanValue = firstPassOutput.replace(customFragmentPattern, ' ');
@@ -972,8 +972,8 @@ async function minifyHTML(value, options, partialMarkup) {
     removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
   }
 
-  // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there;
-  // for all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
+  // Temporarily replace ignored chunks with comments, so that there’s no need to worry what’s there;
+  // there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
   if (value.indexOf('<!-- htmlmin:ignore -->') !== -1) {
     // Use `indexOf`-based O(n) loop instead of a global regex with [\s\S]*? to avoid O(n²)
     // backtracking on adversarial HTML with many `<!--` prefixes but no closing marker
