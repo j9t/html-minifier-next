@@ -1113,7 +1113,7 @@ describe('CLI', () => {
 
   test('Should override preset options with CLI flags', () => {
     const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p class="">test</p>';
-    // Conservative preset has `useShortDoctype`, and we add `removeEmptyAttributes` via CLI
+    // Conservative preset has `useShortDoctype`, `removeEmptyAttributes` added via CLI
     const { stdout, status } = spawnSync('node', [cliPath, '--preset', 'conservative', '--remove-empty-attributes'], {
       cwd: fixturesDir,
       input: input

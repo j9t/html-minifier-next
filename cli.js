@@ -300,7 +300,7 @@ program.helpOption('-h, --help', 'Display help for command');
   await program.arguments('[files...]').action(function (files) {
     capturedFiles = files;
     filesProvided = files.length > 0;
-    // Defer reading files until after we check for consumed filenames
+    // Defer reading files until after check for consumed filenames
   }).parseAsync(process.argv);
 
   const programOptions = program.opts();

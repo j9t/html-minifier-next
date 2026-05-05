@@ -72,7 +72,7 @@ function attributesInclude(attributes, attribute) {
 /**
  * Remove duplicate attributes from an attribute list.
  * Per HTML spec, when an attribute appears multiple times, the first occurrence wins.
- * Duplicate attributes result in invalid HTML, so we keep only the first.
+ * Duplicate attributes result in invalid HTML, so only the first is kept.
  * @param {Array} attrs - Array of attribute objects with `name` property
  * @param {boolean} caseSensitive - Whether to compare names case-sensitively (for XML/SVG)
  * @returns {Array} Deduplicated attribute array (modifies in place and returns)
@@ -117,7 +117,7 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
     return false;
   }
 
-  // Now we know we need to check the value, so normalize it
+  // Value needs to be checked, so normalize it
   attrValue = attrValue ? trimWhitespace(attrValue.toLowerCase()) : '';
 
   // Legacy attribute checks
@@ -575,7 +575,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   let attrFragment;
   let emittedAttrValue;
 
-  // Determine if we need to add/keep quotes
+  // Determine if need to add/keep quotes
   const shouldAddQuotes = typeof attrValue !== 'undefined' && (
     // If `removeAttributeQuotes` is enabled, add quotes only if they can’t be removed
     (options.removeAttributeQuotes && (attrValue.indexOf(uidAttr) !== -1 || !canRemoveAttributeQuotes(attrValue))) ||
@@ -590,7 +590,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
       // Normal mode: Choose optimal quote type to minimize escaping
-      // unless we’re preserving original quotes and they don’t need escaping
+      // unless preserving original quotes and they don’t need escaping
       const needsEscaping = (attrQuote === '"' && attrValue.indexOf('"') !== -1) || (attrQuote === "'" && attrValue.indexOf("'") !== -1);
 
       if (options.removeAttributeQuotes || typeof options.quoteCharacter !== 'undefined' || needsEscaping || attrQuote === '') {

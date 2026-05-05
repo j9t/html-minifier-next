@@ -121,6 +121,11 @@ const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript
 const RE_START_TAG = /^<[^/!]/;
 const RE_END_TAG = /^<\//;
 
+// Pre-compiled patterns for `htmlmin:ignore` block content analysis
+const RE_HTML_COMMENT_START = /^\s*<!--/;
+const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
+const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
+
 // HTML encoding types for annotation-xml (MathML)
 const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 
@@ -759,7 +764,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
           await scan(text);
         }
       },
-      // We never need `nextTag` information in this scan
+      // No need for `nextTag` information in this scan
       wantsNextTag: false,
       // Continue on parse errors during analysis pass
       continueOnParseError: options.continueOnParseError
@@ -768,7 +773,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     try {
       await parser.parse();
     } catch (err) {
-      // If parsing fails during analysis pass, just skip it—we’ll still have partial frequency data from what we could parse
+      // If parsing fails during analysis pass, skip it—there’s partial frequency data from what can be parsed
       if (!options.continueOnParseError) {
         throw err;
       }
@@ -823,9 +828,9 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // First pass minification applies attribute transformations like `removeStyleLinkTypeAttributes` for accurate frequency analysis
     const firstPassOutput = await minifyHTML(expandedValue, firstPassOptions);
 
-    // For frequency analysis, we need to remove custom fragments temporarily
-    // because HTML comments in opening tags prevent proper attribute parsing.
-    // We remove them with a space to preserve attribute boundaries.
+    // For frequency analysis, remove custom fragments temporarily
+    // because HTML comments in opening tags prevent proper attribute parsing;
+    // removed with a space to preserve attribute boundaries
     let scanValue = firstPassOutput;
     if (customFragmentPattern) {
       scanValue = firstPassOutput.replace(customFragmentPattern, ' ');
@@ -967,8 +972,8 @@ async function minifyHTML(value, options, partialMarkup) {
     removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
   }
 
-  // Temporarily replace ignored chunks with comments, so that we don’t have to worry what’s there;
-  // for all we care there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
+  // Temporarily replace ignored chunks with comments, so that there’s no need to worry what’s there;
+  // there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
   if (value.indexOf('<!-- htmlmin:ignore -->') !== -1) {
     // Use `indexOf`-based O(n) loop instead of a global regex with [\s\S]*? to avoid O(n²)
     // backtracking on adversarial HTML with many `<!--` prefixes but no closing marker
@@ -1401,11 +1406,16 @@ async function minifyHTML(value, options, partialMarkup) {
         }
         if (options.collapseWhitespace) {
           if (!stackNoTrimWhitespace.length) {
+            // When the prev item is a UID placeholder, compute its effective tag name for whitespace decisions;
+            // this is only used in `collapseWhitespaceSmart`—`prevTag` itself is not modified,
+            // to avoid side effects on the `inlineTextSet` branch below
+            let effectivePrevTag = prevTag;
             if (prevTag === 'comment') {
               const prevComment = buffer[buffer.length - 1];
               if (!uidIgnore || prevComment.indexOf(uidIgnore) === -1) {
                 if (!prevComment) {
                   prevTag = charsPrevTag;
+                  effectivePrevTag = prevTag;
                 }
                 if (buffer.length > 1 && (!prevComment || (!options.conservativeCollapse && / $/.test(currentChars)))) {
                   const charsIndex = buffer.length - 2;
@@ -1413,6 +1423,23 @@ async function minifyHTML(value, options, partialMarkup) {
                     text = trailingSpaces + text;
                     return '';
                   });
+                }
+              } else if (uidIgnorePlaceholderPattern && nextTag !== 'comment') {
+                // UID placeholder followed by a real element—derive the effective `prevTag` from the
+                // placeholder’s last HTML tag so `collapseWhitespaceSmart` can make the right call;
+                // when `nextTag` is `comment` (another UID placeholder), `commentFinalize` handles it
+                const match = prevComment.match(uidIgnorePlaceholderPattern);
+                if (match) {
+                  const idx = +match[1];
+                  if (idx < ignoredMarkupChunks.length) {
+                    const content = ignoredMarkupChunks[idx];
+                    const lastTagMatch = content && RE_LAST_HTML_TAG.exec(content);
+                    if (lastTagMatch) {
+                      const isClose = lastTagMatch[1].charAt(0) === '/';
+                      const tagName = options.name(isClose ? lastTagMatch[1].slice(1) : lastTagMatch[1]);
+                      effectivePrevTag = isClose ? '/' + tagName : tagName;
+                    }
+                  }
                 }
               }
             }
@@ -1430,7 +1457,7 @@ async function minifyHTML(value, options, partialMarkup) {
               }
             }
             if (prevTag || nextTag) {
-              text = collapseWhitespaceSmart(text, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet);
+              text = collapseWhitespaceSmart(text, effectivePrevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet);
             } else {
               text = collapseWhitespace(text, options, true, true);
             }
@@ -1553,21 +1580,26 @@ async function minifyHTML(value, options, partialMarkup) {
 
                     // Only collapse whitespace if both blocks contain HTML (start with `<`)
                     // Don’t collapse if either contains plain text, as that would change meaning
-                    // Note: This check will match HTML comments (`<!-- … -->`), but the tag name
-                    // regex below requires starting with a letter, so comments are intentionally
-                    // excluded by the `currentTagMatch && prevTagMatch` guard
                     if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
-                      // Extract tag names from the HTML content (excludes comments, processing instructions, etc.)
+                      // Extract tag names from the HTML content
                       const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
                       const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                      // HTML comments are invisible (no block/inline nature), treat as non-inline
+                      const prevIsHtmlComment = !prevTagMatch && RE_HTML_COMMENT_START.test(prevContent);
+                      const currentIsHtmlComment = !currentTagMatch && RE_HTML_COMMENT_START.test(currentContent);
+                      // Closing tags (e.g., `</div>`)—inline-ness determines whether to collapse
+                      const prevClosingTagMatch = !prevTagMatch && RE_CLOSING_TAG_START.exec(prevContent);
+                      const currentClosingTagMatch = !currentTagMatch && RE_CLOSING_TAG_START.exec(currentContent);
 
-                      // Only collapse if both matched valid element tags (not comments/text)
-                      // and both tags are block-level (inline elements need whitespace preserved)
-                      if (currentTagMatch && prevTagMatch) {
-                        const currentTag = options.name(currentTagMatch[1]);
-                        const prevTag = options.name(prevTagMatch[1]);
+                      // Collapse if both sides are element/closing tags or HTML comments, and neither is inline
+                      if ((currentTagMatch || currentIsHtmlComment || currentClosingTagMatch) &&
+                          (prevTagMatch || prevIsHtmlComment || prevClosingTagMatch)) {
+                        const currentTag = currentTagMatch ? options.name(currentTagMatch[1])
+                          : currentClosingTagMatch ? options.name(currentClosingTagMatch[1]) : null;
+                        const prevTag = prevTagMatch ? options.name(prevTagMatch[1])
+                          : prevClosingTagMatch ? options.name(prevClosingTagMatch[1]) : null;
 
-                        // Don’t collapse between inline elements
+                        // Don’t collapse between inline elements (HTML comments count as non-inline)
                         if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
                           // Collapse whitespace respecting context rules
                           let collapsedText = prevText;
