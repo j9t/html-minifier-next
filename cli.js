@@ -60,10 +60,10 @@ const pkg = require('./package.json');
 
 const DEFAULT_FILE_EXTENSIONS = ['html', 'htm', 'shtml', 'shtm'];
 
-const MARK_ERROR   = process.stderr.isTTY ? '\x1b[31m' : '';
+const MARK_ERROR = process.stderr.isTTY ? '\x1b[31m' : '';
 const MARK_SUCCESS = process.stderr.isTTY ? '\x1b[32m' : '';
 const MARK_WARNING = process.stderr.isTTY ? '\x1b[33m' : '';
-const MARK_RESET   = process.stderr.isTTY ? '\x1b[0m'  : '';
+const MARK_RESET = process.stderr.isTTY ? '\x1b[0m' : '';
 
 const program = new Command();
 program.name(pkg.name);
