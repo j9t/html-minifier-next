@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.5] - 2026-05-14
+
+### Changed
+
+* Removed `continueOnParseError` from the `comprehensive` preset, because not related to minification aggressiveness (if needed, the behavior can be opted in explicitly)
+
 ## [6.2.4] - 2026-05-05
 
 ### Fixed
@@ -36,7 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - `value` on form-submission elements (`input`, `option`, `button`, `data`, `param`) where the value is used verbatim—but not on numeric elements (like `li` or `meter`) where the browser normalizes it
   - `title` (line breaks and spacing render visibly in browser tooltips)
   - `placeholder` (spaces render visibly in inputs)
-  - event handler attributes (spaces inside string literals, e.g., `onclick="alert('→     ←')"`).
+  - event handler attributes (spaces inside string literals, e.g., `onclick="alert('→     ←')"`)
 
 ## [6.2.0] - 2026-04-24
 
@@ -782,7 +788,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `continueOnMinifyError` option to control error handling during CSS, JavaScript, and URL minification. When set to `false`, minification errors will throw and may abort processing. When set to `true` (the default), the minifier attempts to recover from errors, preserving the original content when minification fails. This provides users with explicit control over error handling and helps ensure invalid syntax is not silently ignored when strict validation is needed.
+* Added `continueOnMinifyError` option to control error handling during CSS, JavaScript, and URL minification. When set to `false`, minification errors will throw and may abort processing. When set to `true` (the default), the minifier attempts to recover from errors, preserving the original content when minification fails. This provides users with explicit control over error handling and helps ensure invalid syntax is not silently ignored when strict validation is needed
 * Added CLI flag `--no-continue-on-minify-error` to disable error recovery from the command line
 * Added test coverage including error scenarios across CSS, JavaScript, and URL minification
 
@@ -1068,8 +1074,8 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 ### Changed
 
-* **BREAKING:** Removed `HTMLtoXML` and `HTMLtoDOM` functions from the public API. These XML-related functions were outdated and no longer relevant to the library’s focus on HTML minification.
-* **BREAKING:** Deep imports to internal modules are no longer supported. Use the main export instead of importing from specific source files.
+* **BREAKING:** Removed `HTMLtoXML` and `HTMLtoDOM` functions from the public API; these XML-related functions were outdated and no longer relevant to the library’s focus on HTML minification
+* **BREAKING:** Deep imports to internal modules are no longer supported—use the main export instead of importing from specific source files
 * Updated comment references from “HTML5 elements” to “HTML elements” for accuracy
 * Streamlined codebase by removing unused utility functions
 * Updated package exports to enforce clean API boundaries

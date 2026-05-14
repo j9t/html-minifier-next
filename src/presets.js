@@ -22,7 +22,6 @@ export const presets = {
     collapseAttributeWhitespace: true,
     collapseBooleanAttributes: true,
     collapseWhitespace: true,
-    continueOnParseError: true,
     decodeEntities: true,
     mergeScripts: true,
     minifyCSS: true,
