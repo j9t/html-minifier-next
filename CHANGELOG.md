@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `hmn` as a short CLI alias for `html-minifier-next` (both commands work identically after a global install)
+* Added `hmn` as a short CLI alias for `html-minifier-next`
 
 ## [6.2.5] - 2026-05-14
 
