@@ -6,8 +6,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages-${{ github.workflow }}-${{ github.ref_name }}
@@ -38,6 +36,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: "GitHub Pages"
       url: ${{ steps.deployment.outputs.page_url }}
