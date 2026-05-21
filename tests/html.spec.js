@@ -3726,6 +3726,13 @@ describe('HTML', () => {
     input = '<!-- htmlmin:ignore --><head><!-- htmlmin:ignore --><title>T</title></head><!-- htmlmin:ignore --><body><!-- htmlmin:ignore --><p>hi</p>';
     output = '<head><title>T</title><body><p>hi';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Optional end tag removal must respect element-specific rules when the following element is in an ignore block
+    input = '<p>text</p><!-- htmlmin:ignore --><span>foo</span><!-- htmlmin:ignore -->';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<p>text</p><span>foo</span>');
+
+    input = '<p>text</p><!-- htmlmin:ignore --><div>foo</div><!-- htmlmin:ignore -->';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<p>text<div>foo</div>');
   });
 
   test('Whitespace-collapse between consecutive `htmlmin:ignore` blocks', async () => {
