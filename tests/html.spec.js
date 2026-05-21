@@ -2516,6 +2516,15 @@ describe('HTML', () => {
     input = '<style>body{font-size:<%=1%>2pt}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+
+    // Optional end tags before custom fragments should still be removed
+    input = '<head><title>T</title></head><?foo?><body><p>hi</p>';
+    output = '<title>T</title><?foo?><p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    input = '<head><title>T</title></head>{{expr}}<body><p>hi</p>';
+    output = '<title>T</title>{{expr}}<p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
   });
 
   test('`caseSensitive`', async () => {
@@ -3708,6 +3717,15 @@ describe('HTML', () => {
 
     input = '<!-- htmlmin:ignore -->+<!-- htmlmin:ignore -->0';
     assert.strictEqual(await minify(input), '+0');
+
+    // Optional end tags before `htmlmin:ignore` blocks should still be removed
+    input = '<head><title>T</title></head><!-- htmlmin:ignore --><body><!-- htmlmin:ignore --><p>hi</p>';
+    output = '<title>T</title><body><p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    input = '<!-- htmlmin:ignore --><head><!-- htmlmin:ignore --><title>T</title></head><!-- htmlmin:ignore --><body><!-- htmlmin:ignore --><p>hi</p>';
+    output = '<head><title>T</title><body><p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
   });
 
   test('Whitespace-collapse between consecutive `htmlmin:ignore` blocks', async () => {
