@@ -1480,11 +1480,11 @@ async function minifyHTML(value, options, partialMarkup) {
           // UID-attr tokens are padded with `\t`, which would falsely look like leading whitespace;
           // resolve single-token text to its actual content for the space/comment checks below
           let effectiveText = text;
-          if (uidAttrSinglePattern) {
+          if (uidAttrSinglePattern && text.includes(uidAttr)) {
             const uidMatch = uidAttrSinglePattern.exec(text);
             if (uidMatch) {
               const idx = +uidMatch[1];
-              const chunks = idx >= 0 && idx < ignoredCustomMarkupChunks.length ? ignoredCustomMarkupChunks[idx] : null;
+              const chunks = idx < ignoredCustomMarkupChunks.length ? ignoredCustomMarkupChunks[idx] : null;
               if (chunks != null) {
                 effectiveText = chunks[0];
               }
@@ -1564,16 +1564,18 @@ async function minifyHTML(value, options, partialMarkup) {
       // Finalization phase (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
       function commentFinalize(comment) {
         if (options.removeOptionalTags && comment) {
-          if (uidIgnorePlaceholderPattern && uidIgnorePlaceholderPattern.test(comment)) {
-            // UID placeholders represent real HTML content, not true HTML comments;
-            // if there’s a pending optional end tag and the ignored content isn’t itself
-            // a comment (which per the HTML spec prevents omission), resolve it now,
-            // before the UID is pushed to the buffer
-            const match = comment.match(uidIgnorePlaceholderPattern);
-            const idx = match ? +match[1] : -1;
-            const content = idx >= 0 && idx < ignoredMarkupChunks.length ? ignoredMarkupChunks[idx] : null;
-            if (optionalEndTag && optionalEndTagEmitted && content != null && !/^\s*<!--/.test(content)) {
-              removeEndTag();
+          if (uidIgnorePlaceholderPattern) {
+            const match = uidIgnorePlaceholderPattern.exec(comment);
+            if (match) {
+              // UID placeholders represent real HTML content, not true HTML comments;
+              // if there’s a pending optional end tag and the ignored content isn’t itself
+              // a comment (which per the HTML spec prevents omission), resolve it now,
+              // before the UID is pushed to the buffer
+              const idx = +match[1];
+              const content = idx < ignoredMarkupChunks.length ? ignoredMarkupChunks[idx] : null;
+              if (optionalEndTag && optionalEndTagEmitted && content != null && !/^\s*<!--/.test(content)) {
+                removeEndTag();
+              }
             }
           }
           // Comments (real or placeholder) always suppress optional start tag omissions
