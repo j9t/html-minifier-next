@@ -3738,6 +3738,10 @@ describe('HTML', () => {
 
     input = '<p>text</p><!-- htmlmin:ignore --><div>foo</div><!-- htmlmin:ignore -->';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<p>text<div>foo</div>');
+
+    // A closing tag at the start of an ignore block must not cause the regex to skip ahead and match a later opening tag
+    input = '<p>text</p><!-- htmlmin:ignore --></div><p>next</p><!-- htmlmin:ignore -->';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<p>text</p></div><p>next</p>');
   });
 
   test('Whitespace-collapse between consecutive `htmlmin:ignore` blocks', async () => {

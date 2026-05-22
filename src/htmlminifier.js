@@ -1574,7 +1574,7 @@ async function minifyHTML(value, options, partialMarkup) {
               const idx = +match[1];
               const content = idx < ignoredMarkupChunks.length ? ignoredMarkupChunks[idx] : null;
               if (optionalEndTag && optionalEndTagEmitted && content != null && !/^\s*<!--/.test(content)) {
-                const firstTagMatch = content.match(/[^<]*<([a-zA-Z][^\s/>]*)/);
+                const firstTagMatch = content.match(/^\s*<([a-zA-Z][^\s/>]*)/);
                 const firstTag = firstTagMatch ? options.name(firstTagMatch[1]) : '';
                 if (canRemovePrecedingTag(optionalEndTag, firstTag)) {
                   removeEndTag();
