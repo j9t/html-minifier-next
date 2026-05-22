@@ -949,7 +949,7 @@ async function minifyHTML(value, options, partialMarkup) {
   let uidIgnorePlaceholderPattern;
   let uidAttr;
   let uidPattern;
-  let uidAttrSinglePattern;
+  let uidAttrLeadingPattern;
   // Create inline tags/text sets with custom elements
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
@@ -1041,7 +1041,7 @@ async function minifyHTML(value, options, partialMarkup) {
       if (!uidAttr) {
         uidAttr = uniqueId(value);
         uidPattern = new RegExp('(\\s*)' + uidAttr + '([0-9]+)' + uidAttr + '(\\s*)', 'g');
-        uidAttrSinglePattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr + '\\s*$');
+        uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
 
         if (options.minifyCSS) {
           options.minifyCSS = (function (fn) {
@@ -1480,8 +1480,8 @@ async function minifyHTML(value, options, partialMarkup) {
           // UID-attr tokens are padded with `\t`, which would falsely look like leading whitespace;
           // resolve single-token text to its actual content for the space/comment checks below
           let effectiveText = text;
-          if (uidAttrSinglePattern && text.includes(uidAttr)) {
-            const uidMatch = uidAttrSinglePattern.exec(text);
+          if (uidAttrLeadingPattern && text.includes(uidAttr)) {
+            const uidMatch = uidAttrLeadingPattern.exec(text);
             if (uidMatch) {
               const idx = +uidMatch[1];
               const chunks = idx < ignoredCustomMarkupChunks.length ? ignoredCustomMarkupChunks[idx] : null;

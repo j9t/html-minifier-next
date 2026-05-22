@@ -2525,6 +2525,11 @@ describe('HTML', () => {
     input = '<head><title>T</title></head>{{expr}}<body><p>hi</p>';
     output = '<title>T</title>{{expr}}<p>hi';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
+
+    // Multiple separate fragments (whitespace between prevents merging into one token) must not block removal
+    input = '<head><title>T</title></head>{{a}} {{b}}<body><p>hi</p>';
+    output = '<title>T</title>{{a}} {{b}}<p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
   });
 
   test('`caseSensitive`', async () => {
