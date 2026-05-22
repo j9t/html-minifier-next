@@ -949,6 +949,7 @@ async function minifyHTML(value, options, partialMarkup) {
   let uidIgnorePlaceholderPattern;
   let uidAttr;
   let uidPattern;
+  let uidAttrLeadingPattern;
   // Create inline tags/text sets with custom elements
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
@@ -1040,6 +1041,7 @@ async function minifyHTML(value, options, partialMarkup) {
       if (!uidAttr) {
         uidAttr = uniqueId(value);
         uidPattern = new RegExp('(\\s*)' + uidAttr + '([0-9]+)' + uidAttr + '(\\s*)', 'g');
+        uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
 
         if (options.minifyCSS) {
           options.minifyCSS = (function (fn) {
@@ -1475,15 +1477,28 @@ async function minifyHTML(value, options, partialMarkup) {
       // Finalization phase (sync): Optional tag handling, entity re-encoding, buffer push
       function charsFinalize(text) {
         if (options.removeOptionalTags && text) {
+          // UID-attr tokens are padded with `\t`, which would falsely look like leading whitespace;
+          // resolve single-token text to its actual content for the space/comment checks below
+          let effectiveText = text;
+          if (uidAttrLeadingPattern && text.includes(uidAttr)) {
+            const uidMatch = uidAttrLeadingPattern.exec(text);
+            if (uidMatch) {
+              const idx = +uidMatch[1];
+              const chunks = idx < ignoredCustomMarkupChunks.length ? ignoredCustomMarkupChunks[idx] : null;
+              if (chunks != null) {
+                effectiveText = chunks[0];
+              }
+            }
+          }
           // `<html>` may be omitted if first thing inside is not a comment
           // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
-          if (optionalStartTag === 'html' || (optionalStartTag === 'body' && !/^\s/.test(text))) {
+          if (optionalStartTag === 'html' || (optionalStartTag === 'body' && !/^\s/.test(effectiveText))) {
             removeStartTag();
           }
           optionalStartTag = '';
           // `</html>` or `</body>` may be omitted if not followed by comment
           // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
-          if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(text)))) {
+          if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(effectiveText)))) {
             removeEndTag();
           }
           // Don’t reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
@@ -1549,7 +1564,25 @@ async function minifyHTML(value, options, partialMarkup) {
       // Finalization phase (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
       function commentFinalize(comment) {
         if (options.removeOptionalTags && comment) {
-          // Preceding comments suppress tag omissions
+          if (uidIgnorePlaceholderPattern) {
+            const match = uidIgnorePlaceholderPattern.exec(comment);
+            if (match) {
+              // UID placeholders represent real HTML content, not true HTML comments;
+              // if there’s a pending optional end tag and the ignored content isn’t itself
+              // a comment (which per the HTML spec prevents omission), resolve it now,
+              // before the UID is pushed to the buffer
+              const idx = +match[1];
+              const content = idx < ignoredMarkupChunks.length ? ignoredMarkupChunks[idx] : null;
+              if (optionalEndTag && optionalEndTagEmitted && content != null && !/^\s*<!--/.test(content)) {
+                const firstTagMatch = content.match(/^\s*<([a-zA-Z][^\s/>]*)/);
+                const firstTag = firstTagMatch ? options.name(firstTagMatch[1]) : '';
+                if (canRemovePrecedingTag(optionalEndTag, firstTag)) {
+                  removeEndTag();
+                }
+              }
+            }
+          }
+          // Comments (real or placeholder) always suppress optional start tag omissions
           optionalStartTag = '';
           optionalEndTag = '';
           optionalEndTagEmitted = false;

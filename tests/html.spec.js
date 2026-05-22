@@ -2516,6 +2516,29 @@ describe('HTML', () => {
     input = '<style>body{font-size:<%=1%>2pt}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input);
+
+    // Optional end tags before custom fragments should still be removed
+    input = '<head><title>T</title></head><?foo?><body><p>hi</p>';
+    output = '<title>T</title><?foo?><p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    input = '<head><title>T</title></head>{{expr}}<body><p>hi</p>';
+    output = '<title>T</title>{{expr}}<p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
+
+    // Multiple separate fragments (whitespace between prevents merging into one token) must not block removal
+    input = '<head><title>T</title></head>{{a}} {{b}}<body><p>hi</p>';
+    output = '<title>T</title>{{a}} {{b}}<p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
+
+    // `</colgroup>` and `</caption>` (`looseElements`) before custom fragments should also be removed
+    input = '<table><colgroup><col></colgroup>{{x}}<tr><td>hi</td></tr></table>';
+    output = '<table><col>{{x}}<tr><td>hi</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
+
+    input = '<table><caption>T</caption>{{x}}<col><tr><td>hi</td></tr></table>';
+    output = '<table><caption>T{{x}}<col><tr><td>hi</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
   });
 
   test('`caseSensitive`', async () => {
@@ -3708,6 +3731,26 @@ describe('HTML', () => {
 
     input = '<!-- htmlmin:ignore -->+<!-- htmlmin:ignore -->0';
     assert.strictEqual(await minify(input), '+0');
+
+    // Optional end tags before `htmlmin:ignore` blocks should still be removed
+    input = '<head><title>T</title></head><!-- htmlmin:ignore --><body><!-- htmlmin:ignore --><p>hi</p>';
+    output = '<title>T</title><body><p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    input = '<!-- htmlmin:ignore --><head><!-- htmlmin:ignore --><title>T</title></head><!-- htmlmin:ignore --><body><!-- htmlmin:ignore --><p>hi</p>';
+    output = '<head><title>T</title><body><p>hi';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Optional end tag removal must respect element-specific rules when the following element is in an ignore block
+    input = '<p>text</p><!-- htmlmin:ignore --><span>foo</span><!-- htmlmin:ignore -->';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<p>text</p><span>foo</span>');
+
+    input = '<p>text</p><!-- htmlmin:ignore --><div>foo</div><!-- htmlmin:ignore -->';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<p>text<div>foo</div>');
+
+    // A closing tag at the start of an ignore block must not cause the regex to skip ahead and match a later opening tag
+    input = '<p>text</p><!-- htmlmin:ignore --></div><p>next</p><!-- htmlmin:ignore -->';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<p>text</p></div><p>next</p>');
   });
 
   test('Whitespace-collapse between consecutive `htmlmin:ignore` blocks', async () => {

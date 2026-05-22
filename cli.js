@@ -3,7 +3,7 @@
 /**
  * html-minifier-next CLI tool
  *
- * The MIT License (MIT)
+ * MIT License
  *
  *  Copyright 2014–2016 Zoltan Frombach
  *  Copyright Juriy “kangax” Zaytsev
