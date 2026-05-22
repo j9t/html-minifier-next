@@ -2530,6 +2530,15 @@ describe('HTML', () => {
     input = '<head><title>T</title></head>{{a}} {{b}}<body><p>hi</p>';
     output = '<title>T</title>{{a}} {{b}}<p>hi';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
+
+    // `</colgroup>` and `</caption>` (`looseElements`) before custom fragments should also be removed
+    input = '<table><colgroup><col></colgroup>{{x}}<tr><td>hi</td></tr></table>';
+    output = '<table><col>{{x}}<tr><td>hi</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
+
+    input = '<table><caption>T</caption>{{x}}<col><tr><td>hi</td></tr></table>';
+    output = '<table><caption>T{{x}}<col><tr><td>hi</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
   });
 
   test('`caseSensitive`', async () => {
