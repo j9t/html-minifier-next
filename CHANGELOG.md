@@ -8,7 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-* Fixed optional end tags (e.g., `</head>`) not being removed when immediately followed by an `htmlmin:ignore` block or an `ignoreCustomFragments` token—both placeholder mechanisms were resetting the optional-tag state before the next element could trigger the removal
+* Fixed optional tags (e.g., `</head>`, `<body>`) not being removed when immediately followed by an `htmlmin:ignore` block or an `ignoreCustomFragments` token
+  - In the `htmlmin:ignore` case the UID placeholder comment was resetting the optional-tag state before the next element could trigger removal
+  - In the `ignoreCustomFragments` case the synthetic tab padding on the replacement token was falsely registering as leading whitespace and suppressing removal
 
 ## [6.2.6] - 2026-05-14
 
