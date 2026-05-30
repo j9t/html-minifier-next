@@ -4,17 +4,11 @@
 
 Your web page optimization precision tool: HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier** able to also handle in-document CSS, JavaScript, and SVG minification.
 
-The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier); as of 2025, both HTML Minifier Terser and HTML Minifier had been unmaintained for several years. HMN offers additional features and has been optimized for speed. While an independent project, it is still backwards-compatible with HMT and HM.
+The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier). It is now **the official successor to HTML Minifier**. HMN is maintained, easier to use, offers new features, and has been optimized for speed.
 
 ## Installation
 
-From npm for use as a command-line app:
-
-```shell
-npm i -g html-minifier-next
-```
-
-Directly with npx:
+For use as a command-line app, use npx:
 
 ```shell
 npx html-minifier-next --help
@@ -22,30 +16,30 @@ npx html-minifier-next --help
 
 (For immediate, zero-config use in the current folder: `npx html-minifier-next --zero`)
 
-From npm for programmatic use:
+For programmatic use, install as a development dependency:
 
 ```shell
-npm i html-minifier-next
+npm i -D html-minifier-next
 ```
 
 ## General usage
 
 ### CLI
 
-Use `html-minifier-next --help` to check all available options:
+Use `npx html-minifier-next --help` to check all available options:
 
 | Option | Description | Example |
 | --- | --- | --- |
-| `--zero`, `-z` | Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options) | `html-minifier-next --zero` |
+| `--zero`, `-z` | Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options) | `npx html-minifier-next --zero` |
 | `--input-dir <dir>`, `-I <dir>` | Specify an input directory | `--input-dir=src` |
 | `--ignore-dir <patterns>`, `-X <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>`, `-O <dir>` | Specify an output directory | `--output-dir=dist` |
-| `--output <file>`, `-o <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| html-minifier-next -o output.html`<br>File to STDOUT: `html-minifier-next input.html` |
+| `--output <file>`, `-o <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `npx html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| npx html-minifier-next -o output.html`<br>File to STDOUT: `npx html-minifier-next input.html` |
 | `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
 | `--config-file <file>`, `-c <file>` | Use a configuration file | `--config-file=html-minifier.json` |
-| `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
-| `--dry`, `-d` | Dry run: Process and report statistics without writing output | `html-minifier-next input.html --dry --collapse-whitespace` |
+| `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
+| `--dry`, `-d` | Dry run: Process and report statistics without writing output | `npx html-minifier-next input.html --dry --collapse-whitespace` |
 
 ### Configuration file
 
@@ -113,14 +107,14 @@ To review the specific options set, [presets.js](https://github.com/j9t/html-min
 
 ```shell
 # Via CLI flag
-html-minifier-next --preset conservative input.html
+npx html-minifier-next --preset conservative input.html
 
 # Via config file
-html-minifier-next --config-file=html-minifier.json input.html
+npx html-minifier-next --config-file=html-minifier.json input.html
 # where html-minifier.json contains: { "preset": "conservative" }
 
 # Override preset options
-html-minifier-next --preset conservative --remove-empty-attributes input.html
+npx html-minifier-next --preset conservative --remove-empty-attributes input.html
 ```
 
 **Priority order:** Presets are applied first, then config file options, then CLI flags. This allows you to start with a preset and customize as needed.
@@ -246,13 +240,11 @@ const result = await minify(html, {
 * `terser` (default): The standard JavaScript minifier with excellent compression
 * [`swc`](https://swc.rs/): Rust-based minifier that’s significantly faster than Terser (requires separate installation)
 
-**To use SWC**, install it as a dependency:
+**To use SWC**, install it as a development dependency:
 
 ```shell
-npm i @swc/core
+npm i -D @swc/core
 ```
-
-(Build-only users may want to install it as a dev dependency: `npm i -D @swc/core`.)
 
 **Important:** Inline event handlers (e.g., `onclick="return false"`) always use Terser regardless of the `engine` setting, as SWC doesn’t support bare return statements. This is handled automatically—you don’t need to do anything special.
 
@@ -340,7 +332,7 @@ const result = await minify(html, {
 **Via CLI flags:**
 
 ```shell
-html-minifier-next --minify-css --cache-css 750 --minify-js --cache-js 250 --minify-svg --cache-svg 100 input.html
+npx html-minifier-next --minify-css --cache-css 750 --minify-js --cache-js 250 --minify-svg --cache-svg 100 input.html
 ```
 
 **Via environment variables:**
@@ -349,7 +341,7 @@ html-minifier-next --minify-css --cache-css 750 --minify-js --cache-js 250 --min
 export HMN_CACHE_CSS=750
 export HMN_CACHE_JS=250
 export HMN_CACHE_SVG=100
-html-minifier-next --minify-css --minify-js --minify-svg input.html
+npx html-minifier-next --minify-css --minify-js --minify-svg input.html
 ```
 
 **Configuration file:**
@@ -390,12 +382,8 @@ Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier
 **Sample command line:**
 
 ```shell
-html-minifier-next --collapse-whitespace --remove-comments --minify-js --input-dir=. --output-dir=example
-```
+npx html-minifier-next --collapse-whitespace --remove-comments --minify-js --input-dir=. --output-dir=example
 
-Example using npx:
-
-```shell
 npx html-minifier-next --input-dir=test --preset comprehensive --output-dir example
 ```
 
@@ -403,39 +391,39 @@ npx html-minifier-next --input-dir=test --preset comprehensive --output-dir exam
 
 ```shell
 # Process default extensions (html, htm, shtml, shtm)
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
+npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 
 # Process only specific extensions
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,php
+npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,php
 
 # Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,php"`)
-html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir=dist
+npx html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir=dist
 
 # Process all files (explicit wildcard)
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext='*'
+npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext='*'
 ```
 
 **Exclude directories from processing:**
 
 ```shell
 # Ignore a single directory
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=libs
+npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=libs
 
 # Ignore multiple directories
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=libs,vendor,node_modules
+npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=libs,vendor,node_modules
 
 # Ignore by relative path (only ignores src/static/libs, not other “libs” directories)
-html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=static/libs
+npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --ignore-dir=static/libs
 ```
 
 **Dry run mode (preview outcome without writing files):**
 
 ```shell
 # Preview with output file
-html-minifier-next input.html -o output.html --dry --collapse-whitespace
+npx html-minifier-next input.html -o output.html --dry --collapse-whitespace
 
 # Preview directory processing with statistics per file and total
-html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
+npx html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 # Output: [DRY RUN] Would process directory: src → dist
 #   index.html: 1,234 → 892 bytes (-342, 27.7%)
 #   about.html: 2,100 → 1,654 bytes (-446, 21.2%)
@@ -447,7 +435,7 @@ html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 
 ```shell
 # Show processing details while minifying
-html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace
+npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace
 # Output: CLI options: collapseWhitespace
 #   ✓ src/index.html: 1,234 → 892 bytes (-342, 27.7%)
 #   ✓ src/about.html: 2,100 → 1,654 bytes (-446, 21.2%)
@@ -455,7 +443,7 @@ html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whites
 # Total: 3,334 → 2,546 bytes (-788, 23.6%)
 
 # `--dry` automatically enables verbose output
-html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
+npx html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 ```
 
 ## Special cases
@@ -560,13 +548,13 @@ ignoreCustomFragments: [/\{%[\s\S]{0,1000}?%\}/, /\{\{[\s\S]{0,500}?\}\}/]
 **CLI (via config file—recommended):**
 
 ```shell
-html-minifier-next --config-file=config.json input.html
+npx html-minifier-next --config-file=config.json input.html
 ```
 
 **CLI (inline—not recommended due to complex escaping):**
 
 ```shell
-html-minifier-next --ignore-custom-fragments '[\\\"\\\\{%[\\\\s\\\\S]{0,1000}?%\\\\}\\\"]' input.html
+npx html-minifier-next --ignore-custom-fragments '[\\\"\\\\{%[\\\\s\\\\S]{0,1000}?%\\\\}\\\"]' input.html
 ```
 
 For CLI usage, using a config file is strongly recommended to avoid complex shell and JSON escaping.
