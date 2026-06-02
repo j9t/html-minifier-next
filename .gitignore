@@ -1,4 +1,5 @@
 backtest/input/
+backtest/benchmark-baseline.json
 backtest/errors.log
 backtest/results.json
 demo/build/
