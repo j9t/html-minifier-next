@@ -567,6 +567,8 @@ For CLI usage, using a config file is strongly recommended to avoid complex shel
 
 ## Working on HTML Minifier Next
 
+Note: This section assumes working with main dependencies installed (`npm i`).
+
 ### Local server
 
 ```shell
@@ -581,13 +583,37 @@ npm i;
 npm run backtest
 ```
 
-The backtest tool tracks minification performance across Git history. Results are saved in the backtest folder as CSV and JSON files.
+The backtest tool tracks minification performance across Git history. Results are saved in the backtest folder as a JSON file, results.json.
 
 Parameters:
 
 * No argument: Tests last 50 commits (default)
 * `COUNT`: Tests last `COUNT` commits (e.g., `npm run backtest 100`)
 * `COUNT/STEP`: Tests last `COUNT` commits, sampling every `STEP`th commit (e.g., `npm run backtest 500/10` tests 50 commits)
+
+### Working tree benchmarks
+
+Where the backtest walks Git history, the benchmark times the code as it is _right now_—useful for A/B testing a branch against a saved baseline:
+
+```shell
+cd backtest;
+npm i;
+npm run benchmark
+```
+
+It reuses the backtest corpus (run `npm run backtest` once to download it) and reports per-file output size and median processing time.
+
+Parameters:
+
+* No argument: Runs and, if a baseline exists, shows size and time deltas
+* `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
+* `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s own processing time
+* `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
+* `--config=PATH`: Uses an alternative options file (default `html-minifier.json`)
+
+#### How to compare branches
+
+A typical A/B run: `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN’s own code rather than the bundled minifiers.
 
 ## Acknowledgements
 
