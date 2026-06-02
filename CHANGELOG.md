@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.8] - 2026-06-02
+
+### Changed
+
+* Improved minification performance by skipping the `ignoreCustomFragments` scan when the input contains no matching fragments
+  - The fragment-extraction regex is padded with bounded whitespace quantifiers on both sides, which made the engine consume and backtrack at every whitespace run across the whole document—wasted work for the common case of no template fragments
+  - A cheap unpadded probe now precedes the full replace; since the padding is optional and at least one fragment match is required, a probe that finds nothing guarantees the replace is a no-op
+
 ## [6.2.7] - 2026-05-22
 
 ### Fixed
