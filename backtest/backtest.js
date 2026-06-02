@@ -7,11 +7,12 @@
 // changed from commit to commit. Counterpart to `benchmark.js`, which measures the
 // current working tree rather than history.
 //
-// For each commit it restores “src” (plus package.json and html-minifier.json) to
-// that revision, minifies every corpus file, and records output size and median time;
-// results are written to “results.json” (with any failures in “errors.log”). Because
-// it temporarily checks out historical files, the working tree must have no uncommitted
-// changes in “src”, package.json, or html-minifier.json.
+// For each commit it checks out src and package.json at that revision and reads the
+// matching minifier config via `git show` (falling back to the on-disk config), then
+// minifies every corpus file and records output size and median time; results are
+// written to results.json (with any failures in errors.log). Because it temporarily
+// checks out historical files, the working tree must have no uncommitted changes in
+// src, package.json, or html-minifier.json.
 //
 // Usage (from the “backtest” folder):
 //   npm run backtest: Test the last 50 commits (default)
