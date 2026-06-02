@@ -73,6 +73,23 @@ function median(values) {
   return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+// Read and parse required JSON file
+async function readJSON(pathFile, label) {
+  let text;
+  try {
+    text = await fs.readFile(pathFile, 'utf8');
+  } catch (err) {
+    console.error(`Failed to read ${label} (${pathFile}): ${err.message}`);
+    process.exit(1);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    console.error(`Failed to parse ${label} (${pathFile}): ${err.message}`);
+    process.exit(1);
+  }
+}
+
 // Current Git branch and short commit, or null when unavailable
 function getGitInfo() {
   try {
@@ -89,11 +106,11 @@ async function main() {
 
   const { minify } = await import('../src/htmlminifier.js');
 
-  const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
+  const urls = await readJSON(path.join(__dirname, 'sites.json'), 'sites.json');
   const fileNames = Object.keys(urls);
   const dirInput = path.join(__dirname, 'input');
 
-  const baseOptions = JSON.parse(await fs.readFile(path.join(__dirname, args.config), 'utf8'));
+  const baseOptions = await readJSON(path.join(__dirname, args.config), args.config);
   if (args.core) {
     for (const key of CORE_DISABLED_OPTIONS) {
       baseOptions[key] = false;
