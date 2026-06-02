@@ -40,7 +40,8 @@ function parseArgs(argv) {
     } else if (arg === '--core') {
       args.core = true;
     } else if (arg.startsWith('--iterations=')) {
-      args.iterations = Math.max(1, parseInt(arg.slice('--iterations='.length), 10) || DEFAULT_ITERATIONS);
+      const n = parseInt(arg.slice('--iterations='.length), 10);
+      args.iterations = Number.isNaN(n) ? DEFAULT_ITERATIONS : Math.max(1, n);
     } else if (arg.startsWith('--config=')) {
       args.config = arg.slice('--config='.length);
     } else {
@@ -110,7 +111,7 @@ async function main() {
   const fileNames = Object.keys(urls);
   const dirInput = path.join(__dirname, 'input');
 
-  const baseOptions = await readJSON(path.join(__dirname, args.config), args.config);
+  const baseOptions = await readJSON(path.resolve(__dirname, args.config), args.config);
   if (args.core) {
     for (const key of CORE_DISABLED_OPTIONS) {
       baseOptions[key] = false;
@@ -122,8 +123,12 @@ async function main() {
   if (!args.save) {
     try {
       baseline = JSON.parse(await fs.readFile(PATH_BASELINE, 'utf8'));
-    } catch {
-      // No baseline yet—first run reports absolute numbers only
+    } catch (err) {
+      // A missing baseline is normal (first run reports absolute numbers only);
+      // anything else (corrupt JSON, permissions) is worth surfacing
+      if (err.code !== 'ENOENT') {
+        console.error(`Warning: Ignoring unreadable baseline (${PATH_BASELINE}): ${err.message}`);
+      }
     }
   }
 
