@@ -567,6 +567,8 @@ For CLI usage, using a config file is strongly recommended to avoid complex shel
 
 ## Working on HTML Minifier Next
 
+Note: This section assumes working with main dependencies installed (`npm i`).
+
 ### Local server
 
 ```shell
