@@ -137,7 +137,7 @@ async function main() {
   const results = {};
   let sizeTotal = 0, timeTotal = 0;
   let sizeTotalBase = 0, timeTotalBase = 0;
-  let processed = 0;
+  let processed = 0, matched = 0;
 
   for (const fileName of fileNames) {
     const pathFile = path.join(dirInput, fileName + '.html');
@@ -179,6 +179,7 @@ async function main() {
     if (prev) {
       sizeTotalBase += prev.size;
       timeTotalBase += prev.time;
+      matched++;
     }
     const sizeStr = `${formatBytes(size)} B${prev ? formatDelta(size, prev.size) : ''}`;
     const timeStr = `${time.toFixed(1)} ms${prev ? formatDelta(time, prev.time) : ''}`;
@@ -190,9 +191,15 @@ async function main() {
     process.exit(1);
   }
 
-  const sizeStrTotal = `${formatBytes(sizeTotal)} B${baseline ? formatDelta(sizeTotal, sizeTotalBase) : ''}`;
-  const timeStrTotal = `${timeTotal.toFixed(1)} ms${baseline ? formatDelta(timeTotal, timeTotalBase) : ''}`;
+  // Only show total deltas when every processed file has a baseline entry, so the
+  // current and baseline totals cover the same files (an apples-to-apples comparison)
+  const compareTotals = baseline && matched === processed;
+  const sizeStrTotal = `${formatBytes(sizeTotal)} B${compareTotals ? formatDelta(sizeTotal, sizeTotalBase) : ''}`;
+  const timeStrTotal = `${timeTotal.toFixed(1)} ms${compareTotals ? formatDelta(timeTotal, timeTotalBase) : ''}`;
   console.log(`\n${'Total'.padEnd(24)} ${sizeStrTotal.padEnd(24)} @ ${timeStrTotal}`);
+  if (baseline && matched !== processed) {
+    console.log(`Note: Total deltas omitted—only ${matched} of ${processed} processed file(s) have a baseline entry`);
+  }
 
   if (args.save) {
     const payload = {
