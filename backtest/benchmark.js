@@ -16,6 +16,7 @@
 //
 // The corpus is shared with `backtest.js`; run `npm run backtest` once to download it.
 
+import { execSync } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -29,7 +30,7 @@ const DEFAULT_ITERATIONS = 5;
 // External minifiers disabled by `--core` to surface HMN’s own time
 const CORE_DISABLED_OPTIONS = ['minifyCSS', 'minifyJS', 'minifySVG', 'minifyURLs'];
 
-const BASELINE_PATH = path.join(__dirname, 'benchmark-baseline.json');
+const PATH_BASELINE = path.join(__dirname, 'benchmark-baseline.json');
 
 function parseArgs(argv) {
   const args = { save: false, core: false, iterations: DEFAULT_ITERATIONS, config: 'html-minifier.json' };
@@ -72,6 +73,17 @@ function median(values) {
   return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
+// Current Git branch and short commit, or null when unavailable
+function getGitInfo() {
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: __dirname, encoding: 'utf8' }).trim();
+    const commit = execSync('git rev-parse --short HEAD', { cwd: __dirname, encoding: 'utf8' }).trim();
+    return { branch, commit };
+  } catch {
+    return null;
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -79,7 +91,7 @@ async function main() {
 
   const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
   const fileNames = Object.keys(urls);
-  const inputDir = path.join(__dirname, 'input');
+  const dirInput = path.join(__dirname, 'input');
 
   const baseOptions = JSON.parse(await fs.readFile(path.join(__dirname, args.config), 'utf8'));
   if (args.core) {
@@ -92,27 +104,46 @@ async function main() {
   let baseline = null;
   if (!args.save) {
     try {
-      baseline = JSON.parse(await fs.readFile(BASELINE_PATH, 'utf8'));
-      if (baseline.core !== args.core) {
-        console.error(`Warning: Baseline was recorded with core=${baseline.core}; comparing against core=${args.core}\n`);
-      }
+      baseline = JSON.parse(await fs.readFile(PATH_BASELINE, 'utf8'));
     } catch {
       // No baseline yet—first run reports absolute numbers only
     }
   }
 
-  console.log(`Benchmarking ${fileNames.length} file(s)${args.core ? ' (core: external minifiers disabled)' : ''}, median of ${args.iterations} iteration(s)\n`);
+  console.log(`Benchmarking ${fileNames.length} file(s)${args.core ? ' (core: external minifiers disabled)' : ''}, median of ${args.iterations} iteration(s)`);
+
+  if (baseline) {
+    const origin = baseline.git ? `${baseline.git.branch} @ ${baseline.git.commit}` : '(unknown revision)';
+    const when = baseline.created ? new Date(baseline.created).toLocaleString() : 'unknown date';
+    console.log(`Comparing against baseline: ${origin} (saved ${when})`);
+
+    // Flag settings that would make the comparison not apples-to-apples
+    const mismatches = [];
+    if (baseline.core !== args.core) {
+      mismatches.push(`core ${baseline.core} → ${args.core}`);
+    }
+    if (baseline.iterations !== args.iterations) {
+      mismatches.push(`iterations ${baseline.iterations} → ${args.iterations}`);
+    }
+    if (baseline.config !== args.config) {
+      mismatches.push(`config ${baseline.config} → ${args.config}`);
+    }
+    if (mismatches.length) {
+      console.log(`Warning: Baseline settings differ (${mismatches.join('; ')})—deltas may not be comparable`);
+    }
+  }
+  console.log('');
 
   const results = {};
-  let totalSize = 0, totalTime = 0;
-  let baseTotalSize = 0, baseTotalTime = 0;
+  let sizeTotal = 0, timeTotal = 0;
+  let sizeTotalBase = 0, timeTotalBase = 0;
   let processed = 0;
 
   for (const fileName of fileNames) {
-    const filePath = path.join(inputDir, fileName + '.html');
+    const pathFile = path.join(dirInput, fileName + '.html');
     let data;
     try {
-      data = await fs.readFile(filePath, 'utf8');
+      data = await fs.readFile(pathFile, 'utf8');
     } catch {
       console.error(`Skipping “${fileName}”: input not found (run “npm run backtest” once to download the corpus)`);
       continue;
@@ -140,14 +171,14 @@ async function main() {
     const size = minified.length;
 
     results[fileName] = { size, time: Math.round(time * 100) / 100 };
-    totalSize += size;
-    totalTime += time;
+    sizeTotal += size;
+    timeTotal += time;
     processed++;
 
     const prev = baseline && baseline.files && baseline.files[fileName];
     if (prev) {
-      baseTotalSize += prev.size;
-      baseTotalTime += prev.time;
+      sizeTotalBase += prev.size;
+      timeTotalBase += prev.time;
     }
     const sizeStr = `${formatBytes(size)} B${prev ? formatDelta(size, prev.size) : ''}`;
     const timeStr = `${time.toFixed(1)} ms${prev ? formatDelta(time, prev.time) : ''}`;
@@ -159,20 +190,21 @@ async function main() {
     process.exit(1);
   }
 
-  const totalSizeStr = `${formatBytes(totalSize)} B${baseline ? formatDelta(totalSize, baseTotalSize) : ''}`;
-  const totalTimeStr = `${totalTime.toFixed(1)} ms${baseline ? formatDelta(totalTime, baseTotalTime) : ''}`;
-  console.log(`\n${'Total'.padEnd(24)} ${totalSizeStr.padEnd(28)} @ ${totalTimeStr}`);
+  const sizeStrTotal = `${formatBytes(sizeTotal)} B${baseline ? formatDelta(sizeTotal, sizeTotalBase) : ''}`;
+  const timeStrTotal = `${timeTotal.toFixed(1)} ms${baseline ? formatDelta(timeTotal, timeTotalBase) : ''}`;
+  console.log(`\n${'Total'.padEnd(24)} ${sizeStrTotal.padEnd(24)} @ ${timeStrTotal}`);
 
   if (args.save) {
     const payload = {
       created: new Date().toISOString(),
+      git: getGitInfo(),
       core: args.core,
       iterations: args.iterations,
       config: args.config,
       files: results
     };
-    await fs.writeFile(BASELINE_PATH, JSON.stringify(payload, null, 2) + '\n', 'utf8');
-    console.log(`\nBaseline saved to ${path.relative(process.cwd(), BASELINE_PATH)} (${processed} file(s))`);
+    await fs.writeFile(PATH_BASELINE, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+    console.log(`\nBaseline saved to ${path.relative(process.cwd(), PATH_BASELINE)} (${processed} file(s))`);
   }
 }
 

@@ -1,5 +1,26 @@
 #!/usr/bin/env node
 
+// Regression backtest for HTML Minifier Next.
+//
+// Walks Git history and runs the minifier from each sampled commit against the local
+// corpus (`backtest/input`), reporting how output size and median processing time
+// changed from commit to commit. Counterpart to `benchmark.js`, which measures the
+// current working tree rather than history.
+//
+// For each commit it restores “src” (plus package.json and html-minifier.json) to
+// that revision, minifies every corpus file, and records output size and median time;
+// results are written to “results.json” (with any failures in “errors.log”). Because
+// it temporarily checks out historical files, the working tree must have no uncommitted
+// changes in “src”, package.json, or html-minifier.json.
+//
+// Usage (from the “backtest” folder):
+//   npm run backtest: Test the last 50 commits (default)
+//   npm run backtest 100: Test the last COUNT commits
+//   npm run backtest 500/10: Test the last COUNT commits, sampling every STEPth commit
+//
+// The corpus is downloaded on first run (sources listed in “sites.json”) and shared
+// with `benchmark.js`.
+
 import { spawn, fork } from 'child_process';
 import { createWriteStream } from 'fs';
 import fs from 'fs/promises';
@@ -12,7 +33,7 @@ import Progress from 'progress';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.join(__dirname, '..');
+const dirRoot = path.join(__dirname, '..');
 
 // Default number of commits to test when no parameter is provided
 const DEFAULT_COMMIT_COUNT = 50;
@@ -25,21 +46,21 @@ const BENCH_ITERATIONS = 3;
 const TASK_TIMEOUT_MS = 60000;
 
 // Output directory for results
-const OUTPUT_DIR = __dirname;
+const DIR_OUTPUT = __dirname;
 
 const urls = JSON.parse(await fs.readFile(path.join(__dirname, 'sites.json'), 'utf8'));
 const fileNames = Object.keys(urls);
-const inputDir = path.join(__dirname, 'input');
+const dirInput = path.join(__dirname, 'input');
 
-async function downloadFile(url, filePath, redirectsLeft = 5) {
-  const tmpPath = filePath + '.tmp';
+async function downloadFile(url, pathFile, redirectsLeft = 5) {
+  const pathTmp = pathFile + '.tmp';
   return new Promise((resolve) => {
     let resolved = false;
     function safeResolve(value) {
       if (!resolved) {
         resolved = true;
         if (!value) {
-          fs.unlink(tmpPath).catch(() => {});
+          fs.unlink(pathTmp).catch(() => {});
         }
         resolve(value);
       }
@@ -67,11 +88,11 @@ async function downloadFile(url, filePath, redirectsLeft = 5) {
           stream = res.pipe(zlib.createInflate());
         }
 
-        const writeStream = createWriteStream(tmpPath);
+        const writeStream = createWriteStream(pathTmp);
         stream.on('error', () => safeResolve(false));
         writeStream.on('error', () => safeResolve(false));
         writeStream.on('finish', () => {
-          fs.rename(tmpPath, filePath).then(() => safeResolve(true), () => safeResolve(false));
+          fs.rename(pathTmp, pathFile).then(() => safeResolve(true), () => safeResolve(false));
         });
         stream.pipe(writeStream);
       } else if (status >= 300 && status < 400 && res.headers.location) {
@@ -79,7 +100,7 @@ async function downloadFile(url, filePath, redirectsLeft = 5) {
         if (redirectsLeft <= 0) {
           safeResolve(false);
         } else {
-          downloadFile(new URL(res.headers.location, url).href, filePath, redirectsLeft - 1).then(safeResolve);
+          downloadFile(new URL(res.headers.location, url).href, pathFile, redirectsLeft - 1).then(safeResolve);
         }
       } else {
         res.resume();
@@ -99,11 +120,11 @@ async function downloadFile(url, filePath, redirectsLeft = 5) {
 const historicalDeps = ['relateurl', 'clean-css', 'he', 'change-case', 'camel-case', 'param-case'];
 
 async function ensureHistoricalDeps() {
-  const rootNodeModules = path.join(repoRoot, 'node_modules');
+  const dirNodeModules = path.join(dirRoot, 'node_modules');
   const missing = [];
   for (const dep of historicalDeps) {
     try {
-      await fs.stat(path.join(rootNodeModules, dep));
+      await fs.stat(path.join(dirNodeModules, dep));
     } catch {
       missing.push(dep);
     }
@@ -113,7 +134,7 @@ async function ensureHistoricalDeps() {
   console.log(`Installing ${missing.length} historical dependency(ies)…`);
   await new Promise((resolve, reject) => {
     const proc = spawn('npm', ['install', '--no-save', ...missing], {
-      cwd: repoRoot,
+      cwd: dirRoot,
       stdio: ['ignore', 'pipe', 'pipe']
     });
     proc.on('error', (err) => {
@@ -132,13 +153,13 @@ async function ensureHistoricalDeps() {
 }
 
 async function ensureInput() {
-  await fs.mkdir(inputDir, { recursive: true });
+  await fs.mkdir(dirInput, { recursive: true });
 
   const missing = [];
   for (const fileName of fileNames) {
-    const filePath = path.join(inputDir, fileName + '.html');
+    const pathFile = path.join(dirInput, fileName + '.html');
     try {
-      await fs.stat(filePath);
+      await fs.stat(pathFile);
     } catch {
       missing.push(fileName);
     }
@@ -153,8 +174,8 @@ async function ensureInput() {
   });
 
   for (const fileName of missing) {
-    const filePath = path.join(inputDir, fileName + '.html');
-    const ok = await downloadFile(urls[fileName], filePath);
+    const pathFile = path.join(dirInput, fileName + '.html');
+    const ok = await downloadFile(urls[fileName], pathFile);
     if (!ok) {
       console.error(`Failed to download ${fileName} from ${urls[fileName]}`);
     }
@@ -165,7 +186,7 @@ async function ensureInput() {
 function git() {
   const args = [].concat.apply([], [].slice.call(arguments, 0, -1));
   const callback = arguments[arguments.length - 1];
-  const task = spawn('git', args, { cwd: repoRoot, stdio: ['ignore', 'pipe', 'ignore'] });
+  const task = spawn('git', args, { cwd: dirRoot, stdio: ['ignore', 'pipe', 'ignore'] });
   let output = '';
   task.stdout.setEncoding('utf8');
   task.stdout.on('data', function (data) {
@@ -176,12 +197,12 @@ function git() {
   });
 }
 
-async function readText(filePath) {
-  return await fs.readFile(filePath, 'utf8');
+async function readText(pathFile) {
+  return await fs.readFile(pathFile, 'utf8');
 }
 
-async function writeText(filePath, data) {
-  await fs.writeFile(filePath, data, 'utf8');
+async function writeText(pathFile, data) {
+  await fs.writeFile(pathFile, data, 'utf8');
 }
 
 async function loadModule() {
@@ -209,15 +230,15 @@ async function minify(hash, options) {
 
     for (const fileName of fileNames) {
       try {
-        const filePath = path.join(inputDir, fileName + '.html');
+        const pathFile = path.join(dirInput, fileName + '.html');
 
         try {
-          await fs.stat(filePath);
+          await fs.stat(pathFile);
         } catch {
-          throw new Error(`Source file not found: "${fileName}.html"`);
+          throw new Error(`Source file not found: “${fileName}.html”`);
         }
 
-        const data = await readText(filePath);
+        const data = await readText(pathFile);
         const opts = getOptions(fileName, options);
 
         // Warm-up (result discarded)
@@ -259,7 +280,7 @@ async function minify(hash, options) {
 
 async function print(table, step = 1) {
   // Ensure output directory exists
-  await fs.mkdir(OUTPUT_DIR, { recursive: true });
+  await fs.mkdir(DIR_OUTPUT, { recursive: true });
 
   const errors = [];
 
@@ -278,13 +299,13 @@ async function print(table, step = 1) {
   }
 
   // Only write errors.log if there are errors
-  const errorsPath = path.join(OUTPUT_DIR, 'errors.log');
+  const pathErrors = path.join(DIR_OUTPUT, 'errors.log');
   if (errors.length > 0) {
-    await writeText(errorsPath, errors.join('\n'));
+    await writeText(pathErrors, errors.join('\n'));
   } else {
     // Delete errors.log if it exists and is empty/not needed
     try {
-      await fs.unlink(errorsPath);
+      await fs.unlink(pathErrors);
     } catch (err) {
       // Ignore if file doesn’t exist
     }
@@ -320,25 +341,25 @@ async function print(table, step = 1) {
 
         // Calculate deltas comparing to the entry displayed below (index + 1, chronologically older)
         // This shows how the commit performs compared to the older one below it
-        let prevData = null;
+        let dataPrev = null;
         for (let i = index + 1; i < hashes.length; i++) {
           const candidateData = table[hashes[i]][fileName];
           if (candidateData) {
-            prevData = candidateData;
+            dataPrev = candidateData;
             break;
           }
         }
 
-        const prevSize = prevData ? prevData.size : null;
-        const prevTime = prevData ? prevData.time : null;
-        const sizeDelta = prevSize ? size - prevSize : 0;
-        const timeDelta = prevTime ? time - prevTime : 0;
+        const sizePrev = dataPrev ? dataPrev.size : null;
+        const timePrev = dataPrev ? dataPrev.time : null;
+        const sizeDelta = sizePrev ? size - sizePrev : 0;
+        const timeDelta = timePrev ? time - timePrev : 0;
 
         // Format value: “size @ time” or “size (±size%) @ time (±time%)”
         let value = `${formatNumber(size)} @ ${time} ms`;
-        if ((sizeDelta !== 0 || timeDelta !== 0) && prevSize && prevTime) {
-          const sizePercent = ((sizeDelta / prevSize) * 100).toFixed(2);
-          const timePercent = ((timeDelta / prevTime) * 100).toFixed(2);
+        if ((sizeDelta !== 0 || timeDelta !== 0) && sizePrev && timePrev) {
+          const sizePercent = ((sizeDelta / sizePrev) * 100).toFixed(2);
+          const timePercent = ((timeDelta / timePrev) * 100).toFixed(2);
           const sizeSign = sizeDelta > 0 ? '+' : '';
           const timeSign = timeDelta > 0 ? '+' : '';
 
@@ -354,7 +375,7 @@ async function print(table, step = 1) {
     });
   });
 
-  await writeText(path.join(OUTPUT_DIR, 'results.json'), JSON.stringify(jsonOutput, null, 2));
+  await writeText(path.join(DIR_OUTPUT, 'results.json'), JSON.stringify(jsonOutput, null, 2));
 }
 
 if (process.argv.length > 2 || !process.send) {
@@ -399,10 +420,10 @@ if (process.argv.length > 2 || !process.send) {
   if (count > 0) {
 
     // Check for uncommitted changes in files the backtest temporarily modifies
-    const srcPath = path.join(__dirname, '..', 'src');
-    const configPath = path.join(__dirname, 'html-minifier.json');
-    const pkgPath = path.join(repoRoot, 'package.json');
-    git('status', '--porcelain', '--', srcPath, configPath, pkgPath, async function (code, output) {
+    const pathSrc = path.join(__dirname, '..', 'src');
+    const pathConfig = path.join(__dirname, 'html-minifier.json');
+    const pathPkg = path.join(dirRoot, 'package.json');
+    git('status', '--porcelain', '--', pathSrc, pathConfig, pathPkg, async function (code, output) {
       if (output.trim().length > 0) {
         console.error('Error: Uncommitted changes detected in src, package.json, or html-minifier.json');
         console.error('Please commit or stash your changes before running backtest');
@@ -440,13 +461,13 @@ if (process.argv.length > 2 || !process.send) {
 
         // Restore “src” folder, package.json, and html-minifier.json from HEAD using Git
         await new Promise((resolve) => {
-          git('checkout', 'HEAD', '--', srcPath, configPath, pkgPath, function (code) {
+          git('checkout', 'HEAD', '--', pathSrc, pathConfig, pathPkg, function (code) {
             if (code !== 0) {
               console.error('Warning: Failed to restore modified files');
             }
             // Remove stale files that old commits added but HEAD doesn’t have
-            git('reset', 'HEAD', '--', srcPath, function () {
-              git('clean', '-fd', srcPath, function () {
+            git('reset', 'HEAD', '--', pathSrc, function () {
+              git('clean', '-fd', pathSrc, function () {
                 resolve();
               });
             });
@@ -561,7 +582,7 @@ if (process.argv.length > 2 || !process.send) {
   // Running as forked child process
 
   // Config file paths (repo-root-relative), ordered newest to oldest
-  const configPaths = [
+  const pathsConfig = [
     'backtest/html-minifier.json',
     'benchmarks/html-minifier.json',
     'benchmarks/html-minifier-benchmarks.json',
@@ -569,7 +590,7 @@ if (process.argv.length > 2 || !process.send) {
   ];
 
   function readConfigFromGit(hash, index, callback) {
-    if (index >= configPaths.length) {
+    if (index >= pathsConfig.length) {
       // Fallback to current config file on disk
       readText(path.join(__dirname, 'html-minifier.json')).then(callback).catch(err => {
         console.error(`No config found for ${hash}: ${err.message}`);
@@ -577,7 +598,7 @@ if (process.argv.length > 2 || !process.send) {
       });
       return;
     }
-    git('show', hash + ':' + configPaths[index], function (code, data) {
+    git('show', hash + ':' + pathsConfig[index], function (code, data) {
       if (code === 0 && data.trim()) {
         callback(data);
       } else {
