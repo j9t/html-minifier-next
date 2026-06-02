@@ -609,6 +609,8 @@ Parameters:
 * `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
 * `--config=PATH`: Uses an alternative options file (default `html-minifier.json`)
 
+#### How to compare branches
+
 A typical A/B run: `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN’s own code rather than the bundled minifiers.
 
 ## Acknowledgements
