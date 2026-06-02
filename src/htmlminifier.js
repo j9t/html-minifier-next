@@ -1031,47 +1031,55 @@ async function minifyHTML(value, options, partialMarkup) {
     const maxQuantifier = options.customFragmentQuantifierLimit || 200;
     const whitespacePattern = `\\s{0,${maxQuantifier}}`;
 
-    // Use bounded quantifiers to prevent ReDoS—this approach prevents exponential backtracking
-    const reCustomIgnore = new RegExp(
-      whitespacePattern + '(?:' + customFragments.join('|') + '){1,' + maxQuantifier + '}' + whitespacePattern,
-      'g'
-    );
-    // Temporarily replace custom ignored fragments with unique attributes
-    value = value.replace(reCustomIgnore, function (match) {
-      if (!uidAttr) {
-        uidAttr = uniqueId(value);
-        uidPattern = new RegExp('(\\s*)' + uidAttr + '([0-9]+)' + uidAttr + '(\\s*)', 'g');
-        uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
+    // Fast path: The padded replace below is costly on large inputs because the
+    // `\s{0,N}` padding makes the regex engine consume and backtrack at every
+    // whitespace run; since the padding is optional and the fragment group requires
+    // at least one match, a single unpadded probe that finds nothing proves the
+    // replace would be a no-op—so skip it entirely
+    const reFragmentProbe = new RegExp('(?:' + customFragments.join('|') + ')');
+    if (reFragmentProbe.test(value)) {
+      // Use bounded quantifiers to prevent ReDoS—this approach prevents exponential backtracking
+      const reCustomIgnore = new RegExp(
+        whitespacePattern + '(?:' + customFragments.join('|') + '){1,' + maxQuantifier + '}' + whitespacePattern,
+        'g'
+      );
+      // Temporarily replace custom ignored fragments with unique attributes
+      value = value.replace(reCustomIgnore, function (match) {
+        if (!uidAttr) {
+          uidAttr = uniqueId(value);
+          uidPattern = new RegExp('(\\s*)' + uidAttr + '([0-9]+)' + uidAttr + '(\\s*)', 'g');
+          uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
 
-        if (options.minifyCSS) {
-          options.minifyCSS = (function (fn) {
-            return function (text, type) {
-              text = text.replace(uidPattern, function (match, prefix, index) {
-                const chunks = ignoredCustomMarkupChunks[+index];
-                return chunks[1] + uidAttr + index + uidAttr + chunks[2];
-              });
+          if (options.minifyCSS) {
+            options.minifyCSS = (function (fn) {
+              return function (text, type) {
+                text = text.replace(uidPattern, function (match, prefix, index) {
+                  const chunks = ignoredCustomMarkupChunks[+index];
+                  return chunks[1] + uidAttr + index + uidAttr + chunks[2];
+                });
 
-              return fn(text, type);
-            };
-          })(options.minifyCSS);
+                return fn(text, type);
+              };
+            })(options.minifyCSS);
+          }
+
+          if (options.minifyJS) {
+            options.minifyJS = (function (fn) {
+              return function (text, inline, isModule) {
+                return fn(text.replace(uidPattern, function (match, prefix, index) {
+                  const chunks = ignoredCustomMarkupChunks[+index];
+                  return chunks[1] + uidAttr + index + uidAttr + chunks[2];
+                }), inline, isModule);
+              };
+            })(options.minifyJS);
+          }
         }
 
-        if (options.minifyJS) {
-          options.minifyJS = (function (fn) {
-            return function (text, inline, isModule) {
-              return fn(text.replace(uidPattern, function (match, prefix, index) {
-                const chunks = ignoredCustomMarkupChunks[+index];
-                return chunks[1] + uidAttr + index + uidAttr + chunks[2];
-              }), inline, isModule);
-            };
-          })(options.minifyJS);
-        }
-      }
-
-      const token = uidAttr + ignoredCustomMarkupChunks.length + uidAttr;
-      ignoredCustomMarkupChunks.push(/^(\s*)[\s\S]*?(\s*)$/.exec(match));
-      return '\t' + token + '\t';
-    });
+        const token = uidAttr + ignoredCustomMarkupChunks.length + uidAttr;
+        ignoredCustomMarkupChunks.push(/^(\s*)[\s\S]*?(\s*)$/.exec(match));
+        return '\t' + token + '\t';
+      });
+    }
   }
 
   function canCollapseWhitespace(tag, attrs) {
