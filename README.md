@@ -565,7 +565,7 @@ For CLI usage, using a config file is strongly recommended to avoid complex shel
 \{%[\s\S]{0,1000}?%\} \{\{[\s\S]{0,500}?\}\}
 ```
 
-## Running HTML Minifier Next locally
+## Working on HTML Minifier Next
 
 ### Local server
 
