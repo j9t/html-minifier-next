@@ -726,10 +726,11 @@ function mergeConsecutiveScripts(html) {
 async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupChunks) {
   const attrChains = options.sortAttributes && typeof options.sortAttributes !== 'function' && Object.create(null);
   const classChain = options.sortClassNames && typeof options.sortClassNames !== 'function' && new TokenChain();
+  const resolveName = /** @type {(name: string) => string} */ (options.name);
 
   function attrNames(/** @type {HTMLAttribute[]} */ attrs) {
     return attrs.map(function (attr) {
-      return options.name?.(attr.name) ?? attr.name;
+      return resolveName(attr.name);
     });
   }
 
@@ -766,7 +767,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
           attrChains[tag].add(attrNamesList);
         }
         for (const attr of attrs) {
-          if (classChain && attr.value && options.name?.(attr.name) === 'class') {
+          if (classChain && attr.value && resolveName(attr.name) === 'class') {
             const classes = trimWhitespace(attr.value).split(whitespaceSplitPatternScan).filter(shouldKeepToken);
             classChain.add(classes);
           } else if (options.processScripts && attr.name.toLowerCase() === 'type') {
@@ -958,6 +959,10 @@ async function minifyHTML(value, options, partialMarkup) {
     value = collapseWhitespace(value, options, true, true);
   }
 
+  const resolveName = /** @type {(name: string) => string} */ (options.name);
+  /** @type {HTMLAttribute[]} */
+  const emptyAttrs = [];
+
   /** @type {string[]} */
   const buffer = [];
   /** @type {string} */
@@ -993,7 +998,7 @@ async function minifyHTML(value, options, partialMarkup) {
   // Create inline tags/text sets with custom elements
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
-  const normalizedCustomElements = customElementsArr.map(name => options.name?.(name) ?? name);
+  const normalizedCustomElements = customElementsArr.map(name => resolveName(name));
   // Fast path: Reuse base sets if no custom elements
   const inlineTextSet = normalizedCustomElements.length
     ? new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements])
@@ -1149,7 +1154,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // Look for trailing whitespaces, bypass any inline tags
   function trimTrailingWhitespace(/** @type {number} */ index, /** @type {string} */ nextTag) {
-    for (let endTag = ''; index >= 0 && canTrimWhitespace(endTag, []); index--) {
+    for (let endTag = ''; index >= 0 && canTrimWhitespace(endTag, emptyAttrs); index--) {
       const str = buffer[index] ?? '';
       const match = str.match(/^<\/([\w:-]+)>$/);
       if (match) {
@@ -1378,7 +1383,7 @@ async function minifyHTML(value, options, partialMarkup) {
         let preserve = false;
         if (removeEmptyElementsExcept.length) {
           // Normalize attribute names for comparison with specs
-          const normalizedAttrs = attrs.map((/** @type {HTMLAttribute} */ attr) => ({ ...attr, name: options.name?.(attr.name) ?? attr.name }));
+          const normalizedAttrs = attrs.map((/** @type {HTMLAttribute} */ attr) => ({ ...attr, name: resolveName(attr.name) }));
           preserve = shouldPreserveEmptyElement(tag, normalizedAttrs, removeEmptyElementsExcept);
         }
 
@@ -1489,7 +1494,7 @@ async function minifyHTML(value, options, partialMarkup) {
                     if (lastTagMatch) {
                       const group = lastTagMatch[1] ?? '';
                       const isClose = group.charAt(0) === '/';
-                      const tagName = options.name?.(isClose ? group.slice(1) : group) ?? group;
+                      const tagName = resolveName(isClose ? group.slice(1) : group);
                       effectivePrevTag = isClose ? '/' + tagName : tagName;
                     }
                   }
@@ -1627,7 +1632,7 @@ async function minifyHTML(value, options, partialMarkup) {
               if (optionalEndTag && optionalEndTagEmitted && content != null && !/^\s*<!--/.test(content)) {
                 const firstTagMatch = content.match(/^\s*<([a-zA-Z][^\s/>]*)/);
                 const firstTagGroup = firstTagMatch?.[1] ?? '';
-                const firstTag = firstTagGroup ? (options.name?.(firstTagGroup) ?? firstTagGroup) : '';
+                const firstTag = firstTagGroup ? resolveName(firstTagGroup) : '';
                 if (canRemovePrecedingTag(optionalEndTag, firstTag)) {
                   removeEndTag();
                 }
@@ -1679,10 +1684,10 @@ async function minifyHTML(value, options, partialMarkup) {
                       // Collapse if both sides are element/closing tags or HTML comments, and neither is inline
                       if ((currentTagMatch || currentIsHtmlComment || currentClosingTagMatch) &&
                           (prevTagMatch || prevIsHtmlComment || prevClosingTagMatch)) {
-                        const currentTag = currentTagMatch ? (options.name?.(currentTagMatch[1] ?? '') ?? currentTagMatch[1] ?? '')
-                          : currentClosingTagMatch ? (options.name?.(currentClosingTagMatch[1] ?? '') ?? currentClosingTagMatch[1] ?? '') : null;
-                        const prevTag = prevTagMatch ? (options.name?.(prevTagMatch[1] ?? '') ?? prevTagMatch[1] ?? '')
-                          : prevClosingTagMatch ? (options.name?.(prevClosingTagMatch[1] ?? '') ?? prevClosingTagMatch[1] ?? '') : null;
+                        const currentTag = currentTagMatch ? resolveName(currentTagMatch[1] ?? '')
+                          : currentClosingTagMatch ? resolveName(currentClosingTagMatch[1] ?? '') : null;
+                        const prevTag = prevTagMatch ? resolveName(prevTagMatch[1] ?? '')
+                          : prevClosingTagMatch ? resolveName(prevClosingTagMatch[1] ?? '') : null;
 
                         // Don’t collapse between inline elements (HTML comments count as non-inline)
                         if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
