@@ -1159,7 +1159,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const match = str.match(/^<\/([\w:-]+)>$/);
       if (match) {
         endTag = match[1] ?? '';
-      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, '', nextTag, [], [], options, inlineElements, inlineTextSet))) {
+      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, '', nextTag, emptyAttrs, emptyAttrs, options, inlineElements, inlineTextSet))) {
         break;
       }
     }

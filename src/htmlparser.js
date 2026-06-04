@@ -470,12 +470,7 @@ export class HTMLParser {
         const name = args[baseIndex];
         // Extract value from double-quoted (`baseIndex + 2`), single-quoted (`baseIndex + 3`), or unquoted (`baseIndex + 4`)
         const value = args[baseIndex + 2] ?? args[baseIndex + 3] ?? args[baseIndex + 4];
-        const lowerName = name?.toLowerCase();
-        /** @type {{name?: string, value?: string}} */
-        const entry = {};
-        if (lowerName !== undefined) entry.name = lowerName;
-        if (value !== undefined) entry.value = value;
-        return entry;
+        return /** @type {{name?: string, value?: string}} */ ({ name: name?.toLowerCase(), value });
       }).filter((/** @type {{name?: string, value?: string}} */ attr) => attr.name); // Filter out invalid entries
     }
 
