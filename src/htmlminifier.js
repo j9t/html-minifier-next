@@ -58,6 +58,7 @@ import { processOptions } from './lib/options.js';
 
 // Lazy-load heavy dependencies only when needed
 
+/** @type {Promise<Function> | undefined} */
 let lightningCSSPromise;
 async function getLightningCSS() {
   if (!lightningCSSPromise) {
@@ -66,6 +67,7 @@ async function getLightningCSS() {
   return lightningCSSPromise;
 }
 
+/** @type {Promise<Function> | undefined} */
 let terserPromise;
 async function getTerser() {
   if (!terserPromise) {
@@ -74,6 +76,7 @@ async function getTerser() {
   return terserPromise;
 }
 
+/** @type {Promise<any> | undefined} */
 let swcPromise;
 async function getSwc() {
   if (!swcPromise) {
@@ -89,6 +92,7 @@ async function getSwc() {
   return swcPromise;
 }
 
+/** @type {Promise<Function> | undefined} */
 let svgoPromise;
 async function getSvgo() {
   if (!svgoPromise) {
@@ -97,6 +101,7 @@ async function getSvgo() {
   return svgoPromise;
 }
 
+/** @type {Promise<Function> | undefined} */
 let decodeHTMLPromise;
 async function getDecodeHTML() {
   if (!decodeHTMLPromise) {
@@ -106,8 +111,11 @@ async function getDecodeHTML() {
 }
 
 // Minification caches (initialized on first use with configurable sizes)
+/** @type {LRU | null} */
 let cssMinifyCache = null;
+/** @type {LRU | null} */
 let jsMinifyCache = null;
+/** @type {LRU | null} */
 let svgMinifyCache = null;
 
 // Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
@@ -169,12 +177,13 @@ function findTagEnd(html, pos) {
  */
 function mergeConsecutiveScripts(html) {
   // Parse an attribute string into a name→value map
-  const parseAttrs = (attrStr) => {
+  const parseAttrs = (/** @type {string} */ attrStr) => {
+    /** @type {Record<string, string>} */
     const attrs = {};
     RE_SCRIPT_ATTRS.lastIndex = 0;
     let m;
     while ((m = RE_SCRIPT_ATTRS.exec(attrStr)) !== null) {
-      const name = m[1].toLowerCase();
+      const name = (m[1] ?? '').toLowerCase();
       const value = m[2] ?? m[3] ?? m[4] ?? '';
       attrs[name] = value;
     }
@@ -208,7 +217,7 @@ function mergeConsecutiveScripts(html) {
       // Skip optional whitespace and check for a consecutive <script> tag
       let i = afterClose1;
       while (i < html.length && (html[i] === ' ' || html[i] === '\t' || html[i] === '\n' || html[i] === '\r' || html[i] === '\f')) i++;
-      if (html.slice(i, i + 7).toLowerCase() !== '<script' || (html[i + 7] !== '>' && !/\s/.test(html[i + 7]))) {
+      if (html.slice(i, i + 7).toLowerCase() !== '<script' || (html.charAt(i + 7) !== '>' && !/\s/.test(html.charAt(i + 7)))) {
         RE_SCRIPT_OPEN.lastIndex = afterClose1;
         continue;
       }
@@ -700,23 +709,35 @@ function mergeConsecutiveScripts(html) {
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype
  *
  *  Default: `false`
+ *
+ * @prop {boolean} [insideSVG] - Internal: Set when inside SVG/MathML context
+ * @prop {boolean} [insideForeignContent] - Internal: Set when inside SVG `foreignObject`
+ * @prop {Function} [parentName] - Internal: Preserved name function during namespace transitions
+ * @prop {Function} [htmlName] - Internal: HTML name function preserved from outer context
  */
 
+/**
+ * @param {string} value
+ * @param {MinifierOptions} options
+ * @param {string} uidIgnore
+ * @param {string} uidAttr
+ * @param {string[]} ignoredMarkupChunks
+ */
 async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupChunks) {
   const attrChains = options.sortAttributes && typeof options.sortAttributes !== 'function' && Object.create(null);
   const classChain = options.sortClassNames && typeof options.sortClassNames !== 'function' && new TokenChain();
 
-  function attrNames(attrs) {
+  function attrNames(/** @type {HTMLAttribute[]} */ attrs) {
     return attrs.map(function (attr) {
-      return options.name(attr.name);
+      return options.name?.(attr.name) ?? attr.name;
     });
   }
 
-  function shouldSkipUID(token, uid) {
+  function shouldSkipUID(/** @type {string} */ token, /** @type {string} */ uid) {
     return !uid || token.indexOf(uid) === -1;
   }
 
-  function shouldKeepToken(token) {
+  function shouldKeepToken(/** @type {string} */ token) {
     // Filter out any HTML comment tokens (UID placeholders)
     // These are temporary markers created by `htmlmin:ignore` and `ignoreCustomFragments`
     if (token.startsWith('<!--') && token.endsWith('-->')) {
@@ -730,10 +751,13 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
   const whitespaceSplitPatternSort = /[ \n\f\r]+/;
 
-  async function scan(input) {
-    let currentTag, currentType;
+  async function scan(/** @type {string} */ input) {
+    /** @type {string} */
+    let currentTag;
+    /** @type {string | undefined} */
+    let currentType;
     const parser = new HTMLParser(input, {
-      start: function (tag, attrs) {
+      start: function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
         if (attrChains) {
           if (!attrChains[tag]) {
             attrChains[tag] = new TokenChain();
@@ -741,9 +765,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
           const attrNamesList = attrNames(attrs).filter(shouldKeepToken);
           attrChains[tag].add(attrNamesList);
         }
-        for (let i = 0, len = attrs.length; i < len; i++) {
-          const attr = attrs[i];
-          if (classChain && attr.value && options.name(attr.name) === 'class') {
+        for (const attr of attrs) {
+          if (classChain && attr.value && options.name?.(attr.name) === 'class') {
             const classes = trimWhitespace(attr.value).split(whitespaceSplitPatternScan).filter(shouldKeepToken);
             classChain.add(classes);
           } else if (options.processScripts && attr.name.toLowerCase() === 'type') {
@@ -755,11 +778,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       end: function () {
         currentTag = '';
       },
-      chars: async function (text) {
+      chars: async function (/** @type {string} */ text) {
         // Only recursively scan HTML content, not JSON-LD or other non-HTML script types
         // `scan()` is for analyzing HTML attribute order, not for parsing JSON
         if (options.processScripts && specialContentElements.has(currentTag) &&
-            options.processScripts.indexOf(currentType) > -1 &&
+            options.processScripts.indexOf(currentType ?? '') > -1 &&
             currentType === 'text/html') {
           await scan(text);
         }
@@ -818,7 +841,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // Expand UID tokens back to the original content for frequency analysis
     let expandedValue = value;
     if (uidReplacePattern) {
-      expandedValue = value.replace(uidReplacePattern, function (match, index) {
+      expandedValue = value.replace(uidReplacePattern, function (/** @type {string} */ _match, /** @type {string} */ index) {
         return ignoredMarkupChunks[+index] || '';
       });
       // Reset `lastIndex` for pattern reuse
@@ -839,7 +862,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     await scan(scanValue);
   } finally {
     // Restore original option
-    options.continueOnParseError = originalContinueOnParseError;
+    if (originalContinueOnParseError !== undefined) {
+      options.continueOnParseError = originalContinueOnParseError;
+    } else {
+      delete options.continueOnParseError;
+    }
   }
   if (attrChains) {
     const attrSorters = Object.create(null);
@@ -849,14 +876,14 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // Memoize sorted attribute orders—attribute sets often repeat in templates
     const attrOrderCache = new LRU(500);
 
-    options.sortAttributes = function (tag, attrs) {
+    options.sortAttributes = function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
       const sorter = attrSorters[tag];
       if (sorter) {
         const names = attrNames(attrs);
 
         // Create order-independent cache key from tag and sorted attribute names
         const cacheKey = tag + ':' + names.slice().sort().join(',');
-        let sortedNames = attrOrderCache.get(cacheKey);
+        let sortedNames = /** @type {string[] | undefined} */ (attrOrderCache.get(cacheKey));
 
         if (sortedNames === undefined) {
           // Only sort if not in cache—need to clone names since sort mutates in place
@@ -866,10 +893,10 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
 
         // Apply the sorted order to `attrs`
         const attrMap = Object.create(null);
-        names.forEach(function (name, index) {
+        names.forEach(function (/** @type {string} */ name, /** @type {number} */ index) {
           (attrMap[name] || (attrMap[name] = [])).push(attrs[index]);
         });
-        sortedNames.forEach(function (name, index) {
+        /** @type {string[]} */ (sortedNames).forEach(function (/** @type {string} */ name, /** @type {number} */ index) {
           attrs[index] = attrMap[name].shift();
         });
       }
@@ -880,14 +907,14 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // Memoize `sortClassNames` results—class lists often repeat in templates
     const classNameCache = new LRU(500);
 
-    options.sortClassNames = function (value) {
+    options.sortClassNames = function (/** @type {string} */ value) {
       // Fast path: Single class (no spaces) needs no sorting
       if (value.indexOf(' ') === -1) {
         return value;
       }
 
       // Check cache first
-      const cached = classNameCache.get(value);
+      const cached = /** @type {string | undefined} */ (classNameCache.get(value));
       if (cached !== undefined) {
         return cached;
       }
@@ -896,13 +923,13 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       // Fast path: Skip if no HTML comments (UID markers) present
       let expandedValue = value;
       if (uidReplacePattern && value.indexOf('<!--') !== -1) {
-        expandedValue = value.replace(uidReplacePattern, function (match, index) {
+        expandedValue = value.replace(uidReplacePattern, function (/** @type {string} */ _match, /** @type {string} */ index) {
           return ignoredMarkupChunks[+index] || '';
         });
         // Reset `lastIndex` for pattern reuse
         uidReplacePattern.lastIndex = 0;
       }
-      const classes = expandedValue.split(whitespaceSplitPatternSort).filter(function(cls) {
+      const classes = expandedValue.split(whitespaceSplitPatternSort).filter(function(/** @type {string} */ cls) {
         return cls !== '';
       });
       const sorted = sorter.sort(classes);
@@ -931,29 +958,42 @@ async function minifyHTML(value, options, partialMarkup) {
     value = collapseWhitespace(value, options, true, true);
   }
 
+  /** @type {string[]} */
   const buffer = [];
-  let charsPrevTag;
+  /** @type {string} */
+  let charsPrevTag = '';
   let currentChars = '';
-  let hasChars;
+  /** @type {boolean} */
+  let hasChars = false;
   let currentTag = '';
+  /** @type {Array<{name: string, value?: string, quote?: string, customAssign?: string, customOpen?: string, customClose?: string}>} */
   let currentAttrs = [];
+  /** @type {string[]} */
   const stackNoTrimWhitespace = [];
+  /** @type {string[]} */
   const stackNoCollapseWhitespace = [];
   let preTextareaDepth = 0; // Count of `pre`/`textarea` entries in `stackNoTrimWhitespace`
   let optionalStartTag = '';
   let optionalEndTag = '';
   let optionalEndTagEmitted = false;
+  /** @type {string[]} */
   const ignoredMarkupChunks = [];
+  /** @type {Array<RegExpExecArray | null>} */
   const ignoredCustomMarkupChunks = [];
+  /** @type {string | undefined} */
   let uidIgnore;
+  /** @type {RegExp | undefined} */
   let uidIgnorePlaceholderPattern;
+  /** @type {string | undefined} */
   let uidAttr;
+  /** @type {RegExp | undefined} */
   let uidPattern;
+  /** @type {RegExp | undefined} */
   let uidAttrLeadingPattern;
   // Create inline tags/text sets with custom elements
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
-  const normalizedCustomElements = customElementsArr.map(name => options.name(name));
+  const normalizedCustomElements = customElementsArr.map(name => options.name?.(name) ?? name);
   // Fast path: Reuse base sets if no custom elements
   const inlineTextSet = normalizedCustomElements.length
     ? new Set([...inlineElementsToKeepWhitespaceWithin, ...normalizedCustomElements])
@@ -963,6 +1003,7 @@ async function minifyHTML(value, options, partialMarkup) {
     : inlineElementsToKeepWhitespaceAround;
 
   // Parse `removeEmptyElementsExcept` option
+  /** @type {Array<{tag: string, attrs: {[x: string]: string | undefined} | null}>} */
   let removeEmptyElementsExcept;
   if (options.removeEmptyElementsExcept && !Array.isArray(options.removeEmptyElementsExcept)) {
     if (options.log) {
@@ -970,7 +1011,7 @@ async function minifyHTML(value, options, partialMarkup) {
     }
     removeEmptyElementsExcept = [];
   } else {
-    removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept, options) || [];
+    removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept || [], /** @type {any} */ (options)) || [];
   }
 
   // Temporarily replace ignored chunks with comments, so that there’s no need to worry what’s there;
@@ -1012,17 +1053,17 @@ async function minifyHTML(value, options, partialMarkup) {
   // This allows proper frequency analysis with access to ignored content via UID tokens
   if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
       (options.sortClassNames && typeof options.sortClassNames !== 'function')) {
-    await createSortFns(value, options, uidIgnore, null, ignoredMarkupChunks);
+    await createSortFns(value, options, uidIgnore ?? '', uidAttr ?? '', ignoredMarkupChunks);
   }
 
-  const customFragments = options.ignoreCustomFragments.map(function (re) {
+  const customFragments = (options.ignoreCustomFragments || []).map(function (/** @type {RegExp} */ re) {
     return re.source;
   });
   if (customFragments.length) {
     // Warn about potential ReDoS if custom fragments use unlimited quantifiers
-    for (let i = 0; i < customFragments.length; i++) {
-      if (/[*+]/.test(customFragments[i])) {
-        options.log('Warning: Custom fragment contains unlimited quantifiers (“*” or “+”) which may cause ReDoS vulnerability');
+    for (const fragment of customFragments) {
+      if (/[*+]/.test(fragment)) {
+        options.log?.('Warning: Custom fragment contains unlimited quantifiers (“*” or “+”) which may cause ReDoS vulnerability');
         break;
       }
     }
@@ -1050,28 +1091,28 @@ async function minifyHTML(value, options, partialMarkup) {
           uidPattern = new RegExp('(\\s*)' + uidAttr + '([0-9]+)' + uidAttr + '(\\s*)', 'g');
           uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
 
-          if (options.minifyCSS) {
-            options.minifyCSS = (function (fn) {
-              return function (text, type) {
-                text = text.replace(uidPattern, function (match, prefix, index) {
+          if (options.minifyCSS !== identity) {
+            /** @type {any} */ (options).minifyCSS = (function (/** @type {Function} */ fn) {
+              return function (/** @type {string} */ text, /** @type {string} */ type) {
+                text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                   const chunks = ignoredCustomMarkupChunks[+index];
-                  return chunks[1] + uidAttr + index + uidAttr + chunks[2];
+                  return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
                 });
 
                 return fn(text, type);
               };
-            })(options.minifyCSS);
+            })(/** @type {Function} */ (options.minifyCSS));
           }
 
-          if (options.minifyJS) {
-            options.minifyJS = (function (fn) {
-              return function (text, inline, isModule) {
-                return fn(text.replace(uidPattern, function (match, prefix, index) {
+          if (options.minifyJS !== identity) {
+            options.minifyJS = (function (/** @type {Function} */ fn) {
+              return function (/** @type {string} */ text, /** @type {boolean} */ inline, /** @type {boolean} */ isModule) {
+                return fn(text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                   const chunks = ignoredCustomMarkupChunks[+index];
-                  return chunks[1] + uidAttr + index + uidAttr + chunks[2];
+                  return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
                 }), inline, isModule);
               };
-            })(options.minifyJS);
+            })(/** @type {Function} */ (options.minifyJS));
           }
         }
 
@@ -1082,17 +1123,17 @@ async function minifyHTML(value, options, partialMarkup) {
     }
   }
 
-  function canCollapseWhitespace(tag, attrs) {
-    return options.canCollapseWhitespace(tag, attrs, defaultCanCollapseWhitespace);
+  function canCollapseWhitespace(/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
+    return /** @type {Function} */ (options.canCollapseWhitespace)(tag, attrs, defaultCanCollapseWhitespace);
   }
 
-  function canTrimWhitespace(tag, attrs) {
-    return options.canTrimWhitespace(tag, attrs, defaultCanTrimWhitespace);
+  function canTrimWhitespace(/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
+    return /** @type {Function} */ (options.canTrimWhitespace)(tag, attrs, defaultCanTrimWhitespace);
   }
 
   function removeStartTag() {
     let index = buffer.length - 1;
-    while (index > 0 && !RE_START_TAG.test(buffer[index])) {
+    while (index > 0 && !RE_START_TAG.test(buffer[index] ?? '')) {
       index--;
     }
     buffer.length = Math.max(0, index);
@@ -1100,20 +1141,20 @@ async function minifyHTML(value, options, partialMarkup) {
 
   function removeEndTag() {
     let index = buffer.length - 1;
-    while (index > 0 && !RE_END_TAG.test(buffer[index])) {
+    while (index > 0 && !RE_END_TAG.test(buffer[index] ?? '')) {
       index--;
     }
     buffer.length = Math.max(0, index);
   }
 
   // Look for trailing whitespaces, bypass any inline tags
-  function trimTrailingWhitespace(index, nextTag) {
-    for (let endTag = null; index >= 0 && canTrimWhitespace(endTag); index--) {
-      const str = buffer[index];
+  function trimTrailingWhitespace(/** @type {number} */ index, /** @type {string} */ nextTag) {
+    for (let endTag = ''; index >= 0 && canTrimWhitespace(endTag, []); index--) {
+      const str = buffer[index] ?? '';
       const match = str.match(/^<\/([\w:-]+)>$/);
       if (match) {
-        endTag = match[1];
-      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, null, nextTag, [], [], options, inlineElements, inlineTextSet))) {
+        endTag = match[1] ?? '';
+      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, '', nextTag, [], [], options, inlineElements, inlineTextSet))) {
         break;
       }
     }
@@ -1122,10 +1163,10 @@ async function minifyHTML(value, options, partialMarkup) {
   // Look for trailing whitespaces from previously processed text
   // which may not be trimmed due to a following comment or an empty
   // element which has now been removed
-  function squashTrailingWhitespace(nextTag) {
+  function squashTrailingWhitespace(/** @type {string} */ nextTag) {
     let charsIndex = buffer.length - 1;
     if (buffer.length > 1) {
-      const item = buffer[buffer.length - 1];
+      const item = buffer[buffer.length - 1] ?? '';
       if (/^(?:<!|$)/.test(item) && (!uidIgnore || item.indexOf(uidIgnore) === -1)) {
         charsIndex--;
       }
@@ -1134,6 +1175,7 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   // SVG subtree capture: When SVGO is active, record buffer positions for post-processing
+  /** @type {Array<{start: number, end: number}>} */
   const svgBlocks = []; // Array of { start, end } buffer indices
   let svgBufferStartIndex = -1;
   let svgDepth = 0;
@@ -1146,7 +1188,7 @@ async function minifyHTML(value, options, partialMarkup) {
     // Compute `nextTag` only when whitespace collapse features require it
     wantsNextTag: !!(options.collapseWhitespace || options.collapseInlineTagWhitespace || options.conservativeCollapse),
 
-    start: async function (tag, attrs, unary, unarySlash, autoGenerated) {
+    start: async function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ unary, /** @type {string} */ unarySlash, /** @type {boolean} */ autoGenerated) {
       const lowerTag = tag.toLowerCase();
       if (lowerTag === 'svg' || lowerTag === 'math') {
         options = Object.create(options);
@@ -1168,21 +1210,21 @@ async function minifyHTML(value, options, partialMarkup) {
       // Note: The element itself is in SVG/MathML namespace, only its children are HTML
       let useParentNameForTag = false;
       if (options.insideForeignContent && (lowerTag === 'foreignobject' ||
-          (lowerTag === 'annotation-xml' && attrs.some(a => a.name.toLowerCase() === 'encoding' &&
-            RE_HTML_ENCODING.test(a.value))))) {
-        const parentName = options.name;
+          (lowerTag === 'annotation-xml' && attrs.some((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding' &&
+            RE_HTML_ENCODING.test(a.value ?? ''))))) {
+        const parentName = /** @type {(name: string) => string} */ (options.name);
         options = Object.create(options);
         options.caseSensitive = false;
         options.keepClosingSlash = false;
         options.parentName = parentName; // Preserve for the element tag itself
-        options.name = options.htmlName || lowercase;
+        options.name = /** @type {(name: string) => string} */ (options.htmlName ?? lowercase);
         options.insideForeignContent = false;
         // Note: `removeAttributeQuotes`, `removeTagWhitespace`, and `decodeEntities`
         // stay disabled (inherited from SVG context) because the entire SVG block
         // must be valid XML for SVGO processing
         useParentNameForTag = true;
       }
-      tag = (useParentNameForTag ? options.parentName : options.name)(tag);
+      tag = /** @type {(name: string) => string} */ (useParentNameForTag ? options.parentName : options.name)(tag);
       currentTag = tag;
       charsPrevTag = tag;
       if (!inlineTextSet.has(tag)) {
@@ -1248,10 +1290,10 @@ async function minifyHTML(value, options, partialMarkup) {
       // Remove duplicate attributes (per HTML spec, first occurrence wins)
       // Duplicate attributes result in invalid HTML
       // https://html.spec.whatwg.org/multipage/parsing.html#attribute-name-state
-      deduplicateAttributes(attrs, options.caseSensitive);
+      deduplicateAttributes(attrs, Boolean(options.caseSensitive));
 
       if (options.sortAttributes) {
-        options.sortAttributes(tag, attrs);
+        /** @type {Function} */ (options.sortAttributes)(tag, attrs);
       }
 
       const attrResults = attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML));
@@ -1281,7 +1323,7 @@ async function minifyHTML(value, options, partialMarkup) {
         currentTag = '';
       }
     },
-    end: function (tag, attrs, autoGenerated) {
+    end: function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ autoGenerated) {
       const lowerTag = tag.toLowerCase();
       // Restore parent context when exiting SVG/MathML or HTML-in-foreign-content elements
       if (lowerTag === 'svg' || lowerTag === 'math') {
@@ -1290,7 +1332,7 @@ async function minifyHTML(value, options, partialMarkup) {
                  !options.insideForeignContent && Object.getPrototypeOf(options).insideForeignContent) {
         options = Object.getPrototypeOf(options);
       }
-      tag = options.name(tag);
+      tag = /** @type {Function} */ (options.name)(tag);
 
       // Check if current tag is in a whitespace stack
       if (options.collapseWhitespace) {
@@ -1336,7 +1378,7 @@ async function minifyHTML(value, options, partialMarkup) {
         let preserve = false;
         if (removeEmptyElementsExcept.length) {
           // Normalize attribute names for comparison with specs
-          const normalizedAttrs = attrs.map(attr => ({ ...attr, name: options.name(attr.name) }));
+          const normalizedAttrs = attrs.map((/** @type {HTMLAttribute} */ attr) => ({ ...attr, name: options.name?.(attr.name) ?? attr.name }));
           preserve = shouldPreserveEmptyElement(tag, normalizedAttrs, removeEmptyElementsExcept);
         }
 
@@ -1383,7 +1425,7 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
     },
-    chars: function (text, prevTag, nextTag, prevAttrs, nextAttrs) {
+    chars: function (/** @type {string} */ text, /** @type {string} */ prevTag, /** @type {string} */ nextTag, /** @type {HTMLAttribute[]} */ prevAttrs, /** @type {HTMLAttribute[]} */ nextAttrs) {
       prevTag = prevTag === '' ? 'comment' : prevTag;
       nextTag = nextTag === '' ? 'comment' : nextTag;
       prevAttrs = prevAttrs || [];
@@ -1399,7 +1441,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
 
       // Whitespace collapsing phase (sync); captures `prevTag`/`nextTag`/`prevAttrs`/`nextAttrs` from outer scope
-      function charsCollapse(text) {
+      function charsCollapse(/** @type {string} */ text) {
         // Trim outermost newline-based whitespace inside `pre`/`textarea` elements
         // This removes trailing newlines often added by template engines before closing tags
         // Only trims single trailing newlines (multiple newlines are likely intentional formatting)
@@ -1421,7 +1463,7 @@ async function minifyHTML(value, options, partialMarkup) {
             // to avoid side effects on the `inlineTextSet` branch below
             let effectivePrevTag = prevTag;
             if (prevTag === 'comment') {
-              const prevComment = buffer[buffer.length - 1];
+              const prevComment = buffer[buffer.length - 1] ?? '';
               if (!uidIgnore || prevComment.indexOf(uidIgnore) === -1) {
                 if (!prevComment) {
                   prevTag = charsPrevTag;
@@ -1429,7 +1471,7 @@ async function minifyHTML(value, options, partialMarkup) {
                 }
                 if (buffer.length > 1 && (!prevComment || (!options.conservativeCollapse && / $/.test(currentChars)))) {
                   const charsIndex = buffer.length - 2;
-                  buffer[charsIndex] = buffer[charsIndex].replace(/\s+$/, function (trailingSpaces) {
+                  buffer[charsIndex] = (buffer[charsIndex] ?? '').replace(/\s+$/, function (trailingSpaces) {
                     text = trailingSpaces + text;
                     return '';
                   });
@@ -1440,13 +1482,14 @@ async function minifyHTML(value, options, partialMarkup) {
                 // when `nextTag` is `comment` (another UID placeholder), `commentFinalize` handles it
                 const match = prevComment.match(uidIgnorePlaceholderPattern);
                 if (match) {
-                  const idx = +match[1];
+                  const idx = +(match[1] ?? '');
                   if (idx < ignoredMarkupChunks.length) {
                     const content = ignoredMarkupChunks[idx];
                     const lastTagMatch = content && RE_LAST_HTML_TAG.exec(content);
                     if (lastTagMatch) {
-                      const isClose = lastTagMatch[1].charAt(0) === '/';
-                      const tagName = options.name(isClose ? lastTagMatch[1].slice(1) : lastTagMatch[1]);
+                      const group = lastTagMatch[1] ?? '';
+                      const isClose = group.charAt(0) === '/';
+                      const tagName = options.name?.(isClose ? group.slice(1) : group) ?? group;
                       effectivePrevTag = isClose ? '/' + tagName : tagName;
                     }
                   }
@@ -1457,13 +1500,13 @@ async function minifyHTML(value, options, partialMarkup) {
               if (prevTag === '/nobr' || prevTag === 'wbr') {
                 if (/^\s/.test(text)) {
                   let tagIndex = buffer.length - 1;
-                  while (tagIndex > 0 && buffer[tagIndex].lastIndexOf('<' + prevTag) !== 0) {
+                  while (tagIndex > 0 && (buffer[tagIndex] ?? '').lastIndexOf('<' + prevTag) !== 0) {
                     tagIndex--;
                   }
                   trimTrailingWhitespace(tagIndex - 1, 'br');
                 }
               } else if (inlineTextSet.has(prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag)) {
-                text = collapseWhitespace(text, options, /(?:^|\s)$/.test(currentChars));
+                text = collapseWhitespace(text, options, /(?:^|\s)$/.test(currentChars), false);
               }
             }
             if (prevTag || nextTag) {
@@ -1483,18 +1526,18 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       // Finalization phase (sync): Optional tag handling, entity re-encoding, buffer push
-      function charsFinalize(text) {
+      function charsFinalize(/** @type {string} */ text) {
         if (options.removeOptionalTags && text) {
           // UID-attr tokens are padded with `\t`, which would falsely look like leading whitespace;
           // resolve single-token text to its actual content for the space/comment checks below
           let effectiveText = text;
-          if (uidAttrLeadingPattern && text.includes(uidAttr)) {
+          if (uidAttrLeadingPattern && uidAttr && text.includes(uidAttr)) {
             const uidMatch = uidAttrLeadingPattern.exec(text);
             if (uidMatch) {
-              const idx = +uidMatch[1];
+              const idx = +(uidMatch[1] ?? 0);
               const chunks = idx < ignoredCustomMarkupChunks.length ? ignoredCustomMarkupChunks[idx] : null;
               if (chunks != null) {
-                effectiveText = chunks[0];
+                effectiveText = chunks[0] ?? '';
               }
             }
           }
@@ -1530,8 +1573,8 @@ async function minifyHTML(value, options, partialMarkup) {
           }
         }
         if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
-          text = text.replace(uidPattern, function (match, prefix, index) {
-            return ignoredCustomMarkupChunks[+index][0];
+          text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ _prefix, /** @type {string} */ index) {
+            return ignoredCustomMarkupChunks[+index]?.[0] ?? match;
           });
         }
         currentChars += text;
@@ -1557,20 +1600,20 @@ async function minifyHTML(value, options, partialMarkup) {
           text = await processScript(text, options, currentAttrs, minifyHTML);
         }
         if (needsMinifyJS) {
-          text = await options.minifyJS(text, false, isModuleScript);
+          text = await /** @type {Function} */ (options.minifyJS)(text, false, isModuleScript);
         }
         if (needsMinifyCSS) {
-          text = await options.minifyCSS(text);
+          text = await /** @type {Function} */ (options.minifyCSS)(text);
         }
         charsFinalize(text);
       })();
     },
-    comment: function (text, nonStandard) {
+    comment: function (/** @type {string} */ text, /** @type {boolean} */ nonStandard) {
       const prefix = nonStandard ? '<!' : '<!--';
       const suffix = nonStandard ? '>' : '-->';
 
       // Finalization phase (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
-      function commentFinalize(comment) {
+      function commentFinalize(/** @type {string} */ comment) {
         if (options.removeOptionalTags && comment) {
           if (uidIgnorePlaceholderPattern) {
             const match = uidIgnorePlaceholderPattern.exec(comment);
@@ -1579,11 +1622,12 @@ async function minifyHTML(value, options, partialMarkup) {
               // if there’s a pending optional end tag and the ignored content isn’t itself
               // a comment (which per the HTML spec prevents omission), resolve it now,
               // before the UID is pushed to the buffer
-              const idx = +match[1];
+              const idx = +(match[1] ?? 0);
               const content = idx < ignoredMarkupChunks.length ? ignoredMarkupChunks[idx] : null;
               if (optionalEndTag && optionalEndTagEmitted && content != null && !/^\s*<!--/.test(content)) {
                 const firstTagMatch = content.match(/^\s*<([a-zA-Z][^\s/>]*)/);
-                const firstTag = firstTagMatch ? options.name(firstTagMatch[1]) : '';
+                const firstTagGroup = firstTagMatch?.[1] ?? '';
+                const firstTag = firstTagGroup ? (options.name?.(firstTagGroup) ?? firstTagGroup) : '';
                 if (canRemovePrecedingTag(optionalEndTag, firstTag)) {
                   removeEndTag();
                 }
@@ -1611,8 +1655,8 @@ async function minifyHTML(value, options, partialMarkup) {
                 const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
 
                 if (currentMatch && prevMatch) {
-                  const currentIndex = +currentMatch[1];
-                  const prevIndex = +prevMatch[1];
+                  const currentIndex = +(currentMatch[1] ?? 0);
+                  const prevIndex = +(prevMatch[1] ?? 0);
 
                   // Defensive bounds check to ensure indices are valid
                   if (currentIndex < ignoredMarkupChunks.length && prevIndex < ignoredMarkupChunks.length) {
@@ -1635,10 +1679,10 @@ async function minifyHTML(value, options, partialMarkup) {
                       // Collapse if both sides are element/closing tags or HTML comments, and neither is inline
                       if ((currentTagMatch || currentIsHtmlComment || currentClosingTagMatch) &&
                           (prevTagMatch || prevIsHtmlComment || prevClosingTagMatch)) {
-                        const currentTag = currentTagMatch ? options.name(currentTagMatch[1])
-                          : currentClosingTagMatch ? options.name(currentClosingTagMatch[1]) : null;
-                        const prevTag = prevTagMatch ? options.name(prevTagMatch[1])
-                          : prevClosingTagMatch ? options.name(prevClosingTagMatch[1]) : null;
+                        const currentTag = currentTagMatch ? (options.name?.(currentTagMatch[1] ?? '') ?? currentTagMatch[1] ?? '')
+                          : currentClosingTagMatch ? (options.name?.(currentClosingTagMatch[1] ?? '') ?? currentClosingTagMatch[1] ?? '') : null;
+                        const prevTag = prevTagMatch ? (options.name?.(prevTagMatch[1] ?? '') ?? prevTagMatch[1] ?? '')
+                          : prevClosingTagMatch ? (options.name?.(prevClosingTagMatch[1] ?? '') ?? prevClosingTagMatch[1] ?? '') : null;
 
                         // Don’t collapse between inline elements (HTML comments count as non-inline)
                         if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
@@ -1676,7 +1720,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       if (options.removeComments) {
-        if (isIgnoredComment(text, options)) {
+        if (isIgnoredComment(text, /** @type {any} */ (options))) {
           text = prefix + text + suffix;
         } else {
           text = '';
@@ -1686,7 +1730,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
       commentFinalize(text);
     },
-    doctype: function (doctype) {
+    doctype: function (/** @type {string} */ doctype) {
       buffer.push(options.useShortDoctype
         ? '<!doctype' +
         (options.removeTagWhitespace ? '' : ' ') + 'html>'
@@ -1701,11 +1745,12 @@ async function minifyHTML(value, options, partialMarkup) {
   if (options.minifySVG && svgBlocks.length) {
     const optimized = await Promise.all(
       svgBlocks.map(({ start, end }) =>
-        options.minifySVG(buffer.slice(start, end).join(''))
+        /** @type {Function} */ (options.minifySVG)(buffer.slice(start, end).join(''))
       )
     );
     for (let i = svgBlocks.length - 1; i >= 0; i--) {
-      buffer.splice(svgBlocks[i].start, svgBlocks[i].end - svgBlocks[i].start, optimized[i]);
+      const block = svgBlocks[i];
+      if (block) buffer.splice(block.start, block.end - block.start, optimized[i] ?? '');
     }
   }
 
@@ -1725,9 +1770,9 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   return joinResultSegments(buffer, options, uidPattern
-    ? function (str) {
-      return str.replace(uidPattern, function (match, prefix, index, suffix) {
-        let chunk = ignoredCustomMarkupChunks[+index][0];
+    ? function (/** @type {string} */ str) {
+      return str.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ prefix, /** @type {string} */ index, /** @type {string} */ suffix) {
+        let chunk = ignoredCustomMarkupChunks[+index]?.[0] ?? match;
         if (options.collapseWhitespace) {
           if (prefix !== '\t') {
             chunk = prefix + chunk;
@@ -1744,14 +1789,20 @@ async function minifyHTML(value, options, partialMarkup) {
       });
     }
     : identity, uidIgnore
-    ? function (str) {
-      return str.replace(new RegExp('<!--' + uidIgnore + '([0-9]+)-->', 'g'), function (match, index) {
-        return ignoredMarkupChunks[+index];
+    ? function (/** @type {string} */ str) {
+      return str.replace(new RegExp('<!--' + uidIgnore + '([0-9]+)-->', 'g'), function (/** @type {string} */ _match, /** @type {string} */ index) {
+        return ignoredMarkupChunks[+index] ?? '';
       });
     }
     : identity);
 }
 
+/**
+ * @param {string[]} results
+ * @param {MinifierOptions} options
+ * @param {Function} restoreCustom
+ * @param {Function} restoreIgnore
+ */
 function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
   let str;
   const maxLineLength = options.maxLineLength;
@@ -1761,15 +1812,16 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
     let line = ''; const lines = [];
     while (results.length) {
       const len = line.length;
-      const end = results[0].indexOf('\n');
-      const isClosingTag = Boolean(results[0].match(endTag));
+      const cur = results[0] ?? '';
+      const end = cur.indexOf('\n');
+      const isClosingTag = Boolean(cur.match(endTag));
       const shouldKeepSameLine = noNewlinesBeforeTagClose && isClosingTag;
 
       if (end < 0) {
-        line += restoreIgnore(restoreCustom(results.shift()));
+        line += restoreIgnore(restoreCustom(results.shift() ?? ''));
       } else {
-        line += restoreIgnore(restoreCustom(results[0].slice(0, end)));
-        results[0] = results[0].slice(end + 1);
+        line += restoreIgnore(restoreCustom(cur.slice(0, end)));
+        results[0] = cur.slice(end + 1);
       }
       if (len > 0 && line.length > maxLineLength && !shouldKeepSameLine) {
         lines.push(line.slice(0, len));
@@ -1799,13 +1851,14 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
  * - The first call’s options determine the cache sizes for subsequent calls
  * - Invalid values (NaN, Infinity) fall back to the default size (500); values below `1` are clamped to `1`
  */
+/** @param {MinifierOptions} options */
 function initCaches(options) {
   // Only create caches once (on first call)—sizes are locked after this
   if (!cssMinifyCache) {
     const defaultSize = 500;
 
     // Helper to parse env var—returns parsed number (including 0) or undefined if absent, invalid, or negative
-    const parseEnvCacheSize = (envVar) => {
+    const parseEnvCacheSize = (/** @type {string | undefined} */ envVar) => {
       if (envVar === undefined) return undefined;
       const parsed = Number(envVar);
       if (Number.isNaN(parsed) || !Number.isFinite(parsed) || parsed < 0) {
@@ -1815,7 +1868,7 @@ function initCaches(options) {
     };
 
     // Sanitize a cache size: Non-finite/NaN falls back to `defaultSize`; otherwise clamped to min 1 and floored
-    const sanitizeSize = (size) => Number.isFinite(size) ? Math.max(1, Math.floor(size)) : defaultSize;
+    const sanitizeSize = (/** @type {number} */ size) => Number.isFinite(size) ? Math.max(1, Math.floor(size)) : defaultSize;
 
     // Get cache sizes with precedence: Options > env > default
     const cssSize = options.cacheCSS !== undefined ? options.cacheCSS
@@ -1853,7 +1906,9 @@ export const minify = async function (value, options) {
     getTerser,
     getSwc,
     getSvgo,
-    ...caches
+    cssMinifyCache: caches.cssMinifyCache ?? undefined,
+    jsMinifyCache: caches.jsMinifyCache ?? undefined,
+    svgMinifyCache: caches.svgMinifyCache ?? undefined
   });
   let result = await minifyHTML(value, options);
 
@@ -1862,7 +1917,7 @@ export const minify = async function (value, options) {
     result = mergeConsecutiveScripts(result);
   }
 
-  options.log('minified in: ' + (Date.now() - start) + 'ms');
+  /** @type {Function} */ (options.log)('minified in: ' + (Date.now() - start) + 'ms');
   return result;
 };
 

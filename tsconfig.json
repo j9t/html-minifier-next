@@ -1,6 +1,7 @@
 {
   // https://aka.ms/tsconfig
   "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
   "include": [
     "./src/htmlminifier.js"
   ],
@@ -9,42 +10,15 @@
     "rootDir": "./src",
     "outDir": "./dist/types",
 
-    // Environment settings
-    // See also https://aka.ms/tsconfig/module
-    "module": "nodenext",
-    "target": "esnext",
-    "types": [],
+    // Node type definitions for `process`, `Buffer`, etc.
+    "types": ["node"],
 
     // JavaScript support
-    "allowJs": true,
-    // "checkJs": true, // @@ Enable and fix errors
+    "checkJs": true,
 
     // Outputs
     "emitDeclarationOnly": true,
     "declaration": true,
-    "declarationMap": true,
-    "listEmittedFiles": true,
-
-    // Recommended options
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-    "erasableSyntaxOnly": true,
-    "forceConsistentCasingInFileNames": true,
-
-    // Stricter type-checking options
-    // "strict": true,
-    // "noUncheckedIndexedAccess": true,
-    // "exactOptionalPropertyTypes": true,
-
-    // Style options
-    // "noImplicitReturns": true,
-    // "noImplicitOverride": true,
-    // "noUnusedLocals": true,
-    // "noUnusedParameters": true,
-    // "noFallthroughCasesInSwitch": true,
-    // "noPropertyAccessFromIndexSignature": true,
+    "declarationMap": true
   }
 }

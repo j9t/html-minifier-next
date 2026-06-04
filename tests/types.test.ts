@@ -19,7 +19,7 @@ async function testBasicMinify() {
   const result: string = await minify(html);
 
   // Should accept options
-  const result2: string = await minify(html, {
+  await minify(html, {
     collapseWhitespace: true,
     removeComments: true,
   });
@@ -73,14 +73,14 @@ async function testMinifyCSSOptions() {
 
   // Function
   await minify(html, {
-    minifyCSS: (text: string, type?: string) => {
+    minifyCSS: (text: string, _type?: string) => {
       return text.replace(/\s+/g, ' ');
     },
   });
 
   // Async function
   await minify(html, {
-    minifyCSS: async (text: string, type?: string) => {
+    minifyCSS: async (text: string, _type?: string) => {
       return Promise.resolve(text.trim());
     },
   });
@@ -103,14 +103,14 @@ async function testMinifyJSOptions() {
 
   // Function
   await minify(html, {
-    minifyJS: (text: string, inline?: boolean) => {
+    minifyJS: (text: string, _inline?: boolean) => {
       return text.replace(/\s+/g, ' ');
     },
   });
 
   // Async function
   await minify(html, {
-    minifyJS: async (text: string, inline?: boolean) => {
+    minifyJS: async (text: string, _inline?: boolean) => {
       return Promise.resolve(text.trim());
     },
   });
@@ -185,16 +185,16 @@ async function testFunctionOptions() {
       console.log(message);
     },
     name: (name: string) => name.toLowerCase(),
-    canCollapseWhitespace: (tag, attrs, canCollapseWhitespace) => {
+    canCollapseWhitespace: (tag, _attrs, _canCollapseWhitespace) => {
       return tag !== 'pre';
     },
-    canTrimWhitespace: (tag, attrs, canTrimWhitespace) => {
+    canTrimWhitespace: (tag, _attrs, _canTrimWhitespace) => {
       return tag !== 'textarea';
     },
-    removeEmptyAttributes: (attrName: string, tag: string) => {
+    removeEmptyAttributes: (attrName: string, _tag: string) => {
       return attrName !== 'alt';
     },
-    sortAttributes: (tag: string, attrs: HTMLAttribute[]) => {
+    sortAttributes: (_tag: string, attrs: HTMLAttribute[]) => {
       attrs.sort((a, b) => a.name.localeCompare(b.name));
     },
     sortClassNames: (value: string) => {
@@ -273,7 +273,7 @@ async function testTypeInference() {
   });
 
   // Result should be inferred as string
-  const length: number = result.length;
+  void result.length;
 
   return result;
 }

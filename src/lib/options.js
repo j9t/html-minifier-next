@@ -1,5 +1,11 @@
 // Imports
 
+/**
+ * @typedef {Record<string, any>} MinifierOptions
+ */
+
+// @@ Extract a `ProcessedOptions` typedef (with `name`, `log`, `canCollapseWhitespace`, `canTrimWhitespace`,`minifyCSS`, `minifyJS`, `minifyURLs` typed as required, non-optional) to replace the current `Record<string, any>` escape hatch and eliminate the `/** @type {Function} */` casts in htmlminifier.js
+
 import { createUrlMinifier } from './urls.js';
 import { LRU, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
@@ -10,6 +16,7 @@ import { optionDefaults } from './option-definitions.js';
 
 // Helper functions
 
+/** @param {MinifierOptions} options */
 function shouldMinifyInnerHTML(options) {
   return Boolean(
     options.collapseWhitespace ||
@@ -25,18 +32,12 @@ function shouldMinifyInnerHTML(options) {
 // Main options processor
 
 /**
- * @param {Partial<MinifierOptions>} inputOptions - User-provided options
- * @param {Object} deps - Dependencies from htmlminifier.js
- * @param {Function} deps.getLightningCSS - Function to lazily load Lightning CSS
- * @param {Function} deps.getTerser - Function to lazily load Terser
- * @param {Function} deps.getSwc - Function to lazily load @swc/core
- * @param {Function} deps.getSvgo - Function to lazily load SVGO
- * @param {LRU} deps.cssMinifyCache - CSS minification cache
- * @param {LRU} deps.jsMinifyCache - JS minification cache
- * @param {LRU} deps.svgMinifyCache - SVG minification cache
+ * @param {MinifierOptions} inputOptions - User-provided options
+ * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
  * @returns {MinifierOptions} Normalized options with defaults applied
  */
 const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
+  /** @type {MinifierOptions} */
   const options = {
     name: lowercase,
     canCollapseWhitespace,
@@ -49,12 +50,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     minifySVG: null
   };
 
-  const parseRegExpArray = (arr) => {
+  const parseRegExpArray = (/** @type {unknown} */ arr) => {
     return Array.isArray(arr) ? arr.map(parseRegExp) : arr;
   };
 
   // Helper for nested arrays (e.g., `customAttrSurround: [[start, end], …]`)
-  const parseNestedRegExpArray = (arr) => {
+  const parseNestedRegExpArray = (/** @type {unknown} */ arr) => {
     if (!Array.isArray(arr)) return arr;
     return arr.map(item => {
       // If item is an array (a pair), recursively convert each element
@@ -96,13 +97,16 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         options.log = option;
       }
     } else if (key === 'minifyCSS' && typeof option !== 'function') {
-      if (!option) {
+      if (!option || !getLightningCSS || !cssMinifyCache) {
         return;
       }
 
       const lightningCssOptions = typeof option === 'object' ? option : {};
+      // Capture to preserve TypeScript narrowing across the async closure boundary below
+      const cssLoader = getLightningCSS;
+      const cssCache = cssMinifyCache;
 
-      options.minifyCSS = async function (text, type) {
+      options.minifyCSS = async function (/** @type {string} */ text, /** @type {string} */ type) {
         // Fast path: Nothing to minify
         if (!text || !text.trim()) {
           return text;
@@ -114,7 +118,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           text = await replaceAsync(
             text,
             /(url\s*\(\s*)(?:"([^"]*)"|'([^']*)'|([^\s)]+))(\s*\))/ig,
-            async function (match, prefix, dq, sq, unq, suffix) {
+            async function (/** @type {string} */ match, /** @type {string} */ prefix, /** @type {string | undefined} */ dq, /** @type {string | undefined} */ sq, /** @type {string | undefined} */ unq, /** @type {string} */ suffix) {
               const quote = dq != null ? '"' : (sq != null ? "'" : '');
               const url = dq ?? sq ?? unq ?? '';
               try {
@@ -139,7 +143,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           : (inputCSS + '|' + type + '|' + cssSig);
 
         try {
-          const cached = cssMinifyCache.get(cssKey);
+          const cached = cssCache.get(cssKey);
           if (cached) {
             // Support both resolved values and in-flight promises
             return await cached;
@@ -148,7 +152,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           // In-flight promise caching: Prevent duplicate concurrent minifications
           // of the same CSS content (same pattern as JS minification)
           const inFlight = (async () => {
-            const transformCSS = await getLightningCSS();
+            const transformCSS = await cssLoader();
             // Note: `Buffer.from()` is required—Lightning CSS API expects Uint8Array
             const result = transformCSS({
               filename: 'input.css',
@@ -175,12 +179,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             return (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
           })();
 
-          cssMinifyCache.set(cssKey, inFlight);
+          cssCache.set(cssKey, inFlight);
           const resolved = await inFlight;
-          cssMinifyCache.set(cssKey, resolved);
+          cssCache.set(cssKey, resolved);
           return resolved;
         } catch (err) {
-          cssMinifyCache.delete(cssKey);
+          cssCache.delete(cssKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }
@@ -189,9 +193,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         }
       };
     } else if (key === 'minifyJS' && typeof option !== 'function') {
-      if (!option) {
+      if (!option || !getTerser || !getSwc || !jsMinifyCache) {
         return;
       }
+
+      // Capture to preserve TypeScript narrowing across the async closure boundary below
+      const loadTerser = getTerser;
+      const loadSwc = getSwc;
+      const jsCache = jsMinifyCache;
 
       // Parse configuration
       const config = typeof option === 'object' ? option : {};
@@ -227,7 +236,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         cont: !!options.continueOnMinifyError
       });
 
-      options.minifyJS = async function (text, inline, isModule) {
+      options.minifyJS = async function (/** @type {string} */ text, /** @type {boolean} */ inline, /** @type {boolean} */ isModule) {
         const start = text.match(/^\s*<!--.*/);
         const code = start ? text.slice(start[0].length).replace(/\n\s*-->\s*$/, '') : text;
 
@@ -249,7 +258,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
             + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
 
-          const cached = jsMinifyCache.get(jsKey);
+          const cached = jsCache.get(jsKey);
           if (cached) {
             return await cached;
           }
@@ -266,11 +275,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
                 },
                 ...(isModule ? { module: true } : {}) // Overrides user options: module detection takes precedence for `<script type=module>`
               };
-              const terser = await getTerser();
+              const terser = await loadTerser();
               const result = await terser(code, terserCallOptions);
               return result.code.replace(RE_TRAILING_SEMICOLON, '');
             } else if (useEngine === 'swc') {
-              const swc = await getSwc();
+              const swc = await loadSwc();
               // `swc.minify()` takes compress and mangle directly as options
               const result = await swc.minify(code, {
                 compress: true,
@@ -283,12 +292,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             throw new Error(`Unknown JS minifier engine: ${useEngine}`);
           })();
 
-          jsMinifyCache.set(jsKey, inFlight);
+          jsCache.set(jsKey, inFlight);
           const resolved = await inFlight;
-          jsMinifyCache.set(jsKey, resolved);
+          jsCache.set(jsKey, resolved);
           return resolved;
         } catch (err) {
-          if (jsKey) jsMinifyCache.delete(jsKey);
+          if (jsKey) jsCache.delete(jsKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }
@@ -314,7 +323,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       // Create instance-specific cache (results depend on site configuration)
       const instanceCache = new LRU(500);
 
-      options.minifyURLs = function (text) {
+      options.minifyURLs = function (/** @type {string} */ text) {
         // Fast-path: Skip if text doesn’t look like a URL that needs processing
         // Only process if contains URL-like characters (`/`, `:`, `#`, `?`) or spaces that need encoding
         if (!/[/:?#\s]/.test(text)) {
@@ -341,9 +350,13 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         }
       };
     } else if (key === 'minifySVG' && typeof option !== 'function') {
-      if (!option) {
+      if (!option || !getSvgo || !svgMinifyCache) {
         return;
       }
+
+      // Capture to preserve TypeScript narrowing across the async closure boundary below
+      const loadSvgo = getSvgo;
+      const svgCache = svgMinifyCache;
 
       const svgoOptions = typeof option === 'object' ? option : {};
 
@@ -353,7 +366,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         cont: !!options.continueOnMinifyError
       });
 
-      options.minifySVG = async function (svgContent) {
+      options.minifySVG = async function (/** @type {string} */ svgContent) {
         if (!svgContent || !svgContent.trim()) {
           return svgContent;
         }
@@ -364,23 +377,23 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           : (svgContent + '|' + svgSig);
 
         try {
-          const cached = svgMinifyCache.get(svgKey);
+          const cached = svgCache.get(svgKey);
           if (cached) {
             return await cached;
           }
 
           const inFlight = (async () => {
-            const optimize = await getSvgo();
+            const optimize = await loadSvgo();
             const result = optimize(svgContent, svgoOptions);
             return result.data;
           })();
 
-          svgMinifyCache.set(svgKey, inFlight);
+          svgCache.set(svgKey, inFlight);
           const resolved = await inFlight;
-          svgMinifyCache.set(svgKey, resolved);
+          svgCache.set(svgKey, resolved);
           return resolved;
         } catch (err) {
-          svgMinifyCache.delete(svgKey);
+          svgCache.delete(svgKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }

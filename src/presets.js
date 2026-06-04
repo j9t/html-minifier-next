@@ -47,7 +47,7 @@ export const presets = {
 export function getPreset(name) {
   if (!name) return null;
   const normalizedName = name.toLowerCase();
-  return presets[normalizedName] || null;
+  return /** @type {Record<string, object>} */ (presets)[normalizedName] || null;
 }
 
 /**

@@ -7,6 +7,21 @@
 
 import { isThenable } from './lib/utils.js';
 
+/**
+ * @typedef {{
+ *   start?: Function,
+ *   end?: Function,
+ *   chars?: Function,
+ *   comment?: Function,
+ *   doctype?: Function,
+ *   continueOnParseError?: boolean | undefined,
+ *   partialMarkup?: boolean | undefined,
+ *   wantsNextTag?: boolean | undefined,
+ *   customAttrSurround?: RegExp[][] | undefined,
+ *   customAttrAssign?: RegExp[] | undefined
+ * }} HTMLParserHandler
+ */
+
 /*
  * Use like so:
  *
@@ -19,7 +34,8 @@ import { isThenable } from './lib/utils.js';
  */
 
 class CaseInsensitiveSet extends Set {
-  has(str) {
+  /** @override */
+  has(/** @type {string} */ str) {
     return super.has(str.toLowerCase());
   }
 }
@@ -54,8 +70,9 @@ const startTagOpen = new RegExp('^<' + qnameCapture);
 export const endTag = new RegExp('^</' + qnameCapture + '[^>]*>');
 
 let IS_REGEX_CAPTURING_BROKEN = false;
-'x'.replace(/x(.)?/g, function (m, g) {
+'x'.replace(/x(.)?/g, function (/** @type {string} */ m, /** @type {string | undefined} */ g) {
   IS_REGEX_CAPTURING_BROKEN = g === '';
+  return m;
 });
 
 // Empty elements
@@ -89,6 +106,11 @@ const attrRegexCache = new WeakMap();
 
 // O(n) helper: Strip all occurrences of `open…close` delimiters, keeping inner content
 // Used instead of a regex replace to avoid O(n²) behavior on adversarial inputs
+/**
+ * @param {string} str
+ * @param {string} open
+ * @param {string} close
+ */
 function stripDelimited(str, open, close) {
   let result = '';
   let i = 0;
@@ -104,6 +126,7 @@ function stripDelimited(str, open, close) {
   return result;
 }
 
+/** @param {HTMLParserHandler} handler */
 function buildAttrRegex(handler) {
   const unquotedValue = handler.continueOnParseError ? singleAttrValueLenientUnquoted : singleAttrValues[2];
   const attrValues = [singleAttrValues[0], singleAttrValues[1], unquotedValue];
@@ -113,10 +136,11 @@ function buildAttrRegex(handler) {
   if (handler.customAttrSurround) {
     const attrClauses = [];
     for (let i = handler.customAttrSurround.length - 1; i >= 0; i--) {
+      const pair = handler.customAttrSurround[i] ?? [];
       attrClauses[i] = '(?:' +
-        '(' + handler.customAttrSurround[i][0].source + ')\\s*' +
+        '(' + (pair[0]?.source ?? '') + ')\\s*' +
         pattern +
-        '\\s*(' + handler.customAttrSurround[i][1].source + ')' +
+        '\\s*(' + (pair[1]?.source ?? '') + ')' +
         ')';
     }
     attrClauses.push('(?:' + pattern + ')');
@@ -125,6 +149,7 @@ function buildAttrRegex(handler) {
   return new RegExp('^\\s*' + pattern);
 }
 
+/** @param {HTMLParserHandler} handler */
 function getAttrRegexForHandler(handler) {
   let cached = attrRegexCache.get(handler);
   if (cached) return cached;
@@ -136,6 +161,7 @@ function getAttrRegexForHandler(handler) {
 // Cache for sticky attribute regexes (`y` flag for position-based matching on full string)
 const attrRegexStickyCache = new WeakMap();
 
+/** @param {HTMLParserHandler} handler */
 function getAttrRegexStickyForHandler(handler) {
   let cached = attrRegexStickyCache.get(handler);
   if (cached) return cached;
@@ -146,6 +172,7 @@ function getAttrRegexStickyForHandler(handler) {
   return compiled;
 }
 
+/** @param {HTMLParserHandler} handler */
 function joinSingleAttrAssigns(handler) {
   return singleAttrAssigns.concat(
     handler.customAttrAssign || []
@@ -158,6 +185,10 @@ function joinSingleAttrAssigns(handler) {
 const NCP = 7;
 
 export class HTMLParser {
+  /**
+   * @param {string} html
+   * @param {HTMLParserHandler} handler
+   */
   constructor(html, handler) {
     this.html = html;
     this.handler = handler;
@@ -168,12 +199,21 @@ export class HTMLParser {
     const fullHtml = this.html;
     const fullLength = fullHtml.length;
 
-    const stack = []; let lastTag;
+    /** @type {Array<{tag: string, lowerTag: string, attrs: Array<{name: string, value?: string, quote?: string, customAssign?: string, customOpen?: string, customClose?: string}>}>} */
+    const stack = [];
+    /** @type {string} */
+    let lastTag = '';
     // Use cached attribute regex for this handler configuration
     const attribute = getAttrRegexForHandler(handler);
     const attributeY = getAttrRegexStickyForHandler(handler);
-    let prevTag = undefined, nextTag = undefined;
-    let prevAttrs = [], nextAttrs = [];
+    /** @type {string | undefined} */
+    let prevTag;
+    /** @type {string | undefined} */
+    let nextTag;
+    /** @type {Array<{name?: string, value?: string}>} */
+    let prevAttrs = [];
+    /** @type {Array<{name?: string, value?: string}>} */
+    let nextAttrs = [];
 
     // Sticky regex versions for position-based matching (avoids string slicing)
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
@@ -193,10 +233,10 @@ export class HTMLParser {
     let lastPos;
 
     // Helper to advance position
-    const advance = (n) => { pos += n; };
+    const advance = (/** @type {number} */ n) => { pos += n; };
 
     // Lazy line/column calculation—only compute on actual errors
-    const getLineColumn = (position) => {
+    const getLineColumn = (/** @type {number} */ position) => {
       let line = 1;
       let column = 1;
       for (let i = 0; i < position; i++) {
@@ -211,7 +251,7 @@ export class HTMLParser {
     };
 
     // Helper to safely extract substring when needed for stacked tag content
-    const sliceFromPos = (startPos) => {
+    const sliceFromPos = (/** @type {number} */ startPos) => {
       return fullHtml.slice(startPos);
     };
 
@@ -239,9 +279,9 @@ export class HTMLParser {
             const endTagMatch = cachedNextEndTag.match;
             cachedNextStartTag = null;
             cachedNextEndTag = null;
-            advance(endTagMatch[0].length);
-            await parseEndTag(endTagMatch[0], endTagMatch[1]);
-            prevTag = '/' + endTagMatch[1].toLowerCase();
+            advance((endTagMatch[0] ?? '').length);
+            await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
+            prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
             prevAttrs = [];
             continue;
           }
@@ -299,9 +339,9 @@ export class HTMLParser {
           endTagY.lastIndex = pos;
           const endTagMatch = endTagY.exec(fullHtml);
           if (endTagMatch) {
-            advance(endTagMatch[0].length);
-            await parseEndTag(endTagMatch[0], endTagMatch[1]);
-            prevTag = '/' + endTagMatch[1].toLowerCase();
+            advance((endTagMatch[0] ?? '').length);
+            await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
+            prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
             prevAttrs = [];
             continue;
           }
@@ -361,12 +401,12 @@ export class HTMLParser {
       } else {
         const stackedTag = lastTag.toLowerCase();
         // Use pre-compiled regex for common tags (`script`, `style`, `noscript`) to avoid regex creation overhead
-        const reStackedTag = preCompiledStackedTags[stackedTag] || reCache[stackedTag] || (reCache[stackedTag] = new RegExp('([\\s\\S]*?)\\x3c/' + stackedTag + '[^>]*>', 'i'));
+        const reStackedTag = /** @type {Record<string, RegExp>} */ (preCompiledStackedTags)[stackedTag] || /** @type {Record<string, RegExp>} */ (reCache)[stackedTag] || (/** @type {Record<string, RegExp>} */ (reCache)[stackedTag] = new RegExp('([\\s\\S]*?)\\x3c/' + stackedTag + '[^>]*>', 'i'));
 
         const remaining = sliceFromPos(pos);
         const m = reStackedTag.exec(remaining);
         if (m && m.index === 0) {
-          let text = m[1];
+          let text = m[1] ?? '';
           if (stackedTag !== 'script' && stackedTag !== 'style' && stackedTag !== 'noscript') {
             text = stripDelimited(stripDelimited(text, '<!--', '-->'), '<![CDATA[', ']]>');
           }
@@ -414,32 +454,38 @@ export class HTMLParser {
 
     if (!handler.partialMarkup) {
       // Clean up any remaining tags
-      await parseEndTag();
+      await parseEndTag('', '');
     }
 
     // Helper to extract minimal attribute info (name/value pairs) from raw attribute matches
     // Used for whitespace collapsing logic—doesn’t need full processing
-    function extractAttrInfo(rawAttrs) {
+    function extractAttrInfo(/** @type {Array<Array<string | undefined>>} */ rawAttrs) {
       if (!rawAttrs || !rawAttrs.length) return [];
 
       const numCustomParts = handler.customAttrSurround ? handler.customAttrSurround.length * NCP : 0;
       const baseIndex = 1 + numCustomParts;
 
-      return rawAttrs.map(args => {
+      return rawAttrs.map((/** @type {Array<string | undefined>} */ args) => {
         // Extract attribute name (always at `baseIndex`)
         const name = args[baseIndex];
         // Extract value from double-quoted (`baseIndex + 2`), single-quoted (`baseIndex + 3`), or unquoted (`baseIndex + 4`)
         const value = args[baseIndex + 2] ?? args[baseIndex + 3] ?? args[baseIndex + 4];
-        return { name: name?.toLowerCase(), value };
-      }).filter(attr => attr.name); // Filter out invalid entries
+        const lowerName = name?.toLowerCase();
+        /** @type {{name?: string, value?: string}} */
+        const entry = {};
+        if (lowerName !== undefined) entry.name = lowerName;
+        if (value !== undefined) entry.value = value;
+        return entry;
+      }).filter((/** @type {{name?: string, value?: string}} */ attr) => attr.name); // Filter out invalid entries
     }
 
-    function parseStartTag(startPos) {
+    function parseStartTag(/** @type {number} */ startPos) {
       startTagOpenY.lastIndex = startPos;
       const start = startTagOpenY.exec(fullHtml);
       if (start) {
+        /** @type {{tagName: string, attrs: Array<Array<string|undefined>>, advance: number, unarySlash?: string}} */
         const match = {
-          tagName: start[1],
+          tagName: start[1] ?? '',
           attrs: [],
           advance: 0
         };
@@ -582,19 +628,21 @@ export class HTMLParser {
         startTagCloseY.lastIndex = currentPos;
         end = startTagCloseY.exec(fullHtml);
         if (end) {
-          match.unarySlash = end[1];
-          consumed += end[0].length;
+          match.unarySlash = end[1] ?? '';
+          consumed += (end[0] ?? '').length;
           match.advance = consumed;
           return match;
         }
       }
+      return undefined;
     }
 
-    function findTagInCurrentTable(tagName) {
+    function findTagInCurrentTable(/** @type {string} */ tagName) {
       let pos;
       const needle = tagName.toLowerCase();
       for (pos = stack.length - 1; pos >= 0; pos--) {
-        const currentTag = stack[pos].lowerTag;
+        const entry = stack[pos];
+        const currentTag = entry?.lowerTag;
         if (currentTag === needle) {
           return pos;
         }
@@ -606,18 +654,19 @@ export class HTMLParser {
       return -1;
     }
 
-    async function parseEndTagAt(pos) {
+    async function parseEndTagAt(/** @type {number} */ pos) {
       // Close all open elements up to `pos` (mirrors `parseEndTag`’s core branch)
       for (let i = stack.length - 1; i >= pos; i--) {
+        const entry = /** @type {NonNullable<(typeof stack)[number]>} */ (stack[i]);
         if (handler.end) {
-          await handler.end(stack[i].tag, stack[i].attrs, true);
+          await handler.end(entry.tag, entry.attrs, true);
         }
       }
       stack.length = pos;
-      lastTag = pos && stack[pos - 1].tag;
+      lastTag = pos ? (stack[pos - 1]?.tag ?? '') : '';
     }
 
-    async function closeIfFoundInCurrentTable(tagName) {
+    async function closeIfFoundInCurrentTable(/** @type {string} */ tagName) {
       const pos = findTagInCurrentTable(tagName);
       if (pos >= 0) {
         // Close at the specific index to avoid re-searching
@@ -627,7 +676,7 @@ export class HTMLParser {
       return false;
     }
 
-    async function handleStartTag(match) {
+    async function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
       const tagName = match.tagName;
       let unarySlash = match.unarySlash;
 
@@ -669,17 +718,18 @@ export class HTMLParser {
 
       const unary = empty.has(tagName) || (tagName === 'html' && lastTag === 'head') || !!unarySlash;
 
-      const attrs = match.attrs.map(function (args) {
+      const attrs = match.attrs.map(function (/** @type {Array<string | undefined>} */ args) {
+        /** @type {string | undefined} */
         let name, value, customOpen, customClose, customAssign, quote;
 
         // Hackish workaround for Firefox bug, https://bugzilla.mozilla.org/show_bug.cgi?id=369778
-        if (IS_REGEX_CAPTURING_BROKEN && args[0].indexOf('""') === -1) {
+        if (IS_REGEX_CAPTURING_BROKEN && (args[0] ?? '').indexOf('""') === -1) {
           if (args[3] === '') { delete args[3]; }
           if (args[4] === '') { delete args[4]; }
           if (args[5] === '') { delete args[5]; }
         }
 
-        function populate(index) {
+        function populate(/** @type {number} */ index) {
           customAssign = args[index];
           value = args[index + 1];
           if (typeof value !== 'undefined') {
@@ -690,7 +740,7 @@ export class HTMLParser {
             return '\'';
           }
           value = args[index + 3];
-          if (typeof value === 'undefined' && fillAttrs.has(name)) {
+          if (typeof value === 'undefined' && name && fillAttrs.has(name)) {
             value = name;
           }
           return '';
@@ -714,8 +764,8 @@ export class HTMLParser {
         }
 
         return {
-          name,
-          value,
+          name: name ?? '',
+          ...(value !== undefined && { value }),
           customAssign: customAssign || '=',
           customOpen: customOpen || '',
           customClose: customClose || '',
@@ -737,18 +787,18 @@ export class HTMLParser {
       }
     }
 
-    function findTag(tagName) {
+    function findTag(/** @type {string} */ tagName) {
       let pos;
       const needle = tagName.toLowerCase();
       for (pos = stack.length - 1; pos >= 0; pos--) {
-        if (stack[pos].lowerTag === needle) {
+        if (stack[pos]?.lowerTag === needle) {
           break;
         }
       }
       return pos;
     }
 
-    async function parseEndTag(tag, tagName) {
+    async function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
       let pos;
 
       // Find the closest opened tag of the same type
@@ -762,13 +812,13 @@ export class HTMLParser {
         // Close all the open elements, up the stack
         for (let i = stack.length - 1; i >= pos; i--) {
           if (handler.end) {
-            handler.end(stack[i].tag, stack[i].attrs, i > pos || !tag);
+            handler.end(stack[i]?.tag, stack[i]?.attrs, i > pos || !tag);
           }
         }
 
         // Remove the open elements from the stack
         stack.length = pos;
-        lastTag = pos && stack[pos - 1].tag;
+        lastTag = pos ? (stack[pos - 1]?.tag ?? '') : '';
       } else if (handler.partialMarkup && tagName) {
         // In partial markup mode, preserve stray end tags
         if (handler.end) {
