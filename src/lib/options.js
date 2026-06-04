@@ -56,7 +56,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
   // Helper for nested arrays (e.g., `customAttrSurround: [[start, end], …]`)
   const parseNestedRegExpArray = (/** @type {unknown} */ arr) => {
-    if (!Array.isArray(arr)) return arr;
+    if (!Array.isArray(arr)) return [];
     return arr.map(item => {
       // If item is an array (a pair), recursively convert each element
       if (Array.isArray(item)) {
@@ -144,7 +144,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
         try {
           const cached = cssCache.get(cssKey);
-          if (cached) {
+          if (cached !== undefined) {
             // Support both resolved values and in-flight promises
             return await cached;
           }
@@ -259,7 +259,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
 
           const cached = jsCache.get(jsKey);
-          if (cached) {
+          if (cached !== undefined) {
             return await cached;
           }
 
@@ -378,7 +378,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
         try {
           const cached = svgCache.get(svgKey);
-          if (cached) {
+          if (cached !== undefined) {
             return await cached;
           }
 
