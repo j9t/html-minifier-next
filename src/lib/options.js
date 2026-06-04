@@ -51,7 +51,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   };
 
   const parseRegExpArray = (/** @type {unknown} */ arr) => {
-    return Array.isArray(arr) ? arr.map(parseRegExp) : arr;
+    return Array.isArray(arr) ? arr.map(parseRegExp) : [];
   };
 
   // Helper for nested arrays (e.g., `customAttrSurround: [[start, end], …]`)
