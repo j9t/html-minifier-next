@@ -134,6 +134,9 @@ function buildAttrRegex(handler) {
     '(?:\\s*(' + joinSingleAttrAssigns(handler) + ')' +
     '[ \\t\\n\\f\\r]*(?:' + attrValues.join('|') + '))?';
   if (handler.customAttrSurround) {
+    if (!Array.isArray(handler.customAttrSurround)) {
+      throw new Error('`customAttrSurround` must be an array of `[RegExp, RegExp]` pairs');
+    }
     const attrClauses = [];
     for (let i = handler.customAttrSurround.length - 1; i >= 0; i--) {
       const pair = handler.customAttrSurround[i];
