@@ -99,12 +99,6 @@ function lowercase(value) {
  * @param {Function} asyncFn - Async function to process each match
  * @returns {Promise<string>} Processed string
  */
-/**
- * @param {string} str
- * @param {RegExp} regex
- * @param {Function} asyncFn
- * @returns {Promise<string>}
- */
 async function replaceAsync(str, regex, asyncFn) {
   /** @type {Promise<string>[]} */
   const promises = [];

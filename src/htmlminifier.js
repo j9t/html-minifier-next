@@ -1690,7 +1690,7 @@ async function minifyHTML(value, options, partialMarkup) {
                           : prevClosingTagMatch ? resolveName(prevClosingTagMatch[1] ?? '') : null;
 
                         // Don’t collapse between inline elements (HTML comments count as non-inline)
-                        if (!inlineElements.has(currentTag) && !inlineElements.has(prevTag)) {
+                        if (!inlineElements.has(currentTag ?? '') && !inlineElements.has(prevTag ?? '')) {
                           // Collapse whitespace respecting context rules
                           let collapsedText = prevText;
 

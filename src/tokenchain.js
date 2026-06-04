@@ -54,10 +54,12 @@ class TokenChain {
   /** @param {string[]} tokens */
   add(tokens) {
     tokens.forEach((token) => {
-      if (!this.map.has(token)) {
-        this.map.set(token, { arrays: [], processed: 0 });
+      let entry = this.map.get(token);
+      if (!entry) {
+        entry = { arrays: [], processed: 0 };
+        this.map.set(token, entry);
       }
-      this.map.get(token)?.arrays.push(tokens);
+      entry.arrays.push(tokens);
     });
   }
 

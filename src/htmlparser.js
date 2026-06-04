@@ -136,11 +136,14 @@ function buildAttrRegex(handler) {
   if (handler.customAttrSurround) {
     const attrClauses = [];
     for (let i = handler.customAttrSurround.length - 1; i >= 0; i--) {
-      const pair = handler.customAttrSurround[i] ?? [];
+      const pair = handler.customAttrSurround[i];
+      if (!Array.isArray(pair) || !(pair[0] instanceof RegExp) || !(pair[1] instanceof RegExp)) {
+        throw new Error('`customAttrSurround` entries must be `[RegExp, RegExp]` pairs');
+      }
       attrClauses[i] = '(?:' +
-        '(' + (pair[0]?.source ?? '') + ')\\s*' +
+        '(' + pair[0].source + ')\\s*' +
         pattern +
-        '\\s*(' + (pair[1]?.source ?? '') + ')' +
+        '\\s*(' + pair[1].source + ')' +
         ')';
     }
     attrClauses.push('(?:' + pattern + ')');
@@ -446,9 +449,7 @@ export class HTMLParser {
         const CONTEXT_BEFORE = 50;
         const startPos = Math.max(0, pos - CONTEXT_BEFORE);
         const snippet = fullHtml.slice(startPos, startPos + 200).replace(/\n/g, ' ');
-        throw new Error(
-          `Parse error at line ${loc.line}, column ${loc.column}:\n${snippet}${fullHtml.length > startPos + 200 ? '…' : ''}`
-        );
+        throw new Error(`Parse error at line ${loc.line}, column ${loc.column}:\n${snippet}${fullHtml.length > startPos + 200 ? '…' : ''}`);
       }
     }
 
