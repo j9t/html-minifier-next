@@ -2397,6 +2397,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, {}), input);
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
     assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [] }), output);
+    // A bare (non-array) RegExp is treated as an empty fragment list, same as `[]`
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: /\{\{[^}]*\}\}/ }), output);
 
     output = '{{ if foo? }} <div class="bar">…</div> {{ end \n}}';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: reFragments }), output);
@@ -3657,6 +3659,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeComments: true }), input);
     assert.strictEqual(await minify(input, { removeComments: true, ignoreCustomComments: false }), '');
     assert.strictEqual(await minify(input, { removeComments: true, ignoreCustomComments: [] }), '');
+
+    // A bare (non-array) RegExp is treated as an empty ignore list—the comment is removed
+    input = '<!-- foo -->';
+    assert.strictEqual(await minify(input, { removeComments: true, ignoreCustomComments: /foo/ }), '');
   });
 
   test('`processScripts`', async () => {
@@ -3687,6 +3693,16 @@ describe('HTML', () => {
     input = '<script type="application/json; charset=utf-8">{"foo": "bar"}</script>';
     result = await minify(input, { collapseWhitespace: true });
     assert.ok(result.includes('{"foo":"bar"}'), 'JSON detection should strip parameters');
+
+    // `<script type>` with no value: `rawValue` is undefined, should not match `processScripts`
+    assert.strictEqual(
+      await minify('<script type="text/ng-template"><div> test </div></script>', { collapseWhitespace: true, processScripts: ['text/ng-template'] }),
+      '<script type="text/ng-template"><div>test</div></script>'
+    );
+    assert.strictEqual(
+      await minify('<script type><div> test </div></script>', { collapseWhitespace: true, processScripts: ['text/ng-template'] }),
+      '<script type><div> test </div></script>'
+    );
   });
 
   test('`htmlmin:ignore`', async () => {
@@ -5439,6 +5455,11 @@ describe('HTML', () => {
     const html2 = '<div [class="test"]>content</div>';
     const result2 = await minify(html2, jsonConfig);
     assert.strictEqual(result2, '<div [class=test]>content</div>');
+  });
+
+  test('`customAttrSurround` with non-array value degrades gracefully', async () => {
+    // A non-array value is treated as empty (no custom surrounds) and should not throw
+    await assert.doesNotReject(minify('<div foo="bar"></div>', { customAttrSurround: /foo/ }));
   });
 
   test('`customAttrSurround` with complex template patterns', async () => {
