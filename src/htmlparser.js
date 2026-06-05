@@ -764,7 +764,7 @@ export class HTMLParser {
 
         return {
           name: name ?? '',
-          ...(value !== undefined && { value }),
+          value,
           customAssign: customAssign || '=',
           customOpen: customOpen || '',
           customClose: customClose || '',

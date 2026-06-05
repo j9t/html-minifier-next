@@ -1,7 +1,7 @@
 // Imports
 
 /**
- * @typedef {{ name: string, value?: string, quote?: string, customAssign?: string, customOpen?: string, customClose?: string }} HTMLAttr
+ * @typedef {{ name: string, value?: string | undefined, quote?: string, customAssign?: string, customOpen?: string, customClose?: string }} HTMLAttr
  */
 
 import {
