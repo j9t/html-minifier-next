@@ -611,9 +611,17 @@ Parameters:
 * `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
 * `--config=PATH`: Uses an alternative options file (default `html-minifier.json`)
 
-#### How to compare branches
+To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN’s own code rather than the bundled minifiers.
 
-A typical A/B run: `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN’s own code rather than the bundled minifiers.
+#### Profiling
+
+To profile the current working tree, run the benchmark with Node’s built-in CPU profiler:
+
+```shell
+node --cpu-prof benchmark.js
+```
+
+This writes a `.cpuprofile` file to the working directory. Load it with `npx speedscope *.cpuprofile` for a flamegraph, or drag it into Chrome DevTools → Sources → JavaScript Profiler. Compare self-time per function against a clean baseline run on `main`. Pay attention to unexpectedly heavy callbacks in hot paths—V8 de-optimization from variable object shapes or unnecessary method calls can show up there.
 
 ## Acknowledgements
 
