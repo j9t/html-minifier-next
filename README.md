@@ -179,7 +179,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 ### Sorting attributes and style classes
 
-Minifier options like `sortAttributes` and `sortClassNames` won’t impact the plain‑text size of the output. However, using these options for more consistent ordering improves the compression ratio for Gzip and Brotli used over HTTP.
+Minifier options like `sortAttributes` and `sortClassNames` won’t impact the plain-text size of the output. However, using these options for more consistent ordering improves the compression ratio for Gzip and Brotli used over HTTP.
 
 ### CSS minification
 
