@@ -1,5 +1,3 @@
-// Imports
-
 import {
   RE_WS_START,
   RE_WS_END,
@@ -15,6 +13,7 @@ import {
 
 // Trim whitespace
 
+/** @param {string} str */
 const trimWhitespace = str => {
   if (!str) return str;
   // Fast path: If no whitespace at start or end, return early
@@ -26,6 +25,7 @@ const trimWhitespace = str => {
 
 // Collapse all whitespace
 
+/** @param {string} str */
 function collapseWhitespaceAll(str) {
   if (!str) return str;
   // Fast path: If there are no common whitespace characters, return early
@@ -33,7 +33,7 @@ function collapseWhitespaceAll(str) {
     return str;
   }
   // No-break space is specifically handled inside the replacer function here:
-  return str.replace(RE_ALL_WS_NBSP, function (spaces) {
+  return str.replace(RE_ALL_WS_NBSP, function (/** @param {string} spaces */ spaces) {
     // Preserve standalone tabs
     if (spaces === '\t') return '\t';
     // Fast path: No no-break space, common case—just collapse to single space
@@ -46,7 +46,14 @@ function collapseWhitespaceAll(str) {
 
 // Collapse whitespace with options
 
-function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
+/**
+ * @param {string} str
+ * @param {{preserveLineBreaks?: boolean | undefined, conservativeCollapse?: boolean | undefined}} options
+ * @param {boolean} trimLeft
+ * @param {boolean} trimRight
+ * @param {boolean} [collapseAll]
+ */
+function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = false) {
   let lineBreakBefore = ''; let lineBreakAfter = '';
 
   if (!str) return str;
@@ -66,7 +73,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
     // (avoids polynomial backtracking with end-anchored lazy quantifiers)
     const WS_CHARS = ' \n\r\t\f';
     let leadEnd = 0;
-    while (leadEnd < str.length && WS_CHARS.includes(str[leadEnd])) {
+    while (leadEnd < str.length && WS_CHARS.includes(str.charAt(leadEnd))) {
       leadEnd++;
     }
     if (leadEnd > 0) {
@@ -77,7 +84,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
       }
     }
     let trailStart = str.length;
-    while (trailStart > 0 && WS_CHARS.includes(str[trailStart - 1])) {
+    while (trailStart > 0 && WS_CHARS.includes(str.charAt(trailStart - 1))) {
       trailStart--;
     }
     if (trailStart < str.length) {
@@ -91,7 +98,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
 
   if (trimLeft) {
     // No-break space is specifically handled inside the replacer function
-    str = str.replace(/^[ \n\r\t\f\xA0]+/, function (spaces) {
+    str = str.replace(/^[ \n\r\t\f\xA0]+/, function (/** @type {string} */ spaces) {
       const conservative = !lineBreakBefore && options.conservativeCollapse;
       if (conservative && spaces === '\t') {
         return '\t';
@@ -104,7 +111,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
     // Find trailing whitespace boundary manually (avoids polynomial backtracking
     // with `/[ \n\r\t\f\xA0]+$/` on strings with long internal whitespace runs)
     let end = str.length;
-    while (end > 0 && ' \n\r\t\f\xA0'.includes(str[end - 1])) {
+    while (end > 0 && ' \n\r\t\f\xA0'.includes(str.charAt(end - 1))) {
       end--;
     }
     if (end < str.length) {
@@ -135,14 +142,24 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll) {
 
 // Collapse whitespace smartly based on surrounding tags
 
+/**
+ * @param {string} str
+ * @param {string} prevTag
+ * @param {string} nextTag
+ * @param {Array<{name: string, value?: string}>} prevAttrs
+ * @param {Array<{name: string, value?: string}>} nextAttrs
+ * @param {{preserveLineBreaks?: boolean, conservativeCollapse?: boolean, collapseInlineTagWhitespace?: boolean}} options
+ * @param {Set<string>} inlineElements
+ * @param {Set<string>} inlineTextSet
+ */
 function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet) {
   const prevTagName = prevTag && (prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag);
   const nextTagName = nextTag && (nextTag.charAt(0) === '/' ? nextTag.slice(1) : nextTag);
 
   // Helper: Check if an input element has `type="hidden"`
-  const isHiddenInput = (tagName, attrs) => {
+  const isHiddenInput = (/** @type {string} */ tagName, /** @type {Array<{name: string, value?: string}>} */ attrs) => {
     if (tagName !== 'input' || !attrs || !attrs.length) return false;
-    const typeAttr = attrs.find(attr => attr.name === 'type');
+    const typeAttr = attrs.find((/** @type {{name: string, value?: string}} */ attr) => attr.name === 'type');
     return typeAttr && typeAttr.value === 'hidden';
   };
 
@@ -206,7 +223,7 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
     }
   }
 
-  return collapseWhitespace(str, options, trimLeft, trimRight, prevTag && nextTag);
+  return collapseWhitespace(str, options, Boolean(trimLeft), Boolean(trimRight), Boolean(prevTag && nextTag));
 }
 
 // Collapse/trim whitespace for given tag
@@ -214,10 +231,12 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
 const noCollapseWhitespaceTags = new Set(['script', 'style', 'pre', 'textarea']);
 const noTrimWhitespaceTags = new Set(['pre', 'textarea']);
 
+/** @param {string} tag */
 function canCollapseWhitespace(tag) {
   return !noCollapseWhitespaceTags.has(tag);
 }
 
+/** @param {string} tag */
 function canTrimWhitespace(tag) {
   return !noTrimWhitespaceTags.has(tag);
 }

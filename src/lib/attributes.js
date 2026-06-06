@@ -1,5 +1,3 @@
-// Imports
-
 import {
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
@@ -21,8 +19,16 @@ import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
 import { identity, isThenable } from './utils.js';
 
+// Type definitions
+
+/**
+ * @typedef {{ name: string, value?: string | undefined, quote?: string, customAssign?: string, customOpen?: string, customClose?: string }} HTMLAttribute
+ *  Internal counterpart of the public typedef in `htmlminifier.js`—keep in sync.
+ */
+
 // Lazy-load entities (used for `decodeEntities` and event-handler attribute decode before `minifyJS`)
 
+/** @type {Promise<Function> | undefined} */
 let decodeHTMLStrictPromise;
 async function getDecodeHTMLStrict() {
   if (!decodeHTMLStrictPromise) {
@@ -33,20 +39,30 @@ async function getDecodeHTMLStrict() {
 
 // Validators
 
+/**
+ * @param {string} text
+ * @param {{ignoreCustomComments: RegExp[]}} options
+ */
 function isIgnoredComment(text, options) {
-  for (let i = 0, len = options.ignoreCustomComments.length; i < len; i++) {
-    if (options.ignoreCustomComments[i].test(text)) {
+  // @@ Optimize: `Array.isArray(options.ignoreCustomComments)` runs on every comment node; it could be eliminated once `parseRegExpArray` is tightened to coerce non-arrays to `[]` at setup time
+  if (!Array.isArray(options.ignoreCustomComments)) return false;
+  for (const pattern of options.ignoreCustomComments) {
+    if (pattern.test(text)) {
       return true;
     }
   }
   return false;
 }
 
+/**
+ * @param {string} attrName
+ * @param {{customEventAttributes?: RegExp[]}} options
+ */
 function isEventAttribute(attrName, options) {
   const patterns = options.customEventAttributes;
   if (patterns) {
-    for (let i = patterns.length; i--;) {
-      if (patterns[i].test(attrName)) {
+    for (const pattern of patterns) {
+      if (pattern.test(attrName)) {
         return true;
       }
     }
@@ -55,14 +71,19 @@ function isEventAttribute(attrName, options) {
   return RE_EVENT_ATTR_DEFAULT.test(attrName);
 }
 
+/** @param {string} value */
 function canRemoveAttributeQuotes(value) {
   // https://mathiasbynens.be/notes/unquoted-attribute-values
   return RE_CAN_REMOVE_ATTR_QUOTES.test(value);
 }
 
+/**
+ * @param {HTMLAttribute[]} attributes
+ * @param {string} attribute
+ */
 function attributesInclude(attributes, attribute) {
-  for (let i = attributes.length; i--;) {
-    if (attributes[i].name.toLowerCase() === attribute) {
+  for (const attr of attributes) {
+    if (attr.name.toLowerCase() === attribute) {
       return true;
     }
   }
@@ -73,9 +94,9 @@ function attributesInclude(attributes, attribute) {
  * Remove duplicate attributes from an attribute list.
  * Per HTML spec, when an attribute appears multiple times, the first occurrence wins.
  * Duplicate attributes result in invalid HTML, so only the first is kept.
- * @param {Array} attrs - Array of attribute objects with `name` property
+ * @param {HTMLAttribute[]} attrs - Array of attribute objects with `name` property
  * @param {boolean} caseSensitive - Whether to compare names case-sensitively (for XML/SVG)
- * @returns {Array} Deduplicated attribute array (modifies in place and returns)
+ * @returns {HTMLAttribute[]} Deduplicated attribute array (modifies in place and returns)
  */
 function deduplicateAttributes(attrs, caseSensitive) {
   if (attrs.length < 2) {
@@ -85,8 +106,7 @@ function deduplicateAttributes(attrs, caseSensitive) {
   const seen = new Set();
   let writeIndex = 0;
 
-  for (let i = 0; i < attrs.length; i++) {
-    const attr = attrs[i];
+  for (const attr of attrs) {
     const key = caseSensitive ? attr.name : attr.name.toLowerCase();
 
     if (!seen.has(key)) {
@@ -99,6 +119,12 @@ function deduplicateAttributes(attrs, caseSensitive) {
   return attrs;
 }
 
+/**
+ * @param {string} tag
+ * @param {string} attrName
+ * @param {string} attrValue
+ * @param {HTMLAttribute[]} attrs
+ */
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   // Fast-path: Check if this element–attribute combination can possibly be redundant
   // before doing expensive string operations
@@ -132,32 +158,35 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   }
 
   // Check general defaults
-  if (hasGeneralDefault && generalDefaults[attrName] === attrValue) {
+  if (hasGeneralDefault && /** @type {Record<string, string>} */ (generalDefaults)[attrName] === attrValue) {
     return true;
   }
 
   // Check tag-specific defaults
-  return tagHasDefaults && tagDefaults[tag][attrName] === attrValue;
+  return tagHasDefaults && /** @type {Record<string, string>} */ (/** @type {Record<string, unknown>} */ (tagDefaults)[tag])[attrName] === attrValue;
 }
 
 function isScriptTypeAttribute(attrValue = '') {
-  attrValue = trimWhitespace(attrValue.split(/;/, 2)[0]).toLowerCase();
+  attrValue = trimWhitespace(attrValue.split(/;/, 2)[0] ?? '').toLowerCase();
   return attrValue === '' || executableScriptsMimetypes.has(attrValue);
 }
 
 function keepScriptTypeAttribute(attrValue = '') {
-  attrValue = trimWhitespace(attrValue.split(/;/, 2)[0]).toLowerCase();
+  attrValue = trimWhitespace(attrValue.split(/;/, 2)[0] ?? '').toLowerCase();
   return keepScriptsMimetypes.has(attrValue);
 }
 
+/**
+ * @param {string} tag
+ * @param {HTMLAttribute[]} attrs
+ */
 function isExecutableScript(tag, attrs) {
   if (tag !== 'script') {
     return false;
   }
-  for (let i = 0, len = attrs.length; i < len; i++) {
-    const attrName = attrs[i].name.toLowerCase();
-    if (attrName === 'type') {
-      return isScriptTypeAttribute(attrs[i].value);
+  for (const attr of attrs) {
+    if (attr.name.toLowerCase() === 'type') {
+      return isScriptTypeAttribute(attr.value);
     }
   }
   return true;
@@ -168,23 +197,30 @@ function isStyleLinkTypeAttribute(attrValue = '') {
   return attrValue === '' || attrValue === 'text/css';
 }
 
+/**
+ * @param {string} tag
+ * @param {HTMLAttribute[]} attrs
+ */
 function isStyleElement(tag, attrs) {
   if (tag !== 'style') {
     return false;
   }
-  for (let i = 0, len = attrs.length; i < len; i++) {
-    const attrName = attrs[i].name.toLowerCase();
-    if (attrName === 'type') {
-      return isStyleLinkTypeAttribute(attrs[i].value);
+  for (const attr of attrs) {
+    if (attr.name.toLowerCase() === 'type') {
+      return isStyleLinkTypeAttribute(attr.value);
     }
   }
   return true;
 }
 
+/**
+ * @param {string} attrName
+ * @param {string} attrValue
+ */
 function isBooleanAttribute(attrName, attrValue) {
   return isSimpleBoolean.has(attrName) ||
     (attrName === 'draggable' && !isBooleanValue.has(attrValue)) ||
-    (collapsibleValues.has(attrName) && collapsibleValues.get(attrName).has(attrValue));
+    (collapsibleValues.has(attrName) && collapsibleValues.get(attrName)?.has(attrValue));
 }
 
 const uriTypeAttributes = new Map([
@@ -204,6 +240,10 @@ const uriTypeAttributes = new Map([
   ['script', new Set(['src', 'for'])]
 ]);
 
+/**
+ * @param {string} attrName
+ * @param {string} tag
+ */
 function isUriTypeAttribute(attrName, tag) {
   const set = uriTypeAttributes.get(tag);
   return set ? set.has(attrName) : false;
@@ -223,55 +263,87 @@ const numberTypeAttributes = new Map([
   ['td', new Set(['rowspan', 'colspan'])]
 ]);
 
+/**
+ * @param {string} attrName
+ * @param {string} tag
+ */
 function isNumberTypeAttribute(attrName, tag) {
   const set = numberTypeAttributes.get(tag);
   return set ? set.has(attrName) : false;
 }
 
+/**
+ * @param {string} tag
+ * @param {HTMLAttribute[]} attrs
+ * @param {string} value
+ */
 function isLinkType(tag, attrs, value) {
   if (tag !== 'link') return false;
   const needle = String(value).toLowerCase();
-  for (let i = 0; i < attrs.length; i++) {
-    if (attrs[i].name.toLowerCase() === 'rel') {
-      const tokens = String(attrs[i].value).toLowerCase().split(/\s+/);
+  for (const attr of attrs) {
+    if (attr.name.toLowerCase() === 'rel') {
+      const tokens = String(attr.value).toLowerCase().split(/\s+/);
       if (tokens.includes(needle)) return true;
     }
   }
   return false;
 }
 
+/**
+ * @param {string} tag
+ * @param {HTMLAttribute[]} attrs
+ * @param {string} attrName
+ */
 function isMediaQuery(tag, attrs, attrName) {
   return attrName === 'media' && (isLinkType(tag, attrs, 'stylesheet') || isStyleElement(tag, attrs));
 }
 
+/**
+ * @param {string} attrName
+ * @param {string} tag
+ */
 function isSrcset(attrName, tag) {
   return attrName === 'srcset' && srcsetElements.has(tag);
 }
 
+/**
+ * @param {string} tag
+ * @param {HTMLAttribute[]} attrs
+ */
 function isMetaViewport(tag, attrs) {
   if (tag !== 'meta') {
     return false;
   }
-  for (let i = 0, len = attrs.length; i < len; i++) {
-    if (attrs[i].name.toLowerCase() === 'name' && attrs[i].value.toLowerCase() === 'viewport') {
+  for (const attr of attrs) {
+    if (attr.name.toLowerCase() === 'name' && (attr.value || '').toLowerCase() === 'viewport') {
       return true;
     }
   }
   return false;
 }
 
+/**
+ * @param {string} tag
+ * @param {HTMLAttribute[]} attrs
+ */
 function isContentSecurityPolicy(tag, attrs) {
   if (tag !== 'meta') {
     return false;
   }
-  for (let i = 0, len = attrs.length; i < len; i++) {
-    if (attrs[i].name.toLowerCase() === 'http-equiv' && attrs[i].value.toLowerCase() === 'content-security-policy') {
+  for (const attr of attrs) {
+    if (attr.name.toLowerCase() === 'http-equiv' && (attr.value || '').toLowerCase() === 'content-security-policy') {
       return true;
     }
   }
   return false;
 }
 
+/**
+ * @param {string} tag
+ * @param {string} attrName
+ * @param {string | undefined} attrValue
+ * @param {{removeEmptyAttributes?: boolean | Function}} options
+ */
 function canDeleteEmptyAttribute(tag, attrName, attrValue, options) {
   const isValueEmpty = !attrValue || attrValue.trim() === '';
   if (!isValueEmpty) {
@@ -283,9 +355,13 @@ function canDeleteEmptyAttribute(tag, attrName, attrValue, options) {
   return (tag === 'input' && attrName === 'value') || reEmptyAttribute.test(attrName);
 }
 
+/**
+ * @param {string} name
+ * @param {HTMLAttribute[]} attrs
+ */
 function hasAttrName(name, attrs) {
-  for (let i = attrs.length - 1; i >= 0; i--) {
-    if (attrs[i].name === name) {
+  for (const attr of attrs) {
+    if (attr.name === name) {
       return true;
     }
   }
@@ -300,6 +376,14 @@ const valueWhitespaceExemptElements = new Set(['button', 'data', 'input', 'optio
 
 // Returns the cleaned attribute value directly (sync) or as a Promise (async);
 // callers must handle both cases—use `isThenable()` to distinguish
+/**
+ * @param {string} tag
+ * @param {string} attrName
+ * @param {string} attrValue
+ * @param {Record<string, any>} options
+ * @param {HTMLAttribute[]} attrs
+ * @param {Function} minifyHTMLSelf
+ */
 function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
   const isEventAttr = isEventAttribute(attrName, options);
 
@@ -323,9 +407,9 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       return getDecodeHTMLStrict().then(decode => {
         const decoded = decode(attrValue);
         const result = options.minifyJS(decoded, true);
-        const reEncode = v => (v && v.indexOf('&') !== -1) ? v.replace(RE_AMP_ENTITY, '&amp;$1') : v;
+        const reEncode = (/** @type {string} */ v) => (v && v.indexOf('&') !== -1) ? v.replace(RE_AMP_ENTITY, '&amp;$1') : v;
         if (isThenable(result)) {
-          return result.then(reEncode, err => {
+          return result.then(reEncode, (/** @type {Error} */ err) => {
             if (!options.continueOnMinifyError) throw err;
             options.log && options.log(err);
             return attrValue;
@@ -336,7 +420,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     }
     const result = options.minifyJS(attrValue, true);
     if (isThenable(result)) {
-      return result.catch(err => {
+      return result.catch((/** @type {Error} */ err) => {
         if (!options.continueOnMinifyError) throw err;
         options.log && options.log(err);
         return attrValue;
@@ -363,8 +447,8 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     const result = options.minifyURLs(attrValue);
     if (isThenable(result)) {
       return result
-        .then(out => typeof out === 'string' ? out : attrValue)
-        .catch(err => {
+        .then((/** @type {unknown} */ out) => typeof out === 'string' ? out : attrValue)
+        .catch((/** @type {Error} */ err) => {
           if (!options.continueOnMinifyError) throw err;
           options.log && options.log(err);
           return attrValue;
@@ -387,13 +471,13 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       const cssResult = options.minifyCSS(attrValue, 'inline');
       if (isThenable(cssResult)) {
         return cssResult
-          .then(minified => {
+          .then((/** @type {string} */ minified) => {
             // After minification, check if CSS consists entirely of invalid properties (no values)
             // I.e., `color:` or `margin:;padding:` should be treated as empty
             if (minified && /^(?:[a-z-]+:[;\s]*)+$/i.test(minified)) return '';
             return minified;
           })
-          .catch(err => {
+          .catch((/** @type {Error} */ err) => {
             if (!options.continueOnMinifyError) throw err;
             options.log && options.log(err);
             return originalAttrValue;
@@ -415,8 +499,9 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       const match = candidate.match(/\s+([1-9][0-9]*w|[0-9]+(?:\.[0-9]+)?x)$/);
       if (match) {
         url = url.slice(0, -match[0].length);
-        const num = +match[1].slice(0, -1);
-        const suffix = match[1].slice(-1);
+        const group = match[1] ?? '';
+        const num = +group.slice(0, -1);
+        const suffix = group.slice(-1);
         if (num !== 1 || suffix !== 'x') {
           descriptor = ' ' + num + suffix;
         }
@@ -424,8 +509,8 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       const out = options.minifyURLs(url);
       if (isThenable(out)) {
         return out
-          .then(result => (typeof result === 'string' ? result : url) + descriptor)
-          .catch(err => {
+          .then((/** @type {unknown} */ result) => (typeof result === 'string' ? result : url) + descriptor)
+          .catch((/** @type {Error} */ err) => {
             if (!options.continueOnMinifyError) throw err;
             options.log && options.log(err);
             return url + descriptor;
@@ -470,7 +555,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     const originalAttrValue = attrValue;
     const cssResult = options.minifyCSS(attrValue, 'media');
     if (isThenable(cssResult)) {
-      return cssResult.catch(err => {
+      return cssResult.catch((/** @type {Error} */ err) => {
         if (!options.continueOnMinifyError) throw err;
         options.log && options.log(err);
         return originalAttrValue;
@@ -494,7 +579,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
 /**
  * Choose appropriate quote character for an attribute value
  * @param {string} attrValue - The attribute value
- * @param {Object} options - Minifier options
+ * @param {{quoteCharacter?: string}} options - Minifier options
  * @returns {string} The chosen quote character (`"` or `'`)
  */
 function chooseAttributeQuote(attrValue, options) {
@@ -513,6 +598,13 @@ function chooseAttributeQuote(attrValue, options) {
 
 // Returns the normalized attribute object directly (sync) or as a Promise (async);
 // callers must handle both cases—use `isThenable()` to distinguish
+/**
+ * @param {HTMLAttribute} attr
+ * @param {HTMLAttribute[]} attrs
+ * @param {string} tag
+ * @param {Record<string, any>} options
+ * @param {Function} minifyHTML
+ */
 function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   const attrName = options.name(attr.name);
   let attrValue = attr.value;
@@ -528,9 +620,18 @@ function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
 }
 
 // Internal: Handles attribute normalization after entity decoding (if any)
+/**
+ * @param {string} attrName
+ * @param {string | undefined} attrValue
+ * @param {HTMLAttribute} attr
+ * @param {HTMLAttribute[]} attrs
+ * @param {string} tag
+ * @param {Record<string, any>} options
+ * @param {Function} minifyHTML
+ */
 function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML) {
   if ((options.removeRedundantAttributes &&
-       isAttributeRedundant(tag, attrName, attrValue, attrs)) ||
+       isAttributeRedundant(tag, attrName, attrValue ?? '', attrs)) ||
       (options.removeScriptTypeAttributes && tag === 'script' &&
        attrName === 'type' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue)) ||
       (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
@@ -541,7 +642,7 @@ function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, m
   if (attrValue) {
     const cleaned = cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML);
     if (isThenable(cleaned)) {
-      return cleaned.then(v => normalizeAttrFinish(attrName, v, attr, tag, options));
+      return cleaned.then((/** @type {string | undefined} */ v) => normalizeAttrFinish(attrName, v, attr, tag, options));
     }
     return normalizeAttrFinish(attrName, cleaned, attr, tag, options);
   }
@@ -550,6 +651,13 @@ function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, m
 }
 
 // Internal: Final checks and result assembly after value cleaning
+/**
+ * @param {string} attrName
+ * @param {string | undefined} attrValue
+ * @param {HTMLAttribute} attr
+ * @param {string} tag
+ * @param {Record<string, any>} options
+ */
 function normalizeAttrFinish(attrName, attrValue, attr, tag, options) {
   if (options.removeEmptyAttributes &&
       canDeleteEmptyAttribute(tag, attrName, attrValue, options)) {
@@ -567,6 +675,13 @@ function normalizeAttrFinish(attrName, attrValue, attr, tag, options) {
   };
 }
 
+/**
+ * @param {{name: string, value?: string, attr: HTMLAttribute}} normalized
+ * @param {string | boolean | undefined} hasUnarySlash
+ * @param {Record<string, any>} options
+ * @param {boolean} isLast
+ * @param {string | undefined} uidAttr
+ */
 function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   const attrName = normalized.name;
   let attrValue = normalized.value;
@@ -578,7 +693,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   // Determine if need to add/keep quotes
   const shouldAddQuotes = typeof attrValue !== 'undefined' && (
     // If `removeAttributeQuotes` is enabled, add quotes only if they can’t be removed
-    (options.removeAttributeQuotes && (attrValue.indexOf(uidAttr) !== -1 || !canRemoveAttributeQuotes(attrValue))) ||
+    (options.removeAttributeQuotes && ((uidAttr ? attrValue.indexOf(uidAttr) !== -1 : false) || !canRemoveAttributeQuotes(attrValue))) ||
     // If `removeAttributeQuotes` is not enabled, preserve original quote style or add quotes if value requires them
     (!options.removeAttributeQuotes && (attrQuote !== '' || !canRemoveAttributeQuotes(attrValue) ||
       // Special case: With `removeTagWhitespace`, unquoted values that aren’t last will have space added,
@@ -587,6 +702,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   );
 
   if (shouldAddQuotes) {
+    attrValue = attrValue ?? '';
     // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
       // Normal mode: Choose optimal quote type to minimize escaping

@@ -4,6 +4,18 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.9] - 2026-06-06
+
+### Fixed
+
+* Fixed `isIgnoredComment` silently skipping when `ignoreCustomComments` was a non-array value (falsy length); now guarded explicitly
+* Fixed several latent type issues uncovered by stricter checking
+
+### Changed
+
+* Extended TypeScript strictness
+* Enabled `checkJs: true` and `strict: true` in `tsconfig.json`, making TypeScript type-check all JavaScript source files with strict settings
+
 ## [6.2.8] - 2026-06-02
 
 ### Changed

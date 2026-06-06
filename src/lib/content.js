@@ -1,5 +1,3 @@
-// Imports
-
 import {
   jsonScriptTypes
 } from './constants.js';
@@ -9,6 +7,10 @@ import { trimWhitespace } from './whitespace.js';
 
 // Wrap CSS declarations for inline styles and media queries
 // This ensures proper context for CSS minification
+/**
+ * @param {string} text
+ * @param {string} type
+ */
 function wrapCSS(text, type) {
   switch (type) {
     case 'inline':
@@ -20,6 +22,10 @@ function wrapCSS(text, type) {
   }
 }
 
+/**
+ * @param {string} text
+ * @param {string} type
+ */
 function unwrapCSS(text, type) {
   let matches;
   switch (type) {
@@ -30,11 +36,15 @@ function unwrapCSS(text, type) {
       matches = text.match(/^@media ([\s\S]*?)\s*{[\s\S]*}$/);
       break;
   }
-  return matches ? matches[1] : text;
+  return matches ? matches[1] ?? text : text;
 }
 
 // Script processing
 
+/**
+ * @param {string} text
+ * @param {{continueOnMinifyError?: boolean, log?: Function}} options
+ */
 function minifyJson(text, options) {
   try {
     return JSON.stringify(JSON.parse(text));
@@ -48,11 +58,11 @@ function minifyJson(text, options) {
   }
 }
 
+/** @param {Array<{name: string, value?: string}>} attrs */
 function hasJsonScriptType(attrs) {
-  for (let i = 0, len = attrs.length; i < len; i++) {
-    const attrName = attrs[i].name.toLowerCase();
-    if (attrName === 'type') {
-      const attrValue = trimWhitespace((attrs[i].value || '').split(/;/, 2)[0]).toLowerCase();
+  for (const attr of attrs) {
+    if (attr.name.toLowerCase() === 'type') {
+      const attrValue = trimWhitespace((attr.value || '').split(/;/, 2)[0] ?? '').toLowerCase();
       if (jsonScriptTypes.has(attrValue)) {
         return true;
       }
@@ -61,18 +71,24 @@ function hasJsonScriptType(attrs) {
   return false;
 }
 
+/**
+ * @param {string} text
+ * @param {{continueOnMinifyError?: boolean, log?: Function, processScripts?: string[]}} options
+ * @param {Array<{name: string, value?: string | undefined}>} currentAttrs
+ * @param {Function} minifyHTML
+ */
 async function processScript(text, options, currentAttrs, minifyHTML) {
-  for (let i = 0, len = currentAttrs.length; i < len; i++) {
-    const attrName = currentAttrs[i].name.toLowerCase();
+  for (const attr of currentAttrs) {
+    const attrName = attr.name.toLowerCase();
     if (attrName === 'type') {
-      const rawValue = currentAttrs[i].value;
-      const normalizedValue = trimWhitespace((rawValue || '').split(/;/, 2)[0]).toLowerCase();
+      const rawValue = attr.value;
+      const normalizedValue = trimWhitespace((rawValue || '').split(/;/, 2)[0] ?? '').toLowerCase();
       // Minify JSON script types automatically
       if (jsonScriptTypes.has(normalizedValue)) {
         return minifyJson(text, options);
       }
       // Process custom script types if specified
-      if (options.processScripts && options.processScripts.indexOf(rawValue) > -1) {
+      if (options.processScripts && rawValue && options.processScripts.indexOf(rawValue) > -1) {
         return await minifyHTML(text, options);
       }
     }

@@ -20,6 +20,7 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@swc/core": "^1.15.40",
+    "@types/node": "^25.9.1",
     "eslint": "^10.4.0",
     "rollup": "^4.60.4",
     "rollup-plugin-polyfill-node": "^0.13.0",
@@ -97,5 +98,5 @@
   },
   "type": "module",
   "types": "./dist/types/htmlminifier.d.ts",
-  "version": "6.2.8"
+  "version": "6.2.9"
 }

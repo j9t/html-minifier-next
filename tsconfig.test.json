@@ -1,33 +1,15 @@
 {
   // https://aka.ms/tsconfig
   "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
   "include": [
     "./tests/**/*.ts"
   ],
   "compilerOptions": {
-    // Environment settings
-    "module": "nodenext",
-    "target": "esnext",
+    // No Node types—tests don’t use `process`/`Buffer` directly
     "types": [],
 
-    // JavaScript support
-    "allowJs": true,
-
     // Don’t emit files, just check types
-    "noEmit": true,
-
-    // Recommended options
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-    "erasableSyntaxOnly": true,
-    "forceConsistentCasingInFileNames": true,
-
-    // Stricter type-checking options
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "noEmit": true
   }
 }

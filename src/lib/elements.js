@@ -1,5 +1,3 @@
-// Imports
-
 import {
   headerElements,
   descriptionElements,
@@ -13,8 +11,20 @@ import {
 } from './constants.js';
 import { hasAttrName } from './attributes.js';
 
+/** @import { HTMLAttribute } from './attributes.js' */
+
+// Type definitions
+
+/**
+ * @typedef {{ name: (str: string) => string, log?: Function }} MinifierOptions
+ */
+
 // Tag omission rules
 
+/**
+ * @param {string} optionalStartTag
+ * @param {string} tag
+ */
 function canRemoveParentTag(optionalStartTag, tag) {
   switch (optionalStartTag) {
     case 'html':
@@ -30,6 +40,10 @@ function canRemoveParentTag(optionalStartTag, tag) {
   return false;
 }
 
+/**
+ * @param {string} optionalEndTag
+ * @param {string} tag
+ */
 function isStartTagMandatory(optionalEndTag, tag) {
   switch (tag) {
     case 'colgroup':
@@ -40,6 +54,10 @@ function isStartTagMandatory(optionalEndTag, tag) {
   return false;
 }
 
+/**
+ * @param {string} optionalEndTag
+ * @param {string} tag
+ */
 function canRemovePrecedingTag(optionalEndTag, tag) {
   switch (optionalEndTag) {
     case 'html':
@@ -79,6 +97,10 @@ function canRemovePrecedingTag(optionalEndTag, tag) {
 
 // Element removal logic
 
+/**
+ * @param {string} tag
+ * @param {HTMLAttribute[]} attrs
+ */
 function canRemoveElement(tag, attrs) {
   // Elements with `id` attribute must never be removed—they serve as:
   // - Navigation targets (skip links, URL fragments)
@@ -146,20 +168,21 @@ function parseElementSpec(str, options) {
     return null;
   }
 
-  const tag = options.name(match[1]);
-  const attrString = match[2];
+  const tag = options.name(match[1] ?? '');
+  const attrString = match[2] ?? '';
 
   if (!attrString.trim()) {
     return { tag, attrs: null };
   }
 
   // Parse attributes from string
+  /** @type {{[key: string]: string | undefined}} */
   const attrs = {};
   const attrRegex = /([a-zA-Z][\w:-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>/]+)))?/g;
   let attrMatch;
 
   while ((attrMatch = attrRegex.exec(attrString))) {
-    const attrName = options.name(attrMatch[1]);
+    const attrName = options.name(attrMatch[1] ?? '');
     const attrValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4];
     // Boolean attributes have no value (undefined)
     attrs[attrName] = attrValue;
@@ -181,7 +204,7 @@ function parseRemoveEmptyElementsExcept(input, options) {
     return [];
   }
 
-  return input.map(item => {
+  return /** @type {Array<{tag: string, attrs: {[x: string]: string | undefined} | null}>} */ (input.map(item => {
     if (typeof item === 'string') {
       const spec = parseElementSpec(item, options);
       if (!spec && options.log) {
@@ -193,7 +216,7 @@ function parseRemoveEmptyElementsExcept(input, options) {
       options.log('Warning: “removeEmptyElementsExcept” specification must be a string, received: ' + typeof item);
     }
     return null;
-  }).filter(Boolean);
+  }).filter(Boolean));
 }
 
 /**

@@ -263,7 +263,7 @@ async function minify(hash, options) {
         if (minified != null) {
           process.send({ name: fileName, size: minified.length, time: duration });
         } else {
-          throw new Error('unexpected result: ' + minified);
+          throw new Error('Unexpected result: ' + minified);
         }
       } catch (err) {
         console.error('[' + fileName + ']', err.stack || err);
