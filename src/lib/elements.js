@@ -1,10 +1,3 @@
-// Imports
-
-/**
- * @typedef {{ name: (str: string) => string, log?: Function }} MinifierOptions
- * @typedef {{ name: string, value?: string }} HTMLAttribute
- */
-
 import {
   headerElements,
   descriptionElements,
@@ -17,6 +10,14 @@ import {
   cellElements
 } from './constants.js';
 import { hasAttrName } from './attributes.js';
+
+/** @import { HTMLAttribute } from './attributes.js' */
+
+// Type definitions
+
+/**
+ * @typedef {{ name: (str: string) => string, log?: Function }} MinifierOptions
+ */
 
 // Tag omission rules
 
@@ -98,7 +99,7 @@ function canRemovePrecedingTag(optionalEndTag, tag) {
 
 /**
  * @param {string} tag
- * @param {Array<{name: string, value?: string}>} attrs
+ * @param {HTMLAttribute[]} attrs
  */
 function canRemoveElement(tag, attrs) {
   // Elements with `id` attribute must never be removed—they serve as:

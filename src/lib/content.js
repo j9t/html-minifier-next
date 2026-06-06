@@ -1,5 +1,3 @@
-// Imports
-
 import {
   jsonScriptTypes
 } from './constants.js';

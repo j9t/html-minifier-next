@@ -1,9 +1,3 @@
-// Imports
-
-/**
- * @typedef {{ name: string, value?: string | undefined, quote?: string, customAssign?: string, customOpen?: string, customClose?: string }} HTMLAttr
- */
-
 import {
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
@@ -24,6 +18,13 @@ import {
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
 import { identity, isThenable } from './utils.js';
+
+// Type definitions
+
+/**
+ * @typedef {{ name: string, value?: string | undefined, quote?: string, customAssign?: string, customOpen?: string, customClose?: string }} HTMLAttribute
+ *  Internal counterpart of the public typedef in `htmlminifier.js`—keep in sync.
+ */
 
 // Lazy-load entities (used for `decodeEntities` and event-handler attribute decode before `minifyJS`)
 
@@ -77,7 +78,7 @@ function canRemoveAttributeQuotes(value) {
 }
 
 /**
- * @param {HTMLAttr[]} attributes
+ * @param {HTMLAttribute[]} attributes
  * @param {string} attribute
  */
 function attributesInclude(attributes, attribute) {
@@ -93,9 +94,9 @@ function attributesInclude(attributes, attribute) {
  * Remove duplicate attributes from an attribute list.
  * Per HTML spec, when an attribute appears multiple times, the first occurrence wins.
  * Duplicate attributes result in invalid HTML, so only the first is kept.
- * @param {HTMLAttr[]} attrs - Array of attribute objects with `name` property
+ * @param {HTMLAttribute[]} attrs - Array of attribute objects with `name` property
  * @param {boolean} caseSensitive - Whether to compare names case-sensitively (for XML/SVG)
- * @returns {HTMLAttr[]} Deduplicated attribute array (modifies in place and returns)
+ * @returns {HTMLAttribute[]} Deduplicated attribute array (modifies in place and returns)
  */
 function deduplicateAttributes(attrs, caseSensitive) {
   if (attrs.length < 2) {
@@ -122,7 +123,7 @@ function deduplicateAttributes(attrs, caseSensitive) {
  * @param {string} tag
  * @param {string} attrName
  * @param {string} attrValue
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  */
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   // Fast-path: Check if this element–attribute combination can possibly be redundant
@@ -177,7 +178,7 @@ function keepScriptTypeAttribute(attrValue = '') {
 
 /**
  * @param {string} tag
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  */
 function isExecutableScript(tag, attrs) {
   if (tag !== 'script') {
@@ -198,7 +199,7 @@ function isStyleLinkTypeAttribute(attrValue = '') {
 
 /**
  * @param {string} tag
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  */
 function isStyleElement(tag, attrs) {
   if (tag !== 'style') {
@@ -273,7 +274,7 @@ function isNumberTypeAttribute(attrName, tag) {
 
 /**
  * @param {string} tag
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  * @param {string} value
  */
 function isLinkType(tag, attrs, value) {
@@ -290,7 +291,7 @@ function isLinkType(tag, attrs, value) {
 
 /**
  * @param {string} tag
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  * @param {string} attrName
  */
 function isMediaQuery(tag, attrs, attrName) {
@@ -307,7 +308,7 @@ function isSrcset(attrName, tag) {
 
 /**
  * @param {string} tag
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  */
 function isMetaViewport(tag, attrs) {
   if (tag !== 'meta') {
@@ -323,7 +324,7 @@ function isMetaViewport(tag, attrs) {
 
 /**
  * @param {string} tag
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  */
 function isContentSecurityPolicy(tag, attrs) {
   if (tag !== 'meta') {
@@ -356,7 +357,7 @@ function canDeleteEmptyAttribute(tag, attrName, attrValue, options) {
 
 /**
  * @param {string} name
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  */
 function hasAttrName(name, attrs) {
   for (const attr of attrs) {
@@ -380,7 +381,7 @@ const valueWhitespaceExemptElements = new Set(['button', 'data', 'input', 'optio
  * @param {string} attrName
  * @param {string} attrValue
  * @param {Record<string, any>} options
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute[]} attrs
  * @param {Function} minifyHTMLSelf
  */
 function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
@@ -598,8 +599,8 @@ function chooseAttributeQuote(attrValue, options) {
 // Returns the normalized attribute object directly (sync) or as a Promise (async);
 // callers must handle both cases—use `isThenable()` to distinguish
 /**
- * @param {HTMLAttr} attr
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute} attr
+ * @param {HTMLAttribute[]} attrs
  * @param {string} tag
  * @param {Record<string, any>} options
  * @param {Function} minifyHTML
@@ -622,8 +623,8 @@ function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
 /**
  * @param {string} attrName
  * @param {string | undefined} attrValue
- * @param {HTMLAttr} attr
- * @param {HTMLAttr[]} attrs
+ * @param {HTMLAttribute} attr
+ * @param {HTMLAttribute[]} attrs
  * @param {string} tag
  * @param {Record<string, any>} options
  * @param {Function} minifyHTML
@@ -653,7 +654,7 @@ function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, m
 /**
  * @param {string} attrName
  * @param {string | undefined} attrValue
- * @param {HTMLAttr} attr
+ * @param {HTMLAttribute} attr
  * @param {string} tag
  * @param {Record<string, any>} options
  */
@@ -675,7 +676,7 @@ function normalizeAttrFinish(attrName, attrValue, attr, tag, options) {
 }
 
 /**
- * @param {{name: string, value?: string, attr: HTMLAttr}} normalized
+ * @param {{name: string, value?: string, attr: HTMLAttribute}} normalized
  * @param {string | boolean | undefined} hasUnarySlash
  * @param {Record<string, any>} options
  * @param {boolean} isLast

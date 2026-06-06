@@ -1,11 +1,3 @@
-// Imports
-
-/**
- * @typedef {Record<string, any>} MinifierOptions
- */
-
-// @@ Extract a `ProcessedOptions` typedef (with `name`, `log`, `canCollapseWhitespace`, `canTrimWhitespace`,`minifyCSS`, `minifyJS`, `minifyURLs` typed as required, non-optional) to replace the current `Record<string, any>` escape hatch and eliminate the `/** @type {Function} */` casts in htmlminifier.js
-
 import { createUrlMinifier } from './urls.js';
 import { LRU, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
@@ -13,6 +5,14 @@ import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 import { getPreset, getPresetNames } from '../presets.js';
 import { optionDefaults } from './option-definitions.js';
+
+// Type definitions
+
+/**
+ * @typedef {Record<string, any>} MinifierOptions
+ */
+
+// @@ Extract a `ProcessedOptions` typedef (with `name`, `log`, `canCollapseWhitespace`, `canTrimWhitespace`,`minifyCSS`, `minifyJS`, `minifyURLs` typed as required, non-optional) to replace the current `Record<string, any>` escape hatch and eliminate the `/** @type {Function} */` casts in htmlminifier.js
 
 // Helper functions
 

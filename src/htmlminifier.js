@@ -1,5 +1,3 @@
-// Imports
-
 import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
@@ -56,250 +54,12 @@ import {
 
 import { processOptions } from './lib/options.js';
 
-// Lazy-load heavy dependencies only when needed
-
-/** @type {Promise<Function> | undefined} */
-let lightningCSSPromise;
-async function getLightningCSS() {
-  if (!lightningCSSPromise) {
-    lightningCSSPromise = import('lightningcss').then(m => m.transform);
-  }
-  return lightningCSSPromise;
-}
-
-/** @type {Promise<Function> | undefined} */
-let terserPromise;
-async function getTerser() {
-  if (!terserPromise) {
-    terserPromise = import('terser').then(m => m.minify);
-  }
-  return terserPromise;
-}
-
-/** @type {Promise<any> | undefined} */
-let swcPromise;
-async function getSwc() {
-  if (!swcPromise) {
-    swcPromise = import('@swc/core')
-      .then(m => m.default || m)
-      .catch(() => {
-        throw new Error(
-          'The swc minifier requires @swc/core to be installed.\n' +
-          'Install it with: npm install @swc/core'
-        );
-      });
-  }
-  return swcPromise;
-}
-
-/** @type {Promise<Function> | undefined} */
-let svgoPromise;
-async function getSvgo() {
-  if (!svgoPromise) {
-    svgoPromise = import('svgo').then(m => m.optimize);
-  }
-  return svgoPromise;
-}
-
-/** @type {Promise<Function> | undefined} */
-let decodeHTMLPromise;
-async function getDecodeHTML() {
-  if (!decodeHTMLPromise) {
-    decodeHTMLPromise = import('entities').then(m => m.decodeHTML);
-  }
-  return decodeHTMLPromise;
-}
-
-// Minification caches (initialized on first use with configurable sizes)
-/** @type {LRU | null} */
-let cssMinifyCache = null;
-/** @type {LRU | null} */
-let jsMinifyCache = null;
-/** @type {LRU | null} */
-let svgMinifyCache = null;
-
-// Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
-const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
-const RE_SCRIPT_OPEN = /<script(?=[\s>])/gi; // Finds tag start; use `findTagEnd()` for the actual closing `>`
-const RE_SCRIPT_CLOSE = /<\/script\s*>/gi;
-const SCRIPT_BOOL_ATTRS = new Set(['async', 'defer', 'nomodule']);
-const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript']);
-
-// Pre-compiled patterns for buffer scanning
-const RE_START_TAG = /^<[^/!]/;
-const RE_END_TAG = /^<\//;
-
-// Pre-compiled patterns for `htmlmin:ignore` block content analysis
-const RE_HTML_COMMENT_START = /^\s*<!--/;
-const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
-const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
-
-// HTML encoding types for annotation-xml (MathML)
-const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
-
-// Script merging
-
-/**
- * Find the index of the `>` that closes an opening tag, correctly skipping
- * over quoted attribute values (which may contain `>`).
- * @param {string} html
- * @param {number} pos - Start position (just after the tag name)
- * @returns {number} Index of the closing `>`, or -1 if not found
- */
-function findTagEnd(html, pos) {
-  let i = pos;
-  while (i < html.length) {
-    const ch = html[i];
-    if (ch === '>') return i;
-    if (ch === '"' || ch === "'") {
-      const q = ch;
-      i++;
-      while (i < html.length && html[i] !== q) i++;
-    }
-    i++;
-  }
-  return -1;
-}
-
-/**
- * Merge consecutive inline script tags into one (`mergeConsecutiveScripts`).
- * Only merges scripts that are compatible:
- * - Both inline (no `src` attribute)
- * - Same `type` (or both default JavaScript)
- * - No conflicting attributes (`async`, `defer`, `nomodule`, different `nonce`)
- *
- * Uses a scanner rather than a regex to locate script boundaries, so literal
- * `</script>` strings inside script content are handled correctly per the HTML
- * spec (raw text ends at the first `</script>`).
- *
- * @param {string} html - The HTML string to process
- * @returns {string} HTML with consecutive scripts merged
- */
-function mergeConsecutiveScripts(html) {
-  // Parse an attribute string into a name→value map
-  const parseAttrs = (/** @type {string} */ attrStr) => {
-    /** @type {Record<string, string>} */
-    const attrs = {};
-    RE_SCRIPT_ATTRS.lastIndex = 0;
-    let m;
-    while ((m = RE_SCRIPT_ATTRS.exec(attrStr)) !== null) {
-      const name = (m[1] ?? '').toLowerCase();
-      const value = m[2] ?? m[3] ?? m[4] ?? '';
-      attrs[name] = value;
-    }
-    return attrs;
-  };
-
-  let changed = true;
-
-  // Keep merging until no more changes (handles chains of 3+ scripts)
-  while (changed) {
-    changed = false;
-    RE_SCRIPT_OPEN.lastIndex = 0;
-    let m1;
-
-    while ((m1 = RE_SCRIPT_OPEN.exec(html)) !== null) {
-      // Use findTagEnd() to get the real closing '>', skipping quoted attribute values
-      const tagEnd1 = findTagEnd(html, m1.index + 7);
-      if (tagEnd1 === -1) break;
-
-      const attrs1Str = html.slice(m1.index + 7, tagEnd1);
-      const contentStart1 = tagEnd1 + 1;
-
-      // Find end of this script’s content (first `</script>`—per HTML spec, raw text ends here)
-      RE_SCRIPT_CLOSE.lastIndex = contentStart1;
-      const close1 = RE_SCRIPT_CLOSE.exec(html);
-      if (!close1) break;
-
-      const content1 = html.slice(contentStart1, close1.index);
-      const afterClose1 = close1.index + close1[0].length;
-
-      // Skip optional whitespace and check for a consecutive <script> tag
-      let i = afterClose1;
-      while (i < html.length && (html[i] === ' ' || html[i] === '\t' || html[i] === '\n' || html[i] === '\r' || html[i] === '\f')) i++;
-      if (html.slice(i, i + 7).toLowerCase() !== '<script' || (html.charAt(i + 7) !== '>' && !/\s/.test(html.charAt(i + 7)))) {
-        RE_SCRIPT_OPEN.lastIndex = afterClose1;
-        continue;
-      }
-
-      const tagStart2 = i;
-      const tagEnd2 = findTagEnd(html, tagStart2 + 7);
-      if (tagEnd2 === -1) break;
-
-      const attrs2Str = html.slice(tagStart2 + 7, tagEnd2);
-      const contentStart2 = tagEnd2 + 1;
-
-      // Find end of second script’s content
-      RE_SCRIPT_CLOSE.lastIndex = contentStart2;
-      const close2 = RE_SCRIPT_CLOSE.exec(html);
-      if (!close2) break;
-
-      const content2 = html.slice(contentStart2, close2.index);
-      const afterClose2 = close2.index + close2[0].length;
-
-      const a1 = parseAttrs(attrs1Str);
-      const a2 = parseAttrs(attrs2Str);
-
-      // Check for `src`—cannot merge external scripts
-      if ('src' in a1 || 'src' in a2) {
-        RE_SCRIPT_OPEN.lastIndex = afterClose1;
-        continue;
-      }
-
-      // Check `type` compatibility (both must be default JS)
-      // Non-JS types (modules, JSON, etc.) must not be merged:
-      // Module scripts have per-script lexical scope, and non-JS content (e.g., JSON)
-      // is not concatenable; even identical non-JS types are incompatible
-      const type1 = (a1.type || '').toLowerCase();
-      const type2 = (a2.type || '').toLowerCase();
-      if (!DEFAULT_JS_TYPES.has(type1) || !DEFAULT_JS_TYPES.has(type2)) {
-        RE_SCRIPT_OPEN.lastIndex = afterClose1;
-        continue;
-      }
-
-      // Check for conflicting boolean attributes
-      let boolConflict = false;
-      for (const attr of SCRIPT_BOOL_ATTRS) {
-        if ((attr in a1) !== (attr in a2)) { boolConflict = true; break; }
-      }
-
-      // Check `nonce`—must be same or both absent
-      if (boolConflict || a1.nonce !== a2.nonce) {
-        RE_SCRIPT_OPEN.lastIndex = afterClose1;
-        continue;
-      }
-
-      // Scripts are compatible—merge them
-      changed = true;
-
-      // Combine content—use semicolon normally, newline only for trailing `//` comments
-      const c1 = content1.trim();
-      const c2 = content2.trim();
-      let mergedContent;
-      if (c1 && c2) {
-        // Check if last line of c1 contains `//` (single-line comment)
-        // If so, use newline to terminate it; otherwise use semicolon (if not already present)
-        const lastLine = c1.slice(c1.lastIndexOf('\n') + 1);
-        const separator = lastLine.includes('//') ? '\n' : (c1.endsWith(';') ? '' : ';');
-        mergedContent = c1 + separator + c2;
-      } else {
-        mergedContent = c1 || c2;
-      }
-
-      // Use first script’s attributes (they should be compatible)
-      html = html.slice(0, m1.index) + `<script${attrs1Str}>${mergedContent}</script>` + html.slice(afterClose2);
-      break; // Restart scanning (outer while loop)
-    }
-  }
-
-  return html;
-}
-
 // Type definitions
 
 /**
  * @typedef {Object} HTMLAttribute
  *  Representation of an attribute from the HTML parser.
+ *  Internal counterpart: `HTMLAttribute` in `lib/attributes.js`—keep in sync.
  *
  * @prop {string} name
  * @prop {string} [value]
@@ -715,6 +475,245 @@ function mergeConsecutiveScripts(html) {
  * @prop {Function} [parentName] - Internal: Preserved name function during namespace transitions
  * @prop {Function} [htmlName] - Internal: HTML name function preserved from outer context
  */
+
+// Lazy-load heavy dependencies only when needed
+
+/** @type {Promise<Function> | undefined} */
+let lightningCSSPromise;
+async function getLightningCSS() {
+  if (!lightningCSSPromise) {
+    lightningCSSPromise = import('lightningcss').then(m => m.transform);
+  }
+  return lightningCSSPromise;
+}
+
+/** @type {Promise<Function> | undefined} */
+let terserPromise;
+async function getTerser() {
+  if (!terserPromise) {
+    terserPromise = import('terser').then(m => m.minify);
+  }
+  return terserPromise;
+}
+
+/** @type {Promise<any> | undefined} */
+let swcPromise;
+async function getSwc() {
+  if (!swcPromise) {
+    swcPromise = import('@swc/core')
+      .then(m => m.default || m)
+      .catch(() => {
+        throw new Error(
+          'The swc minifier requires @swc/core to be installed.\n' +
+          'Install it with: npm install @swc/core'
+        );
+      });
+  }
+  return swcPromise;
+}
+
+/** @type {Promise<Function> | undefined} */
+let svgoPromise;
+async function getSvgo() {
+  if (!svgoPromise) {
+    svgoPromise = import('svgo').then(m => m.optimize);
+  }
+  return svgoPromise;
+}
+
+/** @type {Promise<Function> | undefined} */
+let decodeHTMLPromise;
+async function getDecodeHTML() {
+  if (!decodeHTMLPromise) {
+    decodeHTMLPromise = import('entities').then(m => m.decodeHTML);
+  }
+  return decodeHTMLPromise;
+}
+
+// Minification caches (initialized on first use with configurable sizes)
+/** @type {LRU | null} */
+let cssMinifyCache = null;
+/** @type {LRU | null} */
+let jsMinifyCache = null;
+/** @type {LRU | null} */
+let svgMinifyCache = null;
+
+// Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
+const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
+const RE_SCRIPT_OPEN = /<script(?=[\s>])/gi; // Finds tag start; use `findTagEnd()` for the actual closing `>`
+const RE_SCRIPT_CLOSE = /<\/script\s*>/gi;
+const SCRIPT_BOOL_ATTRS = new Set(['async', 'defer', 'nomodule']);
+const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript']);
+
+// Pre-compiled patterns for buffer scanning
+const RE_START_TAG = /^<[^/!]/;
+const RE_END_TAG = /^<\//;
+
+// Pre-compiled patterns for `htmlmin:ignore` block content analysis
+const RE_HTML_COMMENT_START = /^\s*<!--/;
+const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
+const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
+
+// HTML encoding types for annotation-xml (MathML)
+const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
+
+// Script merging
+
+/**
+ * Find the index of the `>` that closes an opening tag, correctly skipping
+ * over quoted attribute values (which may contain `>`).
+ * @param {string} html
+ * @param {number} pos - Start position (just after the tag name)
+ * @returns {number} Index of the closing `>`, or -1 if not found
+ */
+function findTagEnd(html, pos) {
+  let i = pos;
+  while (i < html.length) {
+    const ch = html[i];
+    if (ch === '>') return i;
+    if (ch === '"' || ch === "'") {
+      const q = ch;
+      i++;
+      while (i < html.length && html[i] !== q) i++;
+    }
+    i++;
+  }
+  return -1;
+}
+
+/**
+ * Merge consecutive inline script tags into one (`mergeConsecutiveScripts`).
+ * Only merges scripts that are compatible:
+ * - Both inline (no `src` attribute)
+ * - Same `type` (or both default JavaScript)
+ * - No conflicting attributes (`async`, `defer`, `nomodule`, different `nonce`)
+ *
+ * Uses a scanner rather than a regex to locate script boundaries, so literal
+ * `</script>` strings inside script content are handled correctly per the HTML
+ * spec (raw text ends at the first `</script>`).
+ *
+ * @param {string} html - The HTML string to process
+ * @returns {string} HTML with consecutive scripts merged
+ */
+function mergeConsecutiveScripts(html) {
+  // Parse an attribute string into a name→value map
+  const parseAttrs = (/** @type {string} */ attrStr) => {
+    /** @type {Record<string, string>} */
+    const attrs = {};
+    RE_SCRIPT_ATTRS.lastIndex = 0;
+    let m;
+    while ((m = RE_SCRIPT_ATTRS.exec(attrStr)) !== null) {
+      const name = (m[1] ?? '').toLowerCase();
+      const value = m[2] ?? m[3] ?? m[4] ?? '';
+      attrs[name] = value;
+    }
+    return attrs;
+  };
+
+  let changed = true;
+
+  // Keep merging until no more changes (handles chains of 3+ scripts)
+  while (changed) {
+    changed = false;
+    RE_SCRIPT_OPEN.lastIndex = 0;
+    let m1;
+
+    while ((m1 = RE_SCRIPT_OPEN.exec(html)) !== null) {
+      // Use findTagEnd() to get the real closing '>', skipping quoted attribute values
+      const tagEnd1 = findTagEnd(html, m1.index + 7);
+      if (tagEnd1 === -1) break;
+
+      const attrs1Str = html.slice(m1.index + 7, tagEnd1);
+      const contentStart1 = tagEnd1 + 1;
+
+      // Find end of this script’s content (first `</script>`—per HTML spec, raw text ends here)
+      RE_SCRIPT_CLOSE.lastIndex = contentStart1;
+      const close1 = RE_SCRIPT_CLOSE.exec(html);
+      if (!close1) break;
+
+      const content1 = html.slice(contentStart1, close1.index);
+      const afterClose1 = close1.index + close1[0].length;
+
+      // Skip optional whitespace and check for a consecutive <script> tag
+      let i = afterClose1;
+      while (i < html.length && (html[i] === ' ' || html[i] === '\t' || html[i] === '\n' || html[i] === '\r' || html[i] === '\f')) i++;
+      if (html.slice(i, i + 7).toLowerCase() !== '<script' || (html.charAt(i + 7) !== '>' && !/\s/.test(html.charAt(i + 7)))) {
+        RE_SCRIPT_OPEN.lastIndex = afterClose1;
+        continue;
+      }
+
+      const tagStart2 = i;
+      const tagEnd2 = findTagEnd(html, tagStart2 + 7);
+      if (tagEnd2 === -1) break;
+
+      const attrs2Str = html.slice(tagStart2 + 7, tagEnd2);
+      const contentStart2 = tagEnd2 + 1;
+
+      // Find end of second script’s content
+      RE_SCRIPT_CLOSE.lastIndex = contentStart2;
+      const close2 = RE_SCRIPT_CLOSE.exec(html);
+      if (!close2) break;
+
+      const content2 = html.slice(contentStart2, close2.index);
+      const afterClose2 = close2.index + close2[0].length;
+
+      const a1 = parseAttrs(attrs1Str);
+      const a2 = parseAttrs(attrs2Str);
+
+      // Check for `src`—cannot merge external scripts
+      if ('src' in a1 || 'src' in a2) {
+        RE_SCRIPT_OPEN.lastIndex = afterClose1;
+        continue;
+      }
+
+      // Check `type` compatibility (both must be default JS)
+      // Non-JS types (modules, JSON, etc.) must not be merged:
+      // Module scripts have per-script lexical scope, and non-JS content (e.g., JSON)
+      // is not concatenable; even identical non-JS types are incompatible
+      const type1 = (a1.type || '').toLowerCase();
+      const type2 = (a2.type || '').toLowerCase();
+      if (!DEFAULT_JS_TYPES.has(type1) || !DEFAULT_JS_TYPES.has(type2)) {
+        RE_SCRIPT_OPEN.lastIndex = afterClose1;
+        continue;
+      }
+
+      // Check for conflicting boolean attributes
+      let boolConflict = false;
+      for (const attr of SCRIPT_BOOL_ATTRS) {
+        if ((attr in a1) !== (attr in a2)) { boolConflict = true; break; }
+      }
+
+      // Check `nonce`—must be same or both absent
+      if (boolConflict || a1.nonce !== a2.nonce) {
+        RE_SCRIPT_OPEN.lastIndex = afterClose1;
+        continue;
+      }
+
+      // Scripts are compatible—merge them
+      changed = true;
+
+      // Combine content—use semicolon normally, newline only for trailing `//` comments
+      const c1 = content1.trim();
+      const c2 = content2.trim();
+      let mergedContent;
+      if (c1 && c2) {
+        // Check if last line of c1 contains `//` (single-line comment)
+        // If so, use newline to terminate it; otherwise use semicolon (if not already present)
+        const lastLine = c1.slice(c1.lastIndexOf('\n') + 1);
+        const separator = lastLine.includes('//') ? '\n' : (c1.endsWith(';') ? '' : ';');
+        mergedContent = c1 + separator + c2;
+      } else {
+        mergedContent = c1 || c2;
+      }
+
+      // Use first script’s attributes (they should be compatible)
+      html = html.slice(0, m1.index) + `<script${attrs1Str}>${mergedContent}</script>` + html.slice(afterClose2);
+      break; // Restart scanning (outer while loop)
+    }
+  }
+
+  return html;
+}
 
 /**
  * @param {string} value

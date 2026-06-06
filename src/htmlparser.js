@@ -7,6 +7,10 @@
 
 import { isThenable } from './lib/utils.js';
 
+/** @import { HTMLAttribute } from './lib/attributes.js' */
+
+// Type definitions
+
 /**
  * @typedef {{
  *   start?: Function,
@@ -205,7 +209,7 @@ export class HTMLParser {
     const fullHtml = this.html;
     const fullLength = fullHtml.length;
 
-    /** @type {Array<{tag: string, lowerTag: string, attrs: Array<{name: string, value?: string, quote?: string, customAssign?: string, customOpen?: string, customClose?: string}>}>} */
+    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[]}>} */
     const stack = [];
     /** @type {string} */
     let lastTag = '';
@@ -216,9 +220,9 @@ export class HTMLParser {
     let prevTag;
     /** @type {string | undefined} */
     let nextTag;
-    /** @type {Array<{name?: string, value?: string}>} */
+    /** @type {HTMLAttribute[]} */
     let prevAttrs = [];
-    /** @type {Array<{name?: string, value?: string}>} */
+    /** @type {HTMLAttribute[]} */
     let nextAttrs = [];
 
     // Sticky regex versions for position-based matching (avoids string slicing)
@@ -469,13 +473,13 @@ export class HTMLParser {
       const numCustomParts = handler.customAttrSurround ? handler.customAttrSurround.length * NCP : 0;
       const baseIndex = 1 + numCustomParts;
 
-      return rawAttrs.map((/** @type {Array<string | undefined>} */ args) => {
+      return /** @type {HTMLAttribute[]} */ (rawAttrs.map((/** @type {Array<string | undefined>} */ args) => {
         // Extract attribute name (always at `baseIndex`)
         const name = args[baseIndex];
         // Extract value from double-quoted (`baseIndex + 2`), single-quoted (`baseIndex + 3`), or unquoted (`baseIndex + 4`)
         const value = args[baseIndex + 2] ?? args[baseIndex + 3] ?? args[baseIndex + 4];
-        return /** @type {{name?: string, value?: string}} */ ({ name: name?.toLowerCase(), value });
-      }).filter((/** @type {{name?: string, value?: string}} */ attr) => attr.name); // Filter out invalid entries
+        return { name: name?.toLowerCase() ?? '', value };
+      }).filter(attr => attr.name)); // Filter out invalid entries
     }
 
     function parseStartTag(/** @type {number} */ startPos) {
@@ -717,7 +721,7 @@ export class HTMLParser {
 
       const unary = empty.has(tagName) || (tagName === 'html' && lastTag === 'head') || !!unarySlash;
 
-      const attrs = match.attrs.map(function (/** @type {Array<string | undefined>} */ args) {
+      const attrs = /** @type {HTMLAttribute[]} */ (match.attrs.map(function (/** @type {Array<string | undefined>} */ args) {
         /** @type {string | undefined} */
         let name, value, customOpen, customClose, customAssign, quote;
 
@@ -770,7 +774,7 @@ export class HTMLParser {
           customClose: customClose || '',
           quote: quote || ''
         };
-      });
+      }));
 
       if (!unary) {
         stack.push({ tag: tagName, lowerTag: tagName.toLowerCase(), attrs });
