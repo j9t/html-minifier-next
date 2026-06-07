@@ -103,7 +103,7 @@ describe('CLI', () => {
       '--output-dir=./'
     ];
 
-    assert.throws(() => execCli(cliArguments), /The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `-o`/);
+    assert.throws(() => execCli(cliArguments), /The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `--input`\/`--output`/);
   });
 
   test('Should throw error for invalid max-line-length value', () => {
@@ -741,6 +741,51 @@ describe('CLI', () => {
     // Should output to STDOUT
     assert.ok(result.length > 0);
     assert.ok(result.includes('<!DOCTYPE html>'));
+  });
+
+  // `-i` flag tests
+  test('Should minify file to STDOUT with `-i` flag', () => {
+    const result = execCli([
+      '-i', 'default.html',
+      '--collapse-whitespace'
+    ]);
+
+    assert.ok(result.length > 0);
+    assert.ok(result.includes('<!DOCTYPE html>'));
+  });
+
+  test('Should minify file to file with `-i`/`-o` flags', async () => {
+    fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+
+    execCli([
+      '-i', 'default.html',
+      '-o', 'tmp/input-flag-output.html',
+      '--collapse-whitespace'
+    ]);
+
+    assert.strictEqual(existsFixture('tmp/input-flag-output.html'), true);
+
+    const output = await readFixture('tmp/input-flag-output.html');
+    assert.ok(output.length > 0);
+    assert.ok(output.includes('<!DOCTYPE html>'));
+  });
+
+  test('Should produce the same output with `-i` as with a positional argument', async () => {
+    const viaPositional = execCli(['default.html', '--collapse-whitespace']);
+    const viaFlag = execCli(['-i', 'default.html', '--collapse-whitespace']);
+
+    assert.strictEqual(viaPositional, viaFlag);
+  });
+
+  test('Should throw error if file passed to `-i` is not found', () => {
+    assert.throws(() => execCli(['-i', 'no-file.html']), /no such file/);
+  });
+
+  test('Should show helpful error when `-I` receives a file instead of a directory', () => {
+    assert.throws(
+      () => execCli(['-I', 'default.html', '-O', './tmp']),
+      /is not a directory.*-i.*-o/
+    );
   });
 
   // Error handling tests for dry run

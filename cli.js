@@ -171,7 +171,8 @@ mainOptionKeys.forEach(function (key) {
     program.option(cliFlag, description, parser);
   }
 });
-program.option('-o --output <file>', 'Specify output file (reads from file arguments or STDIN; outputs to STDOUT if not specified)');
+program.option('-i --input <file>', 'Specify input file (alternative to positional argument; pair with `--output` for output)');
+program.option('-o --output <file>', 'Specify output file (reads from `--input` file argument or STDIN; outputs to STDOUT if not specified)');
 program.option('-v --verbose', 'Show detailed processing information');
 program.option('-d --dry', 'Dry run: Process and report statistics without writing output');
 program.addHelpText('after', '\nBoolean options support a `--no-<flag>` form to disable them, overriding a preset or config file (e.g., `--preset=comprehensive --no-collapse-whitespace`).');
@@ -318,7 +319,11 @@ program.helpOption('-h, --help', 'Display help for command');
     }
   }
 
-  // Defer reading files—multi-file mode will process per-file later
+  // If `--input` was specified, treat it as a positional file argument
+  if (programOptions.input) {
+    capturedFiles.unshift(programOptions.input);
+    filesProvided = true;
+  }
 
   // Handle zero config mode (standalone in-place minification of the current folder)
   if (programOptions.zero) {
@@ -735,7 +740,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
   if (inputDir || outputDir) {
     if (!inputDir) {
-      fatal('The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `-o`');
+      fatal('The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `--input`/`--output`');
     } else if (!outputDir) {
       fatal('You need to specify where to write the output files with the option `--output-dir`');
     }
@@ -780,7 +785,7 @@ program.helpOption('-h, --help', 'Display help for command');
       try {
         const stat = await fs.promises.stat(inputDir);
         if (!stat.isDirectory()) {
-          fatal(inputDir + ' is not a directory');
+          fatal(`${inputDir} is not a directory—to minify a single file, use \`--input\`/\`--output\`: html-minifier-next [options] -i ${inputDir} -o <output-file>`);
         }
       } catch (err) {
         fatal('Cannot read directory ' + inputDir + '\n' + err.message);

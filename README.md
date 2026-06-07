@@ -34,7 +34,8 @@ Use `npx html-minifier-next --help` to check all available options:
 | `--input-dir <dir>`, `-I <dir>` | Specify an input directory | `--input-dir=src` |
 | `--ignore-dir <patterns>`, `-X <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>`, `-O <dir>` | Specify an output directory | `--output-dir=dist` |
-| `--output <file>`, `-o <file>` | Specify output file (reads from file arguments or STDIN) | File to file: `npx html-minifier-next input.html -o output.html`<br>Pipe to file: `cat input.html \| npx html-minifier-next -o output.html`<br>File to STDOUT: `npx html-minifier-next input.html` |
+| `--input <file>`, `-i <file>` | Specify input file (alternative to positional argument; pair with `--output` for file output) | `npx html-minifier-next -i input.html -o output.html` |
+| `--output <file>`, `-o <file>` | Specify output file (reads from `--input` file argument or STDIN; outputs to STDOUT if not specified) | File to file: `npx html-minifier-next input.html -o output.html`<br>File to file (explicit): `npx html-minifier-next -i input.html -o output.html`<br>Pipe to file: `cat input.html \| npx html-minifier-next -o output.html`<br>File to STDOUT: `npx html-minifier-next input.html` |
 | `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
 | `--config-file <file>`, `-c <file>` | Use a configuration file | `--config-file=html-minifier.json` |
