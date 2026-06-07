@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.10] - 2026-06-07
+
+### Added
+
+* Added `-i`/`--input <file>` flag as an explicit alternative to passing the input file as a positional argument, creating a symmetrical pair with `-o`/`--output` (and mirroring the `-I`/`-O` convention for directories)
+
+### Changed
+
+* Improved the error message when `-I`/`--input-dir` is given a file path instead of a directory—it now includes a suggestion to use `-i`/`-o` instead
+
 ## [6.2.9] - 2026-06-06
 
 ### Fixed
