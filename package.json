@@ -16,7 +16,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.0.1",
     "@eslint/js": "^10.0.1",
-    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@swc/core": "^1.15.40",
