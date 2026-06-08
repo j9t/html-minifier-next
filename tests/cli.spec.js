@@ -788,18 +788,20 @@ describe('CLI', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test.js'), '// comment\nfunction foo() { return 1; }\n');
 
-    const { stderr } = execCliWithStderr(['tmp/test.js', '--collapse-whitespace']);
+    const { stderr, exitCode } = execCliWithStderr(['tmp/test.js', '--collapse-whitespace']);
     assert.ok(stderr.includes('Warning:'), 'Should warn for non-HTML file extension');
     assert.ok(stderr.includes('test.js'), 'Warning should name the file');
+    assert.strictEqual(exitCode, 0, 'Should still exit successfully');
   });
 
   test('Should warn when a non-HTML file is passed via `-i`', () => {
     fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
     fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test.css'), '.foo { color: red; }\n');
 
-    const { stderr } = execCliWithStderr(['-i', 'tmp/test.css', '--collapse-whitespace']);
+    const { stderr, exitCode } = execCliWithStderr(['-i', 'tmp/test.css', '--collapse-whitespace']);
     assert.ok(stderr.includes('Warning:'), 'Should warn for non-HTML file extension');
     assert.ok(stderr.includes('test.css'), 'Warning should name the file');
+    assert.strictEqual(exitCode, 0, 'Should still exit successfully');
   });
 
   test('Should show helpful error when `-I` receives a file instead of a directory', () => {
