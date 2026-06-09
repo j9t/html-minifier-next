@@ -58,7 +58,8 @@ import { optionDefinitions } from './src/lib/option-definitions.js';
 const require = createRequire(import.meta.url);
 const pkg = require('./package.json');
 
-const DEFAULT_FILE_EXTENSIONS = ['html', 'htm', 'shtml', 'shtm'];
+const EXTENSIONS_DEFAULT = ['html', 'htm', 'shtml', 'shtm'];
+const EXTENSIONS_NON_HTML = new Set(['css', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'svg']);
 
 const MARK_ERROR = process.stderr.isTTY ? '\x1b[31m' : '';
 const MARK_SUCCESS = process.stderr.isTTY ? '\x1b[32m' : '';
@@ -362,7 +363,7 @@ program.helpOption('-h, --help', 'Display help for command');
       programOptions.preset = 'comprehensive';
 
       const inputDirResolved = await fs.promises.realpath(cwd).catch(() => cwd);
-      const extensions = DEFAULT_FILE_EXTENSIONS;
+      const extensions = EXTENSIONS_DEFAULT;
       const ignorePatterns = ['node_modules'];
 
       const showProgress = process.stderr.isTTY;
@@ -732,7 +733,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
   // Resolve file extensions: CLI argument > config file > defaults
   const hasCliFileExt = program.getOptionValueSource('fileExt') === 'cli';
-  const resolvedFileExt = hasCliFileExt ? (fileExt || '*') : (config.fileExt || DEFAULT_FILE_EXTENSIONS);
+  const resolvedFileExt = hasCliFileExt ? (fileExt || '*') : (config.fileExt || EXTENSIONS_DEFAULT);
 
   // Resolve ignore patterns: CLI argument takes priority over config file
   const hasCliIgnoreDir = program.getOptionValueSource('ignoreDir') === 'cli';
@@ -743,6 +744,16 @@ program.helpOption('-h, --help', 'Display help for command');
       fatal('The option `output-dir` needs to be used with the option `input-dir`—if you are working with a single file, use `--input`/`--output`');
     } else if (!outputDir) {
       fatal('You need to specify where to write the output files with the option `--output-dir`');
+    }
+
+    {
+      const extList = Array.isArray(resolvedFileExt) ? resolvedFileExt : parseFileExtensions(String(resolvedFileExt || ''));
+      const isWildcard = extList.includes('*');
+      const nonHtmlExts = isWildcard ? [] : extList.filter(e => EXTENSIONS_NON_HTML.has(e));
+      if (isWildcard || nonHtmlExts.length > 0) {
+        const label = isWildcard ? 'all file types' : nonHtmlExts.map(e => `.${e}`).join(', ');
+        console.error(`${MARK_WARNING}Warning: Processing ${label}—HTML Minifier Next processes CSS, JavaScript, and SVG only when embedded in HTML. Non-HTML files may produce incomplete or broken output.${MARK_RESET}`);
+      }
     }
 
     await (async () => {
@@ -838,6 +849,13 @@ program.helpOption('-h, --help', 'Display help for command');
     // Show config info if verbose/dry
     if (programOptions.verbose || programOptions.dry) {
       getActiveOptionsDisplay(minifierOptions);
+    }
+
+    for (const file of capturedFiles) {
+      const ext = path.extname(file).replace(/^\./, '').toLowerCase();
+      if (EXTENSIONS_NON_HTML.has(ext)) {
+        console.error(`${MARK_WARNING}Warning: “${path.basename(file)}” does not appear to be an HTML file—HTML Minifier Next processes CSS, JavaScript, and SVG only when embedded in HTML. The output may be incomplete or broken.${MARK_RESET}`);
+      }
     }
 
     const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));

@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.11] - 2026-06-09
+
+### Added
+
+* Added a warning when a file with a non-HTML extension (`.css`, `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.svg`) is passed as input—HMN processes CSS, JavaScript, and SVG only when embedded in HTML, so standalone non-HTML files may produce incomplete or broken output
+
 ## [6.2.10] - 2026-06-07
 
 ### Added

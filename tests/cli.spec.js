@@ -405,7 +405,8 @@ describe('CLI', () => {
       '--collapse-whitespace'
     ];
 
-    execCli(cliArguments);
+    const { stderr } = execCliWithStderr(cliArguments);
+    assert.ok(stderr.includes('Warning:'), 'Should warn when processing all file types');
 
     // Should process all files when wildcard is specified
     assert.strictEqual(existsFixture('tmp/all-files/extension.html'), true);
@@ -451,7 +452,8 @@ describe('CLI', () => {
       '--collapse-whitespace'
     ];
 
-    execCli(cliArguments);
+    const { stderr } = execCliWithStderr(cliArguments);
+    assert.ok(stderr.includes('Warning:'), 'Should warn when processing all file types');
 
     // Empty `--file-ext=` is treated as wildcard (all files)
     assert.strictEqual(existsFixture('tmp/empty-ext/extension.html'), true);
@@ -560,7 +562,8 @@ describe('CLI', () => {
       '--file-ext=' // Empty CLI argument overrides config; treated as wildcard
     ];
 
-    execCli(cliArguments);
+    const { stderr } = execCliWithStderr(cliArguments);
+    assert.ok(stderr.includes('Warning:'), 'Should warn when processing all file types');
 
     // Should process ALL files (empty `--file-ext=` is treated as wildcard)
     assert.strictEqual(existsFixture('tmp/config-empty-override/extension.html'), true);
@@ -779,6 +782,26 @@ describe('CLI', () => {
 
   test('Should throw error if file passed to `-i` is not found', () => {
     assert.throws(() => execCli(['-i', 'no-file.html']), /no such file/);
+  });
+
+  test('Should warn when a non-HTML file is passed as a positional argument', () => {
+    fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test.js'), '// comment\nfunction foo() { return 1; }\n');
+
+    const { stderr, exitCode } = execCliWithStderr(['tmp/test.js', '--collapse-whitespace']);
+    assert.ok(stderr.includes('Warning:'), 'Should warn for non-HTML file extension');
+    assert.ok(stderr.includes('test.js'), 'Warning should name the file');
+    assert.strictEqual(exitCode, 0, 'Should still exit successfully');
+  });
+
+  test('Should warn when a non-HTML file is passed via `-i`', () => {
+    fs.mkdirSync(path.resolve(fixturesDir, 'tmp'), { recursive: true });
+    fs.writeFileSync(path.resolve(fixturesDir, 'tmp/test.css'), '.foo { color: red; }\n');
+
+    const { stderr, exitCode } = execCliWithStderr(['-i', 'tmp/test.css', '--collapse-whitespace']);
+    assert.ok(stderr.includes('Warning:'), 'Should warn for non-HTML file extension');
+    assert.ok(stderr.includes('test.css'), 'Warning should name the file');
+    assert.strictEqual(exitCode, 0, 'Should still exit successfully');
   });
 
   test('Should show helpful error when `-I` receives a file instead of a directory', () => {
