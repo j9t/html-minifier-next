@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2026-06-@@
+
+### Changed
+
+* **BREAKING:** Dropped CommonJS support—HMN is now ESM-only
+  - **Migration:** Consumers using `require('html-minifier-next')` must migrate to `import`; the `"main"` field and `dist/htmlminifier.cjs` are no longer shipped
+
 ## [6.2.11] - 2026-06-09
 
 ### Added

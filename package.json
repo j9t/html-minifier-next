@@ -16,28 +16,21 @@
   "devDependencies": {
     "@commitlint/cli": "^21.0.1",
     "@eslint/js": "^10.0.1",
-    "@rollup/plugin-commonjs": "^29.0.3",
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.3",
     "@swc/core": "^1.15.40",
     "@types/node": "^25.9.1",
     "eslint": "^10.4.0",
-    "rollup": "^4.60.4",
-    "rollup-plugin-polyfill-node": "^0.13.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.14"
   },
   "exports": {
     ".": {
       "types": "./dist/types/htmlminifier.d.ts",
-      "import": "./src/htmlminifier.js",
-      "require": "./dist/htmlminifier.cjs"
+      "import": "./src/htmlminifier.js"
     },
     "./package.json": "./package.json"
   },
   "files": [
     "cli.js",
-    "dist/htmlminifier.cjs",
     "dist/types/",
     "src/"
   ],
@@ -68,8 +61,6 @@
     "uglify"
   ],
   "license": "MIT",
-  "main": "./dist/htmlminifier.cjs",
-  "module": "./src/htmlminifier.js",
   "name": "html-minifier-next",
   "peerDependencies": {
     "@swc/core": "^1.15.7"
@@ -84,19 +75,18 @@
     "url": "git+https://github.com/j9t/html-minifier-next.git"
   },
   "scripts": {
-    "build": "tsc && rollup -c",
-    "build:docs": "vite build --base /html-minifier-next/ --outDir build",
+    "build": "tsc",
+    "build:docs": "vite build --base /html-minifier-next/",
     "deploy": "npm run build && npm run build:docs",
     "lint": "eslint .",
-    "prebuild": "node --eval='require(`fs`).rmSync(`dist`,{recursive:true,force:true})'",
+    "prebuild": "node --input-type=module --eval \"import {rmSync} from 'fs';rmSync('dist',{recursive:true,force:true})\"",
     "prepack": "npm run build",
     "prepare": "git config core.hooksPath .githooks || true",
-    "serve": "npm run build && vite",
+    "serve": "vite",
     "test": "npm run test:types && node --test tests/*.spec.js",
     "test:types": "tsc --project tsconfig.test.json",
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "types": "./dist/types/htmlminifier.d.ts",
-  "version": "6.2.11"
+  "version": "7.0.0"
 }

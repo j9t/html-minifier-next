@@ -1,4 +1,4 @@
-import HTMLMinifier, { getPreset } from '../dist/htmlminifier.esm.bundle.js';
+import HTMLMinifier, { getPreset } from '../src/htmlminifier.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
 import pkg from '../package.json' with { type: 'json' };
 

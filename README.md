@@ -44,7 +44,7 @@ Use `npx html-minifier-next --help` to check all available options:
 
 ### Configuration file
 
-You can use a configuration file to specify options. The file can be either JSON format or a JavaScript module that exports the configuration object:
+You can use a configuration file to specify options. The file can be either in JSON format or a JavaScript module that exports the configuration object:
 
 **JSON configuration example:**
 
@@ -70,8 +70,6 @@ module.exports = {
 
 ### Node.js
 
-ESM with Node.js ≥16.14:
-
 ```javascript
 import { minify } from 'html-minifier-next';
 
@@ -80,17 +78,6 @@ const result = await minify('<p title="example" id="moo">foo</p>', {
   removeOptionalTags: true
 });
 console.log(result); // “<p title=example id=moo>foo”
-```
-
-CommonJS:
-
-```javascript
-const { minify } = require('html-minifier-next');
-
-(async () => {
-  const result = await minify('<p title="example" id="moo">foo</p>', { preset: 'comprehensive' });
-  console.log(result); // “<p id=moo title=example>foo”
-})();
 ```
 
 See [the original blog post](https://perfectionkills.com/experimenting-with-html-minifier/) for details of [how it works](https://perfectionkills.com/experimenting-with-html-minifier/#how_it_works), [descriptions of most options](https://perfectionkills.com/experimenting-with-html-minifier/#options), [testing results](https://perfectionkills.com/experimenting-with-html-minifier/#field_testing), and [conclusions](https://perfectionkills.com/experimenting-with-html-minifier/#cost_and_benefits).
