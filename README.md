@@ -57,7 +57,7 @@ You can use a configuration file to specify options. The file can be either in J
 }
 ```
 
-**JavaScript module configuration example** (.mjs or .js):
+**JavaScript module configuration example** (requires `"type": "module"` in the project’s package.json, or use a .mjs extension):
 
 ```javascript
 export default {
