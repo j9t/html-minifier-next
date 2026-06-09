@@ -312,7 +312,8 @@ const decodeState = (hash) => {
         if (key in OPTION_MIGRATIONS) {
           // `null` means the option was removed; skip it
           if (OPTION_MIGRATIONS[key]) {
-            migratedOptions[OPTION_MIGRATIONS[key]] = value;
+            const target = OPTION_MIGRATIONS[key];
+            migratedOptions[target] = migratedOptions[target] || value;
           }
         } else {
           migratedOptions[key] = value;
