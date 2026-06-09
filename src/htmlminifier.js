@@ -366,6 +366,12 @@ import { processOptions } from './lib/options.js';
  *
  *  Default: `false`
  *
+ *  @prop {boolean} [removeDefaultTypeAttributes]
+ *  Remove default `type` attributes from `<style>`/`<link>` (e.g., `type="text/css"`)
+ *  and `<script>` (e.g., `type="text/javascript"`) elements.
+ *
+ *  Default: `false`
+ *
  * @prop {boolean | ((attrName: string, tag: string) => boolean)} [removeEmptyAttributes]
  *  If true, removes attributes whose values are empty (some attributes
  *  are excluded by name). Can also be a function to customise which empty
@@ -417,12 +423,6 @@ import { processOptions } from './lib/options.js';
  *  Remove attributes that are redundant because they match the element’s
  *  default values (for example `<button type="submit">`).
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_redundant_attributes
- *
- *  Default: `false`
- *
- * @prop {boolean} [removeDefaultTypeAttributes]
- *  Remove default `type` attributes from `<style>`/`<link>` (e.g., `type="text/css"`)
- *  and `<script>` (e.g., `type="text/javascript"`) elements.
  *
  *  Default: `false`
  *

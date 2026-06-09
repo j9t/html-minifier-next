@@ -47,10 +47,10 @@ async function testBooleanOptions() {
     preventAttributesEscaping: false,
     removeAttributeQuotes: true,
     removeComments: true,
+    removeDefaultTypeAttributes: true,
     removeEmptyElements: false,
     removeOptionalTags: false,
     removeRedundantAttributes: true,
-    removeDefaultTypeAttributes: true,
     removeTagWhitespace: false,
     trimCustomFragments: false,
     useShortDoctype: true,
@@ -302,9 +302,9 @@ async function testRealWorldUsage() {
   const result = await minify(html, {
     collapseWhitespace: true,
     removeComments: true,
+    removeDefaultTypeAttributes: true,
     removeEmptyAttributes: true,
     removeRedundantAttributes: true,
-    removeDefaultTypeAttributes: true,
     useShortDoctype: true,
     minifyCSS: true,
     minifyJS: {

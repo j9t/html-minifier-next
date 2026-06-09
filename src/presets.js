@@ -29,10 +29,10 @@ export const presets = {
     minifyURLs: true,
     removeAttributeQuotes: true,
     removeComments: true,
+    removeDefaultTypeAttributes: true,
     removeEmptyAttributes: true,
     removeOptionalTags: true,
     removeRedundantAttributes: true,
-    removeDefaultTypeAttributes: true,
     useShortDoctype: true
   }
 };

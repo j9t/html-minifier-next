@@ -131,6 +131,10 @@ const demoConfig = {
     label: 'Remove comments',
     checked: true
   },
+  removeDefaultTypeAttributes: {
+    label: 'Remove default <code>type</code> attributes',
+    checked: true
+  },
   removeEmptyAttributes: {
     label: 'Remove empty attributes',
     checked: true
@@ -149,10 +153,6 @@ const demoConfig = {
   },
   removeRedundantAttributes: {
     label: 'Remove redundant attributes',
-    checked: true
-  },
-  removeDefaultTypeAttributes: {
-    label: 'Remove default <code>type</code> attributes',
     checked: true
   },
   removeTagWhitespace: {
