@@ -33,7 +33,6 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import os from 'os';
 import readline from 'readline';
-import { createRequire } from 'module';
 import { Command, Option } from 'commander';
 
 // Simple case conversion for CLI option names (ASCII-only, no Unicode needed)
@@ -55,8 +54,7 @@ import { getPreset, getPresetNames } from './src/presets.js';
 import { parseRegExp } from './src/lib/utils.js';
 import { optionDefinitions } from './src/lib/option-definitions.js';
 
-const require = createRequire(import.meta.url);
-const pkg = require('./package.json');
+const pkg = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 const EXTENSIONS_DEFAULT = ['html', 'htm', 'shtml', 'shtm'];
 const EXTENSIONS_NON_HTML = new Set(['css', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'svg']);
@@ -196,9 +194,8 @@ function readFile(file) {
 }
 
 /**
- * Load config from a file path—for unambiguous extensions (.json, .cjs, .mjs) only the
- * matching format is attempted and its error shown on failure; for .js or unknown extensions
- * all formats are tried and the most relevant error is reported
+ * Load config from a file path. Extensions .json, .js, and .mjs are handled
+ * directly; for unknown extensions, JSON is tried first, then module import.
  * @param {string} configPath - Path to config file
  * @returns {Promise<object>} Loaded config object
  */
@@ -211,34 +208,21 @@ async function loadConfigFromPath(configPath) {
     catch (err) { fatal(`Cannot parse config file as JSON: ${err.message}`); }
   }
 
-  if (ext === '.cjs') {
-    try {
-      const result = require(abs);
-      return (result && typeof result === 'object' && result.__esModule === true) ? result.default : result;
-    } catch (err) { fatal(`Cannot load config file: ${err.message}`); }
-  }
-
-  if (ext === '.mjs') {
+  if (ext === '.js' || ext === '.mjs') {
+    // `import()` handles both ESM and CJS .js files—Node resolves the type via the
+    // nearest package.json `type` field, same as it does for regular module loading
     try { const mod = await import(pathToFileURL(abs).href); return 'default' in mod ? mod.default : mod; }
     catch (err) { fatal(`Cannot load config file: ${err.message}`); }
   }
 
-  // For .js or extension-less files, try JSON first, then CJS, then ESM
+  // Unknown extension: Try JSON, then module import
   let jsonErr;
   try { return JSON.parse(readFile(abs).replace(/^\uFEFF/, '')); }
   catch (err) { jsonErr = err; }
 
-  try {
-    const result = require(abs);
-    // Handle ESM interop: If `require()` loads an ESM file, it may return `{__esModule: true, default: …}`
-    return (result && typeof result === 'object' && result.__esModule === true) ? result.default : result;
-  } catch (cjsErr) {
-    try { const mod = await import(pathToFileURL(abs).href); return 'default' in mod ? mod.default : mod; }
-    catch (esmErr) {
-      fatal(ext === '.js'
-        ? `Cannot load config file: ${cjsErr.message}\nAs module: ${esmErr.message}`
-        : `Cannot read the specified config file.\nAs JSON: ${jsonErr.message}\nAs CJS: ${cjsErr.message}\nAs module: ${esmErr.message}`);
-    }
+  try { const mod = await import(pathToFileURL(abs).href); return 'default' in mod ? mod.default : mod; }
+  catch (esmErr) {
+    fatal(`Cannot read the specified config file.\nAs JSON: ${jsonErr.message}\nAs module: ${esmErr.message}`);
   }
 }
 
