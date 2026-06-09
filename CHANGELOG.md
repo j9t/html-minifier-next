@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * **BREAKING:** Dropped CommonJS support—HMN is now ESM-only
   - **Migration:** Consumers using `require('html-minifier-next')` must migrate to `import`; the `"main"` field and `dist/htmlminifier.cjs` are no longer shipped
+* **BREAKING:** Merged `removeScriptTypeAttributes` and `removeStyleLinkTypeAttributes` into a single `removeDefaultTypeAttributes` option
+  - **Migration:** Replace either or both old options with `removeDefaultTypeAttributes: true`
 
 ## [6.2.11] - 2026-06-09
 

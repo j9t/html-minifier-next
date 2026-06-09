@@ -157,8 +157,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve when `removeEmptyElements` is enabled; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<span aria-hidden='true'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
-| `removeScriptTypeAttributes`<br>`--remove-script-type-attributes` | Remove `type="text/javascript"` from `script` elements; other `type` attribute values are left intact | `false` |
-| `removeStyleLinkTypeAttributes`<br>`--remove-style-link-type-attributes` | Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact | `false` |
+| `removeDefaultTypeAttributes`<br>`--remove-default-type-attributes` | Remove default `type` attributes from `style`/`link` (e.g., `type="text/css"`) and `script` (e.g., `type="text/javascript"`) elements; other `type` attribute values are left intact | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |

@@ -171,7 +171,7 @@ import { processOptions } from './lib/options.js';
  *
  * @prop {RegExp[]} [customAttrAssign]
  *  Array of regexes used to recognise custom attribute assignment
- *  operators (e.g. `'<div flex?="{{mode != cover}}"></div>'`).
+ *  operators (e.g., `'<div flex?="{{mode != cover}}"></div>'`).
  *  These are concatenated with the built-in assignment patterns.
  *
  *  Default: `[]`
@@ -179,16 +179,16 @@ import { processOptions } from './lib/options.js';
  * @prop {RegExp} [customAttrCollapse]
  *  Regex matching attribute names whose values should be collapsed.
  *  Basically used to remove newlines and excess spaces inside attribute values,
- *  e.g. `/ng-class/`.
+ *  e.g., `/ng-class/`.
  *
  * @prop {[RegExp, RegExp][]} [customAttrSurround]
  *  Array of `[openRegExp, closeRegExp]` pairs used by the parser to
  *  detect custom attribute surround patterns (for non-standard syntaxes,
- *  e.g. `<input {{#if value}}checked="checked"{{/if}}>`).
+ *  e.g., `<input {{#if value}}checked="checked"{{/if}}>`).
  *
  * @prop {RegExp[]} [customEventAttributes]
  *  Array of regexes used to detect event handler attributes for `minifyJS`
- *  (e.g. `ng-click`). The default matches standard `on…` event attributes.
+ *  (e.g., `ng-click`). The default matches standard `on…` event attributes.
  *
  *  Default: `[/^on[a-z]{3,}$/]`
  *
@@ -341,7 +341,7 @@ import { processOptions } from './lib/options.js';
  * @prop {string[]} [processScripts]
  *  Array of `type` attribute values for `<script>` elements whose contents
  *  should be processed as HTML
- *  (e.g. `text/ng-template`, `text/x-handlebars-template`, etc.).
+ *  (e.g., `text/ng-template`, `text/x-handlebars-template`, etc.).
  *  When present, the contents of matching script tags are recursively minified,
  *  like normal HTML content.
  *
@@ -420,15 +420,9 @@ import { processOptions } from './lib/options.js';
  *
  *  Default: `false`
  *
- * @prop {boolean} [removeScriptTypeAttributes]
- *  Remove `type` attributes from `<script>` when they are unnecessary
- *  (e.g. `type="text/javascript"`).
- *
- *  Default: `false`
- *
- * @prop {boolean} [removeStyleLinkTypeAttributes]
- *  Remove `type` attributes from `<style>` and `<link>` elements when
- *  they are unnecessary (e.g. `type="text/css"`).
+ * @prop {boolean} [removeDefaultTypeAttributes]
+ *  Remove default `type` attributes from `<style>`/`<link>` (e.g., `type="text/css"`)
+ *  and `<script>` (e.g., `type="text/javascript"`) elements.
  *
  *  Default: `false`
  *
@@ -804,7 +798,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
 
   // For the first pass, create a copy of options and disable aggressive minification.
-  // Keep attribute transformations (like `removeStyleLinkTypeAttributes`) for accurate analysis.
+  // Keep attribute transformations (like `removeDefaultTypeAttributes`) for accurate analysis.
   // This is safe because `createSortFns` is called before custom fragment UID markers (`uidAttr`) are added.
   // Note: `htmlmin:ignore` UID markers (`uidIgnore`) already exist and are expanded for analysis.
   const firstPassOptions = Object.assign({}, options, {
@@ -848,7 +842,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       uidReplacePattern.lastIndex = 0;
     }
 
-    // First pass minification applies attribute transformations like `removeStyleLinkTypeAttributes` for accurate frequency analysis
+    // First pass minification applies attribute transformations like `removeDefaultTypeAttributes` for accurate frequency analysis
     const firstPassOutput = await minifyHTML(expandedValue, firstPassOptions);
 
     // For frequency analysis, remove custom fragments temporarily

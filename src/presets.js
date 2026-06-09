@@ -14,8 +14,7 @@ export const presets = {
     conservativeCollapse: true,
     preserveLineBreaks: true,
     removeComments: true,
-    removeScriptTypeAttributes: true,
-    removeStyleLinkTypeAttributes: true,
+    removeDefaultTypeAttributes: true,
     useShortDoctype: true
   },
   comprehensive: {
@@ -33,8 +32,7 @@ export const presets = {
     removeEmptyAttributes: true,
     removeOptionalTags: true,
     removeRedundantAttributes: true,
-    removeScriptTypeAttributes: true,
-    removeStyleLinkTypeAttributes: true,
+    removeDefaultTypeAttributes: true,
     useShortDoctype: true
   }
 };

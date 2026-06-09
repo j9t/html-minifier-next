@@ -651,7 +651,7 @@ describe('HTML', () => {
       '  <body>\n' +
       '  </body>\n' +
       '</html>';
-    assert.strictEqual(await minify(input, { minifyJS: true, removeComments: true, collapseWhitespace: true, removeOptionalTags: true, removeScriptTypeAttributes: true }), '');
+    assert.strictEqual(await minify(input, { minifyJS: true, removeComments: true, collapseWhitespace: true, removeOptionalTags: true, removeDefaultTypeAttributes: true }), '');
 
     input = '<!DOCTYPE html>\n' +
       '<html lang="en">\n' +
@@ -1375,97 +1375,97 @@ describe('HTML', () => {
     let input, output;
 
     input = '<script type="">alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: false }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: false }), input);
     output = '<script>alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     // https://github.com/terser/html-minifier-terser/issues/132
     input = '<script type>alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: false }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: false }), input);
     output = '<script>alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<script type="modules">alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: false }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: false }), input);
     output = '<script type="modules">alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<script type="text/javascript">alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: false }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: false }), input);
     output = '<script>alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<SCRIPT TYPE="  text/javascript ">alert(1)</script>';
     output = '<script>alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<script type="application/javascript;version=1.8">alert(1)</script>';
     output = '<script>alert(1)</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<script type="text/vbscript">MsgBox("foo bar")</script>';
     output = '<script type="text/vbscript">MsgBox("foo bar")</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     // JSON script types should not be removed (would make them executable JS)
     input = '<script type="application/ld+json">{"foo":"bar"}</script>';
     output = '<script type="application/ld+json">{"foo":"bar"}</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<script type="importmap">{"imports":{}}</script>';
     output = '<script type="importmap">{"imports":{}}</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<script type="application/problem+json">{"status":404}</script>';
     output = '<script type="application/problem+json">{"status":404}</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<script type="application/merge-patch+json">{"title":"New"}</script>';
     output = '<script type="application/merge-patch+json">{"title":"New"}</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<script type="application/json-patch+json">[{"op":"add"}]</script>';
     output = '<script type="application/json-patch+json">[{"op":"add"}]</script>';
-    assert.strictEqual(await minify(input, { removeScriptTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
   });
 
   test('Remove CSS-related `type` attributes', async () => {
     let input, output;
 
     input = '<style type="">.foo { color: red }</style>';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: false }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: false }), input);
     output = '<style>.foo { color: red }</style>';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     // https://github.com/terser/html-minifier-terser/issues/132
     input = '<style type>.foo { color: red }</style>';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: false }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: false }), input);
     output = '<style>.foo { color: red }</style>';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<style type="text/css">.foo { color: red }</style>';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: false }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: false }), input);
     output = '<style>.foo { color: red }</style>';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<STYLE TYPE = "  text/CSS ">body { font-size: 1.75em }</style>';
     output = '<style>body { font-size: 1.75em }</style>';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<style type="text/plain">.foo { background: green }</style>';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), input);
 
     input = '<link rel="stylesheet" type="text/css" href="https://example.com">';
     output = '<link rel="stylesheet" href="https://example.com">';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     // https://github.com/terser/html-minifier-terser/issues/132
     input = '<link rel="stylesheet" type href="https://example.com">';
     output = '<link rel="stylesheet" href="https://example.com">';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), output);
 
     input = '<link rel="alternate" type="application/atom+xml" href="data.xml">';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true }), input);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), input);
   });
 
   test('Remove attribute quotes', async () => {
@@ -4289,7 +4289,7 @@ describe('HTML', () => {
     output = '<link href="foo.css">' +
       '<link href="bar.css" rel="stylesheet" type="text/abc">' +
       '<link href="baz.css">';
-    assert.strictEqual(await minify(input, { removeStyleLinkTypeAttributes: true, sortAttributes: true }), output);
+    assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true, sortAttributes: true }), output);
 
     input = '<a foo moo></a>' +
       '<a bar foo></a>' +
@@ -5115,8 +5115,7 @@ describe('HTML', () => {
       removeEmptyElements: false,
       removeOptionalTags: true,
       removeRedundantAttributes: true,
-      removeScriptTypeAttributes: true,
-      removeStyleLinkTypeAttributes: true,
+      removeDefaultTypeAttributes: true,
       removeTagWhitespace: true,
       sortAttributes: true,
       sortClassNames: false,
@@ -5310,8 +5309,7 @@ describe('HTML', () => {
       removeEmptyElements: true,
       removeOptionalTags: true,
       removeRedundantAttributes: true,
-      removeScriptTypeAttributes: true,
-      removeStyleLinkTypeAttributes: true,
+      removeDefaultTypeAttributes: true,
       removeTagWhitespace: true,
       sortAttributes: true,
       sortClassNames: true,
@@ -5531,7 +5529,7 @@ describe('HTML', () => {
       '</div>' +
       '<button [disabled]=!theForm.form.valid>Submit</button>' +
       '</form>';
-    assert.strictEqual(await minify(input, { caseSensitive: true, collapseBooleanAttributes: true, collapseWhitespace: true, removeAttributeQuotes: true, removeComments: true, removeEmptyAttributes: true, removeOptionalTags: true, removeRedundantAttributes: true, removeScriptTypeAttributes: true, removeStyleLinkTypeAttributes: true, removeTagWhitespace: true, useShortDoctype: true }), output);
+    assert.strictEqual(await minify(input, { caseSensitive: true, collapseBooleanAttributes: true, collapseWhitespace: true, removeAttributeQuotes: true, removeComments: true, removeEmptyAttributes: true, removeOptionalTags: true, removeRedundantAttributes: true, removeDefaultTypeAttributes: true, removeTagWhitespace: true, useShortDoctype: true }), output);
   });
 
   test('PHPTAL markup', async () => {
@@ -5621,8 +5619,7 @@ describe('HTML', () => {
         removeEmptyAttributes: true,
         removeOptionalTags: true,
         removeRedundantAttributes: true,
-        removeScriptTypeAttributes: true,
-        removeStyleLinkTypeAttributes: true,
+        removeDefaultTypeAttributes: true,
         removeTagWhitespace: true,
         sortAttributes: true,
         useShortDoctype: true
@@ -5657,8 +5654,7 @@ describe('HTML', () => {
       removeEmptyElements: true,
       removeOptionalTags: true,
       removeRedundantAttributes: true,
-      removeScriptTypeAttributes: true,
-      removeStyleLinkTypeAttributes: true,
+      removeDefaultTypeAttributes: true,
       removeTagWhitespace: true,
       sortAttributes: false,
       sortClassNames: false,

@@ -151,12 +151,8 @@ const demoConfig = {
     label: 'Remove redundant attributes',
     checked: true
   },
-  removeScriptTypeAttributes: {
-    label: 'Remove script type attributes',
-    checked: true
-  },
-  removeStyleLinkTypeAttributes: {
-    label: 'Remove style link type attributes',
+  removeDefaultTypeAttributes: {
+    label: 'Remove default <code>type</code> attributes',
     checked: true
   },
   removeTagWhitespace: {
@@ -269,6 +265,8 @@ const MAX_URL_LENGTH = 2000; // Conservative limit for URL hash
 const OPTION_MIGRATIONS = {
   html5: null, // Removed in 5.0.0; discard from old URLs
   processConditionalComments: null, // Removed in 6.0.0; discard from old URLs
+  removeScriptTypeAttributes: 'removeDefaultTypeAttributes', // Merged in 7.0.0
+  removeStyleLinkTypeAttributes: 'removeDefaultTypeAttributes', // Merged in 7.0.0
   sortClassName: 'sortClassNames'
 };
 

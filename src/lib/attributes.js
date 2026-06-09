@@ -632,10 +632,10 @@ function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
 function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML) {
   if ((options.removeRedundantAttributes &&
        isAttributeRedundant(tag, attrName, attrValue ?? '', attrs)) ||
-      (options.removeScriptTypeAttributes && tag === 'script' &&
-       attrName === 'type' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue)) ||
-      (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
-       attrName === 'type' && isStyleLinkTypeAttribute(attrValue))) {
+      (options.removeDefaultTypeAttributes && attrName === 'type' && (
+        ((tag === 'style' || tag === 'link') && isStyleLinkTypeAttribute(attrValue)) ||
+        (tag === 'script' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue))
+      ))) {
     return;
   }
 
