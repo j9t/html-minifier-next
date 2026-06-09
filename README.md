@@ -57,10 +57,10 @@ You can use a configuration file to specify options. The file can be either in J
 }
 ```
 
-**JavaScript module configuration example:**
+**JavaScript module configuration example** (.mjs or .js):
 
 ```javascript
-module.exports = {
+export default {
   collapseWhitespace: true,
   removeComments: true,
   fileExt: "html,php",
@@ -608,7 +608,7 @@ To profile the current working tree, run the benchmark with Node’s built-in CP
 node --cpu-prof benchmark.js
 ```
 
-This writes a `.cpuprofile` file to the working directory. Load it with `npx speedscope *.cpuprofile` for a flamegraph, or drag it into Chrome DevTools → Sources → JavaScript Profiler. Compare self-time per function against a clean baseline run on `main`. Pay attention to unexpectedly heavy callbacks in hot paths—V8 de-optimization from variable object shapes or unnecessary method calls can show up there.
+This writes a .cpuprofile file to the working directory. Load it with `npx speedscope *.cpuprofile` for a flamegraph, or drag it into Chrome DevTools → Sources → JavaScript Profiler. Compare self-time per function against a clean baseline run on `main`. Pay attention to unexpectedly heavy callbacks in hot paths—V8 de-optimization from variable object shapes or unnecessary method calls can show up there.
 
 ## Acknowledgements
 
