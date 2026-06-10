@@ -729,15 +729,19 @@ describe('CSS and JS', () => {
     const presetWithOverride = await minify(input, { preset: 'conservative', removeComments: false });
     assert.ok(presetWithOverride.includes('<!-- Comment -->'), 'User option should override preset setting');
 
-    // Test unknown preset emits warning
+    // Test unknown preset emits warning (once per preset name per process)
     const originalWarn = console.warn;
     let warnMessage = '';
-    console.warn = (msg) => { warnMessage = msg; };
+    let warnCount = 0;
+    console.warn = (msg) => { warnMessage = msg; warnCount++; };
     try {
       input = '<p>Test</p>';
       await minify(input, { preset: 'nonexistent' });
       assert.ok(warnMessage.includes('Unknown preset “nonexistent”'), 'Should warn about unknown preset');
       assert.ok(warnMessage.includes('conservative, comprehensive'), 'Should list available presets');
+
+      await minify(input, { preset: 'nonexistent' });
+      assert.strictEqual(warnCount, 1, 'Should not repeat the warning for the same preset');
     } finally {
       console.warn = originalWarn;
     }
