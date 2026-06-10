@@ -32,9 +32,10 @@ function shouldMinifyInnerHTML(options) {
 // User-facing option keys that are valid but not listed in `optionDefinitions`
 const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace', 'cacheCSS', 'cacheJS', 'cacheSVG']);
 
-// Unknown option keys already warned about—warn once per key per process,
-// so repeated `minify` calls (e.g., batch runs) don’t flood STDERR
+// Unknown option keys and preset names already warned about—warn once per
+// key per process, so repeated `minify` calls (e.g., batch runs) don’t flood STDERR
 const optionKeysWarned = new Set();
+const presetNamesWarned = new Set();
 
 // Main options processor
 
@@ -89,7 +90,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     const preset = getPreset(inputOptions.preset);
     if (preset) {
       effectiveInput = { ...preset, ...inputOptions };
-    } else {
+    } else if (!presetNamesWarned.has(inputOptions.preset)) {
+      presetNamesWarned.add(inputOptions.preset);
       const available = getPresetNames().join(', ');
       console.warn(`HTML Minifier Next: Unknown preset “${inputOptions.preset}”. Available presets: ${available}`);
     }
