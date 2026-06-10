@@ -226,6 +226,9 @@ async function loadConfigFromPath(configPath) {
   }
 }
 
+// Config keys the CLI handles itself, beyond the options in `optionDefinitions`
+const CONFIG_KEYS_EXTRA = new Set(['preset', 'fileExt', 'ignoreDir']);
+
 /**
  * Normalize and validate config object by applying parsers and transforming values.
  * @param {object} config - Raw config object
@@ -233,6 +236,13 @@ async function loadConfigFromPath(configPath) {
  */
 function normalizeConfig(config) {
   const normalized = { ...config };
+
+  // Warn about unrecognized config keys—catches typos as well as options removed in earlier versions
+  Object.keys(normalized).forEach(function (key) {
+    if (!Object.hasOwn(optionDefinitions, key) && !CONFIG_KEYS_EXTRA.has(key)) {
+      console.error(`Ignoring unknown or deprecated config option “${key}” (see \`--help\` or README for available options)`);
+    }
+  });
 
   // Apply parsers to main options
   mainOptionKeys.forEach(function (key) {

@@ -1468,6 +1468,47 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeDefaultTypeAttributes: true }), input);
   });
 
+  test('Warn about unknown options', async () => {
+    const originalWarn = console.warn;
+    const warnings = [];
+    console.warn = (msg) => { warnings.push(msg); };
+    try {
+      // Removed options warn
+      await minify('<p>foo</p>', { removeScriptTypeAttributes: true });
+      assert.strictEqual(warnings.length, 1);
+      assert.ok(warnings[0].includes('removeScriptTypeAttributes'), 'Should name the unknown option');
+
+      // …but only once per key per process (no STDERR flood in batch runs)
+      await minify('<p>foo</p>', { removeScriptTypeAttributes: true });
+      assert.strictEqual(warnings.length, 1, 'Should not repeat the warning for the same option');
+
+      // Typos are caught, too
+      warnings.length = 0;
+      await minify('<p>foo</p>', { removeComents: true });
+      assert.strictEqual(warnings.length, 1);
+      assert.ok(warnings[0].includes('removeComents'), 'Should name the misspelled option');
+
+      // `name` is internal (controlled via `caseSensitive`)—warned about and ignored
+      warnings.length = 0;
+      const result = await minify('<P>x</P>', { name: (/** @type {string} */ n) => n });
+      assert.strictEqual(warnings.length, 1, 'Should warn about `name`');
+      assert.strictEqual(result, '<p>x</p>', 'User-supplied `name` must not override lowercasing');
+
+      // Valid options, the preset selector, and function hooks must not warn
+      warnings.length = 0;
+      await minify('<p>foo</p>', {
+        preset: 'conservative',
+        log: () => {},
+        canCollapseWhitespace: () => true,
+        canTrimWhitespace: () => true,
+        removeComments: true
+      });
+      assert.strictEqual(warnings.length, 0, 'Should not warn about valid options');
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
   test('Remove attribute quotes', async () => {
     let input;
 

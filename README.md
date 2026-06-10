@@ -166,6 +166,16 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
 | `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype) | `false` |
 
+### API-only options
+
+A few options take functions and are therefore only available programmatically, not via CLI flags or config files:
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
+| `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
+| `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them) | No-op (errors are silent) |
+
 ### Sorting attributes and style classes
 
 Minifier options like `sortAttributes` and `sortClassNames` won’t impact the plain-text size of the output. However, using these options for more consistent ordering improves the compression ratio for Gzip and Brotli used over HTTP.

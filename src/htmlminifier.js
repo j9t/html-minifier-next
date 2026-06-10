@@ -303,13 +303,6 @@ import { processOptions } from './lib/options.js';
  *
  *  Default: `false`
  *
- * @prop {(name: string) => string} [name]
- *  Function used to normalise tag/attribute names. By default, this lowercases
- *  names, unless `caseSensitive` is enabled.
- *
- *  Default: `(name) => name.toLowerCase()`,
- *  or `(name) => name` (no-op function) if `caseSensitive` is enabled.
- *
  * @prop {boolean} [noNewlinesBeforeTagClose]
  *  When wrapping lines, prevent inserting a newline directly before a
  *  closing tag (useful to keep tags like `</a>` on the same line).

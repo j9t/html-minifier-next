@@ -4,7 +4,7 @@ import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 import { getPreset, getPresetNames } from '../presets.js';
-import { optionDefaults } from './option-definitions.js';
+import { optionDefinitions, optionDefaults } from './option-definitions.js';
 
 // Type definitions
 
@@ -28,6 +28,13 @@ function shouldMinifyInnerHTML(options) {
     options.minifySVG
   );
 }
+
+// User-facing option keys that are valid but not listed in `optionDefinitions`
+const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace', 'cacheCSS', 'cacheJS', 'cacheSVG']);
+
+// Unknown option keys already warned about—warn once per key per process,
+// so repeated `minify` calls (e.g., batch runs) don’t flood STDERR
+const optionKeysWarned = new Set();
 
 // Main options processor
 
@@ -67,6 +74,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     });
   };
 
+  // Warn about unrecognized options—catches typos as well as options removed in earlier versions
+  Object.keys(inputOptions).forEach(function (key) {
+    if (!Object.hasOwn(optionDefinitions, key) && !optionKeysExtra.has(key) && !optionKeysWarned.has(key)) {
+      optionKeysWarned.add(key);
+      console.warn(`HTML Minifier Next: Ignoring unknown or deprecated option “${key}” (see README for available options)`);
+    }
+  });
+
   // Merge preset with user options so all values go through normalization
   // User options take precedence over preset values
   let effectiveInput = inputOptions;
@@ -83,8 +98,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   Object.keys(effectiveInput).forEach(function (key) {
     const option = effectiveInput[key];
 
-    // Skip preset key—it’s already been processed
-    if (key === 'preset') {
+    // Skip `preset` (already processed) and unrecognized keys (warned about above)—
+    // the latter also keeps internal keys from being overridden
+    if (key === 'preset' || (!Object.hasOwn(optionDefinitions, key) && !optionKeysExtra.has(key))) {
       return;
     }
 

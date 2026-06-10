@@ -183,7 +183,6 @@ async function testFunctionOptions() {
     log: (message: unknown) => {
       console.log(message);
     },
-    name: (name: string) => name.toLowerCase(),
     canCollapseWhitespace: (tag, _attrs, _canCollapseWhitespace) => {
       return tag !== 'pre';
     },

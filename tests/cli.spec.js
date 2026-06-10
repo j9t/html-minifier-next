@@ -1220,6 +1220,24 @@ describe('CLI', () => {
     await fs.promises.rm(configPath, { force: true });
   });
 
+  test('Should warn about unknown config options', async () => {
+    const configPath = path.resolve(fixturesDir, 'tmp-unknown-option-config.json');
+    await fs.promises.writeFile(configPath, JSON.stringify({ removeScriptTypeAttributes: true, removeComments: true }));
+
+    const input = '<p><!-- comment -->Hello</p>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    assert.strictEqual(status, 0);
+    // Unknown config keys warn but don’t fail
+    assert.ok(stderr.toString().includes('removeScriptTypeAttributes'));
+    assert.ok(!stdout.toString().includes('<!-- comment -->'));
+
+    await fs.promises.rm(configPath, { force: true });
+  });
+
   test('Should override config file options with CLI flags when using preset', async () => {
     const configPath = path.resolve(fixturesDir, 'tmp-preset-config2.json');
     await fs.promises.writeFile(configPath, JSON.stringify({
