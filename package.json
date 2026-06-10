@@ -87,7 +87,7 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "serve": "vite",
     "test": "npm run test:types && node --test tests/*.spec.js",
-    "test:types": "tsc --project tsconfig.test.json",
+    "test:types": "tsc --noEmit && tsc --project tsconfig.test.json",
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
