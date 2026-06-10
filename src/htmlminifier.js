@@ -459,6 +459,7 @@ import { processOptions } from './lib/options.js';
  *
  * @prop {boolean} [insideSVG] - Internal: Set when inside SVG/MathML context
  * @prop {boolean} [insideForeignContent] - Internal: Set when inside SVG `foreignObject`
+ * @prop {(name: string) => string} [name] - Internal: Tag/attribute name normalization function, controlled via `caseSensitive`; user-supplied values are ignored (with a warning)
  * @prop {Function} [parentName] - Internal: Preserved name function during namespace transitions
  * @prop {Function} [htmlName] - Internal: HTML name function preserved from outer context
  */
