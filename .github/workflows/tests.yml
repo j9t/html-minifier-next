@@ -17,7 +17,8 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, windows-latest]
-        node: ['lts/*', 'current']
+        # “22” is the oldest supported Node.js version (package.json `engines`)
+        node: ["22", "lts/*", "current"]
     name: "Node ${{ matrix.node }} (${{ matrix.platform }})"
     runs-on: ${{ matrix.platform }}
     steps:
@@ -35,7 +36,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     strategy:
       matrix:
-        node: ['lts/*', 'current']
+        node: ["lts/*", "current"]
     name: "Node ${{ matrix.node }} (macOS)"
     runs-on: macos-latest
     steps:

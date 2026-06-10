@@ -8,6 +8,8 @@ The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/
 
 ## Installation
 
+HMN is ESM-only and requires Node.js ≥22.
+
 For use as a command-line app, use npx:
 
 ```shell
