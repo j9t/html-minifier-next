@@ -82,7 +82,7 @@ function identity(value) {
 
 /**
  * @param {unknown} value
- * @returns {value is Promise<any>}
+ * @returns {value is PromiseLike<any>}
  */
 function isThenable(value) {
   return value != null && typeof value === 'object' && typeof /** @type {any} */ (value).then === 'function';
