@@ -246,7 +246,7 @@ describe('SVG and MathML', () => {
       '<svg><foreignObject><div><svg viewBox="0 0 1 1"><foreignObject><myElement>Text</myElement></foreignObject></svg></div></foreignObject></svg>'
     );
 
-    // Without `caseSensitive`, HTML inside `foreignObject` is lower-cased as before
+    // Without `caseSensitive`, HTML inside `foreignObject` is lower-cased
     assert.strictEqual(
       await minify('<svg><foreignObject><myElement mixedCaseAttribute="value">Text</myElement></foreignObject></svg>', {}),
       '<svg><foreignObject><myelement mixedcaseattribute="value">Text</myelement></foreignObject></svg>'

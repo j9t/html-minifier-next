@@ -117,9 +117,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   }
 
-  // Localized escape hatch for the loop below, which reads and assigns
-  // user-provided values by dynamic key; consumers work against the
-  // precisely-typed `ProcessedOptions` object
+  // Escape hatch for the loop below, which reads and assigns user-provided values by dynamic key
   const optionsDynamic = /** @type {Record<string, any>} */ (options);
 
   Object.keys(effectiveInput).forEach(function (key) {

@@ -1298,7 +1298,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       const attrResults = attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML));
-      // The `isThenable` probe guarantees the sync branch holds no promises—the cast reflects that invariant
+      // The `isThenable` probe guarantees the sync branch holds no promises
       const normalizedAttrs = /** @type {Array<{name: string, value: string | undefined, attr: HTMLAttribute} | undefined>} */ (attrResults.some(isThenable) ? await Promise.all(attrResults) : attrResults);
       const parts = [];
       let isLast = true;
