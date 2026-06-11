@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 * Added warnings for unknown or deprecated options (both in the API and for CLI config files), catching typos as well as options removed or renamed in earlier versions
+* Added the `preset` option to the public `MinifierOptions` TypeScript type (the option was documented and supported, but missing from the type)
 * Declared the supported Node.js versions (≥22) via the package.json `engines` field
 * Documented the API-only options `canCollapseWhitespace`, `canTrimWhitespace`, and `log` in the README (previously only covered by TypeScript types)
 
@@ -19,6 +20,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * **BREAKING:** Merged `removeScriptTypeAttributes` and `removeStyleLinkTypeAttributes` into a single `removeDefaultTypeAttributes` option
   - **Migration:** Replace either or both old options with `removeDefaultTypeAttributes: true`
 * **BREAKING:** Removed an undocumented `name` option—it was the internal mechanism behind `caseSensitive`, and user-supplied values are now ignored (with a warning)
+* Split the TypeScript options typing into the public `MinifierOptions` input type and an internal `ProcessedOptions` type—the internal properties (`name`, `parentName`, `htmlName`, `insideSVG`, `insideForeignContent`) no longer appear in the public options type
+
+### Fixed
+
+* Fixed `caseSensitive` being ignored for HTML content inside SVG `foreignObject` and MathML `annotation-xml`—the name-normalization function of the surrounding HTML context is now preserved across the namespace transition (the internal `htmlName` mechanism was read but never set)
 
 ## [6.2.11] - 2026-06-09
 

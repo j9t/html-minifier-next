@@ -3,13 +3,15 @@ import {
 } from './constants.js';
 import { trimWhitespace } from './whitespace.js';
 
+/** @import { ProcessedOptions } from './options.js' */
+
 // CSS processing
 
 // Wrap CSS declarations for inline styles and media queries
 // This ensures proper context for CSS minification
 /**
  * @param {string} text
- * @param {string} type
+ * @param {string} [type]
  */
 function wrapCSS(text, type) {
   switch (type) {
@@ -24,7 +26,7 @@ function wrapCSS(text, type) {
 
 /**
  * @param {string} text
- * @param {string} type
+ * @param {string} [type]
  */
 function unwrapCSS(text, type) {
   let matches;
@@ -73,7 +75,7 @@ function hasJsonScriptType(attrs) {
 
 /**
  * @param {string} text
- * @param {{continueOnMinifyError?: boolean, log?: Function, processScripts?: string[]}} options
+ * @param {ProcessedOptions} options
  * @param {Array<{name: string, value?: string | undefined}>} currentAttrs
  * @param {Function} minifyHTML
  */

@@ -226,6 +226,33 @@ describe('SVG and MathML', () => {
     assert.ok(withEntities.includes('A &amp; B'), 'Entities inside `foreignObject` should be preserved');
   });
 
+  test('`caseSensitive` is respected for HTML inside `foreignObject` and `annotation-xml`', async () => {
+    // With `caseSensitive`, the HTML context’s name function is preserved across
+    // the namespace transition, so mixed-case names inside `foreignObject` keep their case
+    assert.strictEqual(
+      await minify('<svg><foreignObject><myElement mixedCaseAttribute="value">Text</myElement></foreignObject></svg>', { caseSensitive: true }),
+      '<svg><foreignObject><myElement mixedCaseAttribute="value">Text</myElement></foreignObject></svg>'
+    );
+
+    // Same for HTML inside MathML `annotation-xml`
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><myElement>Text</myElement></annotation-xml></math>', { caseSensitive: true }),
+      '<math><annotation-xml encoding="text/html"><myElement>Text</myElement></annotation-xml></math>'
+    );
+
+    // Nested namespace transitions inherit the preserved name function
+    assert.strictEqual(
+      await minify('<svg><foreignObject><div><svg viewBox="0 0 1 1"><foreignObject><myElement>Text</myElement></foreignObject></svg></div></foreignObject></svg>', { caseSensitive: true }),
+      '<svg><foreignObject><div><svg viewBox="0 0 1 1"><foreignObject><myElement>Text</myElement></foreignObject></svg></div></foreignObject></svg>'
+    );
+
+    // Without `caseSensitive`, HTML inside `foreignObject` is lower-cased as before
+    assert.strictEqual(
+      await minify('<svg><foreignObject><myElement mixedCaseAttribute="value">Text</myElement></foreignObject></svg>', {}),
+      '<svg><foreignObject><myelement mixedcaseattribute="value">Text</myelement></foreignObject></svg>'
+    );
+  });
+
   test('HTML inside `foreignObject` is optimized with `minifySVG`', async () => {
     // Whitespace collapse inside `foreignObject`
     assert.strictEqual(

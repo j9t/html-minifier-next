@@ -54,6 +54,8 @@ import {
 
 import { processOptions } from './lib/options.js';
 
+/** @import { ProcessedOptions } from './lib/options.js' */
+
 // Type definitions
 
 /**
@@ -325,6 +327,13 @@ import { processOptions } from './lib/options.js';
  *
  *  Default: `false`
  *
+ * @prop {string} [preset]
+ *  Name of a preset configuration to use as a base (`conservative` or
+ *  `comprehensive`). Explicitly provided options take precedence over
+ *  preset values. Unknown preset names are ignored (with a warning).
+ *
+ *  Default: No preset
+ *
  * @prop {boolean} [preventAttributesEscaping]
  *  When true, attribute values will not be HTML-escaped (dangerous for
  *  untrusted input). By default, attributes are escaped.
@@ -456,12 +465,6 @@ import { processOptions } from './lib/options.js';
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype
  *
  *  Default: `false`
- *
- * @prop {boolean} [insideSVG] - Internal: Set when inside SVG/MathML context
- * @prop {boolean} [insideForeignContent] - Internal: Set when inside SVG `foreignObject`
- * @prop {(name: string) => string} [name] - Internal: Tag/attribute name normalization function, controlled via `caseSensitive`; user-supplied values are ignored (with a warning)
- * @prop {Function} [parentName] - Internal: Preserved name function during namespace transitions
- * @prop {Function} [htmlName] - Internal: HTML name function preserved from outer context
  */
 
 // Lazy-load heavy dependencies only when needed
@@ -705,7 +708,7 @@ function mergeConsecutiveScripts(html) {
 
 /**
  * @param {string} value
- * @param {MinifierOptions} options
+ * @param {ProcessedOptions} options
  * @param {string} uidIgnore
  * @param {string} uidAttr
  * @param {string[]} ignoredMarkupChunks
@@ -713,7 +716,7 @@ function mergeConsecutiveScripts(html) {
 async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupChunks) {
   const attrChains = options.sortAttributes && typeof options.sortAttributes !== 'function' && Object.create(null);
   const classChain = options.sortClassNames && typeof options.sortClassNames !== 'function' && new TokenChain();
-  const resolveName = /** @type {(name: string) => string} */ (options.name);
+  const resolveName = options.name;
 
   function attrNames(/** @type {HTMLAttribute[]} */ attrs) {
     return attrs.map(function (attr) {
@@ -932,7 +935,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
 
 /**
  * @param {string} value - HTML content to minify
- * @param {MinifierOptions} options - Normalized minification options
+ * @param {ProcessedOptions} options - Normalized minification options
  * @param {boolean} [partialMarkup] - Whether treating input as partial markup
  * @returns {Promise<string>} Minified HTML
  */
@@ -946,7 +949,7 @@ async function minifyHTML(value, options, partialMarkup) {
     value = collapseWhitespace(value, options, true, true);
   }
 
-  const resolveName = /** @type {(name: string) => string} */ (options.name);
+  const resolveName = options.name;
   /** @type {HTMLAttribute[]} */
   const emptyAttrs = [];
 
@@ -1003,7 +1006,7 @@ async function minifyHTML(value, options, partialMarkup) {
     }
     removeEmptyElementsExcept = [];
   } else {
-    removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept || [], /** @type {any} */ (options)) || [];
+    removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept || [], options) || [];
   }
 
   // Temporarily replace ignored chunks with comments, so that there’s no need to worry what’s there;
@@ -1084,8 +1087,8 @@ async function minifyHTML(value, options, partialMarkup) {
           uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
 
           if (options.minifyCSS !== identity) {
-            /** @type {any} */ (options).minifyCSS = (function (/** @type {Function} */ fn) {
-              return function (/** @type {string} */ text, /** @type {string} */ type) {
+            options.minifyCSS = (function (/** @type {ProcessedOptions['minifyCSS']} */ fn) {
+              return function (/** @type {string} */ text, /** @type {string | undefined} */ type) {
                 text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                   const chunks = ignoredCustomMarkupChunks[+index];
                   return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
@@ -1093,18 +1096,18 @@ async function minifyHTML(value, options, partialMarkup) {
 
                 return fn(text, type);
               };
-            })(/** @type {Function} */ (options.minifyCSS));
+            })(options.minifyCSS);
           }
 
           if (options.minifyJS !== identity) {
-            options.minifyJS = (function (/** @type {Function} */ fn) {
-              return function (/** @type {string} */ text, /** @type {boolean} */ inline, /** @type {boolean} */ isModule) {
+            options.minifyJS = (function (/** @type {ProcessedOptions['minifyJS']} */ fn) {
+              return function (/** @type {string} */ text, /** @type {boolean | undefined} */ inline, /** @type {boolean | undefined} */ isModule) {
                 return fn(text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                   const chunks = ignoredCustomMarkupChunks[+index];
                   return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
                 }), inline, isModule);
               };
-            })(/** @type {Function} */ (options.minifyJS));
+            })(options.minifyJS);
           }
         }
 
@@ -1116,11 +1119,11 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   function canCollapseWhitespace(/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
-    return /** @type {Function} */ (options.canCollapseWhitespace)(tag, attrs, defaultCanCollapseWhitespace);
+    return options.canCollapseWhitespace(tag, attrs, defaultCanCollapseWhitespace);
   }
 
   function canTrimWhitespace(/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
-    return /** @type {Function} */ (options.canTrimWhitespace)(tag, attrs, defaultCanTrimWhitespace);
+    return options.canTrimWhitespace(tag, attrs, defaultCanTrimWhitespace);
   }
 
   function removeStartTag() {
@@ -1183,10 +1186,14 @@ async function minifyHTML(value, options, partialMarkup) {
     start: async function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ unary, /** @type {string} */ unarySlash, /** @type {boolean} */ autoGenerated) {
       const lowerTag = tag.toLowerCase();
       if (lowerTag === 'svg' || lowerTag === 'math') {
+        // Preserve the surrounding HTML context’s name function (e.g., `identity`
+        // under `caseSensitive`) so `foreignObject`/`annotation-xml` can restore it
+        const htmlName = options.name;
         options = Object.create(options);
         options.caseSensitive = true;
         options.keepClosingSlash = true;
         options.name = identity;
+        options.htmlName = htmlName;
         options.insideSVG = lowerTag === 'svg';
         options.insideForeignContent = true;
         // Disable HTML-specific options that produce invalid XML:
@@ -1204,19 +1211,20 @@ async function minifyHTML(value, options, partialMarkup) {
       if (options.insideForeignContent && (lowerTag === 'foreignobject' ||
           (lowerTag === 'annotation-xml' && attrs.some((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding' &&
             RE_HTML_ENCODING.test(a.value ?? ''))))) {
-        const parentName = /** @type {(name: string) => string} */ (options.name);
+        const parentName = options.name;
         options = Object.create(options);
         options.caseSensitive = false;
         options.keepClosingSlash = false;
         options.parentName = parentName; // Preserve for the element tag itself
-        options.name = /** @type {(name: string) => string} */ (options.htmlName ?? lowercase);
+        options.name = options.htmlName ?? lowercase;
         options.insideForeignContent = false;
         // Note: `removeAttributeQuotes`, `removeTagWhitespace`, and `decodeEntities`
         // stay disabled (inherited from SVG context) because the entire SVG block
         // must be valid XML for SVGO processing
         useParentNameForTag = true;
       }
-      tag = /** @type {(name: string) => string} */ (useParentNameForTag ? options.parentName : options.name)(tag);
+      // `parentName` is always set when `useParentNameForTag` is true; the extra check only narrows the type
+      tag = (useParentNameForTag && options.parentName ? options.parentName : options.name)(tag);
       currentTag = tag;
       charsPrevTag = tag;
       if (!inlineTextSet.has(tag)) {
@@ -1285,16 +1293,19 @@ async function minifyHTML(value, options, partialMarkup) {
       deduplicateAttributes(attrs, Boolean(options.caseSensitive));
 
       if (options.sortAttributes) {
-        /** @type {Function} */ (options.sortAttributes)(tag, attrs);
+        // By the time tags are processed, `createSortFns` has replaced any truthy non-function value
+        /** @type {(tag: string, attrs: HTMLAttribute[]) => void} */ (options.sortAttributes)(tag, attrs);
       }
 
       const attrResults = attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML));
-      const normalizedAttrs = attrResults.some(isThenable) ? await Promise.all(attrResults) : attrResults;
+      // The `isThenable` probe guarantees the sync branch holds no promises—the cast reflects that invariant
+      const normalizedAttrs = /** @type {Array<{name: string, value: string | undefined, attr: HTMLAttribute} | undefined>} */ (attrResults.some(isThenable) ? await Promise.all(attrResults) : attrResults);
       const parts = [];
       let isLast = true;
       for (let i = normalizedAttrs.length - 1; i >= 0; i--) {
-        if (normalizedAttrs[i]) {
-          parts.push(buildAttr(normalizedAttrs[i], hasUnarySlash, options, isLast, uidAttr));
+        const normalizedAttr = normalizedAttrs[i];
+        if (normalizedAttr) {
+          parts.push(buildAttr(normalizedAttr, hasUnarySlash, options, isLast, uidAttr));
           isLast = false;
         }
       }
@@ -1324,7 +1335,7 @@ async function minifyHTML(value, options, partialMarkup) {
                  !options.insideForeignContent && Object.getPrototypeOf(options).insideForeignContent) {
         options = Object.getPrototypeOf(options);
       }
-      tag = /** @type {Function} */ (options.name)(tag);
+      tag = options.name(tag);
 
       // Check if current tag is in a whitespace stack
       if (options.collapseWhitespace) {
@@ -1592,10 +1603,10 @@ async function minifyHTML(value, options, partialMarkup) {
           text = await processScript(text, options, currentAttrs, minifyHTML);
         }
         if (needsMinifyJS) {
-          text = await /** @type {Function} */ (options.minifyJS)(text, false, isModuleScript);
+          text = await options.minifyJS(text, false, isModuleScript);
         }
         if (needsMinifyCSS) {
-          text = await /** @type {Function} */ (options.minifyCSS)(text);
+          text = await options.minifyCSS(text);
         }
         charsFinalize(text);
       })();
@@ -1712,7 +1723,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       if (options.removeComments) {
-        if (isIgnoredComment(text, /** @type {any} */ (options))) {
+        if (isIgnoredComment(text, options)) {
           text = prefix + text + suffix;
         } else {
           text = '';
@@ -1734,10 +1745,11 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // Post-processing: Optimize SVG blocks with SVGO
   // Run all SVGO calls in parallel, then splice results in reverse to preserve indices
-  if (options.minifySVG && svgBlocks.length) {
+  const minifySVG = options.minifySVG;
+  if (minifySVG && svgBlocks.length) {
     const optimized = await Promise.all(
       svgBlocks.map(({ start, end }) =>
-        /** @type {Function} */ (options.minifySVG)(buffer.slice(start, end).join(''))
+        minifySVG(buffer.slice(start, end).join(''))
       )
     );
     for (let i = svgBlocks.length - 1; i >= 0; i--) {
@@ -1791,7 +1803,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
 /**
  * @param {string[]} results
- * @param {MinifierOptions} options
+ * @param {ProcessedOptions} options
  * @param {Function} restoreCustom
  * @param {Function} restoreIgnore
  */
@@ -1893,7 +1905,7 @@ export const minify = async function (value, options) {
   // Initialize caches on first use with configurable sizes
   const caches = initCaches(options || {});
 
-  options = processOptions(options || {}, {
+  const processedOptions = processOptions(options || {}, {
     getLightningCSS,
     getTerser,
     getSwc,
@@ -1902,14 +1914,14 @@ export const minify = async function (value, options) {
     jsMinifyCache: caches.jsMinifyCache ?? undefined,
     svgMinifyCache: caches.svgMinifyCache ?? undefined
   });
-  let result = await minifyHTML(value, options);
+  let result = await minifyHTML(value, processedOptions);
 
   // Post-processing: Merge consecutive inline scripts if enabled
-  if (options.mergeScripts) {
+  if (processedOptions.mergeScripts) {
     result = mergeConsecutiveScripts(result);
   }
 
-  /** @type {Function} */ (options.log)('minified in: ' + (Date.now() - start) + 'ms');
+  processedOptions.log('minified in: ' + (Date.now() - start) + 'ms');
   return result;
 };
 

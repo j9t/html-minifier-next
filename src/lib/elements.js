@@ -12,12 +12,7 @@ import {
 import { hasAttrName } from './attributes.js';
 
 /** @import { HTMLAttribute } from './attributes.js' */
-
-// Type definitions
-
-/**
- * @typedef {{ name: (str: string) => string, log?: Function }} MinifierOptions
- */
+/** @import { ProcessedOptions } from './options.js' */
 
 // Tag omission rules
 
@@ -143,7 +138,7 @@ function canRemoveElement(tag, attrs) {
 
 /**
  * @param {string} str - Tag name or HTML-like element spec (e.g., “td” or “<span aria-hidden='true'>”)
- * @param {MinifierOptions} options - Options object for name normalization
+ * @param {ProcessedOptions} options - Options object for name normalization
  * @returns {{tag: string, attrs: Object.<string, string|undefined>|null}|null} Parsed spec or null if invalid
  */
 function parseElementSpec(str, options) {
@@ -196,7 +191,7 @@ function parseElementSpec(str, options) {
 
 /**
  * @param {string[]} input - Array of element specifications from `removeEmptyElementsExcept` option
- * @param {MinifierOptions} options - Options object for parsing
+ * @param {ProcessedOptions} options - Options object for parsing
  * @returns {Array<{tag: string, attrs: Object.<string, string|undefined>|null}>} Array of parsed element specs
  */
 function parseRemoveEmptyElementsExcept(input, options) {

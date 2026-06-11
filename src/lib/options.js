@@ -6,17 +6,36 @@ import { wrapCSS, unwrapCSS } from './content.js';
 import { getPreset, getPresetNames } from '../presets.js';
 import { optionDefinitions, optionDefaults } from './option-definitions.js';
 
+/** @import { MinifierOptions, HTMLAttribute } from '../htmlminifier.js' */
+
 // Type definitions
 
 /**
- * @typedef {Record<string, any>} MinifierOptions
+ * Options object produced by `processOptions` and consumed by `minifyHTML` and
+ * the `lib/` helpers; normalization guarantees that the function-valued options
+ * below are always present (defaulting to identity/built-in functions), and
+ * minification adds writable internal state on top of the public options
+ * (set on prototype-chain forks during SVG/MathML namespace transitions)
+ *
+ * @typedef {Omit<MinifierOptions, 'preset' | 'canCollapseWhitespace' | 'canTrimWhitespace' | 'log' | 'minifyCSS' | 'minifyJS' | 'minifyURLs' | 'minifySVG'> & {
+ *   name: (name: string) => string,
+ *   log: (message: any) => unknown,
+ *   canCollapseWhitespace: (tag: string, attrs: HTMLAttribute[], defaultFn: (tag: string) => boolean) => boolean,
+ *   canTrimWhitespace: (tag: string, attrs: HTMLAttribute[], defaultFn: (tag: string) => boolean) => boolean,
+ *   minifyCSS: (text: string, type?: string) => string | Promise<string>,
+ *   minifyJS: (text: string, inline?: boolean, isModule?: boolean) => string | Promise<string>,
+ *   minifyURLs: (text: string) => string | Promise<string>,
+ *   minifySVG: ((svgContent: string) => string | Promise<string>) | null,
+ *   parentName?: (name: string) => string,
+ *   htmlName?: (name: string) => string,
+ *   insideSVG?: boolean,
+ *   insideForeignContent?: boolean
+ * }} ProcessedOptions
  */
-
-// @@ Extract a `ProcessedOptions` typedef (with `name`, `log`, `canCollapseWhitespace`, `canTrimWhitespace`,`minifyCSS`, `minifyJS`, `minifyURLs` typed as required, non-optional) to replace the current `Record<string, any>` escape hatch and eliminate the `/** @type {Function} */` casts in htmlminifier.js
 
 // Helper functions
 
-/** @param {MinifierOptions} options */
+/** @param {ProcessedOptions} options */
 function shouldMinifyInnerHTML(options) {
   return Boolean(
     options.collapseWhitespace ||
@@ -42,10 +61,10 @@ const presetNamesWarned = new Set();
 /**
  * @param {MinifierOptions} inputOptions - User-provided options
  * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
- * @returns {MinifierOptions} Normalized options with defaults applied
+ * @returns {ProcessedOptions} Normalized options with defaults applied
  */
 const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
-  /** @type {MinifierOptions} */
+  /** @type {ProcessedOptions} */
   const options = {
     name: lowercase,
     canCollapseWhitespace,
@@ -97,8 +116,13 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   }
 
+  // Localized escape hatch for the loop below, which reads and assigns
+  // user-provided values by dynamic key; consumers work against the
+  // precisely-typed `ProcessedOptions` object
+  const optionsDynamic = /** @type {Record<string, any>} */ (options);
+
   Object.keys(effectiveInput).forEach(function (key) {
-    const option = effectiveInput[key];
+    const option = /** @type {Record<string, any>} */ (effectiveInput)[key];
 
     // Skip `preset` (already processed) and unrecognized keys (warned about above)—
     // the latter also keeps internal keys from being overridden
@@ -124,7 +148,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       const cssLoader = getLightningCSS;
       const cssCache = cssMinifyCache;
 
-      options.minifyCSS = async function (/** @type {string} */ text, /** @type {string} */ type) {
+      options.minifyCSS = async function (/** @type {string} */ text, /** @type {string | undefined} */ type) {
         // Fast path: Nothing to minify
         if (!text || !text.trim()) {
           return text;
@@ -161,7 +185,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           : (inputCSS + '|' + type + '|' + cssSig);
 
         try {
-          const cached = cssCache.get(cssKey);
+          const cached = /** @type {string | Promise<string> | undefined} */ (cssCache.get(cssKey));
           if (cached !== undefined) {
             // Support both resolved values and in-flight promises
             return await cached;
@@ -254,7 +278,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         cont: !!options.continueOnMinifyError
       });
 
-      options.minifyJS = async function (/** @type {string} */ text, /** @type {boolean} */ inline, /** @type {boolean} */ isModule) {
+      options.minifyJS = async function (/** @type {string} */ text, /** @type {boolean | undefined} */ inline, /** @type {boolean | undefined} */ isModule) {
         const start = text.match(/^\s*<!--.*/);
         const code = start ? text.slice(start[0].length).replace(/\n\s*-->\s*$/, '') : text;
 
@@ -276,7 +300,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
             + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
 
-          const cached = jsCache.get(jsKey);
+          const cached = /** @type {string | Promise<string> | undefined} */ (jsCache.get(jsKey));
           if (cached !== undefined) {
             return await cached;
           }
@@ -349,7 +373,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         }
 
         // Check cache
-        const cached = instanceCache.get(text);
+        const cached = /** @type {string | undefined} */ (instanceCache.get(text));
         if (cached !== undefined) {
           return cached;
         }
@@ -395,7 +419,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           : (svgContent + '|' + svgSig);
 
         try {
-          const cached = svgCache.get(svgKey);
+          const cached = /** @type {string | Promise<string> | undefined} */ (svgCache.get(svgKey));
           if (cached !== undefined) {
             return await cached;
           }
@@ -421,15 +445,15 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       };
     } else if (key === 'customAttrCollapse') {
       // Single regex pattern
-      options[key] = parseRegExp(option);
+      optionsDynamic[key] = parseRegExp(option);
     } else if (key === 'customAttrSurround') {
       // Nested array of RegExp pairs: `[[openRegExp, closeRegExp], …]`
-      options[key] = parseNestedRegExpArray(option);
+      optionsDynamic[key] = parseNestedRegExpArray(option);
     } else if (['customAttrAssign', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
       // Array of regex patterns
-      options[key] = parseRegExpArray(option);
+      optionsDynamic[key] = parseRegExpArray(option);
     } else {
-      options[key] = option;
+      optionsDynamic[key] = option;
     }
   });
   return options;
