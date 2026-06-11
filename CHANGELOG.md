@@ -12,7 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added warnings for unknown or deprecated options (both in the API and for CLI config files), catching typos as well as options removed or renamed in earlier versions
+* Added warnings for unknown or deprecated options (both in the API and for CLI config files), catching typos as well as options removed or renamed in earlier versions; in the API, these warnings (like the unknown-preset warning) are routed through a user-provided `log` hook, falling back to `console.warn`
 * Added the `preset` option to the public `MinifierOptions` TypeScript type (the option was documented and supported, but missing from the type)
 * Declared the supported Node.js versions (≥22) via the package.json `engines` field
 * Documented the API-only options `canCollapseWhitespace`, `canTrimWhitespace`, and `log` in the README (previously only covered by TypeScript types)
