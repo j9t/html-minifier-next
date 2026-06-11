@@ -1188,12 +1188,12 @@ async function minifyHTML(value, options, partialMarkup) {
       if (lowerTag === 'svg' || lowerTag === 'math') {
         // Preserve the surrounding HTML context’s name function (e.g., `identity`
         // under `caseSensitive`) so `foreignObject`/`annotation-xml` can restore it
-        const htmlName = options.name;
+        const nameHTML = options.name;
         options = Object.create(options);
         options.caseSensitive = true;
         options.keepClosingSlash = true;
         options.name = identity;
-        options.htmlName = htmlName;
+        options.nameHTML = nameHTML;
         options.insideSVG = lowerTag === 'svg';
         options.insideForeignContent = true;
         // Disable HTML-specific options that produce invalid XML:
@@ -1207,24 +1207,24 @@ async function minifyHTML(value, options, partialMarkup) {
       }
       // `foreignObject` in SVG and `annotation-xml` in MathML contain HTML content
       // Note: The element itself is in SVG/MathML namespace, only its children are HTML
-      let useParentNameForTag = false;
+      let useNameParentForTag = false;
       if (options.insideForeignContent && (lowerTag === 'foreignobject' ||
           (lowerTag === 'annotation-xml' && attrs.some((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding' &&
             RE_HTML_ENCODING.test(a.value ?? ''))))) {
-        const parentName = options.name;
+        const nameParent = options.name;
         options = Object.create(options);
         options.caseSensitive = false;
         options.keepClosingSlash = false;
-        options.parentName = parentName; // Preserve for the element tag itself
-        options.name = options.htmlName ?? lowercase;
+        options.nameParent = nameParent; // Preserve for the element tag itself
+        options.name = options.nameHTML ?? lowercase;
         options.insideForeignContent = false;
         // Note: `removeAttributeQuotes`, `removeTagWhitespace`, and `decodeEntities`
         // stay disabled (inherited from SVG context) because the entire SVG block
         // must be valid XML for SVGO processing
-        useParentNameForTag = true;
+        useNameParentForTag = true;
       }
-      // `parentName` is always set when `useParentNameForTag` is true; the extra check only narrows the type
-      tag = (useParentNameForTag && options.parentName ? options.parentName : options.name)(tag);
+      // `nameParent` is always set when `useNameParentForTag` is true; the extra check only narrows the type
+      tag = (useNameParentForTag && options.nameParent ? options.nameParent : options.name)(tag);
       currentTag = tag;
       charsPrevTag = tag;
       if (!inlineTextSet.has(tag)) {

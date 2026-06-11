@@ -26,8 +26,8 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   minifyJS: (text: string, inline?: boolean, isModule?: boolean) => string | Promise<string>,
  *   minifyURLs: (text: string) => string | Promise<string>,
  *   minifySVG: ((svgContent: string) => string | Promise<string>) | null,
- *   parentName?: (name: string) => string,
- *   htmlName?: (name: string) => string,
+ *   nameParent?: (name: string) => string,
+ *   nameHTML?: (name: string) => string,
  *   insideSVG?: boolean,
  *   insideForeignContent?: boolean
  * }} ProcessedOptions
