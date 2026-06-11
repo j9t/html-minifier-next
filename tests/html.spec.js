@@ -1504,6 +1504,16 @@ describe('HTML', () => {
         removeComments: true
       });
       assert.strictEqual(warnings.length, 0, 'Should not warn about valid options');
+
+      // A user-provided `log` hook captures the warning instead of `console.warn`
+      warnings.length = 0;
+      /** @type {unknown[]} */
+      const logged = [];
+      await minify('<p>foo</p>', { removeStyleLinkTypeAttributes: true, log: (/** @type {unknown} */ msg) => { logged.push(msg); } });
+      assert.strictEqual(warnings.length, 0, 'Should not fall back to `console.warn` when `log` is provided');
+      // `log` also receives the timing message, so filter for the warning
+      const loggedWarnings = logged.filter(msg => String(msg).includes('removeStyleLinkTypeAttributes'));
+      assert.strictEqual(loggedWarnings.length, 1, 'Should route the warning through `log`');
     } finally {
       console.warn = originalWarn;
     }

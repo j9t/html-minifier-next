@@ -95,11 +95,15 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     });
   };
 
+  // Route warnings through the user-provided `log` hook so API consumers can
+  // capture or suppress them consistently; fall back to `console.warn`
+  const warn = typeof inputOptions.log === 'function' ? inputOptions.log : console.warn;
+
   // Warn about unrecognized options—catches typos as well as options removed in earlier versions
   Object.keys(inputOptions).forEach(function (key) {
     if (!Object.hasOwn(optionDefinitions, key) && !optionKeysExtra.has(key) && !optionKeysWarned.has(key)) {
       optionKeysWarned.add(key);
-      console.warn(`HTML Minifier Next: Ignoring unknown or deprecated option “${key}” (see README for available options)`);
+      warn(`HTML Minifier Next: Ignoring unknown or deprecated option “${key}” (see README for available options)`);
     }
   });
 
@@ -113,7 +117,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     } else if (!presetNamesWarned.has(inputOptions.preset)) {
       presetNamesWarned.add(inputOptions.preset);
       const available = getPresetNames().join(', ');
-      console.warn(`HTML Minifier Next: Unknown preset “${inputOptions.preset}”. Available presets: ${available}`);
+      warn(`HTML Minifier Next: Unknown preset “${inputOptions.preset}”; available presets: ${available}`);
     }
   }
 
