@@ -809,7 +809,6 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     decodeEntities: false,
     processScripts: false,
     // Keep `ignoreCustomFragments` to handle template syntax correctly
-    // This is safe because `createSortFns` is now called before UID markers are added
     // Continue on parse errors during analysis (e.g., template syntax)
     continueOnParseError: true,
     log: identity

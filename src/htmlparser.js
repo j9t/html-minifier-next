@@ -428,7 +428,7 @@ export class HTMLParser {
           advance(m[0].length);
           await parseEndTag('</' + stackedTag + '>', stackedTag);
         } else {
-          // No closing tag found; to avoid infinite loop, break similarly to previous behavior
+          // No closing tag found; break to avoid an infinite loop
           if (handler.continueOnParseError && handler.chars && pos < fullLength) {
             const result = handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
             if (isThenable(result)) await result;

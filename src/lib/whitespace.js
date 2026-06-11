@@ -39,7 +39,7 @@ function collapseWhitespaceAll(str) {
     // Fast path: No no-break space, common case—just collapse to single space
     // This avoids the nested regex for the majority of cases
     if (spaces.indexOf('\xA0') === -1) return ' ';
-    // For no-break space handling, use the original regex approach
+    // For no-break space handling, use the nested regex
     return spaces.replace(RE_NBSP_LEADING_GROUP, '$1 ');
   });
 }

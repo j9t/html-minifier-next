@@ -838,7 +838,7 @@ program.helpOption('-h, --help', 'Display help for command');
       }
     })();
   } else if (filesProvided) { // Minifying one or more files specified on the CMD line
-    // Process each file independently, then concatenate outputs to preserve current behavior
+    // Process each file independently, then concatenate outputs
     const minifierOptions = createOptions();
     // Show config info if verbose/dry
     if (programOptions.verbose || programOptions.dry) {
