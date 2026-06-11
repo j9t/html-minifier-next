@@ -4,11 +4,11 @@
 
 Your web page optimization precision tool: HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier** able to also handle in-document CSS, JavaScript, and SVG minification.
 
-The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier). It is now **the official successor to HTML Minifier**. HMN is maintained, easier to use, offers new features, and has been optimized for speed.
+The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier). HMN is **the official successor to HTML Minifier**: It’s maintained, easier to use, offers new features, and has been optimized for speed. Note that HMN is largely compatible with HM and HMT but has evolved—find [migration guidance in the changelog](https://github.com/j9t/html-minifier-next/blob/main/CHANGELOG.md).
 
 ## Installation
 
-HMN is ESM-only and requires Node.js ≥22.
+HTML Minifier Next is ESM-only and requires Node.js ≥22.
 
 For use as a command-line app, use npx:
 
@@ -372,7 +372,7 @@ The caches persist across multiple `minify()` calls, making them particularly ef
 
 ## Minification comparison
 
-Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier-benchmarks) for details on how HMN compares to other minifiers.
+Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier-benchmarks) for details on how HTML Minifier Next compares to other minifiers.
 
 ## Examples
 
