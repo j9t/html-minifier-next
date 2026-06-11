@@ -17,9 +17,10 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  * minification adds writable internal state on top of the public options
  * (set on prototype-chain forks during SVG/MathML namespace transitions)
  *
- * @typedef {Omit<MinifierOptions, 'preset' | 'canCollapseWhitespace' | 'canTrimWhitespace' | 'log' | 'minifyCSS' | 'minifyJS' | 'minifyURLs' | 'minifySVG'> & {
+ * @typedef {Omit<MinifierOptions, 'preset' | 'canCollapseWhitespace' | 'canTrimWhitespace' | 'ignoreCustomComments' | 'log' | 'minifyCSS' | 'minifyJS' | 'minifyURLs' | 'minifySVG'> & {
  *   name: (name: string) => string,
  *   log: (message: any) => unknown,
+ *   ignoreCustomComments: RegExp[],
  *   canCollapseWhitespace: (tag: string, attrs: HTMLAttribute[], defaultFn: (tag: string) => boolean) => boolean,
  *   canTrimWhitespace: (tag: string, attrs: HTMLAttribute[], defaultFn: (tag: string) => boolean) => boolean,
  *   minifyCSS: (text: string, type?: string) => string | Promise<string>,

@@ -46,8 +46,6 @@ async function getDecodeHTMLStrict() {
  * @param {ProcessedOptions} options
  */
 function isIgnoredComment(text, options) {
-  // @@ Optimize: `Array.isArray(options.ignoreCustomComments)` runs on every comment node; it could be eliminated once `parseRegExpArray` is tightened to coerce non-arrays to `[]` at setup time
-  if (!Array.isArray(options.ignoreCustomComments)) return false;
   for (const pattern of options.ignoreCustomComments) {
     if (pattern.test(text)) {
       return true;
