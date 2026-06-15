@@ -4,6 +4,28 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2026-06-@@
+
+### Fixed
+
+* Fixed `caseSensitive` being ignored for HTML content inside SVG `foreignObject` and MathML `annotation-xml`—the name normalization function of the surrounding HTML context is now preserved across the namespace transition
+
+### Added
+
+* Added warnings for unknown or deprecated options (both in the API and for CLI config files), catching typos as well as options removed or renamed in earlier versions; in the API, these warnings (like the “unknown preset” warning) are routed through a user-provided `log` hook, falling back to `console.warn`
+* Added the `preset` option to the public `MinifierOptions` TypeScript type (the option was documented and supported, but missing from the type)
+* Declared the supported Node.js versions (≥22) via the package.json `engines` field
+* Documented the API-only options `canCollapseWhitespace`, `canTrimWhitespace`, and `log` in the README (previously only covered by TypeScript types)
+
+### Changed
+
+* **BREAKING:** Dropped CommonJS support—HMN is now ESM-only
+  - **Migration:** Consumers using `require('html-minifier-next')` must migrate to `import`; the `"main"` field and `dist/htmlminifier.cjs` are no longer shipped
+* **BREAKING:** Merged `removeScriptTypeAttributes` and `removeStyleLinkTypeAttributes` into a single `removeDefaultTypeAttributes` option
+  - **Migration:** Replace either or both old options with `removeDefaultTypeAttributes: true`
+* **BREAKING:** Removed an undocumented `name` option—it was the internal mechanism behind `caseSensitive`, and user-supplied values are now ignored (with a warning)
+* Split the TypeScript options typing into the public `MinifierOptions` input type and an internal `ProcessedOptions` type—internal properties no longer appear in the public options type
+
 ## [6.2.11] - 2026-06-09
 
 ### Added

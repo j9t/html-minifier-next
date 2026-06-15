@@ -1,4 +1,4 @@
-import HTMLMinifier, { getPreset } from '../dist/htmlminifier.esm.bundle.js';
+import HTMLMinifier, { getPreset } from '../src/htmlminifier.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -131,6 +131,10 @@ const demoConfig = {
     label: 'Remove comments',
     checked: true
   },
+  removeDefaultTypeAttributes: {
+    label: 'Remove default <code>type</code> attributes',
+    checked: true
+  },
   removeEmptyAttributes: {
     label: 'Remove empty attributes',
     checked: true
@@ -149,14 +153,6 @@ const demoConfig = {
   },
   removeRedundantAttributes: {
     label: 'Remove redundant attributes',
-    checked: true
-  },
-  removeScriptTypeAttributes: {
-    label: 'Remove script type attributes',
-    checked: true
-  },
-  removeStyleLinkTypeAttributes: {
-    label: 'Remove style link type attributes',
     checked: true
   },
   removeTagWhitespace: {
@@ -269,6 +265,8 @@ const MAX_URL_LENGTH = 2000; // Conservative limit for URL hash
 const OPTION_MIGRATIONS = {
   html5: null, // Removed in 5.0.0; discard from old URLs
   processConditionalComments: null, // Removed in 6.0.0; discard from old URLs
+  removeScriptTypeAttributes: 'removeDefaultTypeAttributes', // Merged in 7.0.0
+  removeStyleLinkTypeAttributes: 'removeDefaultTypeAttributes', // Merged in 7.0.0
   sortClassName: 'sortClassNames'
 };
 
@@ -314,7 +312,8 @@ const decodeState = (hash) => {
         if (key in OPTION_MIGRATIONS) {
           // `null` means the option was removed; skip it
           if (OPTION_MIGRATIONS[key]) {
-            migratedOptions[OPTION_MIGRATIONS[key]] = value;
+            const target = OPTION_MIGRATIONS[key];
+            migratedOptions[target] = migratedOptions[target] || value;
           }
         } else {
           migratedOptions[key] = value;

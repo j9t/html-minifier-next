@@ -138,6 +138,10 @@ const optionDefinitions = {
     description: 'Strip HTML comments',
     type: 'boolean'
   },
+  removeDefaultTypeAttributes: {
+    description: 'Remove default `type` attributes from `style`/`link` (e.g., `type="text/css"`) and `script` (e.g., `type="text/javascript"`) elements; other `type` attribute values are left intact',
+    type: 'boolean'
+  },
   removeEmptyAttributes: {
     description: 'Remove all attributes with whitespace-only values',
     type: 'boolean'
@@ -156,14 +160,6 @@ const optionDefinitions = {
   },
   removeRedundantAttributes: {
     description: 'Remove attributes when value matches default',
-    type: 'boolean'
-  },
-  removeScriptTypeAttributes: {
-    description: 'Remove `type="text/javascript"` from `script` elements; other `type` attribute values are left intact',
-    type: 'boolean'
-  },
-  removeStyleLinkTypeAttributes: {
-    description: 'Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact',
     type: 'boolean'
   },
   removeTagWhitespace: {

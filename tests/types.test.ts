@@ -47,11 +47,10 @@ async function testBooleanOptions() {
     preventAttributesEscaping: false,
     removeAttributeQuotes: true,
     removeComments: true,
+    removeDefaultTypeAttributes: true,
     removeEmptyElements: false,
     removeOptionalTags: false,
     removeRedundantAttributes: true,
-    removeScriptTypeAttributes: true,
-    removeStyleLinkTypeAttributes: true,
     removeTagWhitespace: false,
     trimCustomFragments: false,
     useShortDoctype: true,
@@ -184,7 +183,6 @@ async function testFunctionOptions() {
     log: (message: unknown) => {
       console.log(message);
     },
-    name: (name: string) => name.toLowerCase(),
     canCollapseWhitespace: (tag, _attrs, _canCollapseWhitespace) => {
       return tag !== 'pre';
     },
@@ -303,10 +301,9 @@ async function testRealWorldUsage() {
   const result = await minify(html, {
     collapseWhitespace: true,
     removeComments: true,
+    removeDefaultTypeAttributes: true,
     removeEmptyAttributes: true,
     removeRedundantAttributes: true,
-    removeScriptTypeAttributes: true,
-    removeStyleLinkTypeAttributes: true,
     useShortDoctype: true,
     minifyCSS: true,
     minifyJS: {

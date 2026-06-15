@@ -3,7 +3,9 @@ name: "Tests"
 on:
   push:
     branches: [main]
+    paths-ignore: ["**.md"]
   pull_request:
+    paths-ignore: ["**.md"]
 
 permissions:
   contents: read
@@ -16,8 +18,13 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest]
-        node: ['lts/*', 'current']
+        platform: [ubuntu-latest]
+        # “22” is the oldest supported Node.js version (package.json `engines`)
+        node: ["22", "lts/*", "current"]
+        include:
+          # Windows: One LTS job is enough
+          - platform: windows-latest
+            node: "lts/*"
     name: "Node ${{ matrix.node }} (${{ matrix.platform }})"
     runs-on: ${{ matrix.platform }}
     steps:
@@ -35,7 +42,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     strategy:
       matrix:
-        node: ['lts/*', 'current']
+        node: ["lts/*", "current"]
     name: "Node ${{ matrix.node }} (macOS)"
     runs-on: macos-latest
     steps:

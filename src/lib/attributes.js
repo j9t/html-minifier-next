@@ -19,6 +19,8 @@ import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
 import { identity, isThenable } from './utils.js';
 
+/** @import { ProcessedOptions } from './options.js' */
+
 // Type definitions
 
 /**
@@ -41,11 +43,9 @@ async function getDecodeHTMLStrict() {
 
 /**
  * @param {string} text
- * @param {{ignoreCustomComments: RegExp[]}} options
+ * @param {ProcessedOptions} options
  */
 function isIgnoredComment(text, options) {
-  // @@ Optimize: `Array.isArray(options.ignoreCustomComments)` runs on every comment node; it could be eliminated once `parseRegExpArray` is tightened to coerce non-arrays to `[]` at setup time
-  if (!Array.isArray(options.ignoreCustomComments)) return false;
   for (const pattern of options.ignoreCustomComments) {
     if (pattern.test(text)) {
       return true;
@@ -380,7 +380,7 @@ const valueWhitespaceExemptElements = new Set(['button', 'data', 'input', 'optio
  * @param {string} tag
  * @param {string} attrName
  * @param {string} attrValue
- * @param {Record<string, any>} options
+ * @param {ProcessedOptions} options
  * @param {HTMLAttribute[]} attrs
  * @param {Function} minifyHTMLSelf
  */
@@ -432,7 +432,8 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
   if (attrName === 'class') {
     attrValue = trimWhitespace(attrValue);
     if (options.sortClassNames) {
-      attrValue = options.sortClassNames(attrValue);
+      // By the time attributes are processed, `createSortFns` has replaced any truthy non-function value
+      attrValue = /** @type {(value: string) => string} */ (options.sortClassNames)(attrValue);
     } else {
       attrValue = collapseWhitespaceAll(attrValue);
     }
@@ -602,7 +603,7 @@ function chooseAttributeQuote(attrValue, options) {
  * @param {HTMLAttribute} attr
  * @param {HTMLAttribute[]} attrs
  * @param {string} tag
- * @param {Record<string, any>} options
+ * @param {ProcessedOptions} options
  * @param {Function} minifyHTML
  */
 function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
@@ -626,16 +627,16 @@ function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
  * @param {HTMLAttribute} attr
  * @param {HTMLAttribute[]} attrs
  * @param {string} tag
- * @param {Record<string, any>} options
+ * @param {ProcessedOptions} options
  * @param {Function} minifyHTML
  */
 function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML) {
   if ((options.removeRedundantAttributes &&
        isAttributeRedundant(tag, attrName, attrValue ?? '', attrs)) ||
-      (options.removeScriptTypeAttributes && tag === 'script' &&
-       attrName === 'type' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue)) ||
-      (options.removeStyleLinkTypeAttributes && (tag === 'style' || tag === 'link') &&
-       attrName === 'type' && isStyleLinkTypeAttribute(attrValue))) {
+      (options.removeDefaultTypeAttributes && attrName === 'type' && (
+        ((tag === 'style' || tag === 'link') && isStyleLinkTypeAttribute(attrValue)) ||
+        (tag === 'script' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue))
+      ))) {
     return;
   }
 
@@ -656,7 +657,7 @@ function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, m
  * @param {string | undefined} attrValue
  * @param {HTMLAttribute} attr
  * @param {string} tag
- * @param {Record<string, any>} options
+ * @param {ProcessedOptions} options
  */
 function normalizeAttrFinish(attrName, attrValue, attr, tag, options) {
   if (options.removeEmptyAttributes &&
@@ -676,9 +677,9 @@ function normalizeAttrFinish(attrName, attrValue, attr, tag, options) {
 }
 
 /**
- * @param {{name: string, value?: string, attr: HTMLAttribute}} normalized
+ * @param {{name: string, value: string | undefined, attr: HTMLAttribute}} normalized
  * @param {string | boolean | undefined} hasUnarySlash
- * @param {Record<string, any>} options
+ * @param {ProcessedOptions} options
  * @param {boolean} isLast
  * @param {string | undefined} uidAttr
  */

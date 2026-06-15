@@ -4,9 +4,11 @@
 
 Your web page optimization precision tool: HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier** able to also handle in-document CSS, JavaScript, and SVG minification.
 
-The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier). It is now **the official successor to HTML Minifier**. HMN is maintained, easier to use, offers new features, and has been optimized for speed.
+The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier). HMN is **the official successor to HTML Minifier**: It’s maintained, easier to use, offers new features, and has been optimized for speed. Note that HMN is largely compatible with HM and HMT but has evolved—find [migration guidance in the changelog](https://github.com/j9t/html-minifier-next/blob/main/CHANGELOG.md).
 
 ## Installation
+
+HTML Minifier Next is ESM-only and requires Node.js ≥22.
 
 For use as a command-line app, use npx:
 
@@ -44,7 +46,7 @@ Use `npx html-minifier-next --help` to check all available options:
 
 ### Configuration file
 
-You can use a configuration file to specify options. The file can be either JSON format or a JavaScript module that exports the configuration object:
+You can use a configuration file to specify options. The file can be either in JSON format or a JavaScript module that exports the configuration object:
 
 **JSON configuration example:**
 
@@ -57,10 +59,10 @@ You can use a configuration file to specify options. The file can be either JSON
 }
 ```
 
-**JavaScript module configuration example:**
+**JavaScript module configuration example** (requires `"type": "module"` in the project’s package.json, or use a .mjs extension):
 
 ```javascript
-module.exports = {
+export default {
   collapseWhitespace: true,
   removeComments: true,
   fileExt: "html,php",
@@ -70,8 +72,6 @@ module.exports = {
 
 ### Node.js
 
-ESM with Node.js ≥16.14:
-
 ```javascript
 import { minify } from 'html-minifier-next';
 
@@ -80,17 +80,6 @@ const result = await minify('<p title="example" id="moo">foo</p>', {
   removeOptionalTags: true
 });
 console.log(result); // “<p title=example id=moo>foo”
-```
-
-CommonJS:
-
-```javascript
-const { minify } = require('html-minifier-next');
-
-(async () => {
-  const result = await minify('<p title="example" id="moo">foo</p>', { preset: 'comprehensive' });
-  console.log(result); // “<p id=moo title=example>foo”
-})();
 ```
 
 See [the original blog post](https://perfectionkills.com/experimenting-with-html-minifier/) for details of [how it works](https://perfectionkills.com/experimenting-with-html-minifier/#how_it_works), [descriptions of most options](https://perfectionkills.com/experimenting-with-html-minifier/#options), [testing results](https://perfectionkills.com/experimenting-with-html-minifier/#field_testing), and [conclusions](https://perfectionkills.com/experimenting-with-html-minifier/#cost_and_benefits).
@@ -165,18 +154,27 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `quoteCharacter`<br>`--quote-character` | Type of quote to use for attribute values (`'` or `"`) | Auto-detected (uses the quote requiring less escaping; defaults to `"` when equal) |
 | `removeAttributeQuotes`<br>`--remove-attribute-quotes` | [Remove quotes around attributes when possible](https://perfectionkills.com/experimenting-with-html-minifier/#remove_attribute_quotes) | `false` |
 | `removeComments`<br>`--remove-comments` | [Strip HTML comments](https://perfectionkills.com/experimenting-with-html-minifier/#remove_comments) | `false` |
+| `removeDefaultTypeAttributes`<br>`--remove-default-type-attributes` | Remove default `type` attributes from `style`/`link` (e.g., `type="text/css"`) and `script` (e.g., `type="text/javascript"`) elements; other `type` attribute values are left intact | `false` |
 | `removeEmptyAttributes`<br>`--remove-empty-attributes` | [Remove all attributes with whitespace-only values](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_or_blank_attributes) | `false` (could be `true`, `Function(attrName, tag)`) |
 | `removeEmptyElements`<br>`--remove-empty-elements` | [Remove all elements with empty contents](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_elements) | `false` |
 | `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve when `removeEmptyElements` is enabled; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<span aria-hidden='true'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
-| `removeScriptTypeAttributes`<br>`--remove-script-type-attributes` | Remove `type="text/javascript"` from `script` elements; other `type` attribute values are left intact | `false` |
-| `removeStyleLinkTypeAttributes`<br>`--remove-style-link-type-attributes` | Remove `type="text/css"` from `style` and `link` elements; other `type` attribute values are left intact | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
 | `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype) | `false` |
+
+### API-only options
+
+A few options take functions and are therefore only available programmatically, not via CLI flags or config files:
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
+| `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
+| `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them) | No-op (errors are silent) |
 
 ### Sorting attributes and style classes
 
@@ -374,7 +372,7 @@ The caches persist across multiple `minify()` calls, making them particularly ef
 
 ## Minification comparison
 
-Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier-benchmarks) for details on how HMN compares to other minifiers.
+Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier-benchmarks) for details on how HTML Minifier Next compares to other minifiers.
 
 ## Examples
 
@@ -622,7 +620,7 @@ To profile the current working tree, run the benchmark with Node’s built-in CP
 node --cpu-prof benchmark.js
 ```
 
-This writes a `.cpuprofile` file to the working directory. Load it with `npx speedscope *.cpuprofile` for a flamegraph, or drag it into Chrome DevTools → Sources → JavaScript Profiler. Compare self-time per function against a clean baseline run on `main`. Pay attention to unexpectedly heavy callbacks in hot paths—V8 de-optimization from variable object shapes or unnecessary method calls can show up there.
+This writes a .cpuprofile file to the working directory. Load it with `npx speedscope *.cpuprofile` for a flamegraph, or drag it into Chrome DevTools → Sources → JavaScript Profiler. Compare self-time per function against a clean baseline run on `main`. Pay attention to unexpectedly heavy callbacks in hot paths—V8 de-optimization from variable object shapes or unnecessary method calls can show up there.
 
 ## Acknowledgements
 
