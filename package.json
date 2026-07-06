@@ -14,11 +14,11 @@
   },
   "description": "Super-configurable and well-tested web page minifier (enhanced successor to HTML Minifier)",
   "devDependencies": {
-    "@commitlint/cli": "^21.0.2",
+    "@commitlint/cli": "^21.2.0",
     "@eslint/js": "^10.0.1",
     "@swc/core": "^1.15.41",
-    "@types/node": "^26.0.0",
-    "eslint": "^10.4.1",
+    "@types/node": "^26.1.0",
+    "eslint": "^10.6.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16"
   },
