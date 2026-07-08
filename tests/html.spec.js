@@ -3282,6 +3282,66 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/' } }), output);
   });
 
+  // https://github.com/j9t/html-minifier-next/issues/304
+  test('`srcset` URLs containing commas', async () => {
+    let input, output;
+
+    // Commas within URLs must not be treated as candidate separators
+    input = '<img srcset="\n' +
+      '  /cdn-cgi/image/fit=contain,width=320/assets/hero.jpg   320w,\n' +
+      '  /cdn-cgi/image/fit=contain,width=640/assets/hero.jpg   640w"\n' +
+      '  src="/cdn-cgi/image/width=960/assets/hero.jpg">';
+    output = '<img srcset="/cdn-cgi/image/fit=contain,width=320/assets/hero.jpg 320w, /cdn-cgi/image/fit=contain,width=640/assets/hero.jpg 640w" src="/cdn-cgi/image/width=960/assets/hero.jpg">';
+    assert.strictEqual(await minify(input), output);
+
+    // Also on `source` elements, and for candidates without descriptors
+    input = '<source srcset="/img/a,b/x.jpg, /img/c,d/y.jpg 2x">';
+    output = '<source srcset="/img/a,b/x.jpg, /img/c,d/y.jpg 2x">';
+    assert.strictEqual(await minify(input), output);
+
+    // A separator comma without surrounding whitespace, after a descriptor
+    input = '<img srcset="a.jpg 320w,b.jpg 640w">';
+    output = '<img srcset="a.jpg 320w, b.jpg 640w">';
+    assert.strictEqual(await minify(input), output);
+
+    // Trailing comma(s) after a URL end the candidate
+    input = '<img srcset="a.jpg,, b.jpg 2x,">';
+    output = '<img srcset="a.jpg, b.jpg 2x">';
+    assert.strictEqual(await minify(input), output);
+
+    // Without whitespace after the comma, this is a single URL per the spec
+    input = '<img srcset="a.jpg,b.jpg 2x">';
+    output = '<img srcset="a.jpg,b.jpg 2x">';
+    assert.strictEqual(await minify(input), output);
+
+    // `minifyURLs` must receive the full URL, commas included
+    input = '<img srcset="https://example.com/image/fit=contain,width=320/a.jpg 320w, https://example.com/image/fit=contain,width=640/a.jpg 640w">';
+    output = '<img srcset="image/fit=contain,width=320/a.jpg 320w, image/fit=contain,width=640/a.jpg 640w">';
+    assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/' } }), output);
+  });
+
+  test('`imagesrcset` attribute minification', async () => {
+    let input, output;
+
+    // `imagesrcset` on `link` is processed like `srcset`, including descriptor normalization
+    input = '<link rel="preload" as="image" imagesrcset="foo.jpg   1x,\n  bar.jpg 2.0x" imagesizes="100vw">';
+    output = '<link rel="preload" as="image" imagesrcset="foo.jpg, bar.jpg 2x" imagesizes="100vw">';
+    assert.strictEqual(await minify(input), output);
+
+    // Commas within URLs must not be treated as candidate separators
+    input = '<link rel="preload" as="image" imagesrcset="/cdn-cgi/image/fit=contain,width=320/hero.jpg 320w, /cdn-cgi/image/fit=contain,width=640/hero.jpg 640w">';
+    assert.strictEqual(await minify(input), input);
+
+    // `minifyURLs` applies to `imagesrcset` URLs
+    input = '<link rel="preload" as="image" imagesrcset="https://example.com/a.jpg 320w, https://example.com/b.jpg 640w">';
+    output = '<link rel="preload" as="image" imagesrcset="a.jpg 320w, b.jpg 640w">';
+    assert.strictEqual(await minify(input, { minifyURLs: { site: 'https://example.com/' } }), output);
+
+    // `imagesrcset` on other elements stays untouched
+    input = '<div imagesrcset="foo.jpg   1x"></div>';
+    assert.strictEqual(await minify(input), input);
+  });
+
   test('Async `minifyURLs` support', async () => {
     let input, output;
 
