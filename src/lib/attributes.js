@@ -303,7 +303,8 @@ function isMediaQuery(tag, attrs, attrName) {
  * @param {string} tag
  */
 function isSrcset(attrName, tag) {
-  return attrName === 'srcset' && srcsetElements.has(tag);
+  return (attrName === 'srcset' && srcsetElements.has(tag)) ||
+    (attrName === 'imagesrcset' && tag === 'link');
 }
 
 /**
@@ -492,8 +493,34 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
   }
 
   if (isSrcset(attrName, tag)) {
-    // https://html.spec.whatwg.org/multipage/embedded-content.html#attr-img-srcset
-    const candidates = trimWhitespace(attrValue).split(/\s*,\s*/);
+    // Split into image candidate strings following the spec parsing algorithm
+    // (https://html.spec.whatwg.org/multipage/images.html#parsing-a-srcset-attribute);
+    // a naive split on commas would corrupt URLs that contain commas
+    const value = trimWhitespace(attrValue);
+    /** @type {string[]} */
+    const candidates = [];
+    let pos = 0;
+    while (pos < value.length) {
+      // Skip whitespace and separator commas
+      while (pos < value.length && /[\s,]/.test(value.charAt(pos))) pos++;
+      if (pos >= value.length) break;
+      const start = pos;
+      // URL: a run of non-whitespace characters (which may contain commas)
+      while (pos < value.length && !/\s/.test(value.charAt(pos))) pos++;
+      if (value.charAt(pos - 1) === ',') {
+        // Trailing comma(s) end the candidate—a URL without descriptor
+        candidates.push(value.slice(start, pos).replace(/,+$/, ''));
+        continue;
+      }
+      // Descriptor: everything up to the next comma outside parentheses
+      let inParens = false;
+      while (pos < value.length && (inParens || value.charAt(pos) !== ',')) {
+        if (value.charAt(pos) === '(') inParens = true;
+        else if (value.charAt(pos) === ')') inParens = false;
+        pos++;
+      }
+      candidates.push(trimWhitespace(value.slice(start, pos)));
+    }
     const processed = candidates.map(candidate => {
       let url = candidate;
       let descriptor = '';
