@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.1.0] - 2026-07-08
+
+### Fixed
+
+* Fixed `srcset` handling corrupting URLs that contain commas (e.g., Cloudflare Images URLs like `/cdn-cgi/image/fit=contain,width=320/…`)—image candidates are now split per the HTML spec’s `srcset` parsing algorithm instead of naively on every comma
+
+### Added
+
+* Added support for the `imagesrcset` attribute on `link` elements (as used for `rel="preload" as="image"`)—it now receives the same minification as `srcset` on `img` and `source` elements, including descriptor normalization and `minifyURLs` support
+
 ## [7.0.0] - 2026-06-15
 
 ### Fixed
