@@ -1238,6 +1238,36 @@ describe('CLI', () => {
     await fs.promises.rm(configPath, { force: true });
   });
 
+  test('Should accept cache options from config file and CLI flags', async () => {
+    const configPath = path.resolve(fixturesDir, 'tmp-cache-options-config.json');
+    await fs.promises.writeFile(configPath, JSON.stringify({ cacheCSS: 300, removeComments: true }));
+
+    const input = '<p><!-- comment -->Hello</p>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--cache-js', '300', '--verbose'], {
+      cwd: fixturesDir,
+      input: input
+    });
+
+    assert.strictEqual(status, 0);
+    // Cache options are valid config keys and must not trigger the unknown-option warning
+    assert.ok(!stderr.toString().includes('cacheCSS'));
+    // The flag value must reach the options passed to `minify` (regression: values used to be parsed but dropped)—
+    // verbose mode lists the CLI-provided options that made it into the final options object
+    assert.ok(stderr.toString().includes('cacheJS'));
+    assert.ok(!stdout.toString().includes('<!-- comment -->'));
+
+    await fs.promises.rm(configPath, { force: true });
+  });
+
+  test('Should throw error for invalid cache-css value', () => {
+    const cliArguments = [
+      'default.html',
+      '--cache-css=abc'
+    ];
+
+    assert.throws(() => execCli(cliArguments), /Invalid number for `--cache-css: "abc"`/);
+  });
+
   test('Should override config file options with CLI flags when using preset', async () => {
     const configPath = path.resolve(fixturesDir, 'tmp-preset-config2.json');
     await fs.promises.writeFile(configPath, JSON.stringify({

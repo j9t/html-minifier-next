@@ -34,6 +34,7 @@
   },
   "files": [
     "cli.js",
+    "html-minifier-next.schema.json",
     "dist/types/",
     "src/"
   ],
@@ -78,8 +79,9 @@
     "url": "git+https://github.com/j9t/html-minifier-next.git"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run build:schema",
     "build:docs": "vite build --base /html-minifier-next/",
+    "build:schema": "node scripts/build-schema.js",
     "deploy": "npm run build && npm run build:docs",
     "lint": "eslint .",
     "prebuild": "node --input-type=module --eval \"import {rmSync} from 'fs';rmSync('dist',{recursive:true,force:true})\"",
@@ -91,5 +93,5 @@
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "version": "7.1.0"
+  "version": "7.2.0"
 }

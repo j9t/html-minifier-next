@@ -227,7 +227,7 @@ async function loadConfigFromPath(configPath) {
 }
 
 // Config keys the CLI handles itself, beyond the options in `optionDefinitions`
-const CONFIG_KEYS_EXTRA = new Set(['preset', 'fileExt', 'ignoreDir']);
+const CONFIG_KEYS_EXTRA = new Set(['$schema', 'preset', 'fileExt', 'ignoreDir']);
 
 /**
  * Normalize and validate config object by applying parsers and transforming values.
@@ -283,9 +283,6 @@ program.option('-O --output-dir <dir>', 'Specify an output directory');
 program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to “html,htm,shtml,shtm”; use “*” for all files');
 program.option('-p --preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('-c --config-file <file>', 'Use config file');
-program.option('--cache-css <size>', 'Set CSS minification cache size (number of entries, default: 500)', parseValidInt('cacheCSS'));
-program.option('--cache-js <size>', 'Set JavaScript minification cache size (number of entries, default: 500)', parseValidInt('cacheJS'));
-program.option('--cache-svg <size>', 'Set SVG minification cache size (number of entries, default: 500)', parseValidInt('cacheSVG'));
 program.version(pkg.version, '-V, --version', 'Output the version number');
 program.helpOption('-h, --help', 'Display help for command');
 

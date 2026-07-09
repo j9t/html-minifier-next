@@ -12,7 +12,7 @@
 // minifies every corpus file and records output size and median time; results are
 // written to results.json (with any failures in errors.log). Because it temporarily
 // checks out historical files, the working tree must have no uncommitted changes in
-// src, package.json, or html-minifier.json.
+// src, package.json, or html-minifier-next.json.
 //
 // Usage (from the “backtest” folder):
 //   npm run backtest: Test the last 50 commits (default)
@@ -422,11 +422,11 @@ if (process.argv.length > 2 || !process.send) {
 
     // Check for uncommitted changes in files the backtest temporarily modifies
     const pathSrc = path.join(__dirname, '..', 'src');
-    const pathConfig = path.join(__dirname, 'html-minifier.json');
+    const pathConfig = path.join(__dirname, 'html-minifier-next.json');
     const pathPkg = path.join(dirRoot, 'package.json');
     git('status', '--porcelain', '--', pathSrc, pathConfig, pathPkg, async function (code, output) {
       if (output.trim().length > 0) {
-        console.error('Error: Uncommitted changes detected in src, package.json, or html-minifier.json');
+        console.error('Error: Uncommitted changes detected in src, package.json, or html-minifier-next.json');
         console.error('Please commit or stash your changes before running backtest');
         console.error('This is required because backtest temporarily modifies these files for testing');
         process.exit(1);
@@ -460,7 +460,7 @@ if (process.argv.length > 2 || !process.send) {
           console.log(`\nCleaning up after ${reason}…`);
         }
 
-        // Restore “src” folder, package.json, and html-minifier.json from HEAD using Git
+        // Restore “src” folder, package.json, and html-minifier-next.json from HEAD using Git
         await new Promise((resolve) => {
           git('checkout', 'HEAD', '--', pathSrc, pathConfig, pathPkg, function (code) {
             if (code !== 0) {
@@ -584,6 +584,7 @@ if (process.argv.length > 2 || !process.send) {
 
   // Config file paths (repo-root-relative), ordered newest to oldest
   const pathsConfig = [
+    'backtest/html-minifier-next.json',
     'backtest/html-minifier.json',
     'benchmarks/html-minifier.json',
     'benchmarks/html-minifier-benchmarks.json',
@@ -593,7 +594,7 @@ if (process.argv.length > 2 || !process.send) {
   function readConfigFromGit(hash, index, callback) {
     if (index >= pathsConfig.length) {
       // Fallback to current config file on disk
-      readText(path.join(__dirname, 'html-minifier.json')).then(callback).catch(err => {
+      readText(path.join(__dirname, 'html-minifier-next.json')).then(callback).catch(err => {
         console.error(`No config found for ${hash}: ${err.message}`);
         process.disconnect();
       });
