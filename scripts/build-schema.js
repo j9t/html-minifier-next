@@ -50,10 +50,14 @@ function buildConfigSchema() {
   const properties = { ...propertiesExtra };
 
   for (const [key, definition] of Object.entries(optionDefinitions)) {
+    const typeSchema = typeSchemas[definition.type];
+    if (!typeSchema) {
+      throw new Error(`No JSON Schema mapping for option “${key}” (type “${definition.type}”)—add the type to \`typeSchemas\` in scripts/build-schema.js`);
+    }
     properties[key] = {
       // Prefer the affirmative description—config keys state what `true` does
       description: definition.descriptionAffirmative ?? definition.description,
-      ...typeSchemas[definition.type]
+      ...typeSchema
     };
   }
 
