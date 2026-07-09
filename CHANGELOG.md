@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.2.0] - 2026-07-09
+
+### Fixed
+
+* Fixed the `--cache-css`, `--cache-js`, and `--cache-svg` CLI flags as well as the corresponding `cacheCSS`, `cacheJS`, and `cacheSVG` config file options being accepted but not applied—cache sizes are now forwarded to the minifier, and config files no longer warn about the cache options as unknown
+
+### Added
+
+* Added a JSON Schema for configuration files (html-minifier-next.schema.json, shipped with the package)—referencing it via `$schema` enables editor validation, autocomplete, and inline documentation; the schema is generated from the shared option definitions (`npm run build:schema`, part of `npm run build`) and kept in sync by tests
+
 ## [7.1.0] - 2026-07-08
 
 ### Fixed
