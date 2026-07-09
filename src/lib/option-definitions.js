@@ -1,6 +1,18 @@
 // Single source of truth for minifier option names, descriptions, types, and shared defaults
 
 const optionDefinitions = {
+  cacheCSS: {
+    description: 'Set CSS minification cache size (number of entries, default: 500)',
+    type: 'int'
+  },
+  cacheJS: {
+    description: 'Set JavaScript minification cache size (number of entries, default: 500)',
+    type: 'int'
+  },
+  cacheSVG: {
+    description: 'Set SVG minification cache size (number of entries, default: 500)',
+    type: 'int'
+  },
   caseSensitive: {
     description: 'Treat attributes in case-sensitive manner (useful for custom HTML elements)',
     type: 'boolean'

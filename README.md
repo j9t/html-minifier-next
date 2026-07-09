@@ -40,7 +40,7 @@ Use `npx html-minifier-next --help` to check all available options:
 | `--output <file>`, `-o <file>` | Specify output file (reads from `--input` file argument or STDIN; outputs to STDOUT if not specified) | File to file: `npx html-minifier-next input.html -o output.html`<br>File to file (explicit): `npx html-minifier-next -i input.html -o output.html`<br>Pipe to file: `cat input.html \| npx html-minifier-next -o output.html`<br>File to STDOUT: `npx html-minifier-next input.html` |
 | `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
-| `--config-file <file>`, `-c <file>` | Use a configuration file | `--config-file=html-minifier.json` |
+| `--config-file <file>`, `-c <file>` | Use a configuration file | `--config-file=html-minifier-next.json` |
 | `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `--dry`, `-d` | Dry run: Process and report statistics without writing output | `npx html-minifier-next input.html --dry --collapse-whitespace` |
 
@@ -58,6 +58,18 @@ You can use a configuration file to specify options. The file can be either in J
   "ignoreDir": "libs,vendor"
 }
 ```
+
+For editor support (validation, autocomplete, and inline documentation) in JSON configuration files, reference the [JSON Schema](https://raw.githubusercontent.com/j9t/html-minifier-next/main/html-minifier-next.schema.json) that ships with the package:
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/j9t/html-minifier-next/main/html-minifier-next.schema.json",
+  "collapseWhitespace": true,
+  "removeComments": true
+}
+```
+
+(If HMN is installed locally, you can also use the path `./node_modules/html-minifier-next/html-minifier-next.schema.json` instead of the URL.)
 
 **JavaScript module configuration example** (requires `"type": "module"` in the project’s package.json, or use a .mjs extension):
 
@@ -100,8 +112,8 @@ To review the specific options set, [presets.js](https://github.com/j9t/html-min
 npx html-minifier-next --preset conservative input.html
 
 # Via config file
-npx html-minifier-next --config-file=html-minifier.json input.html
-# where html-minifier.json contains: { "preset": "conservative" }
+npx html-minifier-next --config-file=html-minifier-next.json input.html
+# where html-minifier-next.json contains: { "preset": "conservative" }
 
 # Override preset options
 npx html-minifier-next --preset conservative --remove-empty-attributes input.html
@@ -360,13 +372,13 @@ npx html-minifier-next --minify-css --minify-js --minify-svg input.html
 
 * Single file processing: Default `500` is sufficient
 * Batch processing: Increase to `1000` or higher for better cache hit rates
-* Memory-constrained environments: Reduce to `200`–`300` to save memory
+* Memory-constrained environments: Cache sizes can be lowered, though the savings are usually negligible—entries are typically kilobyte-scale, so even full caches only hold a few megabytes
 * Hundreds/thousands of files: Increase to `1000`–`2000` for optimal performance
 
 **Important:**
 
 * Cache locking: Caches are created on the first `minify()` call and persist for the process lifetime. Cache sizes are locked after first initialization—subsequent calls reuse the same caches even if different `cacheCSS`, `cacheJS`, or `cacheSVG` options are provided. The first call’s options determine the cache sizes.
-* Zero values: Explicit `0` values are coerced to `1` (minimum functional cache size) to avoid immediate eviction. If you want to minimize memory usage, use a small number like `10` or `50` instead of `0`.
+* Zero values: Explicit `0` values are coerced to `1` (minimum functional cache size) to avoid immediate eviction. To keep the cache footprint as small as possible, use a small number like `10` or `50` instead of `0`.
 
 The caches persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
 
@@ -396,7 +408,7 @@ npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,php
 
 # Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,php"`)
-npx html-minifier-next --config-file=html-minifier.json --input-dir=src --output-dir=dist
+npx html-minifier-next --config-file=html-minifier-next.json --input-dir=src --output-dir=dist
 
 # Process all files (explicit wildcard)
 npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext='*'
@@ -608,7 +620,7 @@ Parameters:
 * `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
 * `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s own processing time
 * `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
-* `--config=PATH`: Uses an alternative options file (default `html-minifier.json`)
+* `--config=PATH`: Uses an alternative options file (default `html-minifier-next.json`)
 
 To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN’s own code rather than the bundled minifiers.
 
