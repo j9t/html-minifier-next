@@ -6,12 +6,20 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    minor-and-patch:
+      update-types:
+        - "minor"
+        - "patch"
     cooldown:
       default-days: 7
   - package-ecosystem: "npm"
     directory: "/backtest/"
     schedule:
       interval: "weekly"
+    minor-and-patch:
+      update-types:
+        - "minor"
+        - "patch"
     cooldown:
       default-days: 7
   - package-ecosystem: "github-actions"
