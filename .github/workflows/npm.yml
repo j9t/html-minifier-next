@@ -3,6 +3,10 @@ name: "npm Publishing"
 on:
   workflow_dispatch:
 
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
