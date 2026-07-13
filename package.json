@@ -34,9 +34,9 @@
   },
   "files": [
     "cli.js",
+    "dist/types",
     "html-minifier-next.schema.json",
-    "dist/types/",
-    "src/"
+    "src"
   ],
   "funding": "https://github.com/j9t/html-minifier-next?sponsor=1",
   "homepage": "https://j9t.github.io/html-minifier-next/",
