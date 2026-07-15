@@ -79,7 +79,7 @@ function removeDirectoryIndex(pathname) {
 /**
  * Create a URL minifier function for the given site context
  * @param {string} site - The site base URL (used to compute relative URLs)
- * @returns {function(string): string} Minifier function that returns the shortest URL
+ * @returns {(url: string) => string} Minifier function that returns the shortest URL
  */
 export function createUrlMinifier(site) {
   let baseUrl;
