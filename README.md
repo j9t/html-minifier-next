@@ -73,7 +73,7 @@ For editor support (validation, autocomplete, and inline documentation) in JSON 
 
 **JavaScript module configuration example** (requires `"type": "module"` in the project’s package.json, or use a .mjs extension):
 
-```javascript
+```js
 export default {
   collapseWhitespace: true,
   removeComments: true,
@@ -84,7 +84,7 @@ export default {
 
 ### Node.js
 
-```javascript
+```js
 import { minify } from 'html-minifier-next';
 
 const result = await minify('<p title="example" id="moo">foo</p>', {
@@ -198,7 +198,7 @@ When `minifyCSS` is set to `true`, HTML Minifier Next uses [Lightning CSS](https
 
 You can pass Lightning CSS configuration options by providing an object:
 
-```javascript
+```js
 const result = await minify(html, {
   minifyCSS: {
     targets: {
@@ -221,7 +221,7 @@ Available Lightning CSS options when passed as an object:
 
 For advanced usage, you can also pass a function:
 
-```javascript
+```js
 const result = await minify(html, {
   minifyCSS: function(text, type) {
     // `text`: CSS string to minify
@@ -237,7 +237,7 @@ When `minifyJS` is set to `true`, HTML Minifier Next uses [Terser](https://terse
 
 You can choose between different JS minifiers using the `engine` field:
 
-```javascript
+```js
 const result = await minify(html, {
   minifyJS: {
     engine: 'swc', // Use SWC for faster minification
@@ -261,7 +261,7 @@ npm i -D @swc/core
 
 You can pass engine-specific configuration options:
 
-```javascript
+```js
 // Using Terser with custom options
 const result = await minify(html, {
   minifyJS: {
@@ -281,7 +281,7 @@ const result = await minify(html, {
 
 For advanced usage, you can also pass a function:
 
-```javascript
+```js
 const result = await minify(html, {
   minifyJS: function(text, inline) {
     // `text`: JavaScript string to minify
@@ -295,7 +295,7 @@ const result = await minify(html, {
 
 When `minifySVG` is set to `true`, HTML Minifier Next uses [SVGO](https://svgo.dev/) to optimize inline SVG elements. Complete `<svg>` subtrees are extracted and processed as a block, enabling deep structural optimization:
 
-```javascript
+```js
 const result = await minify(html, {
   minifySVG: true // Enable with SVGO defaults
 });
@@ -303,7 +303,7 @@ const result = await minify(html, {
 
 You can pass custom SVGO options:
 
-```javascript
+```js
 const result = await minify(html, {
   minifySVG: {
     plugins: [{
@@ -328,7 +328,7 @@ const result = await minify(html, {
 
 HTML Minifier Next uses in-memory caches to improve performance when processing multiple files or repeated content. The cache sizes can be configured for optimal performance based on your use case:
 
-```javascript
+```js
 const result = await minify(html, {
   minifyCSS: true,
   minifyJS: true,
@@ -501,7 +501,7 @@ This minifier includes protection against regular expression denial of service (
 
 **Safe patterns** (recommended):
 
-```javascript
+```js
 ignoreCustomFragments: [
   /<%[\s\S]{0,1000}?%>/,         // JSP/ASP with explicit bounds
   /<\?php[\s\S]{0,5000}?\?>/,    // PHP with bounds
@@ -511,7 +511,7 @@ ignoreCustomFragments: [
 
 **Potentially unsafe patterns** (will trigger warnings):
 
-```javascript
+```js
 ignoreCustomFragments: [
   /<%[\s\S]*?%>/,                // Unlimited quantifiers
   /<!--[\s\S]*?-->/,             // Could cause issues with very long comments
@@ -522,7 +522,7 @@ ignoreCustomFragments: [
 
 **Template engine configurations:**
 
-```javascript
+```js
 // Handlebars/Mustache
 ignoreCustomFragments: [/\{\{[\s\S]{0,1000}?\}\}/]
 
@@ -552,7 +552,7 @@ The escaping requirements for `ignoreCustomFragments` patterns differ depending 
 
 **Programmatic (JavaScript/Node.js):**
 
-```javascript
+```js
 ignoreCustomFragments: [/\{%[\s\S]{0,1000}?%\}/, /\{\{[\s\S]{0,500}?\}\}/]
 ```
 

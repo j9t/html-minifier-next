@@ -981,7 +981,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 If you were passing configuration options to `minifyCSS`, review Lightning CSS documentation and update your configuration:
 
-```javascript
+```js
 // Before (clean-css)
 minify(html, {
   minifyCSS: {
@@ -1000,7 +1000,7 @@ minify(html, {
 
 To disable error recovery for strict CSS validation:
 
-```javascript
+```js
 minify(html, {
   minifyCSS: {
     errorRecovery: false // Disable error recovery (enabled by default in HMN)
