@@ -183,13 +183,15 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
-        const cssKey = inputCSS.length > 2048
-          ? (hashContent(inputCSS) + '|' + type + '|' + cssSig)
-          : (inputCSS + '|' + type + '|' + cssSig);
         const isCacheable = inputCSS.length <= MAX_CACHEABLE_INPUT_LENGTH;
+        const cssKey = isCacheable
+          ? (inputCSS.length > 2048
+            ? (hashContent(inputCSS) + '|' + type + '|' + cssSig)
+            : (inputCSS + '|' + type + '|' + cssSig))
+          : undefined;
 
         try {
-          if (isCacheable) {
+          if (cssKey !== undefined) {
             const cached = /** @type {string | Promise<string> | undefined} */ (cssCache.get(cssKey));
             if (cached !== undefined) {
               // Support both resolved values and in-flight promises
@@ -227,12 +229,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             return (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
           })();
 
-          if (isCacheable) cssCache.set(cssKey, inFlight);
+          if (cssKey !== undefined) cssCache.set(cssKey, inFlight);
           const resolved = await inFlight;
-          if (isCacheable) cssCache.set(cssKey, resolved);
+          if (cssKey !== undefined) cssCache.set(cssKey, resolved);
           return resolved;
         } catch (err) {
-          if (isCacheable) cssCache.delete(cssKey);
+          if (cssKey !== undefined) cssCache.delete(cssKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }
@@ -303,11 +305,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           // Select pre-computed signature based on engine
           const optsSig = useEngine === 'terser' ? terserSig : swcSig;
 
-          // For large inputs, hash the full content to avoid storing huge strings as Map keys
-          jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
-            + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
-
           if (isCacheable) {
+            // For large inputs, hash the full content to avoid storing huge strings as Map keys
+            jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
+              + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
+
             const cached = /** @type {string | Promise<string> | undefined} */ (jsCache.get(jsKey));
             if (cached !== undefined) {
               return await cached;
@@ -343,12 +345,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             throw new Error(`Unknown JS minifier engine: ${useEngine}`);
           })();
 
-          if (isCacheable) jsCache.set(jsKey, inFlight);
+          if (jsKey !== undefined) jsCache.set(jsKey, inFlight);
           const resolved = await inFlight;
-          if (isCacheable) jsCache.set(jsKey, resolved);
+          if (jsKey !== undefined) jsCache.set(jsKey, resolved);
           return resolved;
         } catch (err) {
-          if (isCacheable && jsKey) jsCache.delete(jsKey);
+          if (jsKey !== undefined) jsCache.delete(jsKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }
@@ -422,14 +424,15 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return svgContent;
         }
 
-        // Cache key: Large inputs are hashed to avoid huge Map keys
-        const svgKey = svgContent.length > 2048
-          ? (hashContent(svgContent) + '|' + svgSig)
-          : (svgContent + '|' + svgSig);
         const isCacheable = svgContent.length <= MAX_CACHEABLE_INPUT_LENGTH;
+        const svgKey = isCacheable
+          ? (svgContent.length > 2048
+            ? (hashContent(svgContent) + '|' + svgSig)
+            : (svgContent + '|' + svgSig))
+          : undefined;
 
         try {
-          if (isCacheable) {
+          if (svgKey !== undefined) {
             const cached = /** @type {string | Promise<string> | undefined} */ (svgCache.get(svgKey));
             if (cached !== undefined) {
               return await cached;
@@ -442,12 +445,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             return result.data;
           })();
 
-          if (isCacheable) svgCache.set(svgKey, inFlight);
+          if (svgKey !== undefined) svgCache.set(svgKey, inFlight);
           const resolved = await inFlight;
-          if (isCacheable) svgCache.set(svgKey, resolved);
+          if (svgKey !== undefined) svgCache.set(svgKey, resolved);
           return resolved;
         } catch (err) {
-          if (isCacheable) svgCache.delete(svgKey);
+          if (svgKey !== undefined) svgCache.delete(svgKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }
