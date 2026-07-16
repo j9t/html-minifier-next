@@ -382,6 +382,26 @@ npx html-minifier-next --minify-css --minify-js --minify-svg input.html
 
 The caches persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
 
+**Inspecting cache effectiveness:**
+
+Use `getCacheStats()` to see hit/miss counts and current occupancy for each cache:
+
+```js
+import { minify, getCacheStats } from 'html-minifier-next';
+
+await minify(html, { minifyCSS: true, minifyJS: true });
+console.log(getCacheStats());
+// {
+//   css: { gets: 3, hits: 1, size: 2, limit: 500 },
+//   js: { gets: 1, hits: 0, size: 1, limit: 500 },
+//   svg: { gets: 0, hits: 0, size: 0, limit: 500 }
+// }
+```
+
+A cache that was never exercised (e.g., `minifySVG` disabled, or `minify()` not yet called) reports all-zero stats.
+
+The CLI’s `--verbose` and `--dry` modes print the same information to STDERR at the end of a run, omitting caches that were never touched.
+
 ## Minification comparison
 
 Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier-benchmarks) for details on how HTML Minifier Next compares to other minifiers.
