@@ -1016,5 +1016,35 @@ describe('CSS and JS', () => {
       assert.strictEqual(jsAfter.gets, jsBefore.gets, 'JS cache should not be touched when `minifyJS` is off');
       assert.strictEqual(svgAfter.gets, svgBefore.gets, 'SVG cache should not be touched when `minifySVG` is off');
     });
+
+    test('Oversized CSS input (>1 MB) is minified normally but never cached', async () => {
+      const bigComment = '/*' + 'x'.repeat(1024 * 1024) + '*/';
+      const input = `<style>.oversize-probe{color:tomato}${bigComment}</style>`;
+
+      const before = getCacheStats().css;
+      const result1 = await minify(input, { minifyCSS: true });
+      const result2 = await minify(input, { minifyCSS: true });
+      const after = getCacheStats().css;
+
+      assert.strictEqual(result1, result2, 'Result should be identical whether or not it was cached');
+      assert.ok(result1.includes('.oversize-probe{color:tomato}'), 'CSS should still be minified');
+      assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
+      assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
+    });
+
+    test('Oversized JS input (>1 MB) is minified normally but never cached', async () => {
+      const bigComment = '/*' + 'x'.repeat(1024 * 1024) + '*/';
+      const input = `<script>function oversizeProbe(){return 42}${bigComment}</script>`;
+
+      const before = getCacheStats().js;
+      const result1 = await minify(input, { minifyJS: true });
+      const result2 = await minify(input, { minifyJS: true });
+      const after = getCacheStats().js;
+
+      assert.strictEqual(result1, result2, 'Result should be identical whether or not it was cached');
+      assert.ok(result1.includes('return 42'), 'JS should still be minified');
+      assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
+      assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
+    });
   });
 });

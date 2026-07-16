@@ -379,6 +379,7 @@ npx html-minifier-next --minify-css --minify-js --minify-svg input.html
 
 * Cache locking: Caches are created on the first `minify()` call and persist for the process lifetime. Cache sizes are locked after first initialization—subsequent calls reuse the same caches even if different `cacheCSS`, `cacheJS`, or `cacheSVG` options are provided. The first call’s options determine the cache sizes.
 * Zero values: Explicit `0` values are coerced to `1` (minimum functional cache size) to avoid immediate eviction. To keep the cache footprint as small as possible, use a small number like `10` or `50` instead of `0`.
+* Entry size cap: Individual CSS, JavaScript, or SVG blocks larger than 1 MB are minified normally but not stored in the cache—this bounds worst-case cache memory without affecting realistically sized inline content. (This cutoff is fixed and not configurable.)
 
 The caches persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
 

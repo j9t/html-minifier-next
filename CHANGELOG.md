@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 * Added cache hit/miss statistics for the CSS, JavaScript, and SVG minification caches: the `getCacheStats()` function exposes per-cache `gets`, `hits`, `size`, and `limit`; the CLI’s `--verbose` and `--dry` modes print a one-line-per-cache summary to STDERR at the end of a run, omitting caches that were never touched (e.g., when the corresponding minifier is disabled)
+* Added a fixed 1 MB entry size cap to the caches—oversized blocks are still minified normally but are no longer stored, bounding worst-case cache memory without affecting realistically sized inline content
 
 ## [7.2.0] - 2026-07-09
 
