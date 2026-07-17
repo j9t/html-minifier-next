@@ -1259,6 +1259,49 @@ describe('CLI', () => {
     await fs.promises.rm(configPath, { force: true });
   });
 
+  test('Verbose mode prints cache stats, omitting caches that were never touched', () => {
+    // Duplicate `<style>` block to trigger a CSS cache hit; single `<script>` to keep JS at a miss;
+    // no `<svg>`/`minifySVG`, so the SVG cache must be omitted entirely
+    const input = '<style>body{color:red}</style><style>body{color:red}</style><script>let a=1;</script>';
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, '--minify-css', '--minify-js', '--verbose'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    assert.strictEqual(status, 0);
+    const stderrText = stderr.toString();
+    assert.ok(stderrText.includes('Cache stats:'));
+    assert.ok(stderrText.includes('CSS cache: 1 hit, 1 miss, 1/500 entries'));
+    assert.ok(stderrText.includes('JS cache: 0 hits, 1 miss, 1/500 entries'));
+    assert.ok(!stderrText.includes('SVG cache:'), 'SVG cache was never touched and should be omitted');
+    assert.ok(stdout.toString().length > 0);
+  });
+
+  test('Dry run prints cache stats', () => {
+    const input = '<style>body{color:blue}</style>';
+    const { stderr, status } = spawnSync('node', [cliPath, '--minify-css', '--dry'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    assert.strictEqual(status, 0);
+    const stderrText = stderr.toString();
+    assert.ok(stderrText.includes('[DRY RUN]'));
+    assert.ok(stderrText.includes('Cache stats:'));
+    assert.ok(stderrText.includes('CSS cache: 0 hits, 1 miss, 1/500 entries'));
+  });
+
+  test('Cache stats are omitted entirely when no cache was touched', () => {
+    const input = '<p>Hello</p>';
+    const { stderr, status } = spawnSync('node', [cliPath, '--verbose'], {
+      cwd: fixturesDir,
+      input
+    });
+
+    assert.strictEqual(status, 0);
+    assert.ok(!stderr.toString().includes('Cache stats:'));
+  });
+
   test('Should throw error for invalid cache-css value', () => {
     const cliArguments = [
       'default.html',

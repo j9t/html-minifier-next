@@ -452,6 +452,26 @@ program.helpOption('-h, --help', 'Display help for command');
     return { originalSize, minifiedSize, saved, sign, percentage };
   }
 
+  // Print a one-line-per-cache hits/misses/size summary to STDERR, skipping caches
+  // that were never touched (e.g., their minifier is disabled)
+  async function printCacheStats() {
+    const { getCacheStats } = await import('./src/htmlminifier.js');
+    const cacheStats = getCacheStats();
+    const labels = { css: 'CSS', js: 'JS', svg: 'SVG' };
+
+    const lines = Object.keys(labels).reduce((acc, key) => {
+      const { gets, hits, size, limit } = cacheStats[key];
+      if (gets === 0) return acc;
+      const misses = gets - hits;
+      acc.push(`  ${labels[key]} cache: ${hits.toLocaleString()} hit${hits === 1 ? '' : 's'}, ${misses.toLocaleString()} miss${misses === 1 ? '' : 'es'}, ${size.toLocaleString()}/${limit.toLocaleString()} entries`);
+      return acc;
+    }, []);
+
+    if (lines.length === 0) return;
+    console.error('Cache stats:');
+    lines.forEach(line => console.error(line));
+  }
+
   async function processFile(inputFile, outputFile, isDryRun = false, isVerbose = false) {
     const data = await fs.promises.readFile(inputFile, { encoding: 'utf8' }).catch(err => {
       fatal('Cannot read ' + inputFile + '\n' + err.message);
@@ -698,6 +718,7 @@ program.helpOption('-h, --help', 'Display help for command');
       console.error(`  Original: ${stats.originalSize.toLocaleString()} bytes`);
       console.error(`  Minified: ${stats.minifiedSize.toLocaleString()} bytes`);
       console.error(`  Saved: ${stats.sign}${Math.abs(stats.saved).toLocaleString()} bytes (${stats.percentage}%)`);
+      await printCacheStats();
       return;
     }
 
@@ -705,6 +726,7 @@ program.helpOption('-h, --help', 'Display help for command');
     if (programOptions.verbose) {
       const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
       console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      await printCacheStats();
     }
 
     if (programOptions.output) {
@@ -833,6 +855,10 @@ program.helpOption('-h, --help', 'Display help for command');
         console.error('---');
         console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (${sign}${Math.abs(totalSaved).toLocaleString()}, ${totalPercentage}%)`);
       }
+
+      if (isVerbose) {
+        await printCacheStats();
+      }
     })();
   } else if (filesProvided) { // Minifying one or more files specified on the CMD line
     // Process each file independently, then concatenate outputs
@@ -881,12 +907,14 @@ program.helpOption('-h, --help', 'Display help for command');
       console.error(`  Original: ${stats.originalSize.toLocaleString()} bytes`);
       console.error(`  Minified: ${stats.minifiedSize.toLocaleString()} bytes`);
       console.error(`  Saved: ${stats.sign}${Math.abs(stats.saved).toLocaleString()} bytes (${stats.percentage}%)`);
+      await printCacheStats();
       process.exit(0);
     }
 
     if (programOptions.verbose) {
       const inputSource = capturedFiles.join(', ');
       console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      await printCacheStats();
     }
 
     if (programOptions.output) {

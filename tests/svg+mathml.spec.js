@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import {describe, test} from 'node:test';
-import { minify } from '../src/htmlminifier.js';
+import { minify, getCacheStats } from '../src/htmlminifier.js';
 
 describe('SVG and MathML', () => {
   test('SVGO basic optimization', async () => {
@@ -599,5 +599,20 @@ describe('SVG and MathML', () => {
     const withSVGOff = await minify(input, { preset: 'comprehensive', minifySVG: false });
     assert.ok(withSVGMin.includes('<path'), 'SVGO should convert `rect` to `path` when `minifySVG` is enabled');
     assert.ok(!withSVGOff.includes('<path'), '`rect` should be preserved when `minifySVG` is overridden to false');
+  });
+
+  test('Oversized SVG input (>1 MB) is minified normally but never cached', async () => {
+    const bigComment = '<!-- ' + 'x'.repeat(1024 * 1024) + ' -->';
+    const input = `<svg><circle cx="10" cy="10" r="5"/>${bigComment}</svg>`;
+
+    const before = getCacheStats().svg;
+    const result1 = await minify(input, { minifySVG: true });
+    const result2 = await minify(input, { minifySVG: true });
+    const after = getCacheStats().svg;
+
+    assert.strictEqual(result1, result2, 'Result should be identical whether or not it was cached');
+    assert.ok(result1.includes('<circle'), 'SVG should still be minified');
+    assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
+    assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
   });
 });

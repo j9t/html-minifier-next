@@ -1,6 +1,6 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert';
-import { minify } from '../src/htmlminifier.js';
+import { minify, getCacheStats } from '../src/htmlminifier.js';
 
 describe('CSS and JS', () => {
   test('CSS minification', async () => {
@@ -986,6 +986,65 @@ describe('CSS and JS', () => {
       assert.notStrictEqual(result1, result2, 'Different large JS inputs must not share a cache entry');
       assert.ok(result1.includes('1111'), 'First result should contain the correct value');
       assert.ok(result2.includes('2222'), 'Second result should contain the correct value');
+    });
+
+    test('`getCacheStats()` reflects hits and misses', async () => {
+      // Unique selector so this test’s lookups are unaffected by entries other tests left behind
+      const input = '<style>.cache-stats-probe { color: rebeccapurple; }</style>';
+
+      const before = getCacheStats().css;
+      await minify(input, { minifyCSS: true }); // First call: a miss (populates the cache)
+      await minify(input, { minifyCSS: true }); // Second call: a hit (same key, already cached)
+      const after = getCacheStats().css;
+
+      assert.strictEqual(after.gets - before.gets, 2, 'Both calls should perform a cache lookup');
+      assert.strictEqual(after.hits - before.hits, 1, 'Only the second, identical call should hit the cache');
+      assert.ok(after.size >= 1, 'Cache should hold at least the entry just inserted');
+      assert.strictEqual(after.limit, 500, 'Default cache limit should be reported');
+    });
+
+    test('`getCacheStats()` omits caches with no effect on untouched caches', async () => {
+      // Only CSS caching is exercised—JS and SVG lookups must not be incremented by this call
+      const jsBefore = getCacheStats().js;
+      const svgBefore = getCacheStats().svg;
+
+      await minify('<style>.cache-stats-probe-2 { color: teal; }</style>', { minifyCSS: true });
+
+      const jsAfter = getCacheStats().js;
+      const svgAfter = getCacheStats().svg;
+
+      assert.strictEqual(jsAfter.gets, jsBefore.gets, 'JS cache should not be touched when `minifyJS` is off');
+      assert.strictEqual(svgAfter.gets, svgBefore.gets, 'SVG cache should not be touched when `minifySVG` is off');
+    });
+
+    test('Oversized CSS input (>1 MB) is minified normally but never cached', async () => {
+      const bigComment = '/*' + 'x'.repeat(1024 * 1024) + '*/';
+      const input = `<style>.oversize-probe{color:tomato}${bigComment}</style>`;
+
+      const before = getCacheStats().css;
+      const result1 = await minify(input, { minifyCSS: true });
+      const result2 = await minify(input, { minifyCSS: true });
+      const after = getCacheStats().css;
+
+      assert.strictEqual(result1, result2, 'Result should be identical whether or not it was cached');
+      assert.ok(result1.includes('.oversize-probe{color:tomato}'), 'CSS should still be minified');
+      assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
+      assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
+    });
+
+    test('Oversized JS input (>1 MB) is minified normally but never cached', async () => {
+      const bigComment = '/*' + 'x'.repeat(1024 * 1024) + '*/';
+      const input = `<script>function oversizeProbe(){return 42}${bigComment}</script>`;
+
+      const before = getCacheStats().js;
+      const result1 = await minify(input, { minifyJS: true });
+      const result2 = await minify(input, { minifyJS: true });
+      const after = getCacheStats().js;
+
+      assert.strictEqual(result1, result2, 'Result should be identical whether or not it was cached');
+      assert.ok(result1.includes('return 42'), 'JS should still be minified');
+      assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
+      assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
     });
   });
 });

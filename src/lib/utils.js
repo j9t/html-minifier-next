@@ -21,12 +21,16 @@ function stableStringify(obj) {
 class LRU {
   constructor(limit = 200) {
     this.limit = limit;
+    this.gets = 0;
+    this.hits = 0;
     /** @type {Map<string, unknown>} */
     this.map = new Map();
   }
   /** @param {string} key */
   get(key) {
+    this.gets++;
     if (this.map.has(key)) {
+      this.hits++;
       const v = this.map.get(key);
       this.map.delete(key);
       this.map.set(key, v);
@@ -48,7 +52,16 @@ class LRU {
   }
   /** @param {string} key */
   delete(key) { this.map.delete(key); }
+  /** @returns {{ gets: number, hits: number, size: number, limit: number }} */
+  stats() {
+    return { gets: this.gets, hits: this.hits, size: this.map.size, limit: this.limit };
+  }
 }
+
+// Content longer than this (in UTF-16 code units, roughly bytes for typical CSS/JS/SVG) is
+// minified normally but never stored in a minification cache—caps worst-case cache memory
+// (entry count × this size) without affecting realistically sized inline content
+const MAX_CACHE_ENTRY_SIZE = 1024 * 1024; // 1 MB
 
 // FNV-1a 32-bit hash for large-input cache keys
 
@@ -135,6 +148,7 @@ function parseRegExp(value) {
 
 export { stableStringify };
 export { LRU };
+export { MAX_CACHE_ENTRY_SIZE };
 export { hashContent };
 export { uniqueId };
 export { identity };

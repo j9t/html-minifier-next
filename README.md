@@ -379,8 +379,33 @@ npx html-minifier-next --minify-css --minify-js --minify-svg input.html
 
 * Cache locking: Caches are created on the first `minify()` call and persist for the process lifetime. Cache sizes are locked after first initialization—subsequent calls reuse the same caches even if different `cacheCSS`, `cacheJS`, or `cacheSVG` options are provided. The first call’s options determine the cache sizes.
 * Zero values: Explicit `0` values are coerced to `1` (minimum functional cache size) to avoid immediate eviction. To keep the cache footprint as small as possible, use a small number like `10` or `50` instead of `0`.
+* Entry size cap: Individual CSS, JavaScript, or SVG blocks larger than 1 MB are minified normally but not stored in the cache—this bounds worst-case cache memory without affecting realistically sized inline content. (This cutoff is fixed and not configurable.)
 
 The caches persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
+
+**Inspecting cache effectiveness:**
+
+Use `getCacheStats()` to see hit/miss counts and current occupancy for each cache:
+
+```js
+import { minify, getCacheStats } from 'html-minifier-next';
+
+// After minifying pages that share templated CSS/JS…
+for (const html of pages) {
+  await minify(html, { minifyCSS: true, minifyJS: true });
+}
+
+console.log(getCacheStats());
+// {
+//   css: { gets: 392, hits: 298, size: 94, limit: 500 },
+//   js: { gets: 1196, hits: 1192, size: 4, limit: 500 },
+//   svg: { gets: 0, hits: 0, size: 0, limit: 500 }
+// }
+```
+
+A cache that was never exercised (e.g., `minifySVG` disabled, or `minify()` not yet called) reports all-zero stats.
+
+The CLI’s `--verbose` and `--dry` modes print the same information to STDERR at the end of a run, omitting caches that were never touched.
 
 ## Minification comparison
 
@@ -642,6 +667,6 @@ With many thanks to the previous authors of and contributors to HTML Minifier, e
 
 You might like some of my other work:
 
-* Optimization tools: [hihtml](https://github.com/j9t/hihtml) · HTML Minifier Next · [ObsoHTML](https://github.com/j9t/obsohtml) · [Image Guard](https://github.com/j9t/image-guard) · [Compressor.js Next](https://github.com/j9t/compressorjs-next) · [.htaccess Punk](https://github.com/j9t/htaccess-punk)
+* Optimization tools: [hihtml](https://github.com/j9t/hihtml) · HTML Minifier Next · [ObsoHTML](https://github.com/j9t/obsohtml) · [CSS Dedup](https://github.com/j9t/css-dedup) · [Image Guard](https://github.com/j9t/image-guard) · [Compressor.js Next](https://github.com/j9t/compressorjs-next) · [.htaccess Punk](https://github.com/j9t/htaccess-punk)
 * Defense tools: [IA Defensa](https://iadefensa.com/solutions/)
 * Resources for quality web development: [Articles](https://meiert.com/topics/development/) · [Books](https://meiert.com/topics/books/) (including [_On Web Development_](https://meiert.com/blog/on-web-development-2/)) · [News](https://frontenddogma.com/) · [Terminology](https://webglossary.info/)

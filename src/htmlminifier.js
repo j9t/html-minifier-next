@@ -529,6 +529,22 @@ let jsMinifyCache = null;
 /** @type {LRU | null} */
 let svgMinifyCache = null;
 
+/**
+ * @typedef {Object} CacheStats
+ *  Hit/miss statistics and current occupancy for a single minification cache.
+ *
+ * @prop {number} gets Number of lookups attempted against the cache.
+ * @prop {number} hits Number of lookups that found a cached entry.
+ * @prop {number} size Number of entries currently held in the cache.
+ * @prop {number} limit Maximum number of entries the cache can hold.
+ */
+
+/**
+ * @param {LRU | null} cache
+ * @returns {CacheStats}
+ */
+const cacheStatsOrEmpty = (cache) => cache ? cache.stats() : { gets: 0, hits: 0, size: 0, limit: 0 };
+
 // Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
 const RE_SCRIPT_OPEN = /<script(?=[\s>])/gi; // Finds tag start; use `findTagEnd()` for the actual closing `>`
@@ -1894,6 +1910,23 @@ function initCaches(options) {
 }
 
 /**
+ * Get hit/miss statistics for the CSS, JavaScript, and SVG minification caches.
+ *
+ * Each cache is created lazily on the first `minify()` call (see `initCaches`); before
+ * that first call, or for a cache never exercised (e.g., `minifyCSS` disabled), its
+ * entry reports all-zero stats.
+ *
+ * @returns {{ css: CacheStats, js: CacheStats, svg: CacheStats }}
+ */
+export function getCacheStats() {
+  return {
+    css: cacheStatsOrEmpty(cssMinifyCache),
+    js: cacheStatsOrEmpty(jsMinifyCache),
+    svg: cacheStatsOrEmpty(svgMinifyCache)
+  };
+}
+
+/**
  * @param {string} value
  * @param {MinifierOptions} [options]
  * @returns {Promise<string>}
@@ -1926,4 +1959,4 @@ export const minify = async function (value, options) {
 
 export { presets, getPreset, getPresetNames };
 
-export default { minify, presets, getPreset, getPresetNames };
+export default { minify, presets, getPreset, getPresetNames, getCacheStats };
