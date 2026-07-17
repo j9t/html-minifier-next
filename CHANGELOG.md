@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Added automatic config file discovery: If an `html-minifier-next.config.json` file (or, for compatibility, `htmlminifier.config.json`) is present in the working directory, it’s loaded without needing `--config-file`—an explicit `--config-file` still takes precedence, a note on STDERR reports which file was picked up, and the standalone `--zero` mode remains config-free
 
+### Changed
+
+* Raised the declared Node.js minimum from ≥22 to ≥22.13, reflecting the effective floor of current dependencies
+
 ## [7.3.0] - 2026-07-17
 
 ### Added
