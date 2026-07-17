@@ -33,7 +33,7 @@ const CORE_DISABLED_OPTIONS = ['minifyCSS', 'minifyJS', 'minifySVG', 'minifyURLs
 const PATH_BASELINE = path.join(__dirname, 'benchmark-baseline.json');
 
 function parseArgs(argv) {
-  const args = { save: false, core: false, iterations: DEFAULT_ITERATIONS, config: 'html-minifier-next.json' };
+  const args = { save: false, core: false, iterations: DEFAULT_ITERATIONS, config: 'html-minifier-next.config.json' };
   for (const arg of argv) {
     if (arg === '--save') {
       args.save = true;
