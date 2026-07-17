@@ -61,7 +61,7 @@ class LRU {
 // Content longer than this (in UTF-16 code units, roughly bytes for typical CSS/JS/SVG) is
 // minified normally but never stored in a minification cache—caps worst-case cache memory
 // (entry count × this size) without affecting realistically sized inline content
-const MAX_CACHEABLE_INPUT_LENGTH = 1024 * 1024; // 1 MB
+const MAX_CACHE_ENTRY_SIZE = 1024 * 1024; // 1 MB
 
 // FNV-1a 32-bit hash for large-input cache keys
 
@@ -148,7 +148,7 @@ function parseRegExp(value) {
 
 export { stableStringify };
 export { LRU };
-export { MAX_CACHEABLE_INPUT_LENGTH };
+export { MAX_CACHE_ENTRY_SIZE };
 export { hashContent };
 export { uniqueId };
 export { identity };

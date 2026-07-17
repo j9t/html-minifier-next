@@ -1,5 +1,5 @@
 import { createUrlMinifier } from './urls.js';
-import { LRU, MAX_CACHEABLE_INPUT_LENGTH, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
+import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -183,7 +183,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
-        const isCacheable = inputCSS.length <= MAX_CACHEABLE_INPUT_LENGTH;
+        const isCacheable = inputCSS.length <= MAX_CACHE_ENTRY_SIZE;
         const cssKey = isCacheable
           ? (inputCSS.length > 2048
             ? (hashContent(inputCSS) + '|' + type + '|' + cssSig)
@@ -299,7 +299,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         // Use user’s chosen engine for script blocks
         const useEngine = inline ? 'terser' : engine;
         let jsKey;
-        const isCacheable = code.length <= MAX_CACHEABLE_INPUT_LENGTH;
+        const isCacheable = code.length <= MAX_CACHE_ENTRY_SIZE;
 
         try {
           // Select pre-computed signature based on engine
@@ -424,7 +424,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return svgContent;
         }
 
-        const isCacheable = svgContent.length <= MAX_CACHEABLE_INPUT_LENGTH;
+        const isCacheable = svgContent.length <= MAX_CACHE_ENTRY_SIZE;
         const svgKey = isCacheable
           ? (svgContent.length > 2048
             ? (hashContent(svgContent) + '|' + svgSig)
