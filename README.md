@@ -390,11 +390,15 @@ Use `getCacheStats()` to see hit/miss counts and current occupancy for each cach
 ```js
 import { minify, getCacheStats } from 'html-minifier-next';
 
-await minify(html, { minifyCSS: true, minifyJS: true });
+// After minifying pages that share templated CSS/JS…
+for (const html of pages) {
+  await minify(html, { minifyCSS: true, minifyJS: true });
+}
+
 console.log(getCacheStats());
 // {
-//   css: { gets: 3, hits: 1, size: 2, limit: 500 },
-//   js: { gets: 1, hits: 0, size: 1, limit: 500 },
+//   css: { gets: 392, hits: 298, size: 94, limit: 500 },
+//   js: { gets: 1196, hits: 1192, size: 4, limit: 500 },
 //   svg: { gets: 0, hits: 0, size: 0, limit: 500 }
 // }
 ```
