@@ -8,7 +8,7 @@ The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/
 
 ## Installation
 
-HTML Minifier Next is ESM-only and requires Node.js ≥22.
+HTML Minifier Next is ESM-only and requires Node.js ≥22.13.
 
 For use as a command-line app, use npx:
 
@@ -40,7 +40,7 @@ Use `npx html-minifier-next --help` to check all available options:
 | `--output <file>`, `-o <file>` | Specify output file (reads from `--input` file argument or STDIN; outputs to STDOUT if not specified) | File to file: `npx html-minifier-next input.html -o output.html`<br>File to file (explicit): `npx html-minifier-next -i input.html -o output.html`<br>Pipe to file: `cat input.html \| npx html-minifier-next -o output.html`<br>File to STDOUT: `npx html-minifier-next input.html` |
 | `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
-| `--config-file <file>`, `-c <file>` | Use a configuration file (defaults to `html-minifier-next.config.json` in the working directory, if present) | `--config-file=html-minifier-next.json` |
+| `--config-file <file>`, `-c <file>` | Use a configuration file (defaults to `html-minifier-next.config.json` in the working directory, if present) | `--config-file=path/to/config.json` |
 | `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `--dry`, `-d` | Dry run: Process and report statistics without writing output | `npx html-minifier-next input.html --dry --collapse-whitespace` |
 
@@ -112,8 +112,8 @@ To review the specific options set, [presets.js](https://github.com/j9t/html-min
 npx html-minifier-next --preset conservative input.html
 
 # Via config file
-npx html-minifier-next --config-file=html-minifier-next.json input.html
-# where html-minifier-next.json contains: { "preset": "conservative" }
+npx html-minifier-next --config-file=path/to/config.json input.html
+# where config.json contains `{ "preset": "conservative" }`
 
 # Override preset options
 npx html-minifier-next --preset conservative --remove-empty-attributes input.html
@@ -432,8 +432,8 @@ npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist
 # Process only specific extensions
 npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext=html,php
 
-# Using configuration file that sets `fileExt` (e.g., `"fileExt": "html,php"`)
-npx html-minifier-next --config-file=html-minifier-next.json --input-dir=src --output-dir=dist
+# Using a configuration file that sets `fileExt` (e.g., `"fileExt": "html,php"`)
+npx html-minifier-next --config-file=path/to/config.json --input-dir=src --output-dir=dist
 
 # Process all files (explicit wildcard)
 npx html-minifier-next --collapse-whitespace --input-dir=src --output-dir=dist --file-ext='*'
@@ -584,7 +584,7 @@ ignoreCustomFragments: [/\{%[\s\S]{0,1000}?%\}/, /\{\{[\s\S]{0,500}?\}\}/]
 **CLI (via config file—recommended):**
 
 ```shell
-npx html-minifier-next --config-file=config.json input.html
+npx html-minifier-next --config-file=path/to/config.json input.html
 ```
 
 **CLI (inline—not recommended due to complex escaping):**
