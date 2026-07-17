@@ -575,6 +575,76 @@ describe('CLI', () => {
     fs.unlinkSync(path.resolve(fixturesDir, 'tmp/test-config-empty-override.json'));
   });
 
+  // Default config file discovery tests
+  const execCliInDir = (args, cwd) => {
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, ...args], { cwd });
+    return {
+      stdout: stdout.toString().trim(),
+      stderr: stderr.toString().trim(),
+      exitCode: status
+    };
+  };
+
+  const setupConfigDir = (name, configs) => {
+    const dir = path.resolve(fixturesDir, 'tmp', name);
+    fs.mkdirSync(dir, { recursive: true });
+    for (const [fileName, config] of Object.entries(configs)) {
+      fs.writeFileSync(path.join(dir, fileName), JSON.stringify(config, null, 2));
+    }
+    fs.writeFileSync(path.join(dir, 'input.html'), '<p>foo</p><!-- comment -->');
+    return dir;
+  };
+
+  test('Should load default config file from the working directory', () => {
+    const dir = setupConfigDir('config-default', {
+      'html-minifier-next.config.json': { removeComments: true }
+    });
+
+    const { stdout, stderr, exitCode } = execCliInDir(['input.html'], dir);
+
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stderr.includes('Using config file “html-minifier-next.config.json”'));
+    assert.strictEqual(stdout, '<p>foo</p>');
+  });
+
+  test('Should load htmlminifier.config.json as a fallback default config file', () => {
+    const dir = setupConfigDir('config-default-fallback', {
+      'htmlminifier.config.json': { removeComments: true }
+    });
+
+    const { stdout, stderr, exitCode } = execCliInDir(['input.html'], dir);
+
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stderr.includes('Using config file “htmlminifier.config.json”'));
+    assert.strictEqual(stdout, '<p>foo</p>');
+  });
+
+  test('Should prefer html-minifier-next.config.json over htmlminifier.config.json', () => {
+    const dir = setupConfigDir('config-default-precedence', {
+      'html-minifier-next.config.json': { removeComments: true },
+      'htmlminifier.config.json': { removeComments: false }
+    });
+
+    const { stdout, stderr, exitCode } = execCliInDir(['input.html'], dir);
+
+    assert.strictEqual(exitCode, 0);
+    assert.ok(stderr.includes('Using config file “html-minifier-next.config.json”'));
+    assert.strictEqual(stdout, '<p>foo</p>');
+  });
+
+  test('Should ignore default config file when `--config-file` is specified', () => {
+    const dir = setupConfigDir('config-default-explicit', {
+      'html-minifier-next.config.json': { removeComments: true },
+      'explicit.json': { collapseWhitespace: true }
+    });
+
+    const { stdout, stderr, exitCode } = execCliInDir(['--config-file=explicit.json', 'input.html'], dir);
+
+    assert.strictEqual(exitCode, 0);
+    assert.ok(!stderr.includes('Using config file'));
+    assert.strictEqual(stdout, '<p>foo</p><!-- comment -->');
+  });
+
   // Dry run mode tests
   test('Should show statistics in dry run mode for single file', () => {
     const cliArguments = [

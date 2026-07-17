@@ -229,6 +229,10 @@ async function loadConfigFromPath(configPath) {
 // Config keys the CLI handles itself, beyond the options in `optionDefinitions`
 const CONFIG_KEYS_EXTRA = new Set(['$schema', 'preset', 'fileExt', 'ignoreDir']);
 
+// Default config files, looked up in the working directory in this order when
+// `--config-file` isn’t specified
+const CONFIG_FILES_DEFAULT = ['html-minifier-next.config.json', 'htmlminifier.config.json'];
+
 /**
  * Normalize and validate config object by applying parsers and transforming values.
  * @param {object} config - Raw config object
@@ -387,10 +391,17 @@ program.helpOption('-h, --help', 'Display help for command');
     }
   }
 
-  // Load and normalize config if `--config-file` was specified
+  // Load and normalize config if `--config-file` was specified; otherwise look
+  // for a default config file in the working directory
   if (programOptions.configFile) {
     config = await loadConfigFromPath(programOptions.configFile);
     config = normalizeConfig(config);
+  } else {
+    const configFileDefault = CONFIG_FILES_DEFAULT.find(name => fs.existsSync(path.resolve(name)));
+    if (configFileDefault) {
+      console.error(`Using config file “${configFileDefault}”`);
+      config = normalizeConfig(await loadConfigFromPath(configFileDefault));
+    }
   }
 
   function createOptions() {

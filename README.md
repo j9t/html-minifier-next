@@ -40,13 +40,13 @@ Use `npx html-minifier-next --help` to check all available options:
 | `--output <file>`, `-o <file>` | Specify output file (reads from `--input` file argument or STDIN; outputs to STDOUT if not specified) | File to file: `npx html-minifier-next input.html -o output.html`<br>File to file (explicit): `npx html-minifier-next -i input.html -o output.html`<br>Pipe to file: `cat input.html \| npx html-minifier-next -o output.html`<br>File to STDOUT: `npx html-minifier-next input.html` |
 | `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
-| `--config-file <file>`, `-c <file>` | Use a configuration file | `--config-file=html-minifier-next.json` |
+| `--config-file <file>`, `-c <file>` | Use a configuration file (defaults to `html-minifier-next.config.json` in the working directory, if present) | `--config-file=html-minifier-next.json` |
 | `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `--dry`, `-d` | Dry run: Process and report statistics without writing output | `npx html-minifier-next input.html --dry --collapse-whitespace` |
 
 ### Configuration file
 
-You can use a configuration file to specify options. The file can be either in JSON format or a JavaScript module that exports the configuration object:
+You can use a configuration file to specify options. If an `html-minifier-next.config.json` file is present in the current working directory—only there; subfolders (including `--input-dir`) and parent folders are not searched—the CLI picks it up automatically, with a note on STDERR confirming this. An explicit `--config-file` takes precedence. (The standalone `--zero` mode is deliberately config-free and ignores default config files.) The file can be either in JSON format or a JavaScript module that exports the configuration object:
 
 **JSON configuration example:**
 
@@ -645,7 +645,7 @@ Parameters:
 * `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
 * `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s own processing time
 * `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
-* `--config=PATH`: Uses an alternative options file (default `html-minifier-next.json`)
+* `--config=PATH`: Uses an alternative options file (default `html-minifier-next.config.json`)
 
 To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN’s own code rather than the bundled minifiers.
 
