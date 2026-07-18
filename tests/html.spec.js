@@ -5742,7 +5742,7 @@ describe('HTML', () => {
     // Real-world example from Apple TV website with JSON data in `data-rid-relay` attribute
     const input = '<a id="media-gallery-item-1-link" class="media-gallery-wrapper-link fam-media-gallery-wrapper-link" href="https://tv.apple.com/us/movie/f1-the-movie/umc.cmc.3t6dvnnr87zwd4wmvpdx5came?l=en-US?itscg=10000&itsct=atv-apl_hp-stream_now--220622" data-analytics-title="stream now" data-rid-relay=\'{"289":"itsct"}\' data-analytics-exit-link data-analytics-activitymap-region-id="tv-plus-gallery-f1 the movie" aria-label="Stream now, F1 The Movie - Action - Now streaming on Apple TV.">Example</a>';
 
-    // Benchmark config similar to then-current benchmarks/html-minifier.json [now backtest/html-minifier-next.json]
+    // Benchmark config similar to then-current benchmarks/html-minifier.json [now backtest/html-minifier-next.config.json]
     const benchmarkConfig = {
       caseSensitive: false,
       collapseAttributeWhitespace: true,
