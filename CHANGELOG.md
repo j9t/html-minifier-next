@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.5.0] - 2026-07-19
+
+### Changed
+
+* Improved performance by moving special-case handling off the minifier’s hot paths:
+  - Processed options are now memoized per options object, sparing batch runs the repeated regex parsing, closure creation, and option-signature stringification on every `minify()` call
+  - The `minifyURLs` cache now persists across `minify()` calls (per `site` configuration), matching the process-lifetime behavior of the CSS/JS/SVG caches
+  - The parser lowercases each tag name once instead of once per element-set lookup, and the whitespace/comment handlers no longer allocate closures per text node
+  - SVG/MathML foreign-content handling is skipped entirely for documents without `<svg>`/`<math>` elements
+  - `mergeScripts` merges consecutive scripts in a single pass instead of rescanning the document after every merge, and `maxLineLength` output assembly is no longer quadratic in the number of segments
+
 ## [7.4.0] - 2026-07-18
 
 ### Added

@@ -49,6 +49,29 @@ function shouldMinifyInnerHTML(options) {
   );
 }
 
+// Persistent per-site URL minification caches—results depend only on the `site`
+// configuration, so entries can be shared across `minify()` calls; bounded so
+// batch runs with many distinct sites can’t grow memory without limit
+const MAX_URL_CACHE_SITES = 20;
+/** @type {Map<string, LRU>} */
+const urlMinifyCaches = new Map();
+
+/** @param {string} site */
+function getUrlMinifyCache(site) {
+  let cache = urlMinifyCaches.get(site);
+  if (!cache) {
+    if (urlMinifyCaches.size >= MAX_URL_CACHE_SITES) {
+      const oldestSite = urlMinifyCaches.keys().next().value;
+      if (oldestSite !== undefined) {
+        urlMinifyCaches.delete(oldestSite);
+      }
+    }
+    cache = new LRU(500);
+    urlMinifyCaches.set(site, cache);
+  }
+  return cache;
+}
+
 // User-facing option keys that are valid but not listed in `optionDefinitions`
 const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace']);
 
@@ -373,8 +396,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
       const relate = createUrlMinifier(urlOptions.site || '');
 
-      // Create instance-specific cache (results depend on site configuration)
-      const instanceCache = new LRU(500);
+      // Reuse the persistent cache for this site configuration
+      const instanceCache = getUrlMinifyCache(urlOptions.site || '');
 
       options.minifyURLs = function (/** @type {string} */ text) {
         // Fast-path: Skip if text doesn’t look like a URL that needs processing

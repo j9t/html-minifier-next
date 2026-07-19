@@ -564,6 +564,10 @@ const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
 // HTML encoding types for annotation-xml (MathML)
 const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 
+// Probe for SVG/MathML elements—when the input has none (the common case),
+// the per-tag foreign-content machinery can be skipped entirely
+const RE_FOREIGN_ELEMENT_PROBE = /<(?:svg|math)[\s/>]/i;
+
 // Script merging
 
 /**
@@ -599,6 +603,13 @@ function findTagEnd(html, pos) {
  * `</script>` strings inside script content are handled correctly per the HTML
  * spec (raw text ends at the first `</script>`).
  *
+ * Single forward pass: Each script absorbs all directly following compatible
+ * scripts, and the output is assembled from segments—this avoids rebuilding
+ * the full string and restarting the scan after every merge (O(n²) on inputs
+ * with many merges). Merges can’t cascade backwards: compatibility depends
+ * only on the attributes of the first script in a chain, which merging
+ * preserves, so one pass finds every merge the iterated rescan found.
+ *
  * @param {string} html - The HTML string to process
  * @returns {string} HTML with consecutive scripts merged
  */
@@ -617,92 +628,68 @@ function mergeConsecutiveScripts(html) {
     return attrs;
   };
 
-  let changed = true;
+  /** @type {string[]} */
+  const segments = [];
+  let consumedPos = 0; // Start of the input region not yet copied to `segments`
 
-  // Keep merging until no more changes (handles chains of 3+ scripts)
-  while (changed) {
-    changed = false;
-    RE_SCRIPT_OPEN.lastIndex = 0;
-    let m1;
+  RE_SCRIPT_OPEN.lastIndex = 0;
+  let m1;
 
-    while ((m1 = RE_SCRIPT_OPEN.exec(html)) !== null) {
-      // Use findTagEnd() to get the real closing '>', skipping quoted attribute values
-      const tagEnd1 = findTagEnd(html, m1.index + 7);
-      if (tagEnd1 === -1) break;
+  while ((m1 = RE_SCRIPT_OPEN.exec(html)) !== null) {
+    // Use findTagEnd() to get the real closing '>', skipping quoted attribute values
+    const tagEnd1 = findTagEnd(html, m1.index + 7);
+    if (tagEnd1 === -1) break;
 
-      const attrs1Str = html.slice(m1.index + 7, tagEnd1);
-      const contentStart1 = tagEnd1 + 1;
+    const attrs1Str = html.slice(m1.index + 7, tagEnd1);
 
-      // Find end of this script’s content (first `</script>`—per HTML spec, raw text ends here)
-      RE_SCRIPT_CLOSE.lastIndex = contentStart1;
-      const close1 = RE_SCRIPT_CLOSE.exec(html);
-      if (!close1) break;
+    // Find end of this script’s content (first `</script>`—per HTML spec, raw text ends here)
+    RE_SCRIPT_CLOSE.lastIndex = tagEnd1 + 1;
+    const close1 = RE_SCRIPT_CLOSE.exec(html);
+    if (!close1) break;
 
-      const content1 = html.slice(contentStart1, close1.index);
-      const afterClose1 = close1.index + close1[0].length;
+    let mergedContent = html.slice(tagEnd1 + 1, close1.index);
+    let afterClose = close1.index + close1[0].length;
 
+    const a1 = parseAttrs(attrs1Str);
+    // `src` (external) and non-default types (modules, JSON, etc.) must not be merged:
+    // module scripts have per-script lexical scope, and non-JS content (e.g., JSON)
+    // is not concatenable; even identical non-JS types are incompatible
+    const mergeable = !('src' in a1) && DEFAULT_JS_TYPES.has((a1.type || '').toLowerCase());
+    let mergedAny = false;
+
+    // Absorb all directly following compatible scripts
+    while (mergeable) {
       // Skip optional whitespace and check for a consecutive <script> tag
-      let i = afterClose1;
+      let i = afterClose;
       while (i < html.length && (html[i] === ' ' || html[i] === '\t' || html[i] === '\n' || html[i] === '\r' || html[i] === '\f')) i++;
-      if (html.slice(i, i + 7).toLowerCase() !== '<script' || (html.charAt(i + 7) !== '>' && !/\s/.test(html.charAt(i + 7)))) {
-        RE_SCRIPT_OPEN.lastIndex = afterClose1;
-        continue;
-      }
+      if (html.slice(i, i + 7).toLowerCase() !== '<script' || (html.charAt(i + 7) !== '>' && !/\s/.test(html.charAt(i + 7)))) break;
 
-      const tagStart2 = i;
-      const tagEnd2 = findTagEnd(html, tagStart2 + 7);
+      const tagEnd2 = findTagEnd(html, i + 7);
       if (tagEnd2 === -1) break;
 
-      const attrs2Str = html.slice(tagStart2 + 7, tagEnd2);
-      const contentStart2 = tagEnd2 + 1;
+      const attrs2Str = html.slice(i + 7, tagEnd2);
 
-      // Find end of second script’s content
-      RE_SCRIPT_CLOSE.lastIndex = contentStart2;
+      // Find end of the following script’s content
+      RE_SCRIPT_CLOSE.lastIndex = tagEnd2 + 1;
       const close2 = RE_SCRIPT_CLOSE.exec(html);
       if (!close2) break;
 
-      const content2 = html.slice(contentStart2, close2.index);
-      const afterClose2 = close2.index + close2[0].length;
-
-      const a1 = parseAttrs(attrs1Str);
       const a2 = parseAttrs(attrs2Str);
 
-      // Check for `src`—cannot merge external scripts
-      if ('src' in a1 || 'src' in a2) {
-        RE_SCRIPT_OPEN.lastIndex = afterClose1;
-        continue;
-      }
-
-      // Check `type` compatibility (both must be default JS)
-      // Non-JS types (modules, JSON, etc.) must not be merged:
-      // Module scripts have per-script lexical scope, and non-JS content (e.g., JSON)
-      // is not concatenable; even identical non-JS types are incompatible
-      const type1 = (a1.type || '').toLowerCase();
-      const type2 = (a2.type || '').toLowerCase();
-      if (!DEFAULT_JS_TYPES.has(type1) || !DEFAULT_JS_TYPES.has(type2)) {
-        RE_SCRIPT_OPEN.lastIndex = afterClose1;
-        continue;
-      }
-
-      // Check for conflicting boolean attributes
+      // Check compatibility: No `src`, default JS type, no conflicting boolean
+      // attributes, and `nonce` must be same or both absent
+      if ('src' in a2 || !DEFAULT_JS_TYPES.has((a2.type || '').toLowerCase())) break;
       let boolConflict = false;
       for (const attr of SCRIPT_BOOL_ATTRS) {
         if ((attr in a1) !== (attr in a2)) { boolConflict = true; break; }
       }
+      if (boolConflict || a1.nonce !== a2.nonce) break;
 
-      // Check `nonce`—must be same or both absent
-      if (boolConflict || a1.nonce !== a2.nonce) {
-        RE_SCRIPT_OPEN.lastIndex = afterClose1;
-        continue;
-      }
-
-      // Scripts are compatible—merge them
-      changed = true;
-
-      // Combine content—use semicolon normally, newline only for trailing `//` comments
-      const c1 = content1.trim();
+      // Scripts are compatible—combine content: Use semicolon normally,
+      // newline only for trailing `//` comments
+      const content2 = html.slice(tagEnd2 + 1, close2.index);
+      const c1 = mergedContent.trim();
       const c2 = content2.trim();
-      let mergedContent;
       if (c1 && c2) {
         // Check if last line of c1 contains `//` (single-line comment)
         // If so, use newline to terminate it; otherwise use semicolon (if not already present)
@@ -713,13 +700,23 @@ function mergeConsecutiveScripts(html) {
         mergedContent = c1 || c2;
       }
 
-      // Use first script’s attributes (they should be compatible)
-      html = html.slice(0, m1.index) + `<script${attrs1Str}>${mergedContent}</script>` + html.slice(afterClose2);
-      break; // Restart scanning (outer while loop)
+      afterClose = close2.index + close2[0].length;
+      mergedAny = true;
     }
+
+    if (mergedAny) {
+      // Use first script’s attributes (they are compatible)
+      segments.push(html.slice(consumedPos, m1.index), `<script${attrs1Str}>${mergedContent}</script>`);
+      consumedPos = afterClose;
+    }
+
+    // Continue scanning after this script (skips `<script` occurrences inside content)
+    RE_SCRIPT_OPEN.lastIndex = afterClose;
   }
 
-  return html;
+  if (!segments.length) return html;
+  segments.push(html.slice(consumedPos));
+  return segments.join('');
 }
 
 /**
@@ -1184,11 +1181,281 @@ async function minifyHTML(value, options, partialMarkup) {
     trimTrailingWhitespace(charsIndex, nextTag);
   }
 
+  // Per-text-node context for `charsCollapse`/`charsFinalize`, set by the `chars`
+  // handler before either phase runs; shared variables (rather than parameters)
+  // let both phases live at this scope—`charsCollapse` reassigns `textPrevTag`
+  // and `charsFinalize` must see that change. Defining the phases inside the
+  // `chars` handler instead would allocate two closures per text node.
+  /** @type {string} */
+  let textPrevTag = '';
+  /** @type {string} */
+  let textNextTag = '';
+  /** @type {HTMLAttribute[]} */
+  let textPrevAttrs = emptyAttrs;
+  /** @type {HTMLAttribute[]} */
+  let textNextAttrs = emptyAttrs;
+
+  // Whitespace collapsing phase (sync)
+  function charsCollapse(/** @type {string} */ text) {
+    // Trim outermost newline-based whitespace inside `pre`/`textarea` elements
+    // This removes trailing newlines often added by template engines before closing tags
+    // Only trims single trailing newlines (multiple newlines are likely intentional formatting)
+    if (options.collapseWhitespace && stackNoTrimWhitespace.length) {
+      const topTag = stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1];
+      if (preTextareaDepth > 0) {
+        // Trim trailing whitespace only if it ends with a single newline (not multiple)
+        // Multiple newlines are likely intentional formatting, single newline is often a template artifact
+        // Treat CRLF (`\r\n`), CR (`\r`), and LF (`\n`) as single line-ending units
+        if (textNextTag && textNextTag === '/' + topTag && /[^\r\n](?:\r\n|\r|\n)[ \t]*$/.test(text)) {
+          text = text.replace(/(?:\r\n|\r|\n)[ \t]*$/, '');
+        }
+      }
+    }
+    if (options.collapseWhitespace) {
+      if (!stackNoTrimWhitespace.length) {
+        // When the prev item is a UID placeholder, compute its effective tag name for whitespace decisions;
+        // this is only used in `collapseWhitespaceSmart`—`textPrevTag` itself is not modified,
+        // to avoid side effects on the `inlineTextSet` branch below
+        let effectivePrevTag = textPrevTag;
+        if (textPrevTag === 'comment') {
+          const prevComment = buffer[buffer.length - 1] ?? '';
+          if (!uidIgnore || prevComment.indexOf(uidIgnore) === -1) {
+            if (!prevComment) {
+              textPrevTag = charsPrevTag;
+              effectivePrevTag = textPrevTag;
+            }
+            if (buffer.length > 1 && (!prevComment || (!options.conservativeCollapse && / $/.test(currentChars)))) {
+              const charsIndex = buffer.length - 2;
+              buffer[charsIndex] = (buffer[charsIndex] ?? '').replace(/\s+$/, function (trailingSpaces) {
+                text = trailingSpaces + text;
+                return '';
+              });
+            }
+          } else if (uidIgnorePlaceholderPattern && textNextTag !== 'comment') {
+            // UID placeholder followed by a real element—derive the effective `prevTag` from the
+            // placeholder’s last HTML tag so `collapseWhitespaceSmart` can make the right call;
+            // when `textNextTag` is `comment` (another UID placeholder), `commentFinalize` handles it
+            const match = prevComment.match(uidIgnorePlaceholderPattern);
+            if (match) {
+              const idx = +(match[1] ?? '');
+              if (idx < ignoredMarkupChunks.length) {
+                const content = ignoredMarkupChunks[idx];
+                const lastTagMatch = content && RE_LAST_HTML_TAG.exec(content);
+                if (lastTagMatch) {
+                  const group = lastTagMatch[1] ?? '';
+                  const isClose = group.charAt(0) === '/';
+                  const tagName = resolveName(isClose ? group.slice(1) : group);
+                  effectivePrevTag = isClose ? '/' + tagName : tagName;
+                }
+              }
+            }
+          }
+        }
+        if (textPrevTag) {
+          if (textPrevTag === '/nobr' || textPrevTag === 'wbr') {
+            if (/^\s/.test(text)) {
+              let tagIndex = buffer.length - 1;
+              while (tagIndex > 0 && (buffer[tagIndex] ?? '').lastIndexOf('<' + textPrevTag) !== 0) {
+                tagIndex--;
+              }
+              trimTrailingWhitespace(tagIndex - 1, 'br');
+            }
+          } else if (inlineTextSet.has(textPrevTag.charAt(0) === '/' ? textPrevTag.slice(1) : textPrevTag)) {
+            text = collapseWhitespace(text, options, /(?:^|\s)$/.test(currentChars), false);
+          }
+        }
+        if (textPrevTag || textNextTag) {
+          text = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineElements, inlineTextSet);
+        } else {
+          text = collapseWhitespace(text, options, true, true);
+        }
+        if (!text && /\s$/.test(currentChars) && textPrevTag && textPrevTag.charAt(0) === '/') {
+          trimTrailingWhitespace(buffer.length - 1, textNextTag);
+        }
+      }
+      if (!stackNoCollapseWhitespace.length && textNextTag !== 'html' && !(textPrevTag && textNextTag)) {
+        text = collapseWhitespace(text, options, false, false, true);
+      }
+    }
+    return text;
+  }
+
+  // Finalization phase (sync): Optional tag handling, entity re-encoding, buffer push
+  function charsFinalize(/** @type {string} */ text) {
+    if (options.removeOptionalTags && text) {
+      // UID-attr tokens are padded with `\t`, which would falsely look like leading whitespace;
+      // resolve single-token text to its actual content for the space/comment checks below
+      let effectiveText = text;
+      if (uidAttrLeadingPattern && uidAttr && text.includes(uidAttr)) {
+        const uidMatch = uidAttrLeadingPattern.exec(text);
+        if (uidMatch) {
+          const idx = +(uidMatch[1] ?? 0);
+          const chunks = idx < ignoredCustomMarkupChunks.length ? ignoredCustomMarkupChunks[idx] : null;
+          if (chunks != null) {
+            effectiveText = chunks[0] ?? '';
+          }
+        }
+      }
+      // `<html>` may be omitted if first thing inside is not a comment
+      // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
+      if (optionalStartTag === 'html' || (optionalStartTag === 'body' && !/^\s/.test(effectiveText))) {
+        removeStartTag();
+      }
+      optionalStartTag = '';
+      // `</html>` or `</body>` may be omitted if not followed by comment
+      // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
+      if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(effectiveText)))) {
+        removeEndTag();
+      }
+      // Don’t reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
+      if (!/^\s+$/.test(text) || !options.collapseWhitespace || options.conservativeCollapse) {
+        optionalEndTag = '';
+        optionalEndTagEmitted = false;
+      }
+    }
+    charsPrevTag = /^\s*$/.test(text) ? textPrevTag : 'comment';
+    if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
+      // Escape any `&` symbols that start either:
+      // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
+      // 2. or any other character reference (i.e., one that does end with `;`)
+      // Note that `&` can be escaped as `&amp`, without the semicolon.
+      // https://mathiasbynens.be/notes/ambiguous-ampersands
+      if (text.indexOf('&') !== -1) {
+        text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
+      }
+      if (text.indexOf('<') !== -1) {
+        text = text.replace(RE_ESCAPE_LT, '&lt;');
+      }
+    }
+    if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
+      text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ _prefix, /** @type {string} */ index) {
+        return ignoredCustomMarkupChunks[+index]?.[0] ?? match;
+      });
+    }
+    currentChars += text;
+    if (text) {
+      hasChars = true;
+    }
+    buffer.push(text);
+  }
+
+  // Comment finalization (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
+  function commentFinalize(/** @type {string} */ comment) {
+    if (options.removeOptionalTags && comment) {
+      if (uidIgnorePlaceholderPattern) {
+        const match = uidIgnorePlaceholderPattern.exec(comment);
+        if (match) {
+          // UID placeholders represent real HTML content, not true HTML comments;
+          // if there’s a pending optional end tag and the ignored content isn’t itself
+          // a comment (which per the HTML spec prevents omission), resolve it now,
+          // before the UID is pushed to the buffer
+          const idx = +(match[1] ?? 0);
+          const content = idx < ignoredMarkupChunks.length ? ignoredMarkupChunks[idx] : null;
+          if (optionalEndTag && optionalEndTagEmitted && content != null && !/^\s*<!--/.test(content)) {
+            const firstTagMatch = content.match(/^\s*<([a-zA-Z][^\s/>]*)/);
+            const firstTagGroup = firstTagMatch?.[1] ?? '';
+            const firstTag = firstTagGroup ? resolveName(firstTagGroup) : '';
+            if (canRemovePrecedingTag(optionalEndTag, firstTag)) {
+              removeEndTag();
+            }
+          }
+        }
+      }
+      // Comments (real or placeholder) always suppress optional start tag omissions
+      optionalStartTag = '';
+      optionalEndTag = '';
+      optionalEndTagEmitted = false;
+    }
+
+    // Optimize whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
+    if (options.collapseWhitespace && comment && uidIgnorePlaceholderPattern) {
+      if (uidIgnorePlaceholderPattern.test(comment)) {
+        // Check if previous buffer items are: [ignore-placeholder, whitespace-only text]
+        if (buffer.length >= 2) {
+          const prevText = buffer[buffer.length - 1];
+          const prevComment = buffer[buffer.length - 2];
+
+          // Check if previous item is whitespace-only and item before that is ignore-placeholder
+          if (prevText && /^\s+$/.test(prevText) && prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
+            // Extract the index from both placeholders to check their content
+            const currentMatch = comment.match(uidIgnorePlaceholderPattern);
+            const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
+
+            if (currentMatch && prevMatch) {
+              const currentIndex = +(currentMatch[1] ?? 0);
+              const prevIndex = +(prevMatch[1] ?? 0);
+
+              // Defensive bounds check to ensure indices are valid
+              if (currentIndex < ignoredMarkupChunks.length && prevIndex < ignoredMarkupChunks.length) {
+                const currentContent = ignoredMarkupChunks[currentIndex];
+                const prevContent = ignoredMarkupChunks[prevIndex];
+
+                // Only collapse whitespace if both blocks contain HTML (start with `<`)
+                // Don’t collapse if either contains plain text, as that would change meaning
+                if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
+                  // Extract tag names from the HTML content
+                  const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                  const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                  // HTML comments are invisible (no block/inline nature), treat as non-inline
+                  const prevIsHtmlComment = !prevTagMatch && RE_HTML_COMMENT_START.test(prevContent);
+                  const currentIsHtmlComment = !currentTagMatch && RE_HTML_COMMENT_START.test(currentContent);
+                  // Closing tags (e.g., `</div>`)—inline-ness determines whether to collapse
+                  const prevClosingTagMatch = !prevTagMatch && RE_CLOSING_TAG_START.exec(prevContent);
+                  const currentClosingTagMatch = !currentTagMatch && RE_CLOSING_TAG_START.exec(currentContent);
+
+                  // Collapse if both sides are element/closing tags or HTML comments, and neither is inline
+                  if ((currentTagMatch || currentIsHtmlComment || currentClosingTagMatch) &&
+                      (prevTagMatch || prevIsHtmlComment || prevClosingTagMatch)) {
+                    const currentTag = currentTagMatch ? resolveName(currentTagMatch[1] ?? '')
+                      : currentClosingTagMatch ? resolveName(currentClosingTagMatch[1] ?? '') : null;
+                    const prevTag = prevTagMatch ? resolveName(prevTagMatch[1] ?? '')
+                      : prevClosingTagMatch ? resolveName(prevClosingTagMatch[1] ?? '') : null;
+
+                    // Don’t collapse between inline elements (HTML comments count as non-inline)
+                    if (!inlineElements.has(currentTag ?? '') && !inlineElements.has(prevTag ?? '')) {
+                      // Collapse whitespace respecting context rules
+                      let collapsedText = prevText;
+
+                      // Apply `collapseWhitespace` with appropriate context
+                      if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
+                        // Not in pre or other no-collapse context
+                        if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
+                          // Preserve line break as single newline
+                          collapsedText = '\n';
+                        } else if (options.conservativeCollapse) {
+                          // Conservative mode: Keep single space
+                          collapsedText = ' ';
+                        } else {
+                          // Aggressive mode: Remove all whitespace
+                          collapsedText = '';
+                        }
+                      }
+
+                      // Replace the whitespace in buffer
+                      buffer[buffer.length - 1] = collapsedText;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    buffer.push(comment);
+  }
+
   // SVG subtree capture: When SVGO is active, record buffer positions for post-processing
   /** @type {Array<{start: number, end: number}>} */
   const svgBlocks = []; // Array of { start, end } buffer indices
   let svgBufferStartIndex = -1;
   let svgDepth = 0;
+
+  // One-time probe: If the input contains no SVG/MathML elements and the call
+  // isn’t already inside foreign content (recursive calls inherit options),
+  // the per-tag foreign-content handling in `start`/`end` can be skipped
+  const hasForeignContext = Boolean(options.insideForeignContent) || RE_FOREIGN_ELEMENT_PROBE.test(value);
 
   const parser = new HTMLParser(value, {
     partialMarkup: partialMarkup ?? options.partialMarkup,
@@ -1199,44 +1466,49 @@ async function minifyHTML(value, options, partialMarkup) {
     wantsNextTag: !!(options.collapseWhitespace || options.collapseInlineTagWhitespace || options.conservativeCollapse),
 
     start: async function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ unary, /** @type {string} */ unarySlash, /** @type {boolean} */ autoGenerated) {
-      const lowerTag = tag.toLowerCase();
-      if (lowerTag === 'svg' || lowerTag === 'math') {
-        // Preserve the surrounding HTML context’s name function (e.g., `identity`
-        // under `caseSensitive`) so `foreignObject`/`annotation-xml` can restore it
-        const nameHTML = options.name;
-        options = Object.create(options);
-        options.caseSensitive = true;
-        options.keepClosingSlash = true;
-        options.name = identity;
-        options.nameHTML = nameHTML;
-        options.insideSVG = lowerTag === 'svg';
-        options.insideForeignContent = true;
-        // Disable HTML-specific options that produce invalid XML:
-        // SVG with `minifySVG` enabled is passed to SVGO, which requires valid XML input;
-        // MathML is never processed by SVGO, so these restrictions never apply to it
-        if (lowerTag === 'svg' && options.minifySVG) {
-          options.removeAttributeQuotes = false;
-          options.decodeEntities = false;
-        }
-        options.removeTagWhitespace = false;
-      }
-      // `foreignObject` in SVG and `annotation-xml` in MathML contain HTML content
-      // Note: The element itself is in SVG/MathML namespace, only its children are HTML
+      // `lowerTag` stays '' when no foreign content is around—the SVG/MathML
+      // checks below can then never match, and no per-tag lowercasing is needed
+      let lowerTag = '';
       let useNameParentForTag = false;
-      if (options.insideForeignContent && (lowerTag === 'foreignobject' ||
-          (lowerTag === 'annotation-xml' && attrs.some((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding' &&
-            RE_HTML_ENCODING.test(a.value ?? ''))))) {
-        const nameParent = options.name;
-        options = Object.create(options);
-        options.caseSensitive = false;
-        options.keepClosingSlash = false;
-        options.nameParent = nameParent; // Preserve for the element tag itself
-        options.name = options.nameHTML ?? lowercase;
-        options.insideForeignContent = false;
-        // Note: `removeAttributeQuotes`, `removeTagWhitespace`, and `decodeEntities`
-        // stay disabled (inherited from SVG context) because the entire SVG block
-        // must be valid XML for SVGO processing
-        useNameParentForTag = true;
+      if (hasForeignContext) {
+        lowerTag = tag.toLowerCase();
+        if (lowerTag === 'svg' || lowerTag === 'math') {
+          // Preserve the surrounding HTML context’s name function (e.g., `identity`
+          // under `caseSensitive`) so `foreignObject`/`annotation-xml` can restore it
+          const nameHTML = options.name;
+          options = Object.create(options);
+          options.caseSensitive = true;
+          options.keepClosingSlash = true;
+          options.name = identity;
+          options.nameHTML = nameHTML;
+          options.insideSVG = lowerTag === 'svg';
+          options.insideForeignContent = true;
+          // Disable HTML-specific options that produce invalid XML:
+          // SVG with `minifySVG` enabled is passed to SVGO, which requires valid XML input;
+          // MathML is never processed by SVGO, so these restrictions never apply to it
+          if (lowerTag === 'svg' && options.minifySVG) {
+            options.removeAttributeQuotes = false;
+            options.decodeEntities = false;
+          }
+          options.removeTagWhitespace = false;
+        }
+        // `foreignObject` in SVG and `annotation-xml` in MathML contain HTML content
+        // Note: The element itself is in SVG/MathML namespace, only its children are HTML
+        if (options.insideForeignContent && (lowerTag === 'foreignobject' ||
+            (lowerTag === 'annotation-xml' && attrs.some((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding' &&
+              RE_HTML_ENCODING.test(a.value ?? ''))))) {
+          const nameParent = options.name;
+          options = Object.create(options);
+          options.caseSensitive = false;
+          options.keepClosingSlash = false;
+          options.nameParent = nameParent; // Preserve for the element tag itself
+          options.name = options.nameHTML ?? lowercase;
+          options.insideForeignContent = false;
+          // Note: `removeAttributeQuotes`, `removeTagWhitespace`, and `decodeEntities`
+          // stay disabled (inherited from SVG context) because the entire SVG block
+          // must be valid XML for SVGO processing
+          useNameParentForTag = true;
+        }
       }
       // `nameParent` is always set when `useNameParentForTag` is true; the extra check only narrows the type
       tag = (useNameParentForTag && options.nameParent ? options.nameParent : options.name)(tag);
@@ -1312,22 +1584,34 @@ async function minifyHTML(value, options, partialMarkup) {
         /** @type {(tag: string, attrs: HTMLAttribute[]) => void} */ (options.sortAttributes)(tag, attrs);
       }
 
-      const attrResults = attrs.map(attr => normalizeAttr(attr, attrs, tag, options, minifyHTML));
+      const attrResults = new Array(attrs.length);
+      let anyThenable = false;
+      for (let i = 0; i < attrs.length; i++) {
+        const result = normalizeAttr(/** @type {HTMLAttribute} */ (attrs[i]), attrs, tag, options, minifyHTML);
+        if (!anyThenable && isThenable(result)) {
+          anyThenable = true;
+        }
+        attrResults[i] = result;
+      }
       // The `isThenable` probe guarantees the sync branch holds no promises
-      const normalizedAttrs = /** @type {Array<{name: string, value: string | undefined, attr: HTMLAttribute} | undefined>} */ (attrResults.some(isThenable) ? await Promise.all(attrResults) : attrResults);
-      const parts = [];
-      let isLast = true;
+      const normalizedAttrs = /** @type {Array<{name: string, value: string | undefined, attr: HTMLAttribute} | undefined>} */ (anyThenable ? await Promise.all(attrResults) : attrResults);
+      // Find the last kept attribute, then emit in order—avoids the
+      // intermediate parts array and reverse of the previous approach
+      let lastKeptIndex = -1;
       for (let i = normalizedAttrs.length - 1; i >= 0; i--) {
-        const normalizedAttr = normalizedAttrs[i];
-        if (normalizedAttr) {
-          parts.push(buildAttr(normalizedAttr, hasUnarySlash, options, isLast, uidAttr));
-          isLast = false;
+        if (normalizedAttrs[i]) {
+          lastKeptIndex = i;
+          break;
         }
       }
-      parts.reverse();
-      if (parts.length > 0) {
+      if (lastKeptIndex !== -1) {
         buffer.push(' ');
-        buffer.push.apply(buffer, parts);
+        for (let i = 0; i <= lastKeptIndex; i++) {
+          const normalizedAttr = normalizedAttrs[i];
+          if (normalizedAttr) {
+            buffer.push(buildAttr(normalizedAttr, hasUnarySlash, options, i === lastKeptIndex, uidAttr));
+          }
+        }
       } else if (optional && optionalStartTags.has(tag)) {
         // Start tag must never be omitted if it has any attributes
         optionalStartTag = tag;
@@ -1342,13 +1626,17 @@ async function minifyHTML(value, options, partialMarkup) {
       }
     },
     end: function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ autoGenerated) {
-      const lowerTag = tag.toLowerCase();
-      // Restore parent context when exiting SVG/MathML or HTML-in-foreign-content elements
-      if (lowerTag === 'svg' || lowerTag === 'math') {
-        options = Object.getPrototypeOf(options);
-      } else if ((lowerTag === 'foreignobject' || lowerTag === 'annotation-xml') &&
-                 !options.insideForeignContent && Object.getPrototypeOf(options).insideForeignContent) {
-        options = Object.getPrototypeOf(options);
+      // As in `start`: `lowerTag` stays '' when no foreign content is around
+      let lowerTag = '';
+      if (hasForeignContext) {
+        lowerTag = tag.toLowerCase();
+        // Restore parent context when exiting SVG/MathML or HTML-in-foreign-content elements
+        if (lowerTag === 'svg' || lowerTag === 'math') {
+          options = Object.getPrototypeOf(options);
+        } else if ((lowerTag === 'foreignobject' || lowerTag === 'annotation-xml') &&
+                   !options.insideForeignContent && Object.getPrototypeOf(options).insideForeignContent) {
+          options = Object.getPrototypeOf(options);
+        }
       }
       tag = options.name(tag);
 
@@ -1444,10 +1732,11 @@ async function minifyHTML(value, options, partialMarkup) {
       }
     },
     chars: function (/** @type {string} */ text, /** @type {string} */ prevTag, /** @type {string} */ nextTag, /** @type {HTMLAttribute[]} */ prevAttrs, /** @type {HTMLAttribute[]} */ nextAttrs) {
-      prevTag = prevTag === '' ? 'comment' : prevTag;
-      nextTag = nextTag === '' ? 'comment' : nextTag;
-      prevAttrs = prevAttrs || [];
-      nextAttrs = nextAttrs || [];
+      // Publish this node’s context for the `charsCollapse`/`charsFinalize` phases
+      textPrevTag = prevTag === '' ? 'comment' : prevTag;
+      textNextTag = nextTag === '' ? 'comment' : nextTag;
+      textPrevAttrs = prevAttrs || [];
+      textNextAttrs = nextAttrs || [];
 
       // Detect whether any async work is actually needed for this text node
       const needsDecode = options.decodeEntities && text && !specialContentElements.has(currentTag) && text.indexOf('&') !== -1;
@@ -1457,150 +1746,6 @@ async function minifyHTML(value, options, partialMarkup) {
         a => a.name.toLowerCase() === 'type' && (a.value ?? '').trim().toLowerCase() === 'module'
       );
       const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
-
-      // Whitespace collapsing phase (sync); captures `prevTag`/`nextTag`/`prevAttrs`/`nextAttrs` from outer scope
-      function charsCollapse(/** @type {string} */ text) {
-        // Trim outermost newline-based whitespace inside `pre`/`textarea` elements
-        // This removes trailing newlines often added by template engines before closing tags
-        // Only trims single trailing newlines (multiple newlines are likely intentional formatting)
-        if (options.collapseWhitespace && stackNoTrimWhitespace.length) {
-          const topTag = stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1];
-          if (preTextareaDepth > 0) {
-            // Trim trailing whitespace only if it ends with a single newline (not multiple)
-            // Multiple newlines are likely intentional formatting, single newline is often a template artifact
-            // Treat CRLF (`\r\n`), CR (`\r`), and LF (`\n`) as single line-ending units
-            if (nextTag && nextTag === '/' + topTag && /[^\r\n](?:\r\n|\r|\n)[ \t]*$/.test(text)) {
-              text = text.replace(/(?:\r\n|\r|\n)[ \t]*$/, '');
-            }
-          }
-        }
-        if (options.collapseWhitespace) {
-          if (!stackNoTrimWhitespace.length) {
-            // When the prev item is a UID placeholder, compute its effective tag name for whitespace decisions;
-            // this is only used in `collapseWhitespaceSmart`—`prevTag` itself is not modified,
-            // to avoid side effects on the `inlineTextSet` branch below
-            let effectivePrevTag = prevTag;
-            if (prevTag === 'comment') {
-              const prevComment = buffer[buffer.length - 1] ?? '';
-              if (!uidIgnore || prevComment.indexOf(uidIgnore) === -1) {
-                if (!prevComment) {
-                  prevTag = charsPrevTag;
-                  effectivePrevTag = prevTag;
-                }
-                if (buffer.length > 1 && (!prevComment || (!options.conservativeCollapse && / $/.test(currentChars)))) {
-                  const charsIndex = buffer.length - 2;
-                  buffer[charsIndex] = (buffer[charsIndex] ?? '').replace(/\s+$/, function (trailingSpaces) {
-                    text = trailingSpaces + text;
-                    return '';
-                  });
-                }
-              } else if (uidIgnorePlaceholderPattern && nextTag !== 'comment') {
-                // UID placeholder followed by a real element—derive the effective `prevTag` from the
-                // placeholder’s last HTML tag so `collapseWhitespaceSmart` can make the right call;
-                // when `nextTag` is `comment` (another UID placeholder), `commentFinalize` handles it
-                const match = prevComment.match(uidIgnorePlaceholderPattern);
-                if (match) {
-                  const idx = +(match[1] ?? '');
-                  if (idx < ignoredMarkupChunks.length) {
-                    const content = ignoredMarkupChunks[idx];
-                    const lastTagMatch = content && RE_LAST_HTML_TAG.exec(content);
-                    if (lastTagMatch) {
-                      const group = lastTagMatch[1] ?? '';
-                      const isClose = group.charAt(0) === '/';
-                      const tagName = resolveName(isClose ? group.slice(1) : group);
-                      effectivePrevTag = isClose ? '/' + tagName : tagName;
-                    }
-                  }
-                }
-              }
-            }
-            if (prevTag) {
-              if (prevTag === '/nobr' || prevTag === 'wbr') {
-                if (/^\s/.test(text)) {
-                  let tagIndex = buffer.length - 1;
-                  while (tagIndex > 0 && (buffer[tagIndex] ?? '').lastIndexOf('<' + prevTag) !== 0) {
-                    tagIndex--;
-                  }
-                  trimTrailingWhitespace(tagIndex - 1, 'br');
-                }
-              } else if (inlineTextSet.has(prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag)) {
-                text = collapseWhitespace(text, options, /(?:^|\s)$/.test(currentChars), false);
-              }
-            }
-            if (prevTag || nextTag) {
-              text = collapseWhitespaceSmart(text, effectivePrevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet);
-            } else {
-              text = collapseWhitespace(text, options, true, true);
-            }
-            if (!text && /\s$/.test(currentChars) && prevTag && prevTag.charAt(0) === '/') {
-              trimTrailingWhitespace(buffer.length - 1, nextTag);
-            }
-          }
-          if (!stackNoCollapseWhitespace.length && nextTag !== 'html' && !(prevTag && nextTag)) {
-            text = collapseWhitespace(text, options, false, false, true);
-          }
-        }
-        return text;
-      }
-
-      // Finalization phase (sync): Optional tag handling, entity re-encoding, buffer push
-      function charsFinalize(/** @type {string} */ text) {
-        if (options.removeOptionalTags && text) {
-          // UID-attr tokens are padded with `\t`, which would falsely look like leading whitespace;
-          // resolve single-token text to its actual content for the space/comment checks below
-          let effectiveText = text;
-          if (uidAttrLeadingPattern && uidAttr && text.includes(uidAttr)) {
-            const uidMatch = uidAttrLeadingPattern.exec(text);
-            if (uidMatch) {
-              const idx = +(uidMatch[1] ?? 0);
-              const chunks = idx < ignoredCustomMarkupChunks.length ? ignoredCustomMarkupChunks[idx] : null;
-              if (chunks != null) {
-                effectiveText = chunks[0] ?? '';
-              }
-            }
-          }
-          // `<html>` may be omitted if first thing inside is not a comment
-          // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
-          if (optionalStartTag === 'html' || (optionalStartTag === 'body' && !/^\s/.test(effectiveText))) {
-            removeStartTag();
-          }
-          optionalStartTag = '';
-          // `</html>` or `</body>` may be omitted if not followed by comment
-          // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
-          if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(effectiveText)))) {
-            removeEndTag();
-          }
-          // Don’t reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
-          if (!/^\s+$/.test(text) || !options.collapseWhitespace || options.conservativeCollapse) {
-            optionalEndTag = '';
-            optionalEndTagEmitted = false;
-          }
-        }
-        charsPrevTag = /^\s*$/.test(text) ? prevTag : 'comment';
-        if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
-          // Escape any `&` symbols that start either:
-          // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
-          // 2. or any other character reference (i.e., one that does end with `;`)
-          // Note that `&` can be escaped as `&amp`, without the semicolon.
-          // https://mathiasbynens.be/notes/ambiguous-ampersands
-          if (text.indexOf('&') !== -1) {
-            text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
-          }
-          if (text.indexOf('<') !== -1) {
-            text = text.replace(RE_ESCAPE_LT, '&lt;');
-          }
-        }
-        if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
-          text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ _prefix, /** @type {string} */ index) {
-            return ignoredCustomMarkupChunks[+index]?.[0] ?? match;
-          });
-        }
-        currentChars += text;
-        if (text) {
-          hasChars = true;
-        }
-        buffer.push(text);
-      }
 
       // Fast path: All work is sync—skip async machinery entirely
       if (!needsDecode && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
@@ -1629,113 +1774,6 @@ async function minifyHTML(value, options, partialMarkup) {
     comment: function (/** @type {string} */ text, /** @type {boolean} */ nonStandard) {
       const prefix = nonStandard ? '<!' : '<!--';
       const suffix = nonStandard ? '>' : '-->';
-
-      // Finalization phase (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
-      function commentFinalize(/** @type {string} */ comment) {
-        if (options.removeOptionalTags && comment) {
-          if (uidIgnorePlaceholderPattern) {
-            const match = uidIgnorePlaceholderPattern.exec(comment);
-            if (match) {
-              // UID placeholders represent real HTML content, not true HTML comments;
-              // if there’s a pending optional end tag and the ignored content isn’t itself
-              // a comment (which per the HTML spec prevents omission), resolve it now,
-              // before the UID is pushed to the buffer
-              const idx = +(match[1] ?? 0);
-              const content = idx < ignoredMarkupChunks.length ? ignoredMarkupChunks[idx] : null;
-              if (optionalEndTag && optionalEndTagEmitted && content != null && !/^\s*<!--/.test(content)) {
-                const firstTagMatch = content.match(/^\s*<([a-zA-Z][^\s/>]*)/);
-                const firstTagGroup = firstTagMatch?.[1] ?? '';
-                const firstTag = firstTagGroup ? resolveName(firstTagGroup) : '';
-                if (canRemovePrecedingTag(optionalEndTag, firstTag)) {
-                  removeEndTag();
-                }
-              }
-            }
-          }
-          // Comments (real or placeholder) always suppress optional start tag omissions
-          optionalStartTag = '';
-          optionalEndTag = '';
-          optionalEndTagEmitted = false;
-        }
-
-        // Optimize whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
-        if (options.collapseWhitespace && comment && uidIgnorePlaceholderPattern) {
-          if (uidIgnorePlaceholderPattern.test(comment)) {
-            // Check if previous buffer items are: [ignore-placeholder, whitespace-only text]
-            if (buffer.length >= 2) {
-              const prevText = buffer[buffer.length - 1];
-              const prevComment = buffer[buffer.length - 2];
-
-              // Check if previous item is whitespace-only and item before that is ignore-placeholder
-              if (prevText && /^\s+$/.test(prevText) && prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
-                // Extract the index from both placeholders to check their content
-                const currentMatch = comment.match(uidIgnorePlaceholderPattern);
-                const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
-
-                if (currentMatch && prevMatch) {
-                  const currentIndex = +(currentMatch[1] ?? 0);
-                  const prevIndex = +(prevMatch[1] ?? 0);
-
-                  // Defensive bounds check to ensure indices are valid
-                  if (currentIndex < ignoredMarkupChunks.length && prevIndex < ignoredMarkupChunks.length) {
-                    const currentContent = ignoredMarkupChunks[currentIndex];
-                    const prevContent = ignoredMarkupChunks[prevIndex];
-
-                    // Only collapse whitespace if both blocks contain HTML (start with `<`)
-                    // Don’t collapse if either contains plain text, as that would change meaning
-                    if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
-                      // Extract tag names from the HTML content
-                      const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
-                      const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
-                      // HTML comments are invisible (no block/inline nature), treat as non-inline
-                      const prevIsHtmlComment = !prevTagMatch && RE_HTML_COMMENT_START.test(prevContent);
-                      const currentIsHtmlComment = !currentTagMatch && RE_HTML_COMMENT_START.test(currentContent);
-                      // Closing tags (e.g., `</div>`)—inline-ness determines whether to collapse
-                      const prevClosingTagMatch = !prevTagMatch && RE_CLOSING_TAG_START.exec(prevContent);
-                      const currentClosingTagMatch = !currentTagMatch && RE_CLOSING_TAG_START.exec(currentContent);
-
-                      // Collapse if both sides are element/closing tags or HTML comments, and neither is inline
-                      if ((currentTagMatch || currentIsHtmlComment || currentClosingTagMatch) &&
-                          (prevTagMatch || prevIsHtmlComment || prevClosingTagMatch)) {
-                        const currentTag = currentTagMatch ? resolveName(currentTagMatch[1] ?? '')
-                          : currentClosingTagMatch ? resolveName(currentClosingTagMatch[1] ?? '') : null;
-                        const prevTag = prevTagMatch ? resolveName(prevTagMatch[1] ?? '')
-                          : prevClosingTagMatch ? resolveName(prevClosingTagMatch[1] ?? '') : null;
-
-                        // Don’t collapse between inline elements (HTML comments count as non-inline)
-                        if (!inlineElements.has(currentTag ?? '') && !inlineElements.has(prevTag ?? '')) {
-                          // Collapse whitespace respecting context rules
-                          let collapsedText = prevText;
-
-                          // Apply `collapseWhitespace` with appropriate context
-                          if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
-                            // Not in pre or other no-collapse context
-                            if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
-                              // Preserve line break as single newline
-                              collapsedText = '\n';
-                            } else if (options.conservativeCollapse) {
-                              // Conservative mode: Keep single space
-                              collapsedText = ' ';
-                            } else {
-                              // Aggressive mode: Remove all whitespace
-                              collapsedText = '';
-                            }
-                          }
-
-                          // Replace the whitespace in buffer
-                          buffer[buffer.length - 1] = collapsedText;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        buffer.push(comment);
-      }
 
       if (options.removeComments) {
         if (isIgnoredComment(text, options)) {
@@ -1829,18 +1867,22 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
 
   if (maxLineLength) {
     let line = ''; const lines = [];
-    while (results.length) {
+    // Index-based scan—`Array.shift()` is O(n) per call, which would make this
+    // loop quadratic on documents with many segments
+    let index = 0;
+    while (index < results.length) {
       const len = line.length;
-      const cur = results[0] ?? '';
+      const cur = results[index] ?? '';
       const end = cur.indexOf('\n');
       const isClosingTag = Boolean(cur.match(endTag));
       const shouldKeepSameLine = noNewlinesBeforeTagClose && isClosingTag;
 
       if (end < 0) {
-        line += restoreIgnore(restoreCustom(results.shift() ?? ''));
+        line += restoreIgnore(restoreCustom(cur));
+        index++;
       } else {
         line += restoreIgnore(restoreCustom(cur.slice(0, end)));
-        results[0] = cur.slice(end + 1);
+        results[index] = cur.slice(end + 1);
       }
       if (len > 0 && line.length > maxLineLength && !shouldKeepSameLine) {
         lines.push(line.slice(0, len));
@@ -1926,6 +1968,74 @@ export function getCacheStats() {
   };
 }
 
+// Memoized options processing: Batch runs typically pass one options object to
+// many `minify()` calls, and full processing (regex parsing, closure creation,
+// option-signature stringification) is comparatively expensive. The cache is
+// keyed on the options object and verified against a deep snapshot, so any
+// mutation of a reused object—top-level or nested (e.g., engine options)—still
+// triggers reprocessing. Each call works on a shallow copy of the processed
+// options, since `minifyHTML` reassigns top-level keys (wrapped minifiers,
+// sorters, UID comment patterns) that must not leak across calls.
+const EMPTY_OPTIONS = {};
+/** @type {WeakMap<object, {snapshot: unknown, processed: ProcessedOptions}>} */
+const processedOptionsCache = new WeakMap();
+
+// A “plain” value is an array or plain object, which the snapshot copies and
+// compares structurally; anything else (functions, RegExps, class instances)
+// is kept and compared by identity—a false mismatch merely reprocesses, which
+// is the pre-memoization behavior
+/** @param {unknown} value */
+function isPlainValue(value) {
+  if (Array.isArray(value)) return true;
+  if (value === null || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+function snapshotValue(value) {
+  if (!isPlainValue(value)) return value;
+  if (Array.isArray(value)) return value.map(snapshotValue);
+  /** @type {Record<string, unknown>} */
+  const copy = {};
+  const source = /** @type {Record<string, unknown>} */ (value);
+  for (const key of Object.keys(source)) {
+    copy[key] = snapshotValue(source[key]);
+  }
+  return copy;
+}
+
+/**
+ * @param {unknown} snapshot
+ * @param {unknown} current
+ * @returns {boolean}
+ */
+function valueUnchanged(snapshot, current) {
+  if (snapshot === current) return true;
+  if (!isPlainValue(snapshot) || !isPlainValue(current)) return false;
+  if (Array.isArray(snapshot)) {
+    if (!Array.isArray(current) || snapshot.length !== current.length) return false;
+    for (let i = 0; i < snapshot.length; i++) {
+      if (!valueUnchanged(snapshot[i], current[i])) return false;
+    }
+    return true;
+  }
+  if (Array.isArray(current)) return false;
+  const snapshotObj = /** @type {Record<string, unknown>} */ (snapshot);
+  const currentObj = /** @type {Record<string, unknown>} */ (current);
+  const snapshotKeys = Object.keys(snapshotObj);
+  if (snapshotKeys.length !== Object.keys(currentObj).length) return false;
+  for (const key of snapshotKeys) {
+    if (!Object.hasOwn(currentObj, key) || !valueUnchanged(snapshotObj[key], currentObj[key])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * @param {string} value
  * @param {MinifierOptions} [options]
@@ -1934,18 +2044,30 @@ export function getCacheStats() {
 export const minify = async function (value, options) {
   const start = Date.now();
 
-  // Initialize caches on first use with configurable sizes
-  const caches = initCaches(options || {});
+  const inputOptions = options || EMPTY_OPTIONS;
 
-  const processedOptions = processOptions(options || {}, {
-    getLightningCSS,
-    getTerser,
-    getSwc,
-    getSvgo,
-    cssMinifyCache: caches.cssMinifyCache ?? undefined,
-    jsMinifyCache: caches.jsMinifyCache ?? undefined,
-    svgMinifyCache: caches.svgMinifyCache ?? undefined
-  });
+  // Initialize caches on first use with configurable sizes
+  const caches = initCaches(inputOptions);
+
+  const cached = processedOptionsCache.get(inputOptions);
+  /** @type {ProcessedOptions} */
+  let processedBase;
+  if (cached && valueUnchanged(cached.snapshot, inputOptions)) {
+    processedBase = cached.processed;
+  } else {
+    processedBase = processOptions(inputOptions, {
+      getLightningCSS,
+      getTerser,
+      getSwc,
+      getSvgo,
+      cssMinifyCache: caches.cssMinifyCache ?? undefined,
+      jsMinifyCache: caches.jsMinifyCache ?? undefined,
+      svgMinifyCache: caches.svgMinifyCache ?? undefined
+    });
+    processedOptionsCache.set(inputOptions, { snapshot: snapshotValue(inputOptions), processed: processedBase });
+  }
+  // Work on a shallow copy so per-call reassignments don’t reach the cached base
+  const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase });
   let result = await minifyHTML(value, processedOptions);
 
   // Post-processing: Merge consecutive inline scripts if enabled
