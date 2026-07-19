@@ -4724,6 +4724,31 @@ describe('HTML', () => {
     assert.ok(result.includes('<?php echo "test2"; ?>'));
   });
 
+  test('No ReDoS on long unclosed end tag', async () => {
+    // A long end-tag name with no closing `>` (e.g., `</aaaa…`) used to make the
+    // end-tag regex backtrack quadratically (O(n²)); the parser now skips that regex
+    // when no `>` lies ahead. If the quadratic behavior returns, these calls blow past
+    // the wall-clock bound (or the runner timeout) rather than finishing near-instantly.
+    // (500,000 chars took ~30 s per call before the fix and ~1 ms after.)
+    const longName = 'a'.repeat(500000);
+    const unclosed = '<body></' + longName;
+
+    // `continueOnParseError` recovers, treating the unterminated end tag as text
+    let start = Date.now();
+    const recovered = await minify(unclosed, { continueOnParseError: true });
+    assert.ok(Date.now() - start < 5000, 'unclosed end tag should parse in linear time');
+    assert.strictEqual(recovered, unclosed);
+
+    // The default path throws a parse error—but must do so promptly, not after an O(n²) scan
+    start = Date.now();
+    await assert.rejects(minify(unclosed));
+    assert.ok(Date.now() - start < 5000, 'parse error should be raised in linear time');
+
+    // Sanity: A well-formed long end tag is unaffected by the guard
+    const nested = '<x-' + longName + '>hi</x-' + longName + '>';
+    assert.strictEqual(await minify(nested), nested);
+  });
+
   test('Inline custom elements', async () => {
     let input, output;
 

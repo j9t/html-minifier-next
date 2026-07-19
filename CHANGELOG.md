@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [7.5.0] - 2026-07-19
 
+### Fixed
+
+* Fixed a regular expression denial-of-service (ReDoS) in the parser: A long unterminated end tag (e.g., `</aaaa…` with no closing `>`) could have caused quadratic (O(n²)) backtracking in the end-tag pattern on the default `minify()` path; the parser now skips that pattern when no `>` lies ahead, restoring linear-time parsing
+
 ### Changed
 
 * Improved performance by moving special-case handling off the minifier’s hot paths:

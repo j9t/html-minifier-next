@@ -238,6 +238,19 @@ export class HTMLParser {
     let pos = 0;
     let lastPos;
 
+    // An end tag always ends at a `>`; without one, the `endTag` regex’s name run
+    // and its `[^>]*` tail overlap and backtrack O(n²) on a long unclosed name
+    // (e.g., `</aaaa…` with no `>`). Track the next `>` monotonically—`pos` only
+    // advances, so the aggregate scan work stays O(n)—and skip the regex when none
+    // lies ahead, where it could not match anyway.
+    let nextGtPos = fullHtml.indexOf('>');
+    const hasCloseAtOrAfter = (/** @type {number} */ p) => {
+      if (nextGtPos !== -1 && nextGtPos < p) {
+        nextGtPos = fullHtml.indexOf('>', p);
+      }
+      return nextGtPos !== -1;
+    };
+
     // Helper to advance position
     const advance = (/** @type {number} */ n) => { pos += n; };
 
@@ -341,15 +354,18 @@ export class HTMLParser {
             continue;
           }
 
-          // End tag
-          endTagY.lastIndex = pos;
-          const endTagMatch = endTagY.exec(fullHtml);
-          if (endTagMatch) {
-            advance((endTagMatch[0] ?? '').length);
-            await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
-            prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
-            prevAttrs = [];
-            continue;
+          // End tag—skip when no `>` lies ahead: The regex cannot match, and would
+          // otherwise backtrack quadratically on a long unclosed name
+          if (hasCloseAtOrAfter(pos)) {
+            endTagY.lastIndex = pos;
+            const endTagMatch = endTagY.exec(fullHtml);
+            if (endTagMatch) {
+              advance((endTagMatch[0] ?? '').length);
+              await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
+              prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
+              prevAttrs = [];
+              continue;
+            }
           }
 
           // Start tag
@@ -384,7 +400,7 @@ export class HTMLParser {
             // Extract minimal attribute info for whitespace logic (just name/value pairs)
             nextAttrs = extractAttrInfo(nextStartTagMatch.attrs);
             cachedNextStartTag = { match: nextStartTagMatch, pos };
-          } else {
+          } else if (hasCloseAtOrAfter(pos)) {
             endTagY.lastIndex = pos;
             const nextEndTagMatch = endTagY.exec(fullHtml);
             if (nextEndTagMatch) {
@@ -395,6 +411,9 @@ export class HTMLParser {
               nextTag = '';
               nextAttrs = [];
             }
+          } else {
+            nextTag = '';
+            nextAttrs = [];
           }
         }
 
