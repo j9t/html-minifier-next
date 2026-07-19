@@ -700,40 +700,40 @@ export class HTMLParser {
       const lowerTagName = tagName.toLowerCase();
       let unarySlash = match.unarySlash;
 
-      if (lastTag === 'p' && nonPhrasing.has(lowerTagName)) {
+      if (lastTagLower === 'p' && nonPhrasing.has(lowerTagName)) {
         await parseEndTag('', lastTag);
-      } else if (tagName === 'tbody') {
+      } else if (lowerTagName === 'tbody') {
         if (!await closeIfFoundInCurrentTable('tfoot')) {
           await closeIfFoundInCurrentTable('thead');
         }
-      } else if (tagName === 'tfoot') {
+      } else if (lowerTagName === 'tfoot') {
         if (!await closeIfFoundInCurrentTable('tbody')) {
           await closeIfFoundInCurrentTable('thead');
         }
-      } else if (tagName === 'thead') {
+      } else if (lowerTagName === 'thead') {
         // If a `tbody` or `tfoot` is open in the current table, close it
         if (!await closeIfFoundInCurrentTable('tbody')) {
           await closeIfFoundInCurrentTable('tfoot');
         }
       }
-      if (tagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
+      if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
         lastTag = 'colgroup';
         lastTagLower = 'colgroup';
         stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
         if (handler.start) {
           await handler.start(lastTag, [], false, '', true);
         }
-      } else if (tagName !== 'col' && lastTag === 'colgroup') {
+      } else if (lowerTagName !== 'col' && lastTagLower === 'colgroup') {
         // Auto-close synthetic `<colgroup>` when a non-`col` element starts
         await parseEndTag('', 'colgroup');
       }
 
-      if (closeSelf.has(lowerTagName) && lastTag === tagName) {
+      if (closeSelf.has(lowerTagName) && lastTagLower === lowerTagName) {
         await parseEndTag('', tagName);
       }
 
       // Handle `dt`/`dd` cross-closing: `dt` followed by `dd`, or `dd` followed by `dt`
-      if ((tagName === 'dt' || tagName === 'dd') && (lastTag === 'dt' || lastTag === 'dd')) {
+      if ((lowerTagName === 'dt' || lowerTagName === 'dd') && (lastTagLower === 'dt' || lastTagLower === 'dd')) {
         await parseEndTag('', lastTag);
       }
 
