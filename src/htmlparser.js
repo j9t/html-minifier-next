@@ -737,7 +737,7 @@ export class HTMLParser {
         await parseEndTag('', lastTag);
       }
 
-      const unary = empty.has(lowerTagName) || (tagName === 'html' && lastTag === 'head') || !!unarySlash;
+      const unary = empty.has(lowerTagName) || (lowerTagName === 'html' && lastTagLower === 'head') || !!unarySlash;
 
       const attrs = /** @type {HTMLAttribute[]} */ (match.attrs.map(function (/** @type {Array<string | undefined>} */ args) {
         /** @type {string | undefined} */
