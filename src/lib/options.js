@@ -79,6 +79,9 @@ const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canT
 // key per process, so repeated `minify` calls (e.g., batch runs) don’t flood STDERR
 const optionKeysWarned = new Set();
 const presetNamesWarned = new Set();
+// The custom-fragment ReDoS warning is security-relevant, so it reaches the
+// console even without a `log` hook—once per process, like the warnings above
+let customFragmentQuantifierWarned = false;
 
 // Main options processor
 
@@ -119,7 +122,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   };
 
   // Route warnings through the user-provided `log` hook so API consumers can
-  // capture or suppress them consistently; fall back to `console.warn`
+  // capture or suppress them consistently; fall back to `console.warn`.
+  //
+  // Message convention: Strings that may reach the console unsolicited (via
+  // this fallback) carry the “HTML Minifier Next: ” prefix for attribution and
+  // no “Warning:” label—the channel already conveys severity. Strings sent
+  // only to an explicitly provided `log` hook carry “Warning: ” instead, since
+  // the hook mixes severities (info strings, warnings, `Error` objects) and
+  // its consumer already knows the source.
   const warn = typeof inputOptions.log === 'function' ? inputOptions.log : console.warn;
 
   // Warn about unrecognized options—catches typos as well as options removed in earlier versions
@@ -490,6 +500,17 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     } else if (['customAttrAssign', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
       // Array of regex patterns
       optionsDynamic[key] = parseRegExpArray(option);
+      // Warn about potential ReDoS when user-provided fragments use unlimited
+      // quantifiers; only explicitly passed fragments are checked
+      if (key === 'ignoreCustomFragments' && !customFragmentQuantifierWarned) {
+        for (const re of /** @type {RegExp[]} */ (optionsDynamic[key])) {
+          if (/[*+]/.test(re.source)) {
+            customFragmentQuantifierWarned = true;
+            warn('HTML Minifier Next: Custom fragment contains unlimited quantifiers (“*” or “+”) which may cause ReDoS vulnerability');
+            break;
+          }
+        }
+      }
     } else {
       optionsDynamic[key] = option;
     }

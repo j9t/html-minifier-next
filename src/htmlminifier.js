@@ -1067,14 +1067,6 @@ async function minifyHTML(value, options, partialMarkup) {
     return re.source;
   });
   if (customFragments.length) {
-    // Warn about potential ReDoS if custom fragments use unlimited quantifiers
-    for (const fragment of customFragments) {
-      if (/[*+]/.test(fragment)) {
-        options.log?.('Warning: Custom fragment contains unlimited quantifiers (“*” or “+”) which may cause ReDoS vulnerability');
-        break;
-      }
-    }
-
     // Safe approach: Use bounded quantifiers instead of unlimited ones to prevent ReDoS
     const maxQuantifier = options.customFragmentQuantifierLimit || 200;
     const whitespacePattern = `\\s{0,${maxQuantifier}}`;
@@ -1976,6 +1968,7 @@ export function getCacheStats() {
 // triggers reprocessing. Each call works on a shallow copy of the processed
 // options, since `minifyHTML` reassigns top-level keys (wrapped minifiers,
 // sorters, UID comment patterns) that must not leak across calls.
+/** @type {MinifierOptions} */
 const EMPTY_OPTIONS = {};
 /** @type {WeakMap<object, {snapshot: unknown, processed: ProcessedOptions}>} */
 const processedOptionsCache = new WeakMap();
@@ -1997,6 +1990,8 @@ function isPlainValue(value) {
 // back to per-call processing
 const SNAPSHOT_MAX_NODES = 1024;
 const SNAPSHOT_UNSAFE = Symbol('snapshot-unsafe');
+// Skipped memoization is fail-safe but silent—warn once per process
+let snapshotBudgetWarned = false;
 
 /**
  * @param {unknown} value
@@ -2090,6 +2085,10 @@ export const minify = async function (value, options) {
       const snapshot = snapshotValue(inputOptions, { budget: SNAPSHOT_MAX_NODES });
       if (snapshot !== SNAPSHOT_UNSAFE) {
         processedOptionsCache.set(inputOptions, { snapshot, processed: processedBase });
+      } else if (!snapshotBudgetWarned) {
+        snapshotBudgetWarned = true;
+        const warn = typeof inputOptions.log === 'function' ? inputOptions.log : console.warn;
+        warn('HTML Minifier Next: Options object exceeds the memoization complexity limit; options will be processed on every call');
       }
     }
   }
