@@ -672,12 +672,13 @@ export class HTMLParser {
       return -1;
     }
 
-    async function parseEndTagAt(/** @type {number} */ pos) {
-      // Close all open elements up to `pos` (mirrors `parseEndTag`’s core branch)
+    function parseEndTagAt(/** @type {number} */ pos) {
+      // Close all open elements up to `pos` (mirrors `parseEndTag`’s core branch);
+      // `end` handlers are synchronous—invoked without awaiting, as in `parseEndTag`
       for (let i = stack.length - 1; i >= pos; i--) {
         const entry = /** @type {NonNullable<(typeof stack)[number]>} */ (stack[i]);
         if (handler.end) {
-          await handler.end(entry.tag, entry.attrs, true);
+          handler.end(entry.tag, entry.attrs, true);
         }
       }
       stack.length = pos;
@@ -685,11 +686,11 @@ export class HTMLParser {
       lastTagLower = pos ? (stack[pos - 1]?.lowerTag ?? '') : '';
     }
 
-    async function closeIfFoundInCurrentTable(/** @type {string} */ tagName) {
+    function closeIfFoundInCurrentTable(/** @type {string} */ tagName) {
       const pos = findTagInCurrentTable(tagName);
       if (pos >= 0) {
         // Close at the specific index to avoid re-searching
-        await parseEndTagAt(pos);
+        parseEndTagAt(pos);
         return true;
       }
       return false;
@@ -703,17 +704,17 @@ export class HTMLParser {
       if (lastTagLower === 'p' && nonPhrasing.has(lowerTagName)) {
         await parseEndTag('', lastTag);
       } else if (lowerTagName === 'tbody') {
-        if (!await closeIfFoundInCurrentTable('tfoot')) {
-          await closeIfFoundInCurrentTable('thead');
+        if (!closeIfFoundInCurrentTable('tfoot')) {
+          closeIfFoundInCurrentTable('thead');
         }
       } else if (lowerTagName === 'tfoot') {
-        if (!await closeIfFoundInCurrentTable('tbody')) {
-          await closeIfFoundInCurrentTable('thead');
+        if (!closeIfFoundInCurrentTable('tbody')) {
+          closeIfFoundInCurrentTable('thead');
         }
       } else if (lowerTagName === 'thead') {
         // If a `tbody` or `tfoot` is open in the current table, close it
-        if (!await closeIfFoundInCurrentTable('tbody')) {
-          await closeIfFoundInCurrentTable('tfoot');
+        if (!closeIfFoundInCurrentTable('tbody')) {
+          closeIfFoundInCurrentTable('tfoot');
         }
       }
       if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {

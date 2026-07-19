@@ -1992,37 +1992,36 @@ function isPlainValue(value) {
   return proto === Object.prototype || proto === null;
 }
 
-// Cycle guard for `snapshotValue`
-/**
- * @param {unknown} value
- * @param {WeakSet<object>} [seen]
- * @returns {boolean}
- */
-function hasCyclicPlainValue(value, seen = new WeakSet()) {
-  if (!isPlainValue(value)) return false;
-  const obj = /** @type {object} */ (value);
-  if (seen.has(obj)) return true;
-  seen.add(obj);
-  const children = Array.isArray(value) ? value : Object.values(/** @type {Record<string, unknown>} */ (value));
-  for (const child of children) {
-    if (hasCyclicPlainValue(child, seen)) return true;
-  }
-  seen.delete(obj);
-  return false;
-}
+// Budget for `snapshotValue`: Bounds the work spent on pathological options
+// objects; when the budget runs out, the object isn’t memoized and falls
+// back to per-call processing
+const SNAPSHOT_MAX_NODES = 1024;
+const SNAPSHOT_UNSAFE = Symbol('snapshot-unsafe');
 
 /**
  * @param {unknown} value
- * @returns {unknown}
+ * @param {{budget: number}} state
+ * @returns {unknown} The copy, or `SNAPSHOT_UNSAFE` once the budget is exhausted
  */
-function snapshotValue(value) {
+function snapshotValue(value, state) {
   if (!isPlainValue(value)) return value;
-  if (Array.isArray(value)) return value.map(snapshotValue);
+  if (--state.budget < 0) return SNAPSHOT_UNSAFE;
+  if (Array.isArray(value)) {
+    const copy = new Array(value.length);
+    for (let i = 0; i < value.length; i++) {
+      const child = snapshotValue(value[i], state);
+      if (child === SNAPSHOT_UNSAFE) return SNAPSHOT_UNSAFE;
+      copy[i] = child;
+    }
+    return copy;
+  }
   /** @type {Record<string, unknown>} */
   const copy = {};
   const source = /** @type {Record<string, unknown>} */ (value);
   for (const key of Object.keys(source)) {
-    copy[key] = snapshotValue(source[key]);
+    const child = snapshotValue(source[key], state);
+    if (child === SNAPSHOT_UNSAFE) return SNAPSHOT_UNSAFE;
+    copy[key] = child;
   }
   return copy;
 }
@@ -2073,8 +2072,8 @@ export const minify = async function (value, options) {
   const cached = canMemoize ? processedOptionsCache.get(inputOptions) : undefined;
   /** @type {ProcessedOptions} */
   let processedBase;
-  // `valueUnchanged` is cycle-safe: Recursion is bounded by the snapshot, which
-  // is finite by construction—only creating a snapshot needs the cycle guard
+  // `valueUnchanged` needs no budget of its own: Recursion is bounded by the
+  // stored snapshot, which is a finite tree of at most `SNAPSHOT_MAX_NODES`
   if (cached && valueUnchanged(cached.snapshot, inputOptions)) {
     processedBase = cached.processed;
   } else {
@@ -2087,8 +2086,11 @@ export const minify = async function (value, options) {
       jsMinifyCache: caches.jsMinifyCache ?? undefined,
       svgMinifyCache: caches.svgMinifyCache ?? undefined
     });
-    if (canMemoize && !hasCyclicPlainValue(inputOptions)) {
-      processedOptionsCache.set(inputOptions, { snapshot: snapshotValue(inputOptions), processed: processedBase });
+    if (canMemoize) {
+      const snapshot = snapshotValue(inputOptions, { budget: SNAPSHOT_MAX_NODES });
+      if (snapshot !== SNAPSHOT_UNSAFE) {
+        processedOptionsCache.set(inputOptions, { snapshot, processed: processedBase });
+      }
     }
   }
   // Work on a shallow copy so per-call reassignments don’t reach the cached base
