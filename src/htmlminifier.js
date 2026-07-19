@@ -1992,6 +1992,25 @@ function isPlainValue(value) {
   return proto === Object.prototype || proto === null;
 }
 
+// Cycle guard for `snapshotValue`
+/**
+ * @param {unknown} value
+ * @param {WeakSet<object>} [seen]
+ * @returns {boolean}
+ */
+function hasCyclicPlainValue(value, seen = new WeakSet()) {
+  if (!isPlainValue(value)) return false;
+  const obj = /** @type {object} */ (value);
+  if (seen.has(obj)) return true;
+  seen.add(obj);
+  const children = Array.isArray(value) ? value : Object.values(/** @type {Record<string, unknown>} */ (value));
+  for (const child of children) {
+    if (hasCyclicPlainValue(child, seen)) return true;
+  }
+  seen.delete(obj);
+  return false;
+}
+
 /**
  * @param {unknown} value
  * @returns {unknown}
@@ -2049,9 +2068,13 @@ export const minify = async function (value, options) {
   // Initialize caches on first use with configurable sizes
   const caches = initCaches(inputOptions);
 
-  const cached = processedOptionsCache.get(inputOptions);
+  // WeakMap keys must be objects
+  const canMemoize = typeof inputOptions === 'object' && inputOptions !== null;
+  const cached = canMemoize ? processedOptionsCache.get(inputOptions) : undefined;
   /** @type {ProcessedOptions} */
   let processedBase;
+  // `valueUnchanged` is cycle-safe: Recursion is bounded by the snapshot, which
+  // is finite by construction—only creating a snapshot needs the cycle guard
   if (cached && valueUnchanged(cached.snapshot, inputOptions)) {
     processedBase = cached.processed;
   } else {
@@ -2064,7 +2087,9 @@ export const minify = async function (value, options) {
       jsMinifyCache: caches.jsMinifyCache ?? undefined,
       svgMinifyCache: caches.svgMinifyCache ?? undefined
     });
-    processedOptionsCache.set(inputOptions, { snapshot: snapshotValue(inputOptions), processed: processedBase });
+    if (canMemoize && !hasCyclicPlainValue(inputOptions)) {
+      processedOptionsCache.set(inputOptions, { snapshot: snapshotValue(inputOptions), processed: processedBase });
+    }
   }
   // Work on a shallow copy so per-call reassignments don’t reach the cached base
   const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase });
