@@ -37,13 +37,6 @@ import { isThenable } from './lib/utils.js';
  * });
  */
 
-class CaseInsensitiveSet extends Set {
-  /** @override */
-  has(/** @type {string} */ str) {
-    return super.has(str.toLowerCase());
-  }
-}
-
 // Regular expressions for parsing tags and attributes
 const singleAttrIdentifier = /([^\s"'<>/=]+)/;
 const singleAttrAssigns = [/=/];
@@ -80,20 +73,20 @@ let IS_REGEX_CAPTURING_BROKEN = false;
 });
 
 // Empty elements
-const empty = new CaseInsensitiveSet(['area', 'base', 'basefont', 'br', 'col', 'embed', 'frame', 'hr', 'img', 'input', 'isindex', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+const empty = new Set(['area', 'base', 'basefont', 'br', 'col', 'embed', 'frame', 'hr', 'img', 'input', 'isindex', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 
 // Elements that you can, intentionally, leave open (and which close themselves)
-const closeSelf = new CaseInsensitiveSet(['colgroup', 'dd', 'dt', 'li', 'option', 'p', 'td', 'tfoot', 'th', 'thead', 'tr', 'source']);
+const closeSelf = new Set(['colgroup', 'dd', 'dt', 'li', 'option', 'p', 'td', 'tfoot', 'th', 'thead', 'tr', 'source']);
 
 // Attributes that have their values filled in `disabled='disabled'`
-const fillAttrs = new CaseInsensitiveSet(['checked', 'compact', 'declare', 'defer', 'disabled', 'ismap', 'multiple', 'nohref', 'noresize', 'noshade', 'nowrap', 'readonly', 'selected']);
+const fillAttrs = new Set(['checked', 'compact', 'declare', 'defer', 'disabled', 'ismap', 'multiple', 'nohref', 'noresize', 'noshade', 'nowrap', 'readonly', 'selected']);
 
 // Special elements (can contain anything)
-const special = new CaseInsensitiveSet(['script', 'style']);
+const special = new Set(['script', 'style']);
 
 // HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
 // Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
-const nonPhrasing = new CaseInsensitiveSet(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'col', 'colgroup', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'menuitem', 'meta', 'ol', 'optgroup', 'option', 'param', 'rp', 'rt', 'source', 'style', 'summary', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul']);
+const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'col', 'colgroup', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'menuitem', 'meta', 'ol', 'optgroup', 'option', 'param', 'rp', 'rt', 'source', 'style', 'summary', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul']);
 
 const reCache = {};
 
@@ -213,6 +206,9 @@ export class HTMLParser {
     const stack = [];
     /** @type {string} */
     let lastTag = '';
+    // Lowercase counterpart of `lastTag`, kept in sync to avoid per-iteration lowercasing
+    /** @type {string} */
+    let lastTagLower = '';
     // Use cached attribute regex for this handler configuration
     const attribute = getAttrRegexForHandler(handler);
     const attributeY = getAttrRegexStickyForHandler(handler);
@@ -242,6 +238,19 @@ export class HTMLParser {
     let pos = 0;
     let lastPos;
 
+    // An end tag always ends at a `>`; without one, the `endTag` regex’s name run
+    // and its `[^>]*` tail overlap and backtrack O(n²) on a long unclosed name
+    // (e.g., `</aaaa…` with no `>`). Track the next `>` monotonically—`pos` only
+    // advances, so the aggregate scan work stays O(n)—and skip the regex when none
+    // lies ahead, where it could not match anyway.
+    let nextGtPos = fullHtml.indexOf('>');
+    const hasCloseAtOrAfter = (/** @type {number} */ p) => {
+      if (nextGtPos !== -1 && nextGtPos < p) {
+        nextGtPos = fullHtml.indexOf('>', p);
+      }
+      return nextGtPos !== -1;
+    };
+
     // Helper to advance position
     const advance = (/** @type {number} */ n) => { pos += n; };
 
@@ -269,7 +278,7 @@ export class HTMLParser {
       lastPos = pos;
 
       // Make sure not to be in a `script` or `style` element
-      if (!lastTag || !special.has(lastTag)) {
+      if (!lastTagLower || !special.has(lastTagLower)) {
         const textEnd = fullHtml.indexOf('<', pos);
 
         if (textEnd === pos) {
@@ -345,15 +354,18 @@ export class HTMLParser {
             continue;
           }
 
-          // End tag
-          endTagY.lastIndex = pos;
-          const endTagMatch = endTagY.exec(fullHtml);
-          if (endTagMatch) {
-            advance((endTagMatch[0] ?? '').length);
-            await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
-            prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
-            prevAttrs = [];
-            continue;
+          // End tag—skip when no `>` lies ahead: The regex cannot match, and would
+          // otherwise backtrack quadratically on a long unclosed name
+          if (hasCloseAtOrAfter(pos)) {
+            endTagY.lastIndex = pos;
+            const endTagMatch = endTagY.exec(fullHtml);
+            if (endTagMatch) {
+              advance((endTagMatch[0] ?? '').length);
+              await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
+              prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
+              prevAttrs = [];
+              continue;
+            }
           }
 
           // Start tag
@@ -388,7 +400,7 @@ export class HTMLParser {
             // Extract minimal attribute info for whitespace logic (just name/value pairs)
             nextAttrs = extractAttrInfo(nextStartTagMatch.attrs);
             cachedNextStartTag = { match: nextStartTagMatch, pos };
-          } else {
+          } else if (hasCloseAtOrAfter(pos)) {
             endTagY.lastIndex = pos;
             const nextEndTagMatch = endTagY.exec(fullHtml);
             if (nextEndTagMatch) {
@@ -399,6 +411,9 @@ export class HTMLParser {
               nextTag = '';
               nextAttrs = [];
             }
+          } else {
+            nextTag = '';
+            nextAttrs = [];
           }
         }
 
@@ -409,7 +424,7 @@ export class HTMLParser {
         prevTag = '';
         prevAttrs = [];
       } else {
-        const stackedTag = lastTag.toLowerCase();
+        const stackedTag = lastTagLower;
         // Use pre-compiled regex for common tags (`script`, `style`, `noscript`) to avoid regex creation overhead
         const reStackedTag = /** @type {Record<string, RegExp>} */ (preCompiledStackedTags)[stackedTag] || /** @type {Record<string, RegExp>} */ (reCache)[stackedTag] || (/** @type {Record<string, RegExp>} */ (reCache)[stackedTag] = new RegExp('([\\s\\S]*?)\\x3c/' + stackedTag + '[^>]*>', 'i'));
 
@@ -640,9 +655,9 @@ export class HTMLParser {
       return undefined;
     }
 
-    function findTagInCurrentTable(/** @type {string} */ tagName) {
+    // `needle` must already be lowercase
+    function findTagInCurrentTable(/** @type {string} */ needle) {
       let pos;
-      const needle = tagName.toLowerCase();
       for (pos = stack.length - 1; pos >= 0; pos--) {
         const entry = stack[pos];
         const currentTag = entry?.lowerTag;
@@ -657,23 +672,25 @@ export class HTMLParser {
       return -1;
     }
 
-    async function parseEndTagAt(/** @type {number} */ pos) {
-      // Close all open elements up to `pos` (mirrors `parseEndTag`’s core branch)
+    function parseEndTagAt(/** @type {number} */ pos) {
+      // Close all open elements up to `pos` (mirrors `parseEndTag`’s core branch);
+      // `end` handlers are synchronous—invoked without awaiting, as in `parseEndTag`
       for (let i = stack.length - 1; i >= pos; i--) {
         const entry = /** @type {NonNullable<(typeof stack)[number]>} */ (stack[i]);
         if (handler.end) {
-          await handler.end(entry.tag, entry.attrs, true);
+          handler.end(entry.tag, entry.attrs, true);
         }
       }
       stack.length = pos;
       lastTag = pos ? (stack[pos - 1]?.tag ?? '') : '';
+      lastTagLower = pos ? (stack[pos - 1]?.lowerTag ?? '') : '';
     }
 
-    async function closeIfFoundInCurrentTable(/** @type {string} */ tagName) {
+    function closeIfFoundInCurrentTable(/** @type {string} */ tagName) {
       const pos = findTagInCurrentTable(tagName);
       if (pos >= 0) {
         // Close at the specific index to avoid re-searching
-        await parseEndTagAt(pos);
+        parseEndTagAt(pos);
         return true;
       }
       return false;
@@ -681,45 +698,47 @@ export class HTMLParser {
 
     async function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
       const tagName = match.tagName;
+      const lowerTagName = tagName.toLowerCase();
       let unarySlash = match.unarySlash;
 
-      if (lastTag === 'p' && nonPhrasing.has(tagName)) {
+      if (lastTagLower === 'p' && nonPhrasing.has(lowerTagName)) {
         await parseEndTag('', lastTag);
-      } else if (tagName === 'tbody') {
-        if (!await closeIfFoundInCurrentTable('tfoot')) {
-          await closeIfFoundInCurrentTable('thead');
+      } else if (lowerTagName === 'tbody') {
+        if (!closeIfFoundInCurrentTable('tfoot')) {
+          closeIfFoundInCurrentTable('thead');
         }
-      } else if (tagName === 'tfoot') {
-        if (!await closeIfFoundInCurrentTable('tbody')) {
-          await closeIfFoundInCurrentTable('thead');
+      } else if (lowerTagName === 'tfoot') {
+        if (!closeIfFoundInCurrentTable('tbody')) {
+          closeIfFoundInCurrentTable('thead');
         }
-      } else if (tagName === 'thead') {
+      } else if (lowerTagName === 'thead') {
         // If a `tbody` or `tfoot` is open in the current table, close it
-        if (!await closeIfFoundInCurrentTable('tbody')) {
-          await closeIfFoundInCurrentTable('tfoot');
+        if (!closeIfFoundInCurrentTable('tbody')) {
+          closeIfFoundInCurrentTable('tfoot');
         }
       }
-      if (tagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
+      if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
         lastTag = 'colgroup';
+        lastTagLower = 'colgroup';
         stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
         if (handler.start) {
           await handler.start(lastTag, [], false, '', true);
         }
-      } else if (tagName !== 'col' && lastTag === 'colgroup') {
+      } else if (lowerTagName !== 'col' && lastTagLower === 'colgroup') {
         // Auto-close synthetic `<colgroup>` when a non-`col` element starts
         await parseEndTag('', 'colgroup');
       }
 
-      if (closeSelf.has(tagName) && lastTag === tagName) {
+      if (closeSelf.has(lowerTagName) && lastTagLower === lowerTagName) {
         await parseEndTag('', tagName);
       }
 
       // Handle `dt`/`dd` cross-closing: `dt` followed by `dd`, or `dd` followed by `dt`
-      if ((tagName === 'dt' || tagName === 'dd') && (lastTag === 'dt' || lastTag === 'dd')) {
+      if ((lowerTagName === 'dt' || lowerTagName === 'dd') && (lastTagLower === 'dt' || lastTagLower === 'dd')) {
         await parseEndTag('', lastTag);
       }
 
-      const unary = empty.has(tagName) || (tagName === 'html' && lastTag === 'head') || !!unarySlash;
+      const unary = empty.has(lowerTagName) || (lowerTagName === 'html' && lastTagLower === 'head') || !!unarySlash;
 
       const attrs = /** @type {HTMLAttribute[]} */ (match.attrs.map(function (/** @type {Array<string | undefined>} */ args) {
         /** @type {string | undefined} */
@@ -743,7 +762,7 @@ export class HTMLParser {
             return '\'';
           }
           value = args[index + 3];
-          if (typeof value === 'undefined' && name && fillAttrs.has(name)) {
+          if (typeof value === 'undefined' && name && fillAttrs.has(name.toLowerCase())) {
             value = name;
           }
           return '';
@@ -777,8 +796,9 @@ export class HTMLParser {
       }));
 
       if (!unary) {
-        stack.push({ tag: tagName, lowerTag: tagName.toLowerCase(), attrs });
+        stack.push({ tag: tagName, lowerTag: lowerTagName, attrs });
         lastTag = tagName;
+        lastTagLower = lowerTagName;
         unarySlash = '';
       }
 
@@ -790,9 +810,9 @@ export class HTMLParser {
       }
     }
 
-    function findTag(/** @type {string} */ tagName) {
+    // `needle` must already be lowercase
+    function findTag(/** @type {string} */ needle) {
       let pos;
-      const needle = tagName.toLowerCase();
       for (pos = stack.length - 1; pos >= 0; pos--) {
         if (stack[pos]?.lowerTag === needle) {
           break;
@@ -803,10 +823,11 @@ export class HTMLParser {
 
     async function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
       let pos;
+      const lowerTagName = tagName ? tagName.toLowerCase() : '';
 
       // Find the closest opened tag of the same type
       if (tagName) {
-        pos = findTag(tagName);
+        pos = findTag(lowerTagName);
       } else { // If no tag name is provided, clean shop
         pos = 0;
       }
@@ -822,16 +843,17 @@ export class HTMLParser {
         // Remove the open elements from the stack
         stack.length = pos;
         lastTag = pos ? (stack[pos - 1]?.tag ?? '') : '';
+        lastTagLower = pos ? (stack[pos - 1]?.lowerTag ?? '') : '';
       } else if (handler.partialMarkup && tagName) {
         // In partial markup mode, preserve stray end tags
         if (handler.end) {
           handler.end(tagName, [], false);
         }
-      } else if (tagName && tagName.toLowerCase() === 'br') {
+      } else if (lowerTagName === 'br') {
         if (handler.start) {
           await handler.start(tagName, [], true, '');
         }
-      } else if (tagName && tagName.toLowerCase() === 'p') {
+      } else if (lowerTagName === 'p') {
         if (handler.start) {
           await handler.start(tagName, [], false, '', true);
         }

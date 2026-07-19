@@ -552,7 +552,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     return processed.join(', ');
   }
 
-  if (isMetaViewport(tag, attrs) && attrName === 'content') {
+  if (attrName === 'content' && isMetaViewport(tag, attrs)) {
     return attrValue.replace(/\s+/g, '').replace(/[0-9]+\.[0-9]+/g, function (numString) {
       // 0.90000 → 0.9
       // 1.0 → 1
@@ -561,7 +561,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     });
   }
 
-  if (isContentSecurityPolicy(tag, attrs) && attrName.toLowerCase() === 'content') {
+  if (attrName.toLowerCase() === 'content' && isContentSecurityPolicy(tag, attrs)) {
     return collapseWhitespaceAll(attrValue);
   }
 

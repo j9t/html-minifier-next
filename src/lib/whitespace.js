@@ -142,6 +142,22 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
 
 // Collapse whitespace smartly based on surrounding tags
 
+// Check if an input element has `type="hidden"`; module-scope so the hot path
+// doesn’t allocate a closure per text node
+/**
+ * @param {string} tagName
+ * @param {Array<{name: string, value?: string}>} attrs
+ */
+function isHiddenInput(tagName, attrs) {
+  if (tagName !== 'input' || !attrs || !attrs.length) return false;
+  for (const attr of attrs) {
+    if (attr.name === 'type') {
+      return attr.value === 'hidden';
+    }
+  }
+  return false;
+}
+
 /**
  * @param {string} str
  * @param {string} prevTag
@@ -155,13 +171,6 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
 function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet) {
   const prevTagName = prevTag && (prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag);
   const nextTagName = nextTag && (nextTag.charAt(0) === '/' ? nextTag.slice(1) : nextTag);
-
-  // Helper: Check if an input element has `type="hidden"`
-  const isHiddenInput = (/** @type {string} */ tagName, /** @type {Array<{name: string, value?: string}>} */ attrs) => {
-    if (tagName !== 'input' || !attrs || !attrs.length) return false;
-    const typeAttr = attrs.find((/** @type {{name: string, value?: string}} */ attr) => attr.name === 'type');
-    return typeAttr && typeAttr.value === 'hidden';
-  };
 
   // Check if prev/next are non-rendering (hidden) elements
   const prevIsHidden = isHiddenInput(prevTagName, prevAttrs);
