@@ -2105,6 +2105,18 @@ export const minify = async function (value, options) {
   return result;
 };
 
-export { presets, getPreset, getPresetNames };
+// Exports
 
-export default { minify, presets, getPreset, getPresetNames, getCacheStats };
+export {
+  presets,
+  getPreset,
+  getPresetNames
+};
+
+export default {
+  minify,
+  presets,
+  getPreset,
+  getPresetNames,
+  getCacheStats
+};

@@ -317,7 +317,7 @@ async function testRealWorldUsage() {
   return result;
 }
 
-// Export to avoid “unused” warnings
+// Exports (to avoid “unused” warnings)
 export {
   testBasicMinify,
   testBooleanOptions,
