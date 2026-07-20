@@ -146,13 +146,15 @@ function parseRegExp(value) {
 
 // Exports
 
-export { stableStringify };
-export { LRU };
-export { MAX_CACHE_ENTRY_SIZE };
-export { hashContent };
-export { uniqueId };
-export { identity };
-export { isThenable };
-export { lowercase };
-export { replaceAsync };
-export { parseRegExp };
+export {
+  stableStringify,
+  LRU,
+  MAX_CACHE_ENTRY_SIZE,
+  hashContent,
+  uniqueId,
+  identity,
+  isThenable,
+  lowercase,
+  replaceAsync,
+  parseRegExp
+};
