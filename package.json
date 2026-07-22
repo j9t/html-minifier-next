@@ -12,7 +12,7 @@
     "svgo": "^4.0.2",
     "terser": "^5.49.0"
   },
-  "description": "Super-configurable and well-tested web page minifier (enhanced successor to HTML Minifier)",
+  "description": "Highly effective, super-configurable, well-tested web page minifier (enhanced successor to HTML Minifier)",
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
     "@eslint/js": "^10.0.1",

@@ -2,9 +2,9 @@
 
 [![npm version](https://img.shields.io/npm/v/html-minifier-next.svg)](https://www.npmjs.com/package/html-minifier-next) [![Build status](https://github.com/j9t/html-minifier-next/workflows/Tests/badge.svg)](https://github.com/j9t/html-minifier-next/actions) [![Socket](https://badge.socket.dev/npm/package/html-minifier-next)](https://socket.dev/npm/package/html-minifier-next) [![GitHub Sponsors](https://badgen.net/static/Support/Open%20Source/cyan)](https://github.com/j9t/html-minifier-next?sponsor=1)
 
-Your web page optimization precision tool: HTML Minifier Next (HMN) is a **super-configurable, well-tested, JavaScript-based HTML minifier** able to also handle in-document CSS, JavaScript, and SVG minification.
+Your web page optimization precision tool: HTML Minifier Next (HMN) is a **highly effective, super-configurable, well-tested HTML minifier**, written in JavaScript, that also handles in-document CSS, JavaScript, and SVG minification.
 
-The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier). HMN is **the official successor to HTML Minifier**: It’s maintained, easier to use, offers new features, and has been optimized for speed. Note that HMN is largely compatible with HM and HMT but has evolved—find [migration guidance in the changelog](https://github.com/j9t/html-minifier-next/blob/main/CHANGELOG.md).
+The project was based on [HTML Minifier Terser (HMT)](https://github.com/terser/html-minifier-terser), which in turn had been based on [Juriy “kangax” Zaytsev’s HTML Minifier (HM)](https://github.com/kangax/html-minifier). HMN is **the official successor to HTML Minifier**: It’s actively maintained, richer in features, easier to use, and significantly faster. Note that HMN is largely compatible with HM and HMT but isn’t fully drop-in—find [migration guidance in the changelog](https://github.com/j9t/html-minifier-next/blob/main/CHANGELOG.md).
 
 ## Installation
 
@@ -409,7 +409,7 @@ The CLI’s `--verbose` and `--dry` modes print the same information to STDERR a
 
 ## Minification comparison
 
-Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier-benchmarks) for details on how HTML Minifier Next compares to other minifiers.
+Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier-benchmarks) for details on how HTML Minifier Next compares to other minifiers. (The benchmarks are currently maintained by the author of HTML Minifier Next. Contributions, including from other minifier authors, are welcome.)
 
 ## Examples
 
