@@ -93,5 +93,6 @@
     "test:watch": "node --test --watch tests/*.spec.js"
   },
   "type": "module",
-  "version": "7.5.0"
+  "types": "dist/types/htmlminifier.d.ts",
+  "version": "7.5.1"
 }
