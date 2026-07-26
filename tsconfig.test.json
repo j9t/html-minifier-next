@@ -8,7 +8,6 @@
   "compilerOptions": {
     // No Node types—tests don’t use `process`/`Buffer` directly
     "types": [],
-
     // Don’t emit files, just check types
     "noEmit": true
   }

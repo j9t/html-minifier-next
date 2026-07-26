@@ -9,13 +9,10 @@
     // File layout
     "rootDir": "./src",
     "outDir": "./dist/types",
-
     // Node type definitions for `process`, `Buffer`, etc.
     "types": ["node"],
-
     // JavaScript support
     "checkJs": true,
-
     // Outputs
     "emitDeclarationOnly": true,
     "declaration": true,
