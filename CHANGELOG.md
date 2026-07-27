@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Fixed
 
-* Fixed JSON script minification decoding `<` escapes
+* Fixed JSON script minification decoding `<` escapes, which let a `</script>` inside a payload end the script element—`<` is now escaped as `\u003C` in the output
 
 ## [7.5.1] - 2026-07-26
 
