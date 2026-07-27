@@ -747,6 +747,26 @@ describe('CSS and JS', () => {
     }
   });
 
+  test('JSON script content keeps `<` escaped', async () => {
+    // A framework hydration payload: HTML held inside JSON, with `<` and `/`
+    // escaped so the nested `</script>` cannot terminate the container
+    const input = '<script type="application/json">{\n  "content": "\\u003Cscript\\u003Ealert(1)\\u003C\\u002Fscript\\u003E"\n}</script>';
+    const result = await minify(input, { collapseWhitespace: true });
+
+    assert.ok(!/<\/script/i.test(result.slice(result.indexOf('>') + 1, result.lastIndexOf('</script>'))), 'JSON content must not contain a literal `</script`');
+    assert.strictEqual(result, '<script type="application/json">{"content":"\\u003Cscript>alert(1)\\u003C/script>"}</script>');
+
+    // The escaping must not change what the JSON parses to
+    const value = JSON.parse(result.slice(result.indexOf('>') + 1, result.lastIndexOf('</script>')));
+    assert.strictEqual(value.content, '<script>alert(1)</script>');
+  });
+
+  test('JSON script content without markup is unaffected', async () => {
+    const input = '<script type="application/ld+json">{\n  "@type": "Person",\n  "name": "Test"\n}</script>';
+    const output = '<script type="application/ld+json">{"@type":"Person","name":"Test"}</script>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
   test('JSON minification error handling', async () => {
     // Malformed JSON should be preserved with default `continueOnMinifyError: true`
     let input = '<script type="application/ld+json">{"foo:  "bar"}</script>';

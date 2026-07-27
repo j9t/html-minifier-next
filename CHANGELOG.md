@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.5.2] - 2026-07-27
+
+### Fixed
+
+* Fixed JSON script minification decoding `<` escapes, which let a `</script>` inside a payload end the script element—`<` is now escaped as `\u003C` in the output
+
 ## [7.5.1] - 2026-07-26
 
 ### Added

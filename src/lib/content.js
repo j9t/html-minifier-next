@@ -43,13 +43,14 @@ function unwrapCSS(text, type) {
 
 // Script processing
 
+// Minify JSON script content, keeping `<` escaped
 /**
  * @param {string} text
  * @param {{continueOnMinifyError?: boolean, log?: Function}} options
  */
 function minifyJson(text, options) {
   try {
-    return JSON.stringify(JSON.parse(text));
+    return JSON.stringify(JSON.parse(text)).replace(/</g, '\\u003C');
   }
   catch (err) {
     if (!options.continueOnMinifyError) {
