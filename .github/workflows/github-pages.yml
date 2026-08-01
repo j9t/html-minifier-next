@@ -3,6 +3,12 @@ name: "GitHub Pages"
 on:
   push:
     branches: main
+    # Skip changes that don’t affect the site
+    paths-ignore:
+      - "**.md"
+      - ".github/**"
+      - "backtest/**"
+      - "tests/**"
 
 permissions:
   contents: read
