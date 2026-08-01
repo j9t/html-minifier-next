@@ -2,7 +2,7 @@ name: "Tests"
 
 on:
   push:
-    branches: [main]
+    branches: main
     paths-ignore: ["**.md"]
   pull_request:
     paths-ignore: ["**.md"]
@@ -38,6 +38,8 @@ jobs:
       - name: "Install dependencies"
         run: npm ci
       - name: "Lint"
+        # Lint results don’t vary by platform or Node version
+        if: matrix.platform == 'ubuntu-latest' && matrix.node == 'lts/*'
         run: npm run lint
       - name: "Run tests"
         run: npm test
