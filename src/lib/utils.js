@@ -109,7 +109,7 @@ function lowercase(value) {
 // Replace async helper
 
 /**
- * Asynchronously replace matches in a string
+ * Asynchronously replace matches in a string.
  * @param {string} str - Input string
  * @param {RegExp} regex - Regular expression with global flag
  * @param {Function} asyncFn - Async function to process each match

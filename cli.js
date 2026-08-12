@@ -535,7 +535,7 @@ program.helpOption('-h, --help', 'Display help for command');
   }
 
   /**
-   * Parse comma-separated ignore patterns into an array
+   * Parse comma-separated ignore patterns into an array.
    * @param {string} patterns - Comma-separated directory patterns (e.g., "libs,vendor")
    * @returns {string[]} Array of trimmed pattern strings with normalized separators
    */
@@ -548,8 +548,8 @@ program.helpOption('-h, --help', 'Display help for command');
   }
 
   /**
-   * Check if a directory should be ignored based on ignore patterns
-   * Supports matching by directory name or relative path
+   * Check if a directory should be ignored based on ignore patterns.
+   * Supports matching by directory name or relative path.
    * @param {string} dirPath - Absolute path to the directory
    * @param {string[]} ignorePatterns - Array of patterns to match against (with forward slashes)
    * @param {string} baseDir - Base directory for relative path calculation

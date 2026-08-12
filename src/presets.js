@@ -38,7 +38,7 @@ export const presets = {
 };
 
 /**
- * Get preset configuration by name
+ * Get preset configuration by name.
  * @param {string} name - Preset name (“conservative” or “comprehensive”)
  * @returns {object|null} Preset options object or null if not found
  */

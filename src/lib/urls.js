@@ -12,7 +12,7 @@ const REJECTED_SCHEMES = new Set(['data:', 'javascript:', 'mailto:']);
 const DIRECTORY_INDEXES = ['index.html', 'index.htm'];
 
 /**
- * Get the directory portion of a pathname (up to and including the last `/`)
+ * Get the directory portion of a pathname (up to and including the last `/`).
  * @param {string} pathname
  * @returns {string}
  */
@@ -22,7 +22,7 @@ function getDirectory(pathname) {
 }
 
 /**
- * Compute a path-relative URL from a base directory to a target path
+ * Compute a path-relative URL from a base directory to a target path.
  * @param {string} baseDir - Base directory path (must end with `/`)
  * @param {string} targetPath - Target pathname
  * @returns {string}
@@ -63,7 +63,7 @@ function relativize(baseDir, targetPath) {
 }
 
 /**
- * Remove directory index from the end of a pathname
+ * Remove directory index from the end of a pathname.
  * @param {string} pathname
  * @returns {string}
  */
@@ -77,7 +77,7 @@ function removeDirectoryIndex(pathname) {
 }
 
 /**
- * Create a URL minifier function for the given site context
+ * Create a URL minifier function for the given site context.
  * @param {string} site - The site base URL (used to compute relative URLs)
  * @returns {(url: string) => string} Minifier function that returns the shortest URL
  */
