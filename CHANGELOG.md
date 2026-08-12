@@ -36,7 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added automatic config file discovery: If an `html-minifier-next.config.json` file (or, for compatibility, `htmlminifier.config.json`) is present in the working directory, it’s loaded without needing `--config-file`—an explicit `--config-file` still takes precedence, a note on STDERR reports which file was picked up, and the standalone `--zero` mode remains config-free
+* Added automatic config file discovery: If an html-minifier-next.config.json file (or, for compatibility, htmlminifier.config.json) is present in the working directory, it’s loaded without needing `--config-file`—an explicit `--config-file` still takes precedence, a note on STDERR reports which file was picked up, and the standalone `--zero` mode remains config-free
 
 ### Changed
 
@@ -117,7 +117,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * Extended TypeScript strictness
-* Enabled `checkJs: true` and `strict: true` in `tsconfig.json`, making TypeScript type-check all JavaScript source files with strict settings
+* Enabled `checkJs: true` and `strict: true` in tsconfig.json, making TypeScript type-check all JavaScript source files with strict settings
 
 ## [6.2.8] - 2026-06-02
 
@@ -1160,7 +1160,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 ### Changed
 
-* Cleaned up `.gitignore` file
+* Cleaned up .gitignore file
 
 ## [2.1.2] - 2025-09-13
 
