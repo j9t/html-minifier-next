@@ -763,7 +763,7 @@ describe('CLI', () => {
     const { status, stderr } = spawnSync('sh', ['-c', command], {
       cwd: fixturesDir
     });
-    // Exit code should be 0 and no noisy errors
+    // Exit code should be `0` and no noisy errors
     assert.strictEqual(status, 0);
     assert.strictEqual(stderr.toString().trim(), '');
   });
