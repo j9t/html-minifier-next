@@ -10,18 +10,18 @@
     "entities": "^8.0.0",
     "lightningcss": "^1.33.0",
     "svgo": "^4.0.2",
-    "terser": "^5.49.0"
+    "terser": "^5.50.0"
   },
   "description": "Highly effective, super-configurable, well-tested web page minifier (enhanced successor to HTML Minifier)",
   "devDependencies": {
-    "@commitlint/cli": "^21.2.1",
+    "@commitlint/cli": "^21.2.2",
     "@eslint/js": "^10.0.1",
-    "@swc/core": "^1.15.46",
-    "@types/node": "^26.1.2",
-    "eslint": "^10.8.0",
+    "@swc/core": "^1.15.47",
+    "@types/node": "^26.2.0",
+    "eslint": "^10.8.1",
     "globals": "^17.11.0",
     "typescript": "^7.0.2",
-    "vite": "^8.1.5"
+    "vite": "^8.2.1"
   },
   "engines": {
     "node": ">=22.13"
@@ -95,5 +95,5 @@
   },
   "type": "module",
   "types": "dist/types/htmlminifier.d.ts",
-  "version": "7.5.2"
+  "version": "7.5.3"
 }
