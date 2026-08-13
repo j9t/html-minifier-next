@@ -487,7 +487,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       }
       // Sync path (`minifyCSS` disabled—identity function)
       if (cssResult && /^(?:[a-z-]+:[;\s]*)+$/i.test(cssResult)) return '';
-      return cssResult != null ? cssResult : attrValue;
+      return cssResult ?? attrValue;
     }
     return attrValue;
   }
@@ -589,7 +589,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
         return originalAttrValue;
       });
     }
-    return cssResult != null ? cssResult : attrValue;
+    return cssResult ?? attrValue;
   }
 
   if (tag === 'iframe' && attrName === 'srcdoc') {
