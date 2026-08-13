@@ -161,9 +161,16 @@ describe('SVG and MathML', () => {
   });
 
   test('Error recovery', async () => {
-    // SVGO should recover gracefully with `continueOnMinifyError`
-    const result = await minify('<svg><circle cx="5" cy="5" r="2"/></svg>', { minifySVG: true, collapseWhitespace: true, continueOnMinifyError: true });
-    assert.ok(result.includes('<svg'), 'Should produce valid output');
+    // SVGO fails on the invalid XML `removeOptionalTags` produces here; `continueOnMinifyError` keeps the unoptimized SVG
+    assert.strictEqual(
+      await minify('<svg><foreignObject width="100" height="100"><p>A</p><p>B</p></foreignObject></svg>', {
+        minifySVG: true,
+        removeOptionalTags: true,
+        collapseWhitespace: true,
+        continueOnMinifyError: true
+      }),
+      '<svg><foreignObject width="100" height="100"><p>A<p>B</foreignObject></svg>'
+    );
   });
 
   test('Mixed HTML and SVG', async () => {
