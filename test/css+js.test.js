@@ -698,7 +698,7 @@ describe('CSS and JS', () => {
 
     // Test with conservative preset
     let input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n    <script type="application/ld+json">\n{\n  "name": "Test",\n  "url": "https://example.com/page"\n}\n    </script>\n  </head>\n</html>';
-    let conservativeResult = await minify(input, getPreset('conservative'));
+    const conservativeResult = await minify(input, getPreset('conservative'));
     // Conservative preset should: remove comments, collapse whitespace, minify JSON, use short doctype
     assert.ok(!conservativeResult.includes('<!-- Comment -->'), 'Conservative: Should remove comments');
     assert.ok(conservativeResult.includes('<!doctype html>'), 'Conservative: Should use short doctype');
@@ -707,7 +707,7 @@ describe('CSS and JS', () => {
 
     // Test with comprehensive preset
     input = '<script type="importmap">\n{\n  "imports": {\n    "vue": "https://cdn.example.com/vue.js"\n  }\n}\n</script>';
-    let comprehensiveResult = await minify(input, getPreset('comprehensive'));
+    const comprehensiveResult = await minify(input, getPreset('comprehensive'));
     // Comprehensive preset should: minify JSON, collapse whitespace, remove quotes from attributes where possible
     assert.ok(comprehensiveResult.includes('{"imports":{"vue":"https://cdn.example.com/vue.js"}}'), 'Comprehensive: Should minify JSON');
     assert.ok(comprehensiveResult.includes('type=importmap'), 'Comprehensive: Should remove attribute quotes');

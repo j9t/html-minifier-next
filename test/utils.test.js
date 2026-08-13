@@ -56,4 +56,16 @@ describe('LRU', () => {
     assert.strictEqual(stats.gets, 2);
     assert.strictEqual(stats.hits, 1);
   });
+
+  test('`get()` promotes a key, changing which entry is evicted', () => {
+    const cache = new LRU(2);
+    cache.set('a', 1);
+    cache.set('b', 2);
+
+    cache.get('a'); // promotes `a`, leaving `b` least recently used
+    cache.set('c', 3); // evicts `b`, not `a`
+
+    assert.strictEqual(cache.get('a'), 1);
+    assert.strictEqual(cache.get('b'), undefined);
+  });
 });

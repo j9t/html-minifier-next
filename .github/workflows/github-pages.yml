@@ -8,7 +8,7 @@ on:
       - "**.md"
       - ".github/**"
       - "backtest/**"
-      - "tests/**"
+      - "test/**"
 
 permissions:
   contents: read

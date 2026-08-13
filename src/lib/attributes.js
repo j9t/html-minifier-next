@@ -487,7 +487,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       }
       // Sync path (`minifyCSS` disabled—identity function)
       if (cssResult && /^(?:[a-z-]+:[;\s]*)+$/i.test(cssResult)) return '';
-      return cssResult != null ? cssResult : attrValue;
+      return cssResult ?? attrValue;
     }
     return attrValue;
   }
@@ -589,7 +589,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
         return originalAttrValue;
       });
     }
-    return cssResult != null ? cssResult : attrValue;
+    return cssResult ?? attrValue;
   }
 
   if (tag === 'iframe' && attrName === 'srcdoc') {
@@ -635,7 +635,7 @@ function chooseAttributeQuote(attrValue, options) {
  */
 function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   const attrName = options.name(attr.name);
-  let attrValue = attr.value;
+  const attrValue = attr.value;
 
   // Entity decoding requires a lazy import—async only when `&` is present
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
