@@ -3,7 +3,7 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.base.json",
   "include": [
-    "./tests/**/*.ts"
+    "./test/**/*.ts"
   ],
   "compilerOptions": {
     // No Node types—tests don’t use `process`/`Buffer` directly
