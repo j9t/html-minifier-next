@@ -791,9 +791,8 @@ program.helpOption('-h, --help', 'Display help for command');
       }
 
       // Prevent traversing into the output directory when it is inside the input directory
-      let inputReal;
       let outputReal;
-      inputReal = await fs.promises.realpath(inputDir).catch(() => undefined);
+      const inputReal = await fs.promises.realpath(inputDir).catch(() => undefined);
       try {
         outputReal = await fs.promises.realpath(outputDir);
       } catch {

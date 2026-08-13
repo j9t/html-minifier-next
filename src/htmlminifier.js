@@ -910,23 +910,23 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // Memoize `sortClassNames` results—class lists often repeat in templates
     const classNameCache = new LRU(500);
 
-    options.sortClassNames = function (/** @type {string} */ value) {
+    options.sortClassNames = function (/** @type {string} */ classNames) {
       // Fast path: Single class (no spaces) needs no sorting
-      if (value.indexOf(' ') === -1) {
-        return value;
+      if (classNames.indexOf(' ') === -1) {
+        return classNames;
       }
 
       // Check cache first
-      const cached = /** @type {string | undefined} */ (classNameCache.get(value));
+      const cached = /** @type {string | undefined} */ (classNameCache.get(classNames));
       if (cached !== undefined) {
         return cached;
       }
 
       // Expand UID tokens back to original content before sorting
       // Fast path: Skip if no HTML comments (UID markers) present
-      let expandedValue = value;
-      if (uidReplacePattern && value.indexOf('<!--') !== -1) {
-        expandedValue = value.replace(uidReplacePattern, function (/** @type {string} */ _match, /** @type {string} */ index) {
+      let expandedValue = classNames;
+      if (uidReplacePattern && classNames.indexOf('<!--') !== -1) {
+        expandedValue = classNames.replace(uidReplacePattern, function (/** @type {string} */ _match, /** @type {string} */ index) {
           return ignoredMarkupChunks[+index] || '';
         });
         // Reset `lastIndex` for pattern reuse
@@ -939,7 +939,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       const result = sorted.join(' ');
 
       // Cache the result
-      classNameCache.set(value, result);
+      classNameCache.set(classNames, result);
       return result;
     };
   }
@@ -1148,11 +1148,11 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // Look for trailing whitespaces, bypass any inline tags
   function trimTrailingWhitespace(/** @type {number} */ index, /** @type {string} */ nextTag) {
-    for (let endTag = ''; index >= 0 && canTrimWhitespace(endTag, emptyAttrs); index--) {
+    for (let prevTag = ''; index >= 0 && canTrimWhitespace(prevTag, emptyAttrs); index--) {
       const str = buffer[index] ?? '';
       const match = str.match(/^<\/([\w:-]+)>$/);
       if (match) {
-        endTag = match[1] ?? '';
+        prevTag = match[1] ?? '';
       } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, '', nextTag, emptyAttrs, emptyAttrs, options, inlineElements, inlineTextSet))) {
         break;
       }
@@ -1398,13 +1398,13 @@ async function minifyHTML(value, options, partialMarkup) {
                   // Collapse if both sides are element/closing tags or HTML comments, and neither is inline
                   if ((currentTagMatch || currentIsHtmlComment || currentClosingTagMatch) &&
                       (prevTagMatch || prevIsHtmlComment || prevClosingTagMatch)) {
-                    const currentTag = currentTagMatch ? resolveName(currentTagMatch[1] ?? '')
+                    const currentTagName = currentTagMatch ? resolveName(currentTagMatch[1] ?? '')
                       : currentClosingTagMatch ? resolveName(currentClosingTagMatch[1] ?? '') : null;
-                    const prevTag = prevTagMatch ? resolveName(prevTagMatch[1] ?? '')
+                    const prevTagName = prevTagMatch ? resolveName(prevTagMatch[1] ?? '')
                       : prevClosingTagMatch ? resolveName(prevClosingTagMatch[1] ?? '') : null;
 
                     // Don’t collapse between inline elements (HTML comments count as non-inline)
-                    if (!inlineElements.has(currentTag ?? '') && !inlineElements.has(prevTag ?? '')) {
+                    if (!inlineElements.has(currentTagName ?? '') && !inlineElements.has(prevTagName ?? '')) {
                       // Collapse whitespace respecting context rules
                       let collapsedText = prevText;
 

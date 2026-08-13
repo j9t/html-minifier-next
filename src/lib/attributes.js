@@ -635,7 +635,7 @@ function chooseAttributeQuote(attrValue, options) {
  */
 function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
   const attrName = options.name(attr.name);
-  let attrValue = attr.value;
+  const attrValue = attr.value;
 
   // Entity decoding requires a lazy import—async only when `&` is present
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {

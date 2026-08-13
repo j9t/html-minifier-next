@@ -154,7 +154,7 @@ function buildAttrRegex(handler) {
 
 /** @param {HTMLParserHandler} handler */
 function getAttrRegexForHandler(handler) {
-  let cached = attrRegexCache.get(handler);
+  const cached = attrRegexCache.get(handler);
   if (cached) return cached;
   const compiled = buildAttrRegex(handler);
   attrRegexCache.set(handler, compiled);
@@ -166,7 +166,7 @@ const attrRegexStickyCache = new WeakMap();
 
 /** @param {HTMLParserHandler} handler */
 function getAttrRegexStickyForHandler(handler) {
-  let cached = attrRegexStickyCache.get(handler);
+  const cached = attrRegexStickyCache.get(handler);
   if (cached) return cached;
   const nonSticky = getAttrRegexForHandler(handler);
   // Derive sticky version: Remove `^` anchor, add `y` flag
@@ -657,12 +657,12 @@ export class HTMLParser {
 
     // `needle` must already be lowercase
     function findTagInCurrentTable(/** @type {string} */ needle) {
-      let pos;
-      for (pos = stack.length - 1; pos >= 0; pos--) {
-        const entry = stack[pos];
+      let stackIndex;
+      for (stackIndex = stack.length - 1; stackIndex >= 0; stackIndex--) {
+        const entry = stack[stackIndex];
         const currentTag = entry?.lowerTag;
         if (currentTag === needle) {
-          return pos;
+          return stackIndex;
         }
         // Stop searching if hitting a table boundary
         if (currentTag === 'table') {
@@ -672,25 +672,25 @@ export class HTMLParser {
       return -1;
     }
 
-    function parseEndTagAt(/** @type {number} */ pos) {
-      // Close all open elements up to `pos` (mirrors `parseEndTag`’s core branch);
+    function parseEndTagAt(/** @type {number} */ stackIndex) {
+      // Close all open elements up to `stackIndex` (mirrors `parseEndTag`’s core branch);
       // `end` handlers are synchronous—invoked without awaiting, as in `parseEndTag`
-      for (let i = stack.length - 1; i >= pos; i--) {
+      for (let i = stack.length - 1; i >= stackIndex; i--) {
         const entry = /** @type {NonNullable<(typeof stack)[number]>} */ (stack[i]);
         if (handler.end) {
           handler.end(entry.tag, entry.attrs, true);
         }
       }
-      stack.length = pos;
-      lastTag = pos ? (stack[pos - 1]?.tag ?? '') : '';
-      lastTagLower = pos ? (stack[pos - 1]?.lowerTag ?? '') : '';
+      stack.length = stackIndex;
+      lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
+      lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
     }
 
     function closeIfFoundInCurrentTable(/** @type {string} */ tagName) {
-      const pos = findTagInCurrentTable(tagName);
-      if (pos >= 0) {
+      const stackIndex = findTagInCurrentTable(tagName);
+      if (stackIndex >= 0) {
         // Close at the specific index to avoid re-searching
-        parseEndTagAt(pos);
+        parseEndTagAt(stackIndex);
         return true;
       }
       return false;
@@ -812,38 +812,38 @@ export class HTMLParser {
 
     // `needle` must already be lowercase
     function findTag(/** @type {string} */ needle) {
-      let pos;
-      for (pos = stack.length - 1; pos >= 0; pos--) {
-        if (stack[pos]?.lowerTag === needle) {
+      let stackIndex;
+      for (stackIndex = stack.length - 1; stackIndex >= 0; stackIndex--) {
+        if (stack[stackIndex]?.lowerTag === needle) {
           break;
         }
       }
-      return pos;
+      return stackIndex;
     }
 
     async function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
-      let pos;
+      let stackIndex;
       const lowerTagName = tagName ? tagName.toLowerCase() : '';
 
       // Find the closest opened tag of the same type
       if (tagName) {
-        pos = findTag(lowerTagName);
+        stackIndex = findTag(lowerTagName);
       } else { // If no tag name is provided, clean shop
-        pos = 0;
+        stackIndex = 0;
       }
 
-      if (pos >= 0) {
+      if (stackIndex >= 0) {
         // Close all the open elements, up the stack
-        for (let i = stack.length - 1; i >= pos; i--) {
+        for (let i = stack.length - 1; i >= stackIndex; i--) {
           if (handler.end) {
-            handler.end(stack[i]?.tag, stack[i]?.attrs, i > pos || !tag);
+            handler.end(stack[i]?.tag, stack[i]?.attrs, i > stackIndex || !tag);
           }
         }
 
         // Remove the open elements from the stack
-        stack.length = pos;
-        lastTag = pos ? (stack[pos - 1]?.tag ?? '') : '';
-        lastTagLower = pos ? (stack[pos - 1]?.lowerTag ?? '') : '';
+        stack.length = stackIndex;
+        lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
+        lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
       } else if (handler.partialMarkup && tagName) {
         // In partial markup mode, preserve stray end tags
         if (handler.end) {

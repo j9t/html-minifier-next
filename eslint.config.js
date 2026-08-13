@@ -14,6 +14,15 @@ export default [
   },
   js.configs.recommended,
   {
+    rules: {
+      curly: ['error', 'multi-line'],
+      eqeqeq: ['error', 'smart'],
+      'no-shadow': 'error',
+      'no-var': 'error',
+      'prefer-const': 'error'
+    }
+  },
+  {
     ignores: ['demo/**'],
     languageOptions: {
       ecmaVersion: 'latest',
