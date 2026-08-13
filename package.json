@@ -19,6 +19,7 @@
     "@swc/core": "^1.15.46",
     "@types/node": "^26.1.2",
     "eslint": "^10.8.0",
+    "globals": "^17.11.0",
     "typescript": "^7.0.2",
     "vite": "^8.1.5"
   },
