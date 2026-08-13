@@ -89,9 +89,9 @@
     "prepack": "npm run build",
     "prepare": "git config core.hooksPath .githooks || true",
     "serve": "vite",
-    "test": "npm run test:types && node --test test/*.test.js",
+    "test": "npm run test:types && node --test \"test/**/*.test.js\"",
     "test:types": "tsc --noEmit && tsc --project tsconfig.test.json",
-    "test:watch": "node --test --watch test/*.test.js"
+    "test:watch": "node --test --watch \"test/**/*.test.js\""
   },
   "type": "module",
   "types": "dist/types/htmlminifier.d.ts",
