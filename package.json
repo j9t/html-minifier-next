@@ -16,7 +16,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@eslint/js": "^10.0.1",
-    "@swc/core": "^1.15.47",
+    "@swc/core": "^1.16.0",
     "@types/node": "^26.2.0",
     "eslint": "^10.8.1",
     "globals": "^17.11.0",
