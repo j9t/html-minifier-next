@@ -124,15 +124,6 @@ describe('CLI', () => {
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "xyz"`/);
   });
 
-  test('Should throw error for invalid custom-fragment-quantifier-limit value', () => {
-    const cliArguments = [
-      'default.html',
-      '--custom-fragment-quantifier-limit=invalid'
-    ];
-
-    assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "invalid"`/);
-  });
-
   test('Should reject `max-line-length` with trailing characters', () => {
     const cliArguments = [
       'default.html',
@@ -149,15 +140,6 @@ describe('CLI', () => {
     ];
 
     assert.throws(() => execCli(cliArguments), /Invalid number for `--max-input-length: "99KB"`/);
-  });
-
-  test('Should reject `custom-fragment-quantifier-limit` with trailing characters', () => {
-    const cliArguments = [
-      'default.html',
-      '--custom-fragment-quantifier-limit=100x'
-    ];
-
-    assert.throws(() => execCli(cliArguments), /Invalid number for `--custom-fragment-quantifier-limit: "100x"`/);
   });
 
   test('Should reject negative `max-line-length`', () => {

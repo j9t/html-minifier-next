@@ -4,16 +4,23 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [7.6.1] - 2026-08-18
+## [8.0.0] - 2026-08-19
 
 ### Fixed
 
+* Fixed `ignoreCustomFragments` patterns losing their flags (`/…/i` matched case-sensitively and `/…/s` left `.` stopping at line terminators)
 * Fixed the `ignoreCustomFragments` ReDoS warning firing for every `*` or `+`, which flagged linear patterns—among them HMN’s own defaults, whenever they were passed explicitly
-* Fixed the documentation of `customFragmentQuantifierLimit`, which bounds the whitespace and fragment repetition HMN wraps around `ignoreCustomFragments` patterns instead of rewriting the quantifiers inside them
+* Fixed custom fragment matching costing O(n²) on documents that open fragments they never close—`ignoreCustomFragments` patterns that wrap an any-character body in literal delimiters are matched by scanning for those delimiters in linear time
 * Fixed CLI error messages reading `undefined` when the thrown value was not an `Error`
+
+### Added
+
+* Added `strictCustomFragments` to reject `ignoreCustomFragments` patterns whose quantifiers nest or alternate, rather than warning about them—those are the patterns that reach the backtracking path, so an error is the safer answer where the patterns or the input are not fully under your control
 
 ### Changed
 
+* **BREAKING:** Removed `customFragmentQuantifierLimit` in favor of linear matching, `strictCustomFragments`, and `maxInputLength`
+  - **Migration:** Drop the option; whitespace around a fragment match and adjacent fragments now join the match however long the run, where the default limit of 200 used to cut them off
 * Moved the web demo onto the same ReDoS pattern check as the minifier, which had drifted from its own copy
 * Extended ESLint to the backtest scripts and resolved reports
 * Extended type checking beyond src/ to cli.js, scripts/, and build configuration

@@ -597,21 +597,26 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     } else if (['customAttrAssign', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
       // Array of regex patterns
       optionsDynamic[key] = parseRegExpArray(option);
-      // Warn about fragments whose quantifiers nest or alternate, the shapes that
-      // backtrack catastrophically; a lone `[\s\S]*?` up to a literal terminator is
-      // linear, so it passes—as it must, being how the defaults are written
-      if (key === 'ignoreCustomFragments') {
-        for (const re of /** @type {RegExp[]} */ (optionsDynamic[key])) {
-          if (hasRiskyQuantifiers(re.source) && !customFragmentsWarned.has(re.source)) {
-            customFragmentsWarned.add(re.source);
-            warn(`HTML Minifier Next: Custom fragment \`/${re.source}/\` nests or alternates unlimited quantifiers, which may cause ReDoS—bound them (e.g., \`{0,1000}\`) instead`);
-          }
-        }
-      }
     } else {
       optionsDynamic[key] = option;
     }
   });
+
+  // Fragments whose quantifiers nest or alternate are the shapes that backtrack
+  // catastrophically, and they are also the ones no linear scan can stand in for; a
+  // lone `[\s\S]*?` up to a literal terminator is linear, so it passes—as it must,
+  // being how the defaults are written
+  for (const re of options.ignoreCustomFragments || []) {
+    if (!hasRiskyQuantifiers(re.source)) continue;
+    const problem = `Custom fragment \`/${re.source}/\` nests or alternates unlimited quantifiers, which may cause ReDoS—bound them (e.g., \`{0,1000}\`) instead`;
+    if (options.strictCustomFragments) {
+      throw new Error(`HTML Minifier Next: ${problem}`);
+    }
+    if (!customFragmentsWarned.has(re.source)) {
+      customFragmentsWarned.add(re.source);
+      warn(`HTML Minifier Next: ${problem}`);
+    }
+  }
 
   // Unused-CSS removal rides along with Lightning CSS, so it silently does nothing
   // when `minifyCSS` is off or replaced by a function—say so rather than let it pass

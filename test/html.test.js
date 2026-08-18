@@ -2592,6 +2592,44 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
   });
 
+  test('Custom fragment patterns keep their flags', async () => {
+    const input = '<p>  {A%  x  %a}  </p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/\{a%[\s\S]*?%a\}/i] }), '<p> {A%  x  %a} </p>');
+    // Without the flag the pattern does not match, so the fragment is text like any other
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/\{a%[\s\S]*?%a\}/] }), '<p>{A% x %a}</p>');
+  });
+
+  test('Custom fragments that are never closed stay cheap', async () => {
+    // Running the patterns as a regex costs O(n²) here, seconds at this size
+    const input = '<p>' + '<% '.repeat(200000) + '</p>';
+    const start = Date.now();
+    await minify(input, { continueOnParseError: true });
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed < 5000, `Expected a linear scan, took ${elapsed}ms`);
+  });
+
+  test('`strictCustomFragments`', async () => {
+    // A pattern that can backtrack catastrophically is refused outright
+    await assert.rejects(
+      () => minify('<p>x</p>', { ignoreCustomFragments: [/<%(?:x|xx)+%>/], strictCustomFragments: true }),
+      /nests or alternates unlimited quantifiers/
+    );
+
+    // Patterns that stay linear are accepted, the defaults among them
+    const safe = { ignoreCustomFragments: [/<%[\s\S]*?%>/, /\{\{[^}]{0,500}\}\}/], strictCustomFragments: true };
+    assert.strictEqual(await minify('<p><% a %></p>', safe), '<p><% a %></p>');
+
+    // Without the option the same pattern warns instead—once, and through `log`
+    /** @type {unknown[]} */
+    const logged = [];
+    const output = await minify('<p>x</p>', {
+      ignoreCustomFragments: [/<%(?:y|yy)+%>/],
+      log: (/** @type {unknown} */ message) => { logged.push(message); }
+    });
+    assert.strictEqual(output, '<p>x</p>');
+    assert.strictEqual(logged.filter(message => String(message).includes('nests or alternates')).length, 1);
+  });
+
   test('`caseSensitive`', async () => {
     const input = '<div mixedCaseAttribute="value"></div>';
     const caseSensitiveOutput = '<div mixedCaseAttribute="value"></div>';

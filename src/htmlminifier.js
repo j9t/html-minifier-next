@@ -55,6 +55,7 @@ import {
 } from './lib/content.js';
 
 import { processOptions } from './lib/options.js';
+import { toFragment, replaceCustomFragments } from './lib/fragments.js';
 
 /** @import { ProcessedOptions } from './lib/options.js' */
 
@@ -196,11 +197,11 @@ import { processOptions } from './lib/options.js';
  *
  *  Default: `[/^on[a-z]{3,}$/]`
  *
- * @prop {number} [customFragmentQuantifierLimit]
- *  Limits the quantifier used when building a safe regex for custom
- *  fragments to avoid ReDoS. See source use for details.
+ * @prop {boolean} [strictCustomFragments]
+ *  Rejects `ignoreCustomFragments` patterns whose quantifiers nest or alternate,
+ *  rather than warning about them.
  *
- *  Default: `200`
+ *  Default: `false`
  *
  * @prop {boolean} [decodeEntities]
  *  When true, decodes HTML entities in text and attributes before
@@ -1057,63 +1058,46 @@ async function minifyHTML(value, options, partialMarkup) {
     await createSortFns(value, options, uidIgnore ?? '', uidAttr ?? '', ignoredMarkupChunks);
   }
 
-  const customFragments = (options.ignoreCustomFragments || []).map(function (/** @type {RegExp} */ re) {
-    return re.source;
-  });
+  const customFragments = (options.ignoreCustomFragments || []).map(toFragment);
   if (customFragments.length) {
-    // Safe approach: Use bounded quantifiers instead of unlimited ones to prevent ReDoS
-    const maxQuantifier = options.customFragmentQuantifierLimit || 200;
-    const whitespacePattern = `\\s{0,${maxQuantifier}}`;
+    // Temporarily replace custom ignored fragments with unique attributes
+    const replaceFragment = function (/** @type {string} */ match) {
+      if (!uidAttr) {
+        uidAttr = uniqueId(value);
+        uidPattern = new RegExp('(\\s*)' + uidAttr + '([0-9]+)' + uidAttr + '(\\s*)', 'g');
+        uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
 
-    // Fast path: The padded replace below is costly on large inputs because the
-    // `\s{0,N}` padding makes the regex engine consume and backtrack at every
-    // whitespace run; since the padding is optional and the fragment group requires
-    // at least one match, a single unpadded probe that finds nothing proves the
-    // replace would be a no-op—so skip it entirely
-    const reFragmentProbe = new RegExp('(?:' + customFragments.join('|') + ')');
-    if (reFragmentProbe.test(value)) {
-      // Use bounded quantifiers to prevent ReDoS—this approach prevents exponential backtracking
-      const reCustomIgnore = new RegExp(
-        whitespacePattern + '(?:' + customFragments.join('|') + '){1,' + maxQuantifier + '}' + whitespacePattern,
-        'g'
-      );
-      // Temporarily replace custom ignored fragments with unique attributes
-      value = value.replace(reCustomIgnore, function (match) {
-        if (!uidAttr) {
-          uidAttr = uniqueId(value);
-          uidPattern = new RegExp('(\\s*)' + uidAttr + '([0-9]+)' + uidAttr + '(\\s*)', 'g');
-          uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
+        if (options.minifyCSS !== identity) {
+          options.minifyCSS = (function (/** @type {ProcessedOptions['minifyCSS']} */ fn) {
+            return function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {ProcessedOptions['cssContext']} */ context) {
+              text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
+                const chunks = ignoredCustomMarkupChunks[+index];
+                return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
+              });
 
-          if (options.minifyCSS !== identity) {
-            options.minifyCSS = (function (/** @type {ProcessedOptions['minifyCSS']} */ fn) {
-              return function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {ProcessedOptions['cssContext']} */ context) {
-                text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
-                  const chunks = ignoredCustomMarkupChunks[+index];
-                  return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
-                });
-
-                return fn(text, type, context);
-              };
-            })(options.minifyCSS);
-          }
-
-          if (options.minifyJS !== identity) {
-            options.minifyJS = (function (/** @type {ProcessedOptions['minifyJS']} */ fn) {
-              return function (/** @type {string} */ text, /** @type {boolean | undefined} */ inline, /** @type {boolean | undefined} */ isModule) {
-                return fn(text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
-                  const chunks = ignoredCustomMarkupChunks[+index];
-                  return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
-                }), inline, isModule);
-              };
-            })(options.minifyJS);
-          }
+              return fn(text, type, context);
+            };
+          })(options.minifyCSS);
         }
 
-        const token = uidAttr + ignoredCustomMarkupChunks.length + uidAttr;
-        ignoredCustomMarkupChunks.push(/^(\s*)[\s\S]*?(\s*)$/.exec(match));
-        return '\t' + token + '\t';
-      });
-    }
+        if (options.minifyJS !== identity) {
+          options.minifyJS = (function (/** @type {ProcessedOptions['minifyJS']} */ fn) {
+            return function (/** @type {string} */ text, /** @type {boolean | undefined} */ inline, /** @type {boolean | undefined} */ isModule) {
+              return fn(text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
+                const chunks = ignoredCustomMarkupChunks[+index];
+                return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
+              }), inline, isModule);
+            };
+          })(options.minifyJS);
+        }
+      }
+
+      const token = uidAttr + ignoredCustomMarkupChunks.length + uidAttr;
+      ignoredCustomMarkupChunks.push(/^(\s*)[\s\S]*?(\s*)$/.exec(match));
+      return '\t' + token + '\t';
+    };
+
+    value = replaceCustomFragments(value, customFragments, replaceFragment);
   }
 
   function canCollapseWhitespace(/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {

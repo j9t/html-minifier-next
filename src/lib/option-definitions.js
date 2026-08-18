@@ -70,10 +70,6 @@ const optionDefinitions = {
     description: 'Array of regexes that allow to support custom event attributes for minifyJS (e.g., `ng-click`)',
     type: 'regexpArray'
   },
-  customFragmentQuantifierLimit: {
-    description: 'Cap the whitespace and the number of adjacent custom fragments a match may consume, limiting backtracking (default: 200)',
-    type: 'int'
-  },
   decodeEntities: {
     description: 'Use direct Unicode characters whenever possible',
     type: 'boolean'
@@ -200,6 +196,10 @@ const optionDefinitions = {
   },
   trimCustomFragments: {
     description: 'Trim whitespace around custom fragments (`--ignore-custom-fragments`)',
+    type: 'boolean'
+  },
+  strictCustomFragments: {
+    description: 'Reject `ignoreCustomFragments` patterns whose quantifiers nest or alternate, rather than warning about them',
     type: 'boolean'
   },
   useShortDoctype: {

@@ -144,7 +144,6 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | `undefined` |
 | `customAttrSurround`<br>`--custom-attr-surround` | Array of regexes that allow to support custom attribute surround expressions (e.g., `<input {{#if value}}checked="checked"{{/if}}>`) | `[]` |
 | `customEventAttributes`<br>`--custom-event-attributes` | Array of regexes that allow to support custom event attributes for `minifyJS` (e.g., `ng-click`) | `[ /^on[a-z]{3,}$/ ]` |
-| `customFragmentQuantifierLimit`<br>`--custom-fragment-quantifier-limit` | Cap the whitespace and the number of adjacent custom fragments a match may consume, limiting backtracking | `200` |
 | `decodeEntities`<br>`--decode-entities` | Use direct Unicode characters whenever possible | `false` |
 | `ignoreCustomComments`<br>`--ignore-custom-comments` | Array of regexes that allow to ignore matching comments | `[ /^!/, /^\s*#/ ]` |
 | `ignoreCustomFragments`<br>`--ignore-custom-fragments` | Array of regexes that allow to ignore certain fragments, when matched (e.g., `<?php … ?>`, `{{ … }}`, etc.) | `[ /<%[\s\S]*?%>/, /<\?[\s\S]*?\?>/ ]` |
@@ -176,6 +175,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeUnusedCSS`<br>`--remove-unused-css` | [Remove unused CSS rules](#unused-css-removal) from `style` elements; requires `minifyCSS`; **note that this can change how a document renders** | `false` (could be `true`, `{ safelist, scripts }`) |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
+| `strictCustomFragments`<br>`--strict-custom-fragments` | [Reject `ignoreCustomFragments` patterns whose quantifiers nest or alternate](#redos-protection), rather than warning about them | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
 | `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype) | `false` |
 
@@ -539,7 +539,7 @@ SVG and MathML elements are automatically recognized as foreign elements, and wh
 
 ### Working with invalid or partial markup
 
-By default, HTML Minifier Next parses markup into a complete tree structure, then modifies it (removing anything that was specified for removal, ignoring anything that was specified to be ignored, etc.), then creates markup from that tree and returns it.
+By default, HMN parses markup into a complete tree structure, then modifies it (removing anything that was specified for removal, ignoring anything that was specified to be ignored, etc.), then creates markup from that tree and returns it.
 
 _Input markup (e.g., `<p id="">foo`) → Internal representation of markup in a form of tree (e.g., `{ tag: "p", attr: "id", children: ["foo"] }`) → Transformation of internal representation (e.g., removal of `id` attribute) → Output of resulting markup (e.g., `<p>foo</p>`)_
 
@@ -551,13 +551,13 @@ To validate complete HTML markup, use [the W3C validator](https://validator.w3.o
 
 ### ReDoS protection
 
-This minifier includes protection against regular expression denial of service (ReDoS) attacks:
+You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular expression to run against your documents. This is also where a regular expression denial of service (ReDoS) could originate:
 
-* Custom fragment bounds: To find the fragments to protect, HMN combines your `ignoreCustomFragments` patterns into one regular expression. The parts it adds are bounded by the `customFragmentQuantifierLimit` option (default: 200)—the whitespace around a match, and the number of adjacent fragments a single match may span. Your patterns themselves are used as written.
+* Matching without backtracking: A pattern that wraps an any-character body in literal delimiters—`<%[\s\S]*?%>`, and every other shape below—is matched by scanning for those delimiters in linear time, with no regular expression involved. Patterns of other shapes run as regular expressions, one per pattern, so each keeps its own flags.
+
+* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself repeats (`(a+)+`) or alternates (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control.
 
 * Input length limits: The `maxInputLength` option allows you to set a maximum input size to prevent processing of excessively large inputs that could cause performance issues.
-
-* Pattern detection: HMN inspects the `ignoreCustomFragments` patterns you pass and warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself repeats (`(a+)+`) or alternates (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`).
 
 **Important:** A single unlimited quantifier is not one of those shapes: `[\s\S]*?` running up to a literal terminator matches in linear time, and it is how HMN’s own defaults are written. Bounds are still worth adding where you know the maximum length of a fragment, since they cap how far a failing match can scan.
 
@@ -598,8 +598,6 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 // Vue.js
 ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 ```
-
-**Important:** The minifier bounds the whitespace and fragment repetition it adds around your patterns, but the patterns themselves run as you wrote them—explicit bounds are yours to add.
 
 ##### Escaping patterns in different contexts
 

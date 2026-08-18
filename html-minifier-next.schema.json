@@ -117,11 +117,6 @@
         "type": "string"
       }
     },
-    "customFragmentQuantifierLimit": {
-      "description": "Cap the whitespace and the number of adjacent custom fragments a match may consume, limiting backtracking (default: 200)",
-      "type": "integer",
-      "minimum": 0
-    },
     "decodeEntities": {
       "description": "Use direct Unicode characters whenever possible",
       "type": "boolean"
@@ -296,6 +291,10 @@
     },
     "trimCustomFragments": {
       "description": "Trim whitespace around custom fragments (`--ignore-custom-fragments`)",
+      "type": "boolean"
+    },
+    "strictCustomFragments": {
+      "description": "Reject `ignoreCustomFragments` patterns whose quantifiers nest or alternate, rather than warning about them",
       "type": "boolean"
     },
     "useShortDoctype": {
