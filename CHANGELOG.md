@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Added `removeUnusedCSS` option to enable removing rules from `style` elements whose class or ID selectors the document never references (requires `minifyCSS`, since removal runs through Lightning CSS)
 * Added minifier diagnostics to `--verbose` (and `--dry`, which implies it)
-* Added reporting for invalid CSS under `errorRecovery`: With `continueOnMinifyError` enabled (the default), Lightning CSS reports invalid rules instead of throwing; it is reported through the `log` hook, once per document and for every document
+* Added reporting for invalid CSS under `errorRecovery`—with `continueOnMinifyError` enabled (the default), Lightning CSS reports invalid rules instead of throwing, which is done through the `log` hook
 
 ### Changed
 
