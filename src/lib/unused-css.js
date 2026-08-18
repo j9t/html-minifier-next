@@ -20,10 +20,6 @@ const idReferenceAttributes = new Set([
   'popovertarget'
 ]);
 
-// Browsers close a raw-text element on an end tag carrying whitespace, stray
-// attributes, or a slash (`</style >`, `</script\t\n bar>`, `</script/>`)
-const styleElementPattern = /<style\b[^>]*>[\s\S]*?<\/style(?:[\s/][^>]*)?>/gi;
-const scriptElementPattern = /<script\b([^>]*)>([\s\S]*?)<\/script(?:[\s/][^>]*)?>/gi;
 const attributePattern = /(?:^|[\s/])([-\w:.]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 const identifierPattern = /[A-Za-z_][\w-]*/g;
 
@@ -57,6 +53,78 @@ function unescapeIdentifier(identifier) {
 }
 
 /**
+ * Locate the bodies of a raw-text element (`style`, `script`).
+ *
+ * Scanning beats one regular expression here: A pattern permissive enough for the
+ * end tags browsers accept (`</script\t\n bar>`, `</script/>`) backtracks
+ * quadratically over a document full of near-matches, and bounding it would make
+ * long start tags go unrecognized.
+ *
+ * @param {string} html - Raw document markup
+ * @param {string} tagName - Lowercase element name
+ * @returns {Array<{start: number, bodyStart: number, bodyEnd: number, end: number, closed: boolean}>}
+ */
+function findRawTextElements(html, tagName) {
+  /** @type {Array<{start: number, bodyStart: number, bodyEnd: number, end: number, closed: boolean}>} */
+  const found = [];
+  const haystack = html.toLowerCase();
+  const openTag = '<' + tagName;
+  const closeTag = '</' + tagName;
+  // A tag name ends at whitespace, a slash, or the closing bracket—so `<styles>`
+  // and `</scriptfoo>` name different elements and must not match
+  const endsName = (/** @type {string} */ character) =>
+    character === '' || character === '/' || character === '>' || /\s/.test(character);
+
+  let cursor = 0;
+  for (;;) {
+    const start = haystack.indexOf(openTag, cursor);
+    if (start === -1) {
+      break;
+    }
+    if (!endsName(haystack.charAt(start + openTag.length))) {
+      cursor = start + openTag.length;
+      continue;
+    }
+    const startTagEnd = haystack.indexOf('>', start + openTag.length);
+    if (startTagEnd === -1) {
+      break;
+    }
+
+    const bodyStart = startTagEnd + 1;
+    let search = bodyStart;
+    let bodyEnd = -1;
+    let end = -1;
+    for (;;) {
+      const candidate = haystack.indexOf(closeTag, search);
+      if (candidate === -1) {
+        break;
+      }
+      if (endsName(haystack.charAt(candidate + closeTag.length))) {
+        const closeEnd = haystack.indexOf('>', candidate + closeTag.length);
+        if (closeEnd !== -1) {
+          bodyEnd = candidate;
+          end = closeEnd + 1;
+        }
+        break;
+      }
+      search = candidate + closeTag.length;
+    }
+
+    const closed = bodyEnd !== -1;
+    found.push({
+      start,
+      bodyStart,
+      bodyEnd: closed ? bodyEnd : html.length,
+      end: closed ? end : html.length,
+      closed
+    });
+    cursor = closed ? end : html.length;
+  }
+
+  return found;
+}
+
+/**
  * Collect the class names and IDs a document references.
  *
  * `style` element contents are excluded, so that a style sheet never counts as
@@ -65,20 +133,41 @@ function unescapeIdentifier(identifier) {
  *
  * @param {string} html - Raw document markup
  * @param {boolean} includeScripts - Also treat identifiers inside inline `script` elements as used
+ * @param {((text: string) => string)} [decode] - Resolves character references in attribute values
  * @returns {Set<string>} Symbols to keep
  */
-function collectUsedSymbols(html, includeScripts) {
+function collectUsedSymbols(html, includeScripts, decode) {
   const used = new Set();
-  const markup = html.replace(styleElementPattern, '');
+
+  // An unclosed `style` element is left in place: Its contents then read as markup,
+  // which can only add symbols, whereas dropping the rest of the document would lose them
+  let markup = html;
+  const styleElements = findRawTextElements(html, 'style');
+  for (let index = styleElements.length - 1; index >= 0; index--) {
+    const element = styleElements[index];
+    if (element?.closed) {
+      markup = markup.slice(0, element.start) + markup.slice(element.end);
+    }
+  }
+
+  const addIdentifiers = (/** @type {string} */ text) => {
+    identifierPattern.lastIndex = 0;
+    let identifier;
+    while ((identifier = identifierPattern.exec(text))) {
+      used.add(identifier[0]);
+    }
+  };
 
   attributePattern.lastIndex = 0;
   let match;
   while ((match = attributePattern.exec(markup))) {
     const name = (match[1] ?? '').toLowerCase();
-    const value = match[2] ?? match[3] ?? match[4] ?? '';
-    if (!value) {
+    const raw = match[2] ?? match[3] ?? match[4] ?? '';
+    if (!raw) {
       continue;
     }
+    // `class="us&#101;d"` names the class `used`, so compare against the decoded value
+    const value = (decode && raw.indexOf('&') !== -1) ? decode(raw) : raw;
     if (name === 'class' || name === 'id' || idReferenceAttributes.has(name)) {
       for (const token of value.split(/\s+/)) {
         if (token) {
@@ -87,26 +176,15 @@ function collectUsedSymbols(html, includeScripts) {
       }
     } else if (name.startsWith('data-')) {
       // Class names are commonly parked in `data-*` attributes for scripts to apply later
-      identifierPattern.lastIndex = 0;
-      let identifier;
-      while ((identifier = identifierPattern.exec(value))) {
-        used.add(identifier[0]);
-      }
+      addIdentifiers(value);
     }
   }
 
   if (includeScripts) {
-    scriptElementPattern.lastIndex = 0;
-    while ((match = scriptElementPattern.exec(markup))) {
-      const body = match[2];
-      if (!body) {
-        continue;
-      }
-      identifierPattern.lastIndex = 0;
-      let identifier;
-      while ((identifier = identifierPattern.exec(body))) {
-        used.add(identifier[0]);
-      }
+    // Script contents are raw text, so character references stay literal;
+    // an unclosed `script` runs to the end of the document, as it does in a browser
+    for (const element of findRawTextElements(markup, 'script')) {
+      addIdentifiers(markup.slice(element.bodyStart, element.bodyEnd));
     }
   }
 

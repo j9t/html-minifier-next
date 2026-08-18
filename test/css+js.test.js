@@ -1,6 +1,7 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
+import { collectUsedSymbols } from '../src/lib/unused-css.js';
 
 describe('CSS and JS', () => {
   test('CSS minification', async () => {
@@ -949,13 +950,52 @@ describe('CSS and JS', () => {
       }
     });
 
-    test('Does not mistake a longer tag name for a raw-text end tag', async () => {
+    test('Does not mistake a longer tag name for a raw-text tag', async () => {
+      // `</scriptfoo>` closes nothing, so what follows is still script content
       const input = style('.js-x{color:red}') +
-        '<p></p><script>document.body.classList.add("js-x")</scriptfoo>';
+        '<p></p><script>void 0</scriptfoo>document.body.classList.add("js-x")';
       const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
 
-      // `</scriptfoo>` closes nothing, so the script body is never scanned
-      assert.ok(!styleOf(output).includes('.js-x'), '`</scriptfoo>` must not count as an end tag');
+      assert.ok(styleOf(output).includes('.js-x'), 'Script content should run past a non-matching end tag');
+
+      // Likewise, `<styles>` is a different element and must not be stripped as a style sheet
+      const other = '<styles class="kept"></styles>' + style('.kept{color:red}') + '<p></p>';
+      assert.ok(
+        styleOf(await minify(other, { minifyCSS: true, removeUnusedCSS: true })).includes('.kept'),
+        '`<styles>` must not be treated as a `style` element'
+      );
+    });
+
+    test('Decodes character references in attribute values', async () => {
+      const cases = [
+        ['.used{color:red}', '<p class="us&#101;d"></p>', '.used'],
+        ['.used{color:red}', '<p class="us&#x65;d"></p>', '.used'],
+        ['#tgt{color:red}', '<p id="t&#103;t"></p>', '#tgt'],
+        ['.two{color:red}', '<p class="one&#32;two"></p>', '.two']
+      ];
+
+      for (const [css, markup, expected] of cases) {
+        const output = await minify(style(css) + markup, { minifyCSS: true, removeUnusedCSS: true });
+        assert.ok(styleOf(output).includes(expected), `${markup} should reference ${expected}`);
+      }
+
+      // A decoded value must not turn into a match for something else
+      const unrelated = await minify(style('.gone{color:red}') + '<p class="us&#101;d"></p>', {
+        minifyCSS: true,
+        removeUnusedCSS: true
+      });
+      assert.ok(!styleOf(unrelated).includes('.gone'), 'Unreferenced rules should still be removed');
+    });
+
+    test('Scans raw-text elements in linear time', () => {
+      // A regular expression permissive enough for malformed end tags backtracked
+      // quadratically here—30,000 near-matches took seconds rather than milliseconds
+      const input = '<style>' + '</style\t'.repeat(15000) + '<script>' + '<script\t'.repeat(15000);
+
+      const started = Date.now();
+      collectUsedSymbols(input, true);
+
+      assert.ok(Date.now() - started < 2000, 'Near-matches should not degrade into quadratic scanning');
     });
 
     test('Stops stripping a stylesheet at its own end tag, however malformed', async () => {

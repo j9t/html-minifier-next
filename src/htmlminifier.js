@@ -2113,7 +2113,13 @@ export const minify = async function (value, options) {
   // Unused-CSS removal needs the whole document’s symbols before the first `style`
   // element is minified, so collect them upfront from the raw input
   if (processedOptions.removeUnusedCSS && processedOptions.minifyCSS !== identity) {
-    processedOptions.usedCSSSymbols = collectUsedSymbols(value, processedOptions.removeUnusedCSS.scripts);
+    processedOptions.usedCSSSymbols = collectUsedSymbols(
+      value,
+      processedOptions.removeUnusedCSS.scripts,
+      value.indexOf('&') !== -1
+        ? /** @type {(text: string) => string} */ (await getDecodeHTML())
+        : undefined
+    );
   }
 
   let result = await minifyHTML(value, processedOptions);
