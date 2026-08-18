@@ -909,6 +909,45 @@ describe('CSS and JS', () => {
       assert.ok(styleOf(output).includes('flex'), 'Escaped class present in markup should be kept');
       assert.ok(!styleOf(output).includes('grid'), 'Escaped class absent from markup should be removed');
     });
+
+    test('Survives out-of-range escapes instead of throwing', async () => {
+      // `\FFFFFF` exceeds the maximum code point; per CSS Syntax it resolves to U+FFFD
+      const input = style(String.raw`.\FFFFFF{color:red}.b{color:red}`) + '<p class="b"></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.b'), 'Referenced class should survive an out-of-range escape');
+    });
+
+    test('Still applies when a custom fragment is present', async () => {
+      // `<%…%>` is matched by the default `ignoreCustomFragments`, which swaps in a
+      // wrapper around `minifyCSS` that must keep forwarding the symbol set
+      const input = style('.used{color:red}.unused{color:red}') + '<p class="used"></p><%= tpl %>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.used'), 'Referenced class should be kept');
+      assert.ok(!styleOf(output).includes('.unused'), 'Custom fragments must not disable the option');
+    });
+
+    test('Reads raw-text elements whose end tag carries whitespace', async () => {
+      const input = style('.js-x{color:red}') +
+        '<p></p><script>document.body.classList.add("js-x")</script >';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.js-x'), '`</script >` should still be recognized as an end tag');
+    });
+
+    test('Honors a safelist entry that is a global regular expression', async () => {
+      const input = style('.js-a{color:red}.js-b{color:red}.js-c{color:red}') + '<p></p>';
+      const output = await minify(input, {
+        minifyCSS: true,
+        removeUnusedCSS: { safelist: [/^js-/g] }
+      });
+
+      // A stateful pattern would otherwise match only every other symbol
+      for (const name of ['.js-a', '.js-b', '.js-c']) {
+        assert.ok(styleOf(output).includes(name), `${name} should be safelisted`);
+      }
+    });
   });
 
   // Cache configuration tests

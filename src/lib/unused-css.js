@@ -20,8 +20,8 @@ const idReferenceAttributes = new Set([
   'popovertarget'
 ]);
 
-const styleElementPattern = /<style\b[^>]*>[\s\S]*?<\/style>/gi;
-const scriptElementPattern = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+const styleElementPattern = /<style\b[^>]*>[\s\S]*?<\/style\s*>/gi;
+const scriptElementPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
 const attributePattern = /(?:^|[\s/])([-\w:.]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 const identifierPattern = /[A-Za-z_][\w-]*/g;
 
@@ -42,9 +42,16 @@ function unescapeIdentifier(identifier) {
   if (identifier.indexOf('\\') === -1) {
     return identifier;
   }
-  return identifier.replace(escapePattern, (_match, hex, literal) =>
-    hex ? String.fromCodePoint(parseInt(hex, 16)) : literal
-  );
+  return identifier.replace(escapePattern, (_match, hex, literal) => {
+    if (!hex) {
+      return literal;
+    }
+    // Per CSS Syntax spec, a null, surrogate, or out-of-range escape becomes U+FFFD
+    const code = parseInt(hex, 16);
+    return (code === 0 || code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF))
+      ? '\uFFFD'
+      : String.fromCodePoint(code);
+  });
 }
 
 /**
@@ -133,7 +140,15 @@ function findUnusedSymbols(css, used, safelist) {
     if (used.has(symbol) || reserved.has(symbol)) {
       continue;
     }
-    if (safelist.some(entry => entry instanceof RegExp ? entry.test(symbol) : entry === symbol)) {
+    if (safelist.some(entry => {
+      if (!(entry instanceof RegExp)) {
+        return entry === symbol;
+      }
+      // `test()` advances `lastIndex` on global and sticky patterns, which would
+      // make a safelist entry match only every other symbol
+      entry.lastIndex = 0;
+      return entry.test(symbol);
+    })) {
       continue;
     }
     unused.push(symbol);
