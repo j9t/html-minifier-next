@@ -936,6 +936,37 @@ describe('CSS and JS', () => {
       assert.ok(styleOf(output).includes('.js-x'), '`</script >` should still be recognized as an end tag');
     });
 
+    test('Reads raw-text elements whose end tag carries attributes or a slash', async () => {
+      // Browsers close the element on all of these, so the script body still runs
+      const endTags = ['</script\t\n bar>', '</script foo="bar">', '</script/>', '</script >trailing'];
+
+      for (const endTag of endTags) {
+        const input = style('.js-x{color:red}') +
+          `<p></p><script>document.body.classList.add("js-x")${endTag}`;
+        const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+        assert.ok(styleOf(output).includes('.js-x'), `“${endTag}” should be recognized as an end tag`);
+      }
+    });
+
+    test('Does not mistake a longer tag name for a raw-text end tag', async () => {
+      const input = style('.js-x{color:red}') +
+        '<p></p><script>document.body.classList.add("js-x")</scriptfoo>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      // `</scriptfoo>` closes nothing, so the script body is never scanned
+      assert.ok(!styleOf(output).includes('.js-x'), '`</scriptfoo>` must not count as an end tag');
+    });
+
+    test('Stops stripping a stylesheet at its own end tag, however malformed', async () => {
+      // A missed end tag would let the body run on to the next one, swallowing markup
+      const input = '<style>.a{color:red}</style bar><p class="a b"></p><style>.b{color:red}</style>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(output.includes('.a{color:red}'), 'Class before the second stylesheet should be kept');
+      assert.ok(output.includes('.b{color:red}'), 'Class after the first stylesheet should be kept');
+    });
+
     test('Honors a safelist entry that is a global regular expression', async () => {
       const input = style('.js-a{color:red}.js-b{color:red}.js-c{color:red}') + '<p></p>';
       const output = await minify(input, {

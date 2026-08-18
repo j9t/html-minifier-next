@@ -20,8 +20,10 @@ const idReferenceAttributes = new Set([
   'popovertarget'
 ]);
 
-const styleElementPattern = /<style\b[^>]*>[\s\S]*?<\/style\s*>/gi;
-const scriptElementPattern = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+// Browsers close a raw-text element on an end tag carrying whitespace, stray
+// attributes, or a slash (`</style >`, `</script\t\n bar>`, `</script/>`)
+const styleElementPattern = /<style\b[^>]*>[\s\S]*?<\/style(?:[\s/][^>]*)?>/gi;
+const scriptElementPattern = /<script\b([^>]*)>([\s\S]*?)<\/script(?:[\s/][^>]*)?>/gi;
 const attributePattern = /(?:^|[\s/])([-\w:.]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 const identifierPattern = /[A-Za-z_][\w-]*/g;
 
