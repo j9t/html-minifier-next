@@ -619,6 +619,33 @@ describe('CLI', () => {
     assert.strictEqual(stdout, '<p>foo</p>');
   });
 
+  test('Should refuse a string value for an object-valued option in a config file', () => {
+    // Config values are JSON-parsed first, so `"true"` and `"false"` arrive as
+    // booleans; anything that is not JSON stays a string and used to read as “on”
+    const dir = setupConfigDir('config-string-value', {
+      'html-minifier-next.config.json': { minifyCSS: 'yes' }
+    });
+    fs.writeFileSync(path.join(dir, 'input.html'), '<style>.a { color : red }</style>');
+
+    const { stdout, stderr, exitCode } = execCliInDir(['input.html'], dir);
+
+    assert.strictEqual(exitCode, 0);
+    assert.strictEqual(stdout, '<style>.a { color : red }</style>', 'A string must not enable minification');
+    assert.ok(stderr.includes('minifyCSS'), 'The rejected value should be reported');
+  });
+
+  test('Should still read `"true"` and `"false"` in a config file as booleans', () => {
+    const dir = setupConfigDir('config-boolean-string', {
+      'html-minifier-next.config.json': { minifyCSS: 'true' }
+    });
+    fs.writeFileSync(path.join(dir, 'input.html'), '<style>.a { color : red }</style>');
+
+    const { stdout, exitCode } = execCliInDir(['input.html'], dir);
+
+    assert.strictEqual(exitCode, 0);
+    assert.strictEqual(stdout, '<style>.a{color:red}</style>', 'JSON-parsed config values keep working');
+  });
+
   test('Should prefer html-minifier-next.config.json over htmlminifier.config.json', () => {
     const dir = setupConfigDir('config-default-precedence', {
       'html-minifier-next.config.json': { removeComments: true },
@@ -1007,7 +1034,7 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/verbose-stdin.html'), true);
   });
 
-  test('Should report skipped CSS rules in verbose mode', () => {
+  test('Should report invalid CSS in verbose mode', () => {
     const result = execCliWithStderr([
       'invalid-css-js.html',
       '--verbose',
@@ -1017,8 +1044,8 @@ describe('CLI', () => {
 
     assert.strictEqual(result.exitCode, 0);
     assert.ok(
-      result.stderr.includes('Lightning CSS skipped invalid CSS'),
-      'Rules dropped under error recovery should be reported'
+      result.stderr.includes('Lightning CSS reported invalid CSS'),
+      'Rules flagged under error recovery should be reported'
     );
   });
 
@@ -1046,7 +1073,7 @@ describe('CLI', () => {
     ]);
 
     assert.strictEqual(result.exitCode, 0);
-    assert.ok(!result.stderr.includes('Lightning CSS skipped invalid CSS'));
+    assert.ok(!result.stderr.includes('Lightning CSS reported invalid CSS'));
     assert.ok(!result.stderr.includes('Minification failed, content left as-is'));
     assert.strictEqual(existsFixture('tmp/invalid-quiet.html'), true);
   });
@@ -1061,9 +1088,52 @@ describe('CLI', () => {
     assert.strictEqual(result.exitCode, 0);
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(
-      result.stderr.includes('Lightning CSS skipped invalid CSS'),
+      result.stderr.includes('Lightning CSS reported invalid CSS'),
       '`--dry` implies verbose, so diagnostics should show there too'
     );
+  });
+
+  test('Should remove unused CSS with `--remove-unused-css`', () => {
+    const output = execCli(['unused-css.html', '--minify-css', '--remove-unused-css']);
+
+    assert.ok(output.includes('.used'), 'Referenced class should be kept');
+    assert.ok(!output.includes('.unused'), 'Unreferenced class should be removed');
+  });
+
+  test('Should accept a `--remove-unused-css` safelist as JSON', () => {
+    const output = execCli(['unused-css.html', '--minify-css', '--remove-unused-css={"safelist":["safe-a"]}']);
+
+    assert.ok(output.includes('.safe-a'), 'Safelisted class should be kept');
+    assert.ok(!output.includes('.unused'), 'Unsafelisted class should still be removed');
+  });
+
+  test('Should refuse `--remove-unused-css` without `--minify-css`', () => {
+    const result = execCliWithStderr(['unused-css.html', '--remove-unused-css']);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stdout.includes('.unused'), 'Nothing should be removed without `--minify-css`');
+    assert.ok(
+      result.stderr.includes('removeUnusedCSS') && result.stderr.includes('--minify-css'),
+      'The warning should name the flag a CLI user would reach for'
+    );
+  });
+
+  test('Should refuse a non-JSON `--minify-css` value', () => {
+    // A bare word parses as a string, which carries no configuration
+    const result = execCliWithStderr(['unused-css.html', '--minify-css=yes']);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stdout.includes('<title>Unused CSS</title>'), 'The document should still be written');
+    assert.ok(result.stderr.includes('minifyCSS'), 'The rejected value should be reported');
+  });
+
+  test('Should refuse a non-JSON `--remove-unused-css` value', () => {
+    // A bare word parses as a string, which must not read as “on”
+    const result = execCliWithStderr(['unused-css.html', '--minify-css', '--remove-unused-css=yes']);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stdout.includes('.unused'), 'A string must not enable the option');
+    assert.ok(result.stderr.includes('removeUnusedCSS'), 'The rejected value should be reported');
   });
 
   test('Should automatically enable verbose mode with `--dry` flag', () => {

@@ -390,7 +390,7 @@ if (process.argv.length > 2 || !process.send) {
     if (arg.includes('/')) {
       const parts = arg.split('/');
       if (parts.length !== 2) {
-        console.error(`Error: Invalid format “${arg}”—use “COUNT” or “COUNT/STEP”`);
+        console.error(`Error: Invalid format “${arg}”—use \`COUNT\` or \`COUNT/STEP\``);
         console.error('Examples: `backtest.js 50` or `backtest.js 500/10`');
         process.exit(1);
       }

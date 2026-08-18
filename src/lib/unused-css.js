@@ -20,8 +20,30 @@ const idReferenceAttributes = new Set([
   'popovertarget'
 ]);
 
+// Attributes whose value may be a same-document fragment URL (`#main`). `:target`
+// rules and SVG sprite references (`<use href="#icon">`) rest on these, so the ID
+// they name counts as used.
+const fragmentReferenceAttributes = new Set([
+  'action',
+  'cite',
+  'data',
+  'formaction',
+  'href',
+  'poster',
+  'src',
+  'usemap',
+  'xlink:href'
+]);
+
 const attributePattern = /(?:^|[\s/])([-\w:.]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 const identifierPattern = /--[\w-]*|-?[A-Za-z_][\w-]*/g;
+// SVG paints and filters reach elements by ID through `url(#gradient)`, in
+// presentation attributes as well as in `style`
+const fragmentURLPattern = /url\(\s*['"]?#([^)'"\s]+)/gi;
+// Class names routinely carry characters that end a CSS identifier (`md:flex`,
+// `w-1/2`, `p-[3px]`), so scripts and `data-*` values contribute whole tokens
+// besides identifiers; quoted strings are where scripts keep such names
+const stringLiteralPattern = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
 
 // CSS identifiers may contain escapes (`.md\:flex`, `.w-1\/2`), which have to be
 // resolved before comparing them against the plain tokens found in the markup
@@ -143,7 +165,7 @@ function findRawTextElements(haystack, tagName) {
 /**
  * Collect the class names and IDs a document references.
  *
- * `style` element contents are excluded, so that a style sheet never counts as
+ * Style sheet contents are excluded, so that a style sheet never counts as
  * evidence for its own selectors. Over-collecting is safe here (a symbol wrongly
  * considered used is merely kept), under-collecting is not.
  *
@@ -156,17 +178,29 @@ function collectUsedSymbols(html, includeScripts, decode) {
   const used = new Set();
   const haystack = foldCase(html);
 
-  // Style elements are skipped rather than cut out, so both scans share one folded
-  // copy and offsets keep pointing into `html`. An unclosed one is not skipped:
-  // Reading its contents as markup can only add symbols, whereas ignoring the rest
-  // of the document would lose them.
-  const skipped = findRawTextElements(haystack, 'style').filter(element => element.closed);
+  // Style sheets are skipped rather than cut out, so both scans share one folded
+  // copy and offsets keep pointing into `html`. Only the body is skipped—the start
+  // tag carries ordinary attributes, and `<style id="theme">` could be what
+  // `#theme` refers to. An unclosed element is not skipped: Reading its contents
+  // as markup can only add symbols, whereas ignoring the rest of the document
+  // would lose them.
+  const skipped = findRawTextElements(haystack, 'style')
+    .filter(element => element.closed)
+    .map(element => ({ start: element.bodyStart, end: element.bodyEnd }));
 
   const addIdentifiers = (/** @type {string} */ text) => {
     identifierPattern.lastIndex = 0;
     let identifier;
     while ((identifier = identifierPattern.exec(text))) {
       used.add(identifier[0]);
+    }
+  };
+
+  const addTokens = (/** @type {string} */ text) => {
+    for (const token of text.split(/\s+/)) {
+      if (token) {
+        used.add(token);
+      }
     }
   };
 
@@ -191,14 +225,21 @@ function collectUsedSymbols(html, includeScripts, decode) {
     // `class="us&#101;d"` names the class `used`, so compare against the decoded value
     const value = (decode && raw.indexOf('&') !== -1) ? decode(raw) : raw;
     if (name === 'class' || name === 'id' || idReferenceAttributes.has(name)) {
-      for (const token of value.split(/\s+/)) {
-        if (token) {
-          used.add(token);
-        }
-      }
+      addTokens(value);
     } else if (name.startsWith('data-')) {
       // Class names are commonly parked in `data-*` attributes for scripts to apply later
       addIdentifiers(value);
+      addTokens(value);
+    } else if (fragmentReferenceAttributes.has(name) && value.charAt(0) === '#') {
+      // Only a leading `#`: `href="/page#sec"` names a section of another document
+      addTokens(value.slice(1));
+    }
+    if (value.indexOf('(') !== -1) {
+      fragmentURLPattern.lastIndex = 0;
+      let reference;
+      while ((reference = fragmentURLPattern.exec(value))) {
+        addTokens(reference[1] ?? '');
+      }
     }
   }
 
@@ -207,8 +248,15 @@ function collectUsedSymbols(html, includeScripts, decode) {
     // an unclosed `script` runs to the end of the document, as it does in a browser
     skipCursor = 0;
     for (const element of findRawTextElements(haystack, 'script')) {
-      if (!isSkipped(element.start)) {
-        addIdentifiers(html.slice(element.bodyStart, element.bodyEnd));
+      if (isSkipped(element.start)) {
+        continue;
+      }
+      const body = html.slice(element.bodyStart, element.bodyEnd);
+      addIdentifiers(body);
+      stringLiteralPattern.lastIndex = 0;
+      let literal;
+      while ((literal = stringLiteralPattern.exec(body))) {
+        addTokens(literal[1] ?? literal[2] ?? literal[3] ?? '');
       }
     }
   }
@@ -262,21 +310,57 @@ function findUnusedSymbols(css, used, safelist) {
   return unused;
 }
 
+const unusedCSSKeys = new Set(['safelist', 'scripts']);
+
 /**
  * Normalize the `removeUnusedCSS` option into a settled configuration.
+ *
+ * A misspelled key or a safelist that is not an array would otherwise protect
+ * nothing, and that only surfaces as a missing rule much later—so every value
+ * that gets dropped is reported.
+ *
  * @param {boolean | {safelist?: Array<string | RegExp>, scripts?: boolean} | undefined} option
+ * @param {(message: string) => unknown} [warn] - Receives one message per ignored value
  * @returns {{safelist: Array<string | RegExp>, scripts: boolean} | null} Null when disabled
  */
-function normalizeUnusedCSSOptions(option) {
+function normalizeUnusedCSSOptions(option, warn) {
   if (!option) {
     return null;
   }
-  const config = typeof option === 'object' ? option : {};
+  const report = warn ?? (() => {});
+  const config = /** @type {Record<string, any>} */ (typeof option === 'object' ? option : {});
+
+  for (const key of Object.keys(config)) {
+    if (!unusedCSSKeys.has(key)) {
+      report(`Ignoring unknown \`removeUnusedCSS\` key \`${key}\`—expected \`safelist\` or \`scripts\``);
+    }
+  }
+
+  /** @type {Array<string | RegExp>} */
+  let safelist = [];
+  if (config.safelist !== undefined) {
+    if (!Array.isArray(config.safelist)) {
+      report('Ignoring `removeUnusedCSS.safelist`—it takes an array of strings and regular expressions');
+    } else {
+      safelist = config.safelist.filter((/** @type {unknown} */ entry) => {
+        if (typeof entry === 'string' || entry instanceof RegExp) {
+          return true;
+        }
+        report(`Ignoring \`removeUnusedCSS.safelist\` entry of type ${typeof entry}—entries must be strings or regular expressions`);
+        return false;
+      });
+    }
+  }
+
+  if (config.scripts !== undefined && typeof config.scripts !== 'boolean') {
+    report('Ignoring `removeUnusedCSS.scripts`—it takes a boolean');
+  }
+
   return {
-    safelist: Array.isArray(config.safelist) ? config.safelist : [],
+    safelist,
     // Keeping identifiers seen in inline scripts costs a little of the reduction
     // but avoids the most common breakage, so it is the default
-    scripts: config.scripts !== false
+    scripts: typeof config.scripts === 'boolean' ? config.scripts : true
   };
 }
 

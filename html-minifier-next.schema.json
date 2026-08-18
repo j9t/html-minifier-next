@@ -182,7 +182,6 @@
       "description": "Minify CSS in `style` elements and attributes (uses Lightning CSS)",
       "type": [
         "boolean",
-        "string",
         "object"
       ]
     },
@@ -190,7 +189,6 @@
       "description": "Minify JavaScript in `script` elements and event attributes (uses Terser or SWC; pass `{\"engine\": \"swc\"}` for SWC)",
       "type": [
         "boolean",
-        "string",
         "object"
       ]
     },
@@ -198,7 +196,6 @@
       "description": "Minify SVG elements (uses SVGO)",
       "type": [
         "boolean",
-        "string",
         "object"
       ]
     },
@@ -286,7 +283,6 @@
       "description": "Remove rules from `style` elements whose class or ID selectors the document never references (requires `--minify-css`); note that class names only applied by external scripts cannot be detected—use `{\"safelist\": […]}` for those",
       "type": [
         "boolean",
-        "string",
         "object"
       ]
     },

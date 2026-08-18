@@ -217,7 +217,7 @@ Available Lightning CSS options when passed as an object:
 
 * `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`).
 * `unusedSymbols`: Array of class names, IDs, keyframe names, and CSS variables to remove.
-* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors. This is disabled by default in Lightning CSS, but enabled in HMN when the `continueOnMinifyError` option is set to `true` (the default). Explicitly setting `errorRecovery` in `minifyCSS` options will override this automatic behavior. Rules skipped this way are reported through the [`log` hook](#api-only-options), so that a dropped rule does not go unnoticed.
+* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors. This is disabled by default in Lightning CSS, but enabled in HMN when the `continueOnMinifyError` option is set to `true` (the default). Explicitly setting `errorRecovery` in `minifyCSS` options will override this automatic behavior. What Lightning CSS takes issue with is reported through [the `log` hook](#api-only-options)—it drops some of it (`@property` with an invalid `syntax`) and passes the rest through (an unknown at-rule), so that a dropped rule does not go unnoticed. Every document is reported on separately.
 * `sourceMap`: Boolean to generate source maps.
 
 For advanced usage, you can also pass a function:
@@ -247,8 +247,11 @@ Symbols are considered used when they appear
 
 * in a `class` or `id` attribute,
 * in an attribute that references an ID (`for`, `headers`, `list`, `popovertarget`, `aria-controls`, and similar),
+* in a same-document fragment URL, as `href="#main"`, `<use href="#icon">`, or `usemap="#map"`, and in a `url(#gradient)` reference from any attribute,
 * anywhere in a `data-*` attribute value, or
 * anywhere inside an inline `script` element, unless `scripts` is set to `false`.
+
+Names carrying characters that end a CSS identifier—`md:flex`, `w-1/2`, `p-[3px]`—are matched as whole tokens, so utility-CSS class names survive whether they come from markup, a `data-*` value, or a string in an inline script.
 
 **Class names that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a class added by `bundle.js` looks exactly like a class nobody uses. List those under `safelist`, as strings or regular expressions:
 
@@ -264,6 +267,8 @@ const result = await minify(html, {
 ```
 
 Names used by `@keyframes` and `@counter-style` rules are not removed, even when no element carries them as a class or ID, since those at-rules are referenced from CSS rather than from markup.
+
+Values that cannot be honored—a `safelist` that isn’t an array, an entry that is neither a string nor a regular expression, a misspelled key—are reported through the `log` hook.
 
 ### JavaScript minification
 

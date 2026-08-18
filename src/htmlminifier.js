@@ -8,6 +8,7 @@ import { collectUsedSymbols } from './lib/unused-css.js';
 import {
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
+  RE_STYLE_ELEMENT,
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
   specialContentElements,
@@ -1107,13 +1108,13 @@ async function minifyHTML(value, options, partialMarkup) {
 
           if (options.minifyCSS !== identity) {
             options.minifyCSS = (function (/** @type {ProcessedOptions['minifyCSS']} */ fn) {
-              return function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {Set<string> | undefined} */ usedSymbols) {
+              return function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {ProcessedOptions['cssContext']} */ context) {
                 text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                   const chunks = ignoredCustomMarkupChunks[+index];
                   return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
                 });
 
-                return fn(text, type, usedSymbols);
+                return fn(text, type, context);
               };
             })(options.minifyCSS);
           }
@@ -1773,7 +1774,7 @@ async function minifyHTML(value, options, partialMarkup) {
           text = await options.minifyJS(text, false, isModuleScript);
         }
         if (needsMinifyCSS) {
-          text = await options.minifyCSS(text, undefined, options.usedCSSSymbols);
+          text = await options.minifyCSS(text, undefined, options.cssContext);
         }
         charsFinalize(text);
       })();
@@ -2110,10 +2111,16 @@ export const minify = async function (value, options) {
   // Work on a shallow copy so per-call reassignments don’t reach the cached base
   const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase });
 
+  // Warnings are deduplicated per document, so the state has to live on the per-call
+  // copy; the `minifyCSS` closure hangs off the memoized base, shared across calls
+  processedOptions.cssContext = { warned: new Set() };
+
   // Unused-CSS removal needs the whole document’s symbols before the first `style`
-  // element is minified, so collect them upfront from the raw input
-  if (processedOptions.removeUnusedCSS) {
-    processedOptions.usedCSSSymbols = collectUsedSymbols(
+  // element is minified, so collect them upfront from the raw input. A document
+  // without a style sheet has nothing to remove from, and scanning it would be work
+  // spent on an empty result.
+  if (processedOptions.removeUnusedCSS && RE_STYLE_ELEMENT.test(value)) {
+    processedOptions.cssContext.usedSymbols = collectUsedSymbols(
       value,
       processedOptions.removeUnusedCSS.scripts,
       value.indexOf('&') !== -1

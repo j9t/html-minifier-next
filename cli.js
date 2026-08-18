@@ -141,6 +141,7 @@ const typeParsers = {
   regexp: parseRegExp,
   regexpArray: parseJSONRegExpArray,
   json: parseJSON,
+  jsonObject: parseJSON,
   jsonArray: parseJSONArray,
   string: parseString,
   int: (key) => parseValidInt(key)
@@ -165,7 +166,7 @@ mainOptionKeys.forEach(function (key) {
       program.addOption(new Option('--no-' + flag, 'Disable --' + flag).hideHelp());
     }
   } else {
-    const cliFlag = '--' + flag + (type === 'json' ? ' [value]' : ' <value>');
+    const cliFlag = '--' + flag + (type === 'json' || type === 'jsonObject' ? ' [value]' : ' <value>');
     const parser = type === 'int' ? typeParsers.int(key) : typeParsers[type];
     program.option(cliFlag, description, parser);
   }

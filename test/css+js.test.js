@@ -805,7 +805,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('function test(){}'), 'Empty function after console removal');
   });
 
-  test('Reports rules Lightning CSS skips under error recovery', async () => {
+  test('Reports invalid CSS Lightning CSS flags under error recovery', async () => {
     const input = '<style>@property --p{syntax:"<percentage>";inherits:false;initial-value:0}.a{color:red}</style>';
     const logs = [];
     const output = await minify(input, { minifyCSS: true, log: message => logs.push(String(message)) });
@@ -813,33 +813,85 @@ describe('CSS and JS', () => {
     assert.ok(output.includes('.a{color:red}'), 'Valid rules should still be minified');
     assert.ok(!output.includes('@property'), 'Invalid rule should be skipped, as browsers skip it');
     assert.ok(
-      logs.some(message => message.startsWith('Warning: Lightning CSS skipped invalid CSS')),
-      'The skipped rule should be reported through `log`'
+      logs.some(message => message.startsWith('Warning: Lightning CSS reported invalid CSS')),
+      'The rule should be reported through `log`'
     );
   });
 
-  test('Reports a skipped CSS rule once, whatever the cache does', () => {
-    return (async () => {
-      const invalid = '@unknown-thing{foo:bar}';
-      const logs = [];
-      const options = {
-        minifyCSS: true,
-        cacheCSS: 1,
-        log: message => {
-          if (String(message).includes('skipped invalid CSS')) {
-            logs.push(String(message));
-          }
-        }
-      };
+  test('Reports invalid CSS Lightning CSS keeps, without claiming it was dropped', async () => {
+    // Lightning CSS passes an unknown at-rule through and still warns, so the
+    // wording may not promise the rule is gone
+    const input = '<style>@unknown-thing{foo:bar}.a{color:red}</style>';
+    const logs = [];
+    const output = await minify(input, { minifyCSS: true, log: message => logs.push(String(message)) });
 
-      // Alternate two stylesheets through a one-entry cache, evicting on every pass
-      for (let pass = 0; pass < 6; pass++) {
-        const filler = pass % 2 ? '.a{color:red}' : '.b{color:blue}';
-        await minify(`<style>${invalid}${filler}</style><p class="a b"></p>`, options);
+    assert.ok(output.includes('@unknown-thing'), 'The rule is kept, so the report must not say it was skipped');
+    assert.ok(
+      logs.some(message => message.startsWith('Warning: Lightning CSS reported invalid CSS')),
+      'The rule should still be reported through `log`'
+    );
+    assert.ok(!logs.some(message => message.includes('skipped')), 'Nothing was skipped here');
+  });
+
+  test('Reports invalid CSS once per document, and for every document', async () => {
+    const invalid = '@unknown-thing{foo:bar}';
+    const collect = sink => message => {
+      if (String(message).includes('reported invalid CSS')) {
+        sink.push(String(message));
       }
+    };
 
-      assert.strictEqual(logs.length, 1, 'The same invalid rule should be reported once, not once per cache miss');
-    })();
+    // One defect across two style sheets: the document should hear about it once
+    const perDocument = [];
+    await minify(
+      `<style>${invalid}.a{color:red}</style><style>${invalid}.b{color:blue}</style><p class="a b"></p>`,
+      { minifyCSS: true, log: collect(perDocument) }
+    );
+    assert.strictEqual(perDocument.length, 1, 'One defect, one warning');
+
+    // The same document four times over, so every pass but the first is a cache
+    // hit: A hit must not swallow the warning for the document that hit it, or a
+    // batch would report the first file and pass the rest off as clean
+    const perBatch = [];
+    const options = { minifyCSS: true, log: collect(perBatch) };
+    for (let pass = 0; pass < 4; pass++) {
+      await minify(`<style>${invalid}.c{color:red}</style><p class="c"></p>`, options);
+    }
+    assert.strictEqual(perBatch.length, 4, 'Every document should hear about its own invalid rule');
+  });
+
+  describe('Object-valued options handed a string', () => {
+    // `'false'` used to switch minification on: Any non-empty string is truthy, and
+    // these options read a non-object as `{}`
+    const cases = [
+      ['minifyCSS', '<style>.a { color : red }</style>'],
+      ['minifyJS', '<script>var x  =  1</script>'],
+      ['minifySVG', '<svg><circle cx="1.00"/></svg>']
+    ];
+
+    for (const [key, input] of cases) {
+      test(`\`${key}\` refuses a string rather than reading it as “on”`, async () => {
+        const logs = [];
+        const output = await minify(input, { [key]: 'false', log: message => logs.push(String(message)) });
+
+        assert.strictEqual(output, input, `\`${key}: "false"\` must not enable minification`);
+        assert.ok(
+          logs.some(message => message.includes(key) && message.includes('string')),
+          `The rejected value should be reported (got ${JSON.stringify(logs)})`
+        );
+      });
+    }
+
+    test('`minifyURLs` still takes a string, which names the site', async () => {
+      // The one object-valued option where a string carries meaning, so it is
+      // deliberately left out of the check above
+      const input = '<a href="https://example.com/x/y.html">y</a>';
+
+      assert.strictEqual(
+        await minify(input, { minifyURLs: 'https://example.com/x/' }),
+        '<a href="y.html">y</a>'
+      );
+    });
   });
 
   // Unused-CSS removal tests
@@ -1096,16 +1148,22 @@ describe('CSS and JS', () => {
     test('Scans raw-text elements in linear time', () => {
       // A regular expression permissive enough for malformed end tags backtracked
       // quadratically over near-matches; compare growth rather than absolute time,
-      // which would depend on the machine. No `>` may follow the repetitions—one
-      // lets the pattern succeed immediately, which is what makes the near-matches
-      // pathological rather than merely long.
+      // which would depend on the machine, and keep the best of several runs, as a
+      // lone sample largely reports what else the machine was doing. No `>` may
+      // follow the repetitions—one lets the pattern succeed immediately, which is
+      // what makes the near-matches pathological rather than merely long.
       const measure = (/** @type {number} */ count) => {
         const input = '<style>' + '</style\t'.repeat(count);
-        const started = performance.now();
-        collectUsedSymbols(input, true);
-        return performance.now() - started;
+        let best = Infinity;
+        for (let run = 0; run < 3; run++) {
+          const started = performance.now();
+          collectUsedSymbols(input, true);
+          best = Math.min(best, performance.now() - started);
+        }
+        return best;
       };
 
+      measure(1000); // Warm up, so the first timed run is not the one that compiles
       const small = measure(8000);
       const large = measure(16000);
 
@@ -1137,6 +1195,100 @@ describe('CSS and JS', () => {
       for (const name of ['.js-a', '.js-b', '.js-c']) {
         assert.ok(styleOf(output).includes(name), `${name} should be safelisted`);
       }
+    });
+
+    test('Keeps IDs reached through a fragment URL', async () => {
+      // `:target` rules and SVG sprites name their element by fragment, never by
+      // an `id` attribute on the element doing the referencing
+      const cases = [
+        ['#sec:target{color:red}', '<a href="#sec">go</a>', '#sec'],
+        ['#ic{fill:red}', '<svg><use href="#ic"/></svg>', '#ic'],
+        ['#ic{fill:red}', '<svg><use xlink:href="#ic"/></svg>', '#ic'],
+        ['#m{color:red}', '<img usemap="#m">', '#m'],
+        // Presentation attributes reach a paint server the same way `style` does
+        ['#grad stop{stop-color:red}', '<svg><rect fill="url(#grad)"/></svg>', '#grad'],
+        ['#blur{flood-color:red}', '<p style="filter:url(#blur)"></p>', '#blur']
+      ];
+
+      for (const [css, markup, expected] of cases) {
+        const output = await minify(style(css) + markup, { minifyCSS: true, removeUnusedCSS: true });
+        assert.ok(styleOf(output).includes(expected), `${markup} should keep ${expected}`);
+      }
+
+      // A fragment on another document names nothing here, so it protects nothing
+      const external = await minify(style('#gone{color:red}') + '<a href="/page#gone">x</a>', {
+        minifyCSS: true,
+        removeUnusedCSS: true
+      });
+      assert.ok(!styleOf(external).includes('#gone'), 'A fragment on another document is not a local reference');
+    });
+
+    test('Keeps class names whose characters end a CSS identifier', async () => {
+      // `md:flex`, `w-1/2`, and `p-[3px]` are ordinary class names in utility CSS;
+      // an identifier scan stops at the `:`, `/`, or `[` and would lose them
+      const cases = [
+        ['.md\\:flex{display:flex}', '<script>el.classList.add("md:flex")</script>', 'flex'],
+        ['.w-1\\/2{width:50%}', '<script>el.classList.add(\'w-1/2\')</script>', 'width'],
+        ['.p-\\[3px\\]{padding:3px}', '<script>el.classList.add("p-[3px]")</script>', 'padding'],
+        ['.tpl\\:x{color:red}', '<script>el.className=`tpl:x`</script>', 'color'],
+        // A name may not start with a digit unescaped, but it may be one
+        ['.\\31 col{width:1px}', '<script>el.classList.add("1col")</script>', 'width'],
+        ['.md\\:flex{display:flex}', '<p data-c="md:flex"></p>', 'flex']
+      ];
+
+      for (const [css, markup, expected] of cases) {
+        const output = await minify(style(css) + '<p></p>' + markup, { minifyCSS: true, removeUnusedCSS: true });
+        assert.ok(styleOf(output).includes(expected), `${markup} should keep ${css}`);
+      }
+
+      // Nothing references these, so the widened scan must not keep them either
+      const unused = await minify(style('.md\\:gone{display:flex}.q-\\[1px\\]{padding:1px}') + '<p></p>', {
+        minifyCSS: true,
+        removeUnusedCSS: true
+      });
+      assert.strictEqual(styleOf(unused), '', 'Unreferenced names should still be removed');
+    });
+
+    test('Reads a style sheet’s own attributes, not its contents', async () => {
+      const output = await minify(
+        '<style id="theme" class="t">#theme{color:red}.t{color:red}.gone{color:red}</style><p></p>',
+        { minifyCSS: true, removeUnusedCSS: true }
+      );
+
+      assert.ok(output.includes('#theme'), '`<style id="theme">` is what `#theme` refers to');
+      assert.ok(output.includes('.t'), 'A class on the element itself counts too');
+      assert.ok(!output.includes('.gone'), 'The sheet is still no evidence for its own selectors');
+    });
+
+    test('Reports values it has to ignore rather than silently protecting nothing', async () => {
+      // Each case uses a distinct message: `processOptions` reports a given warning
+      // once per process, as it does for unknown option keys
+      const cases = [
+        [{ safelist: 'js-' }, 'safelist'],
+        [{ safelist: [42] }, 'type number'],
+        [{ scripts: 'false' }, 'scripts'],
+        [{ safeList: ['x'] }, 'safeList']
+      ];
+
+      for (const [config, expected] of cases) {
+        const logs = [];
+        await minify(style('.drop{color:red}') + '<p></p>', {
+          minifyCSS: true,
+          removeUnusedCSS: config,
+          log: message => logs.push(String(message))
+        });
+        assert.ok(
+          logs.some(message => message.includes(expected)),
+          `${JSON.stringify(config)} should be reported (got ${JSON.stringify(logs)})`
+        );
+      }
+    });
+
+    test('Leaves a document without a style sheet exactly as `minifyCSS` alone would', async () => {
+      const input = '<p class="a" data-x="b"></p><script>el.classList.add("c")</script>';
+      const baseline = await minify(input, { minifyCSS: true });
+
+      assert.strictEqual(await minify(input, { minifyCSS: true, removeUnusedCSS: true }), baseline);
     });
   });
 

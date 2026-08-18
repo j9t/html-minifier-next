@@ -104,15 +104,15 @@ const optionDefinitions = {
   },
   minifyCSS: {
     description: 'Minify CSS in `style` elements and attributes (uses Lightning CSS)',
-    type: 'json'
+    type: 'jsonObject'
   },
   minifyJS: {
     description: 'Minify JavaScript in `script` elements and event attributes (uses Terser or SWC; pass `{"engine": "swc"}` for SWC)',
-    type: 'json'
+    type: 'jsonObject'
   },
   minifySVG: {
     description: 'Minify SVG elements (uses SVGO)',
-    type: 'json'
+    type: 'jsonObject'
   },
   minifyURLs: {
     description: 'Minify URLs in various attributes',
@@ -180,7 +180,7 @@ const optionDefinitions = {
   },
   removeUnusedCSS: {
     description: 'Remove rules from `style` elements whose class or ID selectors the document never references (requires `--minify-css`); note that class names only applied by external scripts cannot be detected—use `{"safelist": […]}` for those',
-    type: 'json'
+    type: 'jsonObject'
   },
   sortAttributes: {
     description: 'Sort attributes by frequency',
