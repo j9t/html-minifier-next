@@ -69,7 +69,7 @@ For editor support (validation, autocomplete, and inline documentation) in JSON 
 }
 ```
 
-(If HMN is installed locally, you can also use the path `./node_modules/html-minifier-next/html-minifier-next.schema.json` instead of the URL.)
+(If HMN is installed locally, you can also use the path ./node_modules/html-minifier-next/html-minifier-next.schema.json instead of the URL.)
 
 **JavaScript module configuration example** (requires `"type": "module"` in the project’s package.json, or use a .mjs extension):
 
@@ -144,7 +144,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | `undefined` |
 | `customAttrSurround`<br>`--custom-attr-surround` | Array of regexes that allow to support custom attribute surround expressions (e.g., `<input {{#if value}}checked="checked"{{/if}}>`) | `[]` |
 | `customEventAttributes`<br>`--custom-event-attributes` | Array of regexes that allow to support custom event attributes for `minifyJS` (e.g., `ng-click`) | `[ /^on[a-z]{3,}$/ ]` |
-| `customFragmentQuantifierLimit`<br>`--custom-fragment-quantifier-limit` | Set maximum quantifier limit for custom fragments to prevent ReDoS attacks | `200` |
+| `customFragmentQuantifierLimit`<br>`--custom-fragment-quantifier-limit` | Cap the whitespace and the number of adjacent custom fragments a match may consume, limiting backtracking | `200` |
 | `decodeEntities`<br>`--decode-entities` | Use direct Unicode characters whenever possible | `false` |
 | `ignoreCustomComments`<br>`--ignore-custom-comments` | Array of regexes that allow to ignore matching comments | `[ /^!/, /^\s*#/ ]` |
 | `ignoreCustomFragments`<br>`--ignore-custom-fragments` | Array of regexes that allow to ignore certain fragments, when matched (e.g., `<?php … ?>`, `{{ … }}`, etc.) | `[ /<%[\s\S]*?%>/, /<\?[\s\S]*?\?>/ ]` |
@@ -253,7 +253,7 @@ Symbols are considered used when they appear
 
 Names carrying characters that end a CSS identifier—`md:flex`, `w-1/2`, `p-[3px]`—are matched as whole tokens, so utility-CSS class names survive whether they come from markup, a `data-*` value, or a string in an inline script.
 
-**Class names that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a class added by `bundle.js` looks exactly like a class nobody uses. List those under `safelist`, as strings or regular expressions:
+**Class names that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a class added by bundle.js looks exactly like a class nobody uses. List those under `safelist`, as strings or regular expressions:
 
 ```js
 const result = await minify(html, {
@@ -553,34 +553,33 @@ To validate complete HTML markup, use [the W3C validator](https://validator.w3.o
 
 This minifier includes protection against regular expression denial of service (ReDoS) attacks:
 
-* Custom fragment quantifier limits: The `customFragmentQuantifierLimit` option (default: 200) prevents exponential backtracking by replacing unlimited quantifiers (`*`, `+`) with bounded ones in regular expressions.
+* Custom fragment bounds: To find the fragments to protect, HMN combines your `ignoreCustomFragments` patterns into one regular expression. The parts it adds are bounded by the `customFragmentQuantifierLimit` option (default: 200)—the whitespace around a match, and the number of adjacent fragments a single match may span. Your patterns themselves are used as written.
 
 * Input length limits: The `maxInputLength` option allows you to set a maximum input size to prevent processing of excessively large inputs that could cause performance issues.
 
-* Enhanced pattern detection: The minifier detects and warns about various ReDoS-prone patterns including nested quantifiers, alternation with quantifiers, and multiple unlimited quantifiers.
+* Pattern detection: HMN inspects the `ignoreCustomFragments` patterns you pass and warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself repeats (`(a+)+`) or alternates (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`).
 
-**Important:** When using custom `ignoreCustomFragments`, ensure your regular expressions don’t contain unlimited quantifiers (`*`, `+`) without bounds, as these can lead to ReDoS vulnerabilities.
+**Important:** A single unlimited quantifier is not one of those shapes: `[\s\S]*?` running up to a literal terminator matches in linear time, and it is how HMN’s own defaults are written. Bounds are still worth adding where you know the maximum length of a fragment, since they cap how far a failing match can scan.
 
 #### Custom fragment examples
 
-**Safe patterns** (recommended):
+**Safe patterns:**
 
 ```js
 ignoreCustomFragments: [
-  /<%[\s\S]{0,1000}?%>/,         // JSP/ASP with explicit bounds
-  /<\?php[\s\S]{0,5000}?\?>/,    // PHP with bounds
+  /<%[\s\S]*?%>/,                // Lazy scan up to a literal terminator
+  /<\?php[\s\S]{0,5000}?\?>/,    // PHP with explicit bounds
   /\{\{[^}]{0,500}\}\}/          // Handlebars without nested braces
 ]
 ```
 
-**Potentially unsafe patterns** (will trigger warnings):
+**Unsafe patterns** (these trigger warnings):
 
 ```js
 ignoreCustomFragments: [
-  /<%[\s\S]*?%>/,                // Unlimited quantifiers
-  /<!--[\s\S]*?-->/,             // Could cause issues with very long comments
-  /\{\{.*?\}\}/,                 // Nested unlimited quantifiers
-  /(script|style)[\s\S]*?/       // Multiple unlimited quantifiers
+  /<%(\s|\S)*?%>/,               // Unlimited quantifier over an alternating group
+  /\{\{([^}]+)+\}\}/,            // Nested unlimited quantifiers
+  /<!--[\s\S]*[\s\S]*-->/        // The same atom repeated unboundedly twice
 ]
 ```
 
@@ -600,7 +599,7 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 ```
 
-**Important:** When using custom `ignoreCustomFragments`, the minifier automatically applies bounded quantifiers to prevent ReDoS attacks, but you can also write safer patterns yourself using explicit bounds.
+**Important:** The minifier bounds the whitespace and fragment repetition it adds around your patterns, but the patterns themselves run as you wrote them—explicit bounds are yours to add.
 
 ##### Escaping patterns in different contexts
 

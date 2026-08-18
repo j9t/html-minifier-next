@@ -71,7 +71,7 @@ const optionDefinitions = {
     type: 'regexpArray'
   },
   customFragmentQuantifierLimit: {
-    description: 'Set maximum quantifier limit for custom fragments to prevent ReDoS attacks (default: 200)',
+    description: 'Cap the whitespace and the number of adjacent custom fragments a match may consume, limiting backtracking (default: 200)',
     type: 'int'
   },
   decodeEntities: {

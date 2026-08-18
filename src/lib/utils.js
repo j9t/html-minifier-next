@@ -144,7 +144,101 @@ function parseRegExp(value) {
   return value;
 }
 
-// Exports
+// ReDoS risk detection for user-supplied patterns
+
+// Quantifier following an atom, with its optional lazy `?`; the capture holds
+// the upper bound of a `{n,m}` form, which is empty when the form is `{n,}`
+const reQuantifier = /(?:[*+?]|\{\d+(?:,(\d*))?\})\??/y;
+
+/** @param {string} source @param {number} index - Index of the opening `[` */
+function skipCharacterClass(source, index) {
+  let i = index + 1;
+  while (i < source.length && source[i] !== ']') {
+    i += source[i] === '\\' ? 2 : 1;
+  }
+  return i + 1;
+}
+
+/**
+ * Walk a regex source for the shapes whose backtracking blows up: an unlimited
+ * quantifier over a group that itself repeats or alternates, and the same atom
+ * repeated unboundedly twice in a row. A lone unlimited quantifier stays
+ * linear, so `[\s\S]*?` up to a literal terminator passes
+ * @param {string} source - Regex source, assumed syntactically valid
+ * @returns {{risky: boolean, unbounded: boolean, alternates: boolean}}
+ */
+function analyzeQuantifiers(source) {
+  let risky = false;
+  let unbounded = false;
+  let alternates = false;
+  /** @type {{text: string, repeats: boolean} | null} */
+  let previous = null;
+  let i = 0;
+
+  while (i < source.length) {
+    const start = i;
+    const char = source[i];
+    /** @type {ReturnType<typeof analyzeQuantifiers> | null} */
+    let group = null;
+
+    if (char === '|') {
+      // Alternatives are separate expressions, so nothing carries across
+      alternates = true;
+      previous = null;
+      i++;
+      continue;
+    } else if (char === '\\') {
+      i += 2;
+    } else if (char === '[') {
+      i = skipCharacterClass(source, i);
+    } else if (char === '(') {
+      let depth = 1;
+      i++;
+      while (i < source.length && depth > 0) {
+        const inner = source[i];
+        if (inner === '\\') {
+          i += 2;
+        } else if (inner === '[') {
+          i = skipCharacterClass(source, i);
+        } else {
+          if (inner === '(') depth++;
+          else if (inner === ')') depth--;
+          i++;
+        }
+      }
+      // Drop the group prefix (`?:`, `?=`, `?<name>`, …) before reading the body
+      group = analyzeQuantifiers(source.slice(start + 1, i - 1).replace(/^\?(?:[:=!]|<[=!]|<[^>]*>)/, ''));
+    } else {
+      i++;
+    }
+
+    const atom = source.slice(start, i);
+    reQuantifier.lastIndex = i;
+    const quantifier = reQuantifier.exec(source);
+    const repeats = !!quantifier && (quantifier[0][0] === '*' || quantifier[0][0] === '+' || quantifier[1] === '');
+    if (quantifier) i = reQuantifier.lastIndex;
+
+    if (group) {
+      if (group.risky || (repeats && (group.unbounded || group.alternates))) risky = true;
+      if (group.unbounded) unbounded = true;
+    }
+    if (repeats) {
+      unbounded = true;
+      if (previous?.repeats && previous.text === atom) risky = true;
+    }
+    previous = { text: atom, repeats };
+  }
+
+  return { risky, unbounded, alternates };
+}
+
+/**
+ * @param {string} source - Regex source to judge
+ * @returns {boolean} Whether the pattern can backtrack catastrophically
+ */
+function hasRiskyQuantifiers(source) {
+  return analyzeQuantifiers(source).risky;
+}
 
 /**
  * Find the index of the `>` that closes an opening tag, correctly skipping
@@ -168,6 +262,8 @@ function findTagEnd(html, pos) {
   return -1;
 }
 
+// Exports
+
 export {
   stableStringify,
   findTagEnd,
@@ -179,5 +275,6 @@ export {
   isThenable,
   lowercase,
   replaceAsync,
-  parseRegExp
+  parseRegExp,
+  hasRiskyQuantifiers
 };

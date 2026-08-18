@@ -1,5 +1,6 @@
 import HTMLMinifier, { getPreset } from '../src/htmlminifier.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
+import { hasRiskyQuantifiers } from '../src/lib/utils.js';
 import pkg from '../package.json' with { type: 'json' };
 
 // Escape HTML entities for safe rendering inside `<code>` elements
@@ -243,9 +244,7 @@ const getOptions = (options) => {
       value = patterns.map(pattern => {
         try {
           // Warn about potentially dangerous patterns (ReDoS risk)
-          if (/\([^)]*[*+][^)]*\)[*+]/.test(pattern) || // Nested quantifiers like `(a+)+`
-              /\*[^{]*\*/.test(pattern) || // Multiple unlimited quantifiers like `.*.*`
-              /\+[^{]*\+/.test(pattern)) { // Multiple unlimited `+` quantifiers
+          if (hasRiskyQuantifiers(pattern)) {
             console.warn(`Potentially dangerous regex pattern detected: ${pattern}`);
             console.warn('This pattern may cause performance issues. Consider using bounded quantifiers like `{0,1000}`.');
           }

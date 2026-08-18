@@ -1,5 +1,5 @@
 import { createUrlMinifier } from './urls.js';
-import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp } from './utils.js';
+import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp, hasRiskyQuantifiers } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -28,7 +28,7 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
 
 /**
  * Options object produced by `processOptions` and consumed by `minifyHTML` and
- * the `lib/` helpers; normalization guarantees that the function-valued options
+ * the lib/ helpers; normalization guarantees that the function-valued options
  * below are always present (defaulting to identity/built-in functions), and
  * minification adds writable internal state on top of the public options
  * (set on prototype-chain forks during SVG/MathML namespace transitions)
@@ -97,9 +97,8 @@ const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canT
 // key per process, so repeated `minify` calls (e.g., batch runs) don’t flood STDERR
 const optionKeysWarned = new Set();
 const presetNamesWarned = new Set();
-// The custom-fragment ReDoS warning is security-relevant, so it reaches the
-// console even without a `log` hook—once per process, like the warnings above
-let customFragmentQuantifierWarned = false;
+// Custom fragments whose shape risks ReDoS, warned about once per pattern per process
+const customFragmentsWarned = new Set();
 const unusedCSSWarned = new Set();
 // Object-valued options handed a string, warned about once per distinct value
 const stringValuesWarned = new Set();
@@ -598,14 +597,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     } else if (['customAttrAssign', 'customEventAttributes', 'ignoreCustomComments', 'ignoreCustomFragments'].includes(key)) {
       // Array of regex patterns
       optionsDynamic[key] = parseRegExpArray(option);
-      // Warn about potential ReDoS when user-provided fragments use unlimited
-      // quantifiers; only explicitly passed fragments are checked
-      if (key === 'ignoreCustomFragments' && !customFragmentQuantifierWarned) {
+      // Warn about fragments whose quantifiers nest or alternate, the shapes that
+      // backtrack catastrophically; a lone `[\s\S]*?` up to a literal terminator is
+      // linear, so it passes—as it must, being how the defaults are written
+      if (key === 'ignoreCustomFragments') {
         for (const re of /** @type {RegExp[]} */ (optionsDynamic[key])) {
-          if (/[*+]/.test(re.source)) {
-            customFragmentQuantifierWarned = true;
-            warn('HTML Minifier Next: Custom fragment contains unlimited quantifiers (“*” or “+”) which may cause ReDoS vulnerability');
-            break;
+          if (hasRiskyQuantifiers(re.source) && !customFragmentsWarned.has(re.source)) {
+            customFragmentsWarned.add(re.source);
+            warn(`HTML Minifier Next: Custom fragment \`/${re.source}/\` nests or alternates unlimited quantifiers, which may cause ReDoS—bound them (e.g., \`{0,1000}\`) instead`);
           }
         }
       }

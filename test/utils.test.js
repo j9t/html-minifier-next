@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { LRU } from '../src/lib/utils.js';
+import { LRU, hasRiskyQuantifiers } from '../src/lib/utils.js';
 
 describe('LRU', () => {
   test('New cache reports all-zero stats', () => {
@@ -67,5 +67,47 @@ describe('LRU', () => {
 
     assert.strictEqual(cache.get('a'), 1);
     assert.strictEqual(cache.get('b'), undefined);
+  });
+});
+
+describe('hasRiskyQuantifiers', () => {
+  test('A lazy scan up to a literal terminator is linear', () => {
+    // The shipped `ignoreCustomFragments` defaults
+    assert.strictEqual(hasRiskyQuantifiers(/<%[\s\S]*?%>/.source), false);
+    assert.strictEqual(hasRiskyQuantifiers(/<\?[\s\S]*?\?>/.source), false);
+  });
+
+  test('Bounded quantifiers pass', () => {
+    assert.strictEqual(hasRiskyQuantifiers(/\{\{[\s\S]{0,500}?\}\}/.source), false);
+    assert.strictEqual(hasRiskyQuantifiers(/<!--[^-]{1,200}-->/.source), false);
+  });
+
+  test('Alternation without an unlimited quantifier over it passes', () => {
+    assert.strictEqual(hasRiskyQuantifiers(/(?:<%[\s\S]*?%>|<\?[\s\S]*?\?>)/.source), false);
+  });
+
+  test('Unlimited quantifiers nested in a group are risky', () => {
+    assert.strictEqual(hasRiskyQuantifiers(/(a+)+/.source), true);
+    assert.strictEqual(hasRiskyQuantifiers(/\{\{([^}]+)+\}\}/.source), true);
+    assert.strictEqual(hasRiskyQuantifiers(/(?:\s*\w*)*/.source), true);
+  });
+
+  test('Unlimited quantifiers over an alternating group are risky', () => {
+    assert.strictEqual(hasRiskyQuantifiers(/(a|b)*/.source), true);
+    assert.strictEqual(hasRiskyQuantifiers(/<%(\s|\S)*?%>/.source), true);
+  });
+
+  test('The same atom repeated unboundedly twice in a row is risky', () => {
+    assert.strictEqual(hasRiskyQuantifiers(/.*.*/.source), true);
+    assert.strictEqual(hasRiskyQuantifiers(/<!--[\s\S]*[\s\S]*-->/.source), true);
+  });
+
+  test('A repeated group repeating only within a bound passes', () => {
+    // The shape HMN itself composes from the fragment patterns
+    assert.strictEqual(hasRiskyQuantifiers(/(?:<%[\s\S]*?%>|<\?[\s\S]*?\?>){1,200}/.source), false);
+  });
+
+  test('Risk nested deeper in a group still surfaces', () => {
+    assert.strictEqual(hasRiskyQuantifiers(/<%(?:x(a+)+y)?%>/.source), true);
   });
 });
