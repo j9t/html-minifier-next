@@ -91,7 +91,7 @@ const result = await minify('<p title="example" id="moo">foo</p>', {
   removeAttributeQuotes: true,
   removeOptionalTags: true
 });
-console.log(result); // “<p title=example id=moo>foo”
+console.log(result); // `<p title=example id=moo>foo`
 ```
 
 See [the original blog post](https://perfectionkills.com/experimenting-with-html-minifier/) for details of [how it works](https://perfectionkills.com/experimenting-with-html-minifier/#how_it_works), [descriptions of most options](https://perfectionkills.com/experimenting-with-html-minifier/#options), [testing results](https://perfectionkills.com/experimenting-with-html-minifier/#field_testing), and [conclusions](https://perfectionkills.com/experimenting-with-html-minifier/#cost_and_benefits).
@@ -234,7 +234,7 @@ const result = await minify(html, {
 
 ### Unused CSS removal
 
-`removeUnusedCSS` removes rules from `style` elements whose class or ID selectors the document doesn’t reference. It requires `minifyCSS`, because the removal runs through Lightning CSS. It does not touch `style` or `media` attributes.
+`removeUnusedCSS` removes rules from `style` elements whose class or ID selectors the document doesn’t reference. It requires `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
 
 ```js
 const result = await minify(html, {

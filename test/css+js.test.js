@@ -834,11 +834,37 @@ describe('CSS and JS', () => {
       assert.ok(!styleOf(output).includes('#gone'), 'Unreferenced ID should be removed');
     });
 
-    test('Requires `minifyCSS`', async () => {
+    test('Requires `minifyCSS`, and says so', async () => {
       const input = style('.unused{color:red}') + '<p></p>';
-      const output = await minify(input, { removeUnusedCSS: true });
+      const logs = [];
+      const output = await minify(input, { removeUnusedCSS: true, log: message => logs.push(String(message)) });
 
       assert.ok(styleOf(output).includes('.unused'), 'Without `minifyCSS` nothing should be removed');
+      assert.ok(
+        logs.some(message => message.includes('removeUnusedCSS') && message.includes('requires')),
+        'Silently doing nothing would be the surprise, so it should warn'
+      );
+      assert.ok(
+        logs.some(message => message.includes('--minify-css')),
+        'The warning should name the flag a CLI user would reach for'
+      );
+    });
+
+    test('Reports that a `minifyCSS` function takes over', async () => {
+      // The removal rides along with Lightning CSS, which a custom function replaces
+      const input = style('.unused{color:red}') + '<p></p>';
+      const logs = [];
+      const output = await minify(input, {
+        minifyCSS: text => text,
+        removeUnusedCSS: true,
+        log: message => logs.push(String(message))
+      });
+
+      assert.ok(styleOf(output).includes('.unused'), 'A `minifyCSS` function minifies CSS itself');
+      assert.ok(
+        logs.some(message => message.includes('removeUnusedCSS') && message.includes('function')),
+        'The combination should warn rather than pass silently'
+      );
     });
 
     test('Keeps symbols referenced from ID references and `data-*` attributes', async () => {

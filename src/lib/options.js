@@ -85,6 +85,7 @@ const presetNamesWarned = new Set();
 // The custom-fragment ReDoS warning is security-relevant, so it reaches the
 // console even without a `log` hook—once per process, like the warnings above
 let customFragmentQuantifierWarned = false;
+const unusedCSSWarned = new Set();
 
 // Main options processor
 
@@ -140,7 +141,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   Object.keys(inputOptions).forEach(function (key) {
     if (!Object.hasOwn(optionDefinitions, key) && !optionKeysExtra.has(key) && !optionKeysWarned.has(key)) {
       optionKeysWarned.add(key);
-      warn(`HTML Minifier Next: Ignoring unknown or deprecated option “${key}” (see README for available options)`);
+      warn(`HTML Minifier Next: Ignoring unknown or deprecated option \`${key}\` (see README for available options)`);
     }
   });
 
@@ -548,6 +549,20 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       optionsDynamic[key] = option;
     }
   });
+
+  // Unused-CSS removal rides along with Lightning CSS, so it silently does nothing
+  // when `minifyCSS` is off or replaced by a function—say so rather than let it pass
+  if (options.removeUnusedCSS) {
+    const cssOption = /** @type {Record<string, any>} */ (effectiveInput).minifyCSS;
+    const reason = typeof cssOption === 'function'
+      ? 'it does not apply when `minifyCSS` is a function'
+      : (options.minifyCSS === identity ? 'it requires `minifyCSS` (`--minify-css`)' : '');
+    if (reason && !unusedCSSWarned.has(reason)) {
+      unusedCSSWarned.add(reason);
+      warn(`HTML Minifier Next: Ignoring \`removeUnusedCSS\`—${reason}`);
+    }
+  }
+
   return options;
 };
 
