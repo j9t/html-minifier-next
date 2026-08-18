@@ -1,4 +1,4 @@
-// Unused-CSS removal for `style` elements, driven by the symbols a document actually references
+// Unused-CSS removal
 
 // Attributes whose values name elements by ID or hold space-separated ID lists
 const idReferenceAttributes = new Set([
