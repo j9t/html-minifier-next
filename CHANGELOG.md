@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Updated `minifyCSS`, `minifyJS`, and `minifySVG` to refuse a string value and report it instead of reading any non-empty string as “on”
+* Updated `minifyCSS`, `minifyJS`, and `minifySVG` to refuse a string value and report it instead of reading any non-empty string as “on”—pass `true` or an options object instead; config file and CLI values are unaffected where they parse as JSON, so `"true"` and `"false"` keep working
 
 ## [7.5.3] - 2026-08-13
 
