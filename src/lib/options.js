@@ -3,6 +3,7 @@ import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowe
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
+import { findUnusedSymbols, normalizeUnusedCSSOptions } from './unused-css.js';
 import { getPreset, getPresetNames } from '../presets.js';
 import { optionDefinitions, optionDefaults } from './option-definitions.js';
 
@@ -17,16 +18,18 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  * minification adds writable internal state on top of the public options
  * (set on prototype-chain forks during SVG/MathML namespace transitions)
  *
- * @typedef {Omit<MinifierOptions, 'preset' | 'canCollapseWhitespace' | 'canTrimWhitespace' | 'ignoreCustomComments' | 'log' | 'minifyCSS' | 'minifyJS' | 'minifyURLs' | 'minifySVG'> & {
+ * @typedef {Omit<MinifierOptions, 'preset' | 'canCollapseWhitespace' | 'canTrimWhitespace' | 'ignoreCustomComments' | 'log' | 'minifyCSS' | 'minifyJS' | 'minifyURLs' | 'minifySVG' | 'removeUnusedCSS'> & {
  *   name: (name: string) => string,
  *   log: (message: any) => unknown,
  *   ignoreCustomComments: RegExp[],
  *   canCollapseWhitespace: (tag: string, attrs: HTMLAttribute[], defaultFn: (tag: string) => boolean) => boolean,
  *   canTrimWhitespace: (tag: string, attrs: HTMLAttribute[], defaultFn: (tag: string) => boolean) => boolean,
- *   minifyCSS: (text: string, type?: string) => string | Promise<string>,
+ *   minifyCSS: (text: string, type?: string, usedSymbols?: Set<string>) => string | Promise<string>,
  *   minifyJS: (text: string, inline?: boolean, isModule?: boolean) => string | Promise<string>,
  *   minifyURLs: (text: string) => string | Promise<string>,
  *   minifySVG: ((svgContent: string) => string | Promise<string>) | null,
+ *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
+ *   usedCSSSymbols?: Set<string>,
  *   nameParent?: (name: string) => string,
  *   nameHTML?: (name: string) => string,
  *   insideSVG?: boolean,
@@ -101,7 +104,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     minifyCSS: identity,
     minifyJS: identity,
     minifyURLs: identity,
-    minifySVG: null
+    minifySVG: null,
+    removeUnusedCSS: null
   };
 
   const parseRegExpArray = (/** @type {unknown} */ arr) => {
@@ -170,6 +174,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       if (option) {
         options.name = identity;
       }
+    } else if (key === 'removeUnusedCSS') {
+      optionsDynamic.removeUnusedCSS = normalizeUnusedCSSOptions(option);
     } else if (key === 'log') {
       if (typeof option === 'function') {
         options.log = option;
@@ -184,7 +190,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       const cssLoader = getLightningCSS;
       const cssCache = cssMinifyCache;
 
-      options.minifyCSS = async function (/** @type {string} */ text, /** @type {string | undefined} */ type) {
+      options.minifyCSS = async function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {Set<string> | undefined} */ usedSymbols) {
         // Fast path: Nothing to minify
         if (!text || !text.trim()) {
           return text;
@@ -213,9 +219,22 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           );
         }
 
-        // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys
+        // Unused-symbol removal applies to style sheets only
+        const unusedCSSConfig = type === undefined ? options.removeUnusedCSS : undefined;
+        const unusedSymbols = (unusedCSSConfig && usedSymbols)
+          ? findUnusedSymbols(text, usedSymbols, unusedCSSConfig.safelist)
+          : undefined;
+
+        // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys.
+        // The symbol list belongs in the signature: The cache outlives a single `minify()` call, so
+        // identical style sheets in differently marked-up documents must not share an entry.
         const inputCSS = wrapCSS(text, type);
-        const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
+        const cssSig = stableStringify({
+          type,
+          opts: lightningCssOptions,
+          cont: !!options.continueOnMinifyError,
+          unused: unusedSymbols && unusedSymbols.length ? unusedSymbols.slice().sort() : undefined
+        });
         const isCacheable = inputCSS.length <= MAX_CACHE_ENTRY_SIZE;
         const cssKey = isCacheable
           ? (inputCSS.length > 2048
@@ -242,8 +261,22 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
               code: Buffer.from(inputCSS),
               minify: true,
               errorRecovery: !!options.continueOnMinifyError,
-              ...lightningCssOptions
+              ...lightningCssOptions,
+              // Union, so that a manually supplied `unusedSymbols` list survives
+              ...(unusedSymbols && unusedSymbols.length
+                ? { unusedSymbols: lightningCssOptions.unusedSymbols ? [...new Set([...lightningCssOptions.unusedSymbols, ...unusedSymbols])] : unusedSymbols }
+                : {})
             });
+
+            // With `errorRecovery` enabled, Lightning CSS skips invalid rules instead of
+            // throwing, and reports each one here; surfacing them keeps a dropped rule
+            // from vanishing without a trace (fires on cache misses only)
+            if (options.log !== identity && result.warnings && result.warnings.length) {
+              for (const warning of result.warnings) {
+                const at = warning.loc ? ` (line ${warning.loc.line}, column ${warning.loc.column})` : '';
+                options.log(`Warning: Lightning CSS skipped invalid CSS${at}: ${warning.message}`);
+              }
+            }
 
             const outputCSS = unwrapCSS(result.code.toString(), type);
 

@@ -178,6 +178,10 @@ const optionDefinitions = {
     description: 'Remove space between attributes whenever possible; note that this will result in invalid HTML',
     type: 'boolean'
   },
+  removeUnusedCSS: {
+    description: 'Remove rules from `style` elements whose class or ID selectors the document never references (requires `--minify-css`); note that class names only applied by external scripts cannot be detected—use `{"safelist": […]}` for those',
+    type: 'json'
+  },
   sortAttributes: {
     description: 'Sort attributes by frequency',
     type: 'boolean'

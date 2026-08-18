@@ -804,6 +804,113 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('function test(){}'), 'Empty function after console removal');
   });
 
+  test('Reports rules Lightning CSS skips under error recovery', async () => {
+    const input = '<style>@property --p{syntax:"<percentage>";inherits:false;initial-value:0}.a{color:red}</style>';
+    const logs = [];
+    const output = await minify(input, { minifyCSS: true, log: message => logs.push(String(message)) });
+
+    assert.ok(output.includes('.a{color:red}'), 'Valid rules should still be minified');
+    assert.ok(!output.includes('@property'), 'Invalid rule should be skipped, as browsers skip it');
+    assert.ok(
+      logs.some(message => message.startsWith('Warning: Lightning CSS skipped invalid CSS')),
+      'The skipped rule should be reported through `log`'
+    );
+  });
+
+  // Unused-CSS removal tests
+  describe('Unused CSS removal', () => {
+    const style = css => `<!doctype html><html><head><style>${css}</style></head><body>`;
+    const styleOf = html => (html.match(/<style>([\s\S]*?)<\/style>/) ?? ['', ''])[1];
+
+    test('Removes rules the document never references', async () => {
+      const input = style('.used{color:red}.unused{color:red}#gone{color:red}#kept{color:red}') +
+        '<p id="kept" class="used"></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.used'), 'Referenced class should be kept');
+      assert.ok(styleOf(output).includes('#kept'), 'Referenced ID should be kept');
+      assert.ok(!styleOf(output).includes('.unused'), 'Unreferenced class should be removed');
+      assert.ok(!styleOf(output).includes('#gone'), 'Unreferenced ID should be removed');
+    });
+
+    test('Requires `minifyCSS`', async () => {
+      const input = style('.unused{color:red}') + '<p></p>';
+      const output = await minify(input, { removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.unused'), 'Without `minifyCSS` nothing should be removed');
+    });
+
+    test('Keeps symbols referenced from ID references and `data-*` attributes', async () => {
+      const input = style('.late{color:red}#target{color:red}') +
+        '<button aria-controls="target" data-toggle-class="late"></button>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('#target'), '`aria-controls` should count as a reference');
+      assert.ok(styleOf(output).includes('.late'), '`data-*` values should count as references');
+    });
+
+    test('Keeps symbols named in inline scripts unless `scripts` is disabled', async () => {
+      const input = style('.js-only{color:red}') +
+        '<p></p><script>document.body.classList.add("js-only")</script>';
+
+      const guarded = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+      assert.ok(styleOf(guarded).includes('.js-only'), 'Inline script references should be kept by default');
+
+      const unguarded = await minify(input, { minifyCSS: true, removeUnusedCSS: { scripts: false } });
+      assert.ok(!styleOf(unguarded).includes('.js-only'), '`scripts: false` should drop the guard');
+    });
+
+    test('Honors the safelist, as strings and as regular expressions', async () => {
+      const input = style('.keep-me{color:red}.keep-prefix-a{color:red}.drop{color:red}') + '<p></p>';
+      const output = await minify(input, {
+        minifyCSS: true,
+        removeUnusedCSS: { safelist: ['keep-me', /^keep-prefix-/] }
+      });
+
+      assert.ok(styleOf(output).includes('.keep-me'), 'Safelisted string should be kept');
+      assert.ok(styleOf(output).includes('.keep-prefix-a'), 'Safelisted pattern should be kept');
+      assert.ok(!styleOf(output).includes('.drop'), 'Unsafelisted symbol should still be removed');
+    });
+
+    test('Never removes `@keyframes` or `@counter-style` a class name collides with', async () => {
+      const input = style('@keyframes spin{from{opacity:0}}.spin{animation:spin 1s}' +
+        '@counter-style tick{system:cyclic}.tick{list-style:tick}') + '<p></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('@keyframes spin'), '`@keyframes` must survive a colliding class name');
+      assert.ok(styleOf(output).includes('@counter-style tick'), '`@counter-style` must survive a colliding class name');
+    });
+
+    test('Leaves `style` and `media` attributes alone', async () => {
+      const input = '<p style="color:red" class="used"></p><link media="(min-width:0)" rel="stylesheet" href="a.css">';
+      const baseline = await minify(input, { minifyCSS: true });
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      // Attributes carry declarations and media queries, never selectors
+      assert.strictEqual(output, baseline);
+    });
+
+    test('Does not leak one document’s result into another through the CSS cache', async () => {
+      const sheet = '.alpha{color:red}.beta{color:red}';
+      const options = { minifyCSS: true, removeUnusedCSS: true };
+
+      const first = await minify(style(sheet) + '<p class="alpha"></p>', options);
+      const second = await minify(style(sheet) + '<p class="beta"></p>', options);
+
+      assert.ok(styleOf(first).includes('.alpha') && !styleOf(first).includes('.beta'));
+      assert.ok(styleOf(second).includes('.beta'), 'Second document must not inherit the first document’s output');
+      assert.ok(!styleOf(second).includes('.alpha'));
+    });
+
+    test('Resolves escaped identifiers when matching markup', async () => {
+      const input = style('.md\\:flex{display:flex}.lg\\:grid{display:grid}') + '<p class="md:flex"></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('flex'), 'Escaped class present in markup should be kept');
+      assert.ok(!styleOf(output).includes('grid'), 'Escaped class absent from markup should be removed');
+    });
+  });
+
   // Cache configuration tests
   describe('Caches', () => {
     test('Default sizes work', async () => {

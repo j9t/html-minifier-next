@@ -3,6 +3,7 @@ import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
 import { LRU, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
+import { collectUsedSymbols } from './lib/unused-css.js';
 
 import {
   RE_LEGACY_ENTITIES,
@@ -434,6 +435,20 @@ import { processOptions } from './lib/options.js';
  *  When true, extra whitespace between tag name and attributes (or before
  *  the closing bracket) will be removed where possible. Affects output spacing
  *  such as the space used in the short doctype representation.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean | {safelist?: Array<string | RegExp>, scripts?: boolean}} [removeUnusedCSS]
+ *  **Note that this can change how a document renders!**
+ *
+ *  Remove rules from `style` elements whose class or ID selectors the document
+ *  never references. Requires `minifyCSS` (removal runs through Lightning CSS)
+ *  and has no effect on `style` or `media` attributes.
+ *
+ *  Class names and IDs are collected from the markup, from `data-*` attributes,
+ *  and—unless `scripts` is set to `false`—from inline `script` elements. Names
+ *  that only ever appear in external scripts cannot be detected; list those
+ *  under `safelist` (strings or regular expressions) to keep them.
  *
  *  Default: `false`
  *
@@ -1758,7 +1773,7 @@ async function minifyHTML(value, options, partialMarkup) {
           text = await options.minifyJS(text, false, isModuleScript);
         }
         if (needsMinifyCSS) {
-          text = await options.minifyCSS(text);
+          text = await options.minifyCSS(text, undefined, options.usedCSSSymbols);
         }
         charsFinalize(text);
       })();
@@ -2094,6 +2109,13 @@ export const minify = async function (value, options) {
   }
   // Work on a shallow copy so per-call reassignments don’t reach the cached base
   const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase });
+
+  // Unused-CSS removal needs the whole document’s symbols before the first `style`
+  // element is minified, so collect them upfront from the raw input
+  if (processedOptions.removeUnusedCSS && processedOptions.minifyCSS !== identity) {
+    processedOptions.usedCSSSymbols = collectUsedSymbols(value, processedOptions.removeUnusedCSS.scripts);
+  }
+
   let result = await minifyHTML(value, processedOptions);
 
   // Post-processing: Merge consecutive inline scripts if enabled

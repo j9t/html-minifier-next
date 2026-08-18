@@ -173,6 +173,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
+| `removeUnusedCSS`<br>`--remove-unused-css` | [Remove unused CSS rules](#unused-css-removal) from `style` elements; requires `minifyCSS`; **note that this can change how a document renders** | `false` (could be `true`, `{ safelist, scripts }`) |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
@@ -216,7 +217,7 @@ Available Lightning CSS options when passed as an object:
 
 * `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`).
 * `unusedSymbols`: Array of class names, IDs, keyframe names, and CSS variables to remove.
-* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors. This is disabled by default in Lightning CSS, but enabled in HMN when the `continueOnMinifyError` option is set to `true` (the default). Explicitly setting `errorRecovery` in `minifyCSS` options will override this automatic behavior.
+* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors. This is disabled by default in Lightning CSS, but enabled in HMN when the `continueOnMinifyError` option is set to `true` (the default). Explicitly setting `errorRecovery` in `minifyCSS` options will override this automatic behavior. Rules skipped this way are reported through the [`log` hook](#api-only-options), so that a dropped rule does not go unnoticed.
 * `sourceMap`: Boolean to generate source maps.
 
 For advanced usage, you can also pass a function:
@@ -230,6 +231,39 @@ const result = await minify(html, {
   }
 });
 ```
+
+### Unused CSS removal
+
+`removeUnusedCSS` removes rules from `style` elements whose class or ID selectors the document doesn’t reference. It requires `minifyCSS`, because the removal runs through Lightning CSS. It does not touch `style` or `media` attributes.
+
+```js
+const result = await minify(html, {
+  minifyCSS: true,
+  removeUnusedCSS: true
+});
+```
+
+Symbols are considered used when they appear
+
+* in a `class` or `id` attribute,
+* in an attribute that references an ID (`for`, `headers`, `list`, `popovertarget`, `aria-controls`, and similar),
+* anywhere in a `data-*` attribute value, or
+* anywhere inside an inline `script` element, unless `scripts` is set to `false`.
+
+**Class names that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a class added by `bundle.js` looks exactly like a class nobody uses. List those under `safelist`, as strings or regular expressions:
+
+```js
+const result = await minify(html, {
+  minifyCSS: true,
+  removeUnusedCSS: {
+    safelist: ['is-open', /^js-/],
+    // Set to `false` to also drop rules only referenced from inline scripts
+    scripts: true
+  }
+});
+```
+
+Names used by `@keyframes` and `@counter-style` rules are not removed, even when no element carries them as a class or ID, since those at-rules are referenced from CSS rather than from markup.
 
 ### JavaScript minification
 

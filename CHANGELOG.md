@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.6.0] - 2026-08-18
+
+### Added
+
+* Added `removeUnusedCSS` option to enable removing rules from `style` elements whose class or ID selectors the document never references (requires `minifyCSS`, since removal runs through Lightning CSS):
+  - Symbols count as used when they appear in a `class` or `id` attribute, in an ID-referencing attribute (`for`, `headers`, `list`, `popovertarget`, `aria-controls`, and similar), anywhere in a `data-*` attribute value, or—unless `scripts` is set to `false`—anywhere inside an inline `script` element
+  - Class names only applied by external scripts cannot be detected; `safelist` accepts strings and regular expressions to keep them
+  - Names bound by `@keyframes` and `@counter-style` are not removed, even when no element carries them as a class or ID, as those at-rules are referenced from CSS rather than from markup
+  - Escaped identifiers (e.g., `.md\:flex`) are resolved before being matched against the markup
+  - A manually supplied `minifyCSS.unusedSymbols` list is merged with the computed one rather than replaced
+
 ## [7.5.3] - 2026-08-13
 
 ### Changed
