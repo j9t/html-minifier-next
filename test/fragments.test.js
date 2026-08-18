@@ -28,6 +28,8 @@ describe('Fragments', () => {
       assert.strictEqual(toDelimitedFragment(/^<%[\s\S]*?%>/), null, 'Anchors are not literal');
       assert.strictEqual(toDelimitedFragment(/\s*[\s\S]*?%>/), null, 'Opening delimiter is not literal');
       assert.strictEqual(toDelimitedFragment(/<%[\s\S]*?/), null, 'No closing delimiter to scan to');
+      assert.strictEqual(toDelimitedFragment(/<%\.*?%>/s), null, 'The body token is an escaped literal `.`');
+      assert.strictEqual(toDelimitedFragment(/<%\[\s\S]*?%>/), null, 'The body token starts inside an escape');
     });
 
     test('Takes flags into account', () => {

@@ -37,7 +37,10 @@ function toLiteral(source) {
   for (let i = 0; i < source.length; i++) {
     const char = source[i] ?? '';
     if (char === '\\') {
-      const escaped = source[++i] ?? '';
+      const escaped = source[++i];
+      // A trailing backslash is half an escape the body token was split out of,
+      // as in `<%\.*?%>`, where the `.` is literal and not a body
+      if (escaped === undefined) return null;
       // `\n` and friends are literal characters, `\s` and `\1` are not
       if (escaped === 'n') literal += '\n';
       else if (escaped === 't') literal += '\t';
