@@ -18,7 +18,7 @@ const RE_DELIMITED = /^(.*?)(?:\[\\s\\S\]|\[\\S\\s\]|\[\^\]|(\.)|\[\^((?:\\[^]|[
 
 // Flags that leave literal matching alone, so a pattern carrying them can still be
 // scanned for; `i` in particular cannot, since case folding moves character indexes
-const FLAGS_LITERAL = /^[gds]*$/;
+const RE_LITERAL_FLAGS = /^[gds]*$/;
 
 /**
  * @typedef {{open: string, close: string, min: number, max: number, excluded: RegExp | null}} DelimitedFragment
@@ -69,7 +69,7 @@ function toLiteral(source) {
  *  the caller answers by running it as a regex
  */
 function toDelimitedFragment(pattern) {
-  if (!FLAGS_LITERAL.test(pattern.flags)) return null;
+  if (!RE_LITERAL_FLAGS.test(pattern.flags)) return null;
 
   const match = RE_DELIMITED.exec(pattern.source);
   if (!match) return null;

@@ -13,7 +13,7 @@ import {
   isBooleanValue,
   collapsibleValues,
   srcsetElements,
-  reEmptyAttribute,
+  RE_EMPTY_ATTRIBUTE,
   RE_STYLE_ELEMENT
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
@@ -365,7 +365,7 @@ function canDeleteEmptyAttribute(tag, attrName, attrValue, options) {
   if (typeof options.removeEmptyAttributes === 'function') {
     return options.removeEmptyAttributes(attrName, tag);
   }
-  return (tag === 'input' && attrName === 'value') || reEmptyAttribute.test(attrName);
+  return (tag === 'input' && attrName === 'value') || RE_EMPTY_ATTRIBUTE.test(attrName);
 }
 
 /**

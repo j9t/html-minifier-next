@@ -148,7 +148,7 @@ function parseRegExp(value) {
 
 // Quantifier following an atom, with its optional lazy `?`; the capture holds
 // the upper bound of a `{n,m}` form, which is empty when the form is `{n,}`
-const reQuantifier = /(?:[*+?]|\{\d+(?:,(\d*))?\})\??/y;
+const RE_QUANTIFIER = /(?:[*+?]|\{\d+(?:,(\d*))?\})\??/y;
 
 /** @param {string} source @param {number} index - Index of the opening `[` */
 function skipCharacterClass(source, index) {
@@ -214,13 +214,13 @@ function analyzeQuantifiers(source) {
     }
 
     const atom = source.slice(start, i);
-    reQuantifier.lastIndex = i;
-    const quantifier = reQuantifier.exec(source);
+    RE_QUANTIFIER.lastIndex = i;
+    const quantifier = RE_QUANTIFIER.exec(source);
     const repeats = !!quantifier && (quantifier[0][0] === '*' || quantifier[0][0] === '+' || quantifier[1] === '');
     // A count that can vary—anything but `{n}`—makes the group ambiguous about
     // how much it consumes, which multiplies under an unlimited repeat
     const variable = !!quantifier && (quantifier[0][0] !== '{' || quantifier[1] !== undefined);
-    if (quantifier) i = reQuantifier.lastIndex;
+    if (quantifier) i = RE_QUANTIFIER.lastIndex;
 
     if (group) {
       if (group.risky || (repeats && (group.varies || group.alternates))) risky = true;
