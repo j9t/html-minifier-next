@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * **BREAKING:** Removed `customFragmentQuantifierLimit` in favor of linear matching, `strictCustomFragments`, and `maxInputLength`
   - **Migration:** Drop the option; whitespace around a fragment match and adjacent fragments now join the match however long the run, where the default limit of 200 used to cut them off
+* Sped up `sortAttributes` and `sortClassNames` on documents with many distinct attribute names or classes
+* Sped up URL minification in style sheets with many `url()` references (by consuming replacement results by index instead of quadratic array shifting)
 * Moved the web demo onto the same ReDoS pattern check as the minifier, which had drifted from its own copy
 * Extended ESLint to the backtest scripts and resolved reports
 * Extended type checking beyond src/ to cli.js, scripts/, and build configuration
