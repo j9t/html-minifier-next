@@ -161,15 +161,16 @@ function skipCharacterClass(source, index) {
 
 /**
  * Walk a regex source for the shapes whose backtracking blows up: an unlimited
- * quantifier over a group that itself repeats or alternates, and the same atom
- * repeated unboundedly twice in a row. A lone unlimited quantifier stays
- * linear, so `[\s\S]*?` up to a literal terminator passes
+ * quantifier over a group that itself contains a variable quantifier (`(a+)+`,
+ * `(a?)+`) or alternates, and the same atom repeated unboundedly twice in a
+ * row. A lone unlimited quantifier stays linear, so `[\s\S]*?` up to a literal
+ * terminator passes
  * @param {string} source - Regex source, assumed syntactically valid
- * @returns {{risky: boolean, unbounded: boolean, alternates: boolean}}
+ * @returns {{risky: boolean, varies: boolean, alternates: boolean}}
  */
 function analyzeQuantifiers(source) {
   let risky = false;
-  let unbounded = false;
+  let varies = false;
   let alternates = false;
   /** @type {{text: string, repeats: boolean} | null} */
   let previous = null;
@@ -216,20 +217,21 @@ function analyzeQuantifiers(source) {
     reQuantifier.lastIndex = i;
     const quantifier = reQuantifier.exec(source);
     const repeats = !!quantifier && (quantifier[0][0] === '*' || quantifier[0][0] === '+' || quantifier[1] === '');
+    // A count that can vary—anything but `{n}`—makes the group ambiguous about
+    // how much it consumes, which multiplies under an unlimited repeat
+    const variable = !!quantifier && (quantifier[0][0] !== '{' || quantifier[1] !== undefined);
     if (quantifier) i = reQuantifier.lastIndex;
 
     if (group) {
-      if (group.risky || (repeats && (group.unbounded || group.alternates))) risky = true;
-      if (group.unbounded) unbounded = true;
+      if (group.risky || (repeats && (group.varies || group.alternates))) risky = true;
+      if (group.varies) varies = true;
     }
-    if (repeats) {
-      unbounded = true;
-      if (previous?.repeats && previous.text === atom) risky = true;
-    }
+    if (variable) varies = true;
+    if (repeats && previous?.repeats && previous.text === atom) risky = true;
     previous = { text: atom, repeats };
   }
 
-  return { risky, unbounded, alternates };
+  return { risky, varies, alternates };
 }
 
 /**

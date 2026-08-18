@@ -2612,7 +2612,7 @@ describe('HTML', () => {
     // A pattern that can backtrack catastrophically is refused outright
     await assert.rejects(
       () => minify('<p>x</p>', { ignoreCustomFragments: [/<%(?:x|xx)+%>/], strictCustomFragments: true }),
-      /nests or alternates unlimited quantifiers/
+      /compounds quantifiers or alternation/
     );
 
     // Patterns that stay linear are accepted, the defaults among them
@@ -2627,7 +2627,7 @@ describe('HTML', () => {
       log: (/** @type {unknown} */ message) => { logged.push(message); }
     });
     assert.strictEqual(output, '<p>x</p>');
-    assert.strictEqual(logged.filter(message => String(message).includes('nests or alternates')).length, 1);
+    assert.strictEqual(logged.filter(message => String(message).includes('compounds quantifiers')).length, 1);
   });
 
   test('`caseSensitive`', async () => {

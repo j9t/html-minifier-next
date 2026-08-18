@@ -5,25 +5,31 @@ import { toDelimitedFragment, toFragment, replaceCustomFragments } from '../src/
 describe('Fragments', () => {
   describe('`toDelimitedFragment`', () => {
     test('Reads the shape the shipped defaults use', () => {
-      assert.deepStrictEqual(toDelimitedFragment(/<%[\s\S]*?%>/), { open: '<%', close: '%>', min: 0, max: Infinity });
-      assert.deepStrictEqual(toDelimitedFragment(/<\?[\s\S]*?\?>/), { open: '<?', close: '?>', min: 0, max: Infinity });
+      assert.deepStrictEqual(toDelimitedFragment(/<%[\s\S]*?%>/), { open: '<%', close: '%>', min: 0, max: Infinity, excluded: null });
+      assert.deepStrictEqual(toDelimitedFragment(/<\?[\s\S]*?\?>/), { open: '<?', close: '?>', min: 0, max: Infinity, excluded: null });
     });
 
     test('Reads bounded and reversed bodies', () => {
-      assert.deepStrictEqual(toDelimitedFragment(/\{\{[\s\S]{0,500}?\}\}/), { open: '{{', close: '}}', min: 0, max: 500 });
-      assert.deepStrictEqual(toDelimitedFragment(/<%[\S\s]{2,}?%>/), { open: '<%', close: '%>', min: 2, max: Infinity });
-      assert.deepStrictEqual(toDelimitedFragment(/<%[^]+?%>/), { open: '<%', close: '%>', min: 1, max: Infinity });
-      assert.deepStrictEqual(toDelimitedFragment(/<%[\s\S]{4}?%>/), { open: '<%', close: '%>', min: 4, max: 4 });
+      assert.deepStrictEqual(toDelimitedFragment(/\{\{[\s\S]{0,500}?\}\}/), { open: '{{', close: '}}', min: 0, max: 500, excluded: null });
+      assert.deepStrictEqual(toDelimitedFragment(/<%[\S\s]{2,}?%>/), { open: '<%', close: '%>', min: 2, max: Infinity, excluded: null });
+      assert.deepStrictEqual(toDelimitedFragment(/<%[^]+?%>/), { open: '<%', close: '%>', min: 1, max: Infinity, excluded: null });
+      assert.deepStrictEqual(toDelimitedFragment(/<%[\s\S]{4}?%>/), { open: '<%', close: '%>', min: 4, max: 4, excluded: null });
+    });
+
+    test('Reads negated-class bodies, keeping the class as the boundary', () => {
+      assert.deepStrictEqual(toDelimitedFragment(/<%[^%]*?%>/), { open: '<%', close: '%>', min: 0, max: Infinity, excluded: /[%]/g });
+      assert.deepStrictEqual(toDelimitedFragment(/\{\{[^{}]{0,500}?\}\}/), { open: '{{', close: '}}', min: 0, max: 500, excluded: /[{}]/g });
+      assert.deepStrictEqual(toDelimitedFragment(/\{%[^\]]+?%\}/), { open: '{%', close: '%}', min: 1, max: Infinity, excluded: /[\]]/g });
     });
 
     test('Keeps escaped characters as themselves', () => {
-      assert.deepStrictEqual(toDelimitedFragment(/\{%[\s\S]*?%\}/), { open: '{%', close: '%}', min: 0, max: Infinity });
-      assert.deepStrictEqual(toDelimitedFragment(/<\?php[\s\S]*?\?>/), { open: '<?php', close: '?>', min: 0, max: Infinity });
+      assert.deepStrictEqual(toDelimitedFragment(/\{%[\s\S]*?%\}/), { open: '{%', close: '%}', min: 0, max: Infinity, excluded: null });
+      assert.deepStrictEqual(toDelimitedFragment(/<\?php[\s\S]*?\?>/), { open: '<?php', close: '?>', min: 0, max: Infinity, excluded: null });
     });
 
     test('Refuses shapes a literal scan cannot stand in for', () => {
       assert.strictEqual(toDelimitedFragment(/<%[\s\S]*%>/), null, 'Greedy body takes the last terminator, not the first');
-      assert.strictEqual(toDelimitedFragment(/<%[^%]*?%>/), null, 'Body is not every character');
+      assert.strictEqual(toDelimitedFragment(/<%[^]]*?%>/), null, 'An any-character body followed by a literal `]`, not a negated class');
       assert.strictEqual(toDelimitedFragment(/<(WC@[\s\S]*?)>/), null, 'Delimiters are not literal');
       assert.strictEqual(toDelimitedFragment(/^<%[\s\S]*?%>/), null, 'Anchors are not literal');
       assert.strictEqual(toDelimitedFragment(/\s*[\s\S]*?%>/), null, 'Opening delimiter is not literal');
@@ -33,11 +39,12 @@ describe('Fragments', () => {
     });
 
     test('Takes flags into account', () => {
-      assert.strictEqual(toDelimitedFragment(/<%.*?%>/), null, '`.` stops at line terminators without `s`');
-      assert.deepStrictEqual(toDelimitedFragment(/<%.*?%>/s), { open: '<%', close: '%>', min: 0, max: Infinity });
+      // `.` spans every character only under `s`; without it, line terminators bound the body
+      assert.deepStrictEqual(toDelimitedFragment(/<%.*?%>/), { open: '<%', close: '%>', min: 0, max: Infinity, excluded: /[\n\r\u2028\u2029]/g });
+      assert.deepStrictEqual(toDelimitedFragment(/<%.*?%>/s), { open: '<%', close: '%>', min: 0, max: Infinity, excluded: null });
       assert.strictEqual(toDelimitedFragment(/<%[\s\S]*?%>/i), null, 'Case folding moves character indexes');
       // `g` is the caller's business, so it does not stand in the way
-      assert.deepStrictEqual(toDelimitedFragment(/<%[\s\S]*?%>/g), { open: '<%', close: '%>', min: 0, max: Infinity });
+      assert.deepStrictEqual(toDelimitedFragment(/<%[\s\S]*?%>/g), { open: '<%', close: '%>', min: 0, max: Infinity, excluded: null });
     });
   });
 
@@ -56,10 +63,14 @@ describe('Fragments', () => {
       [/<%[\s\S]*?%>/, /<%%[\s\S]*?%%>/],
       [/<%[\s\S]+?%>/, /<%[\s\S]{2,5}?%>/],
       [/a[\s\S]*?a/],
-      // Shapes that fall back to running the pattern, on their own and mixed in
+      // Negated-class bodies, scanned with their class as the boundary
       [/<%[^%]*?%>/],
-      [/<%[\s\S]*%>/],
       [/<%[^%]*?%>/, /\{\{[\s\S]*?\}\}/],
+      [/\{\{[^{}]{1,4}?\}\}/, /<%[\s\S]*?%>/],
+      [/\{\{.*?\}\}/],
+      [/a[^x]*?a/],
+      // Shapes that fall back to running the pattern, on their own and mixed in
+      [/<%[\s\S]*%>/],
       [/<(WC@[\s\S]*?)>/, /<%[\s\S]*?%>/]
     ];
 
@@ -98,6 +109,12 @@ describe('Fragments', () => {
       // Only fragments running straight into each other share a match; whitespace
       // between them belongs to the first
       assert.strictEqual(replaceCustomFragments('<%x%> <%y%>', fragments, marker), '["<%x%> "]["<%y%>"]');
+    });
+
+    test('A negated-class body cannot cross the characters it excludes', () => {
+      const fragments = prepare([/\{\{[^}]*?\}\}/]);
+      assert.strictEqual(replaceCustomFragments('{{a}b}} {{c}}', fragments, marker), '{{a}b}}[" {{c}}"]');
+      assert.strictEqual(replaceCustomFragments('{{}a}}', fragments, marker), '{{}a}}');
     });
 
     test('Input without a fragment comes back untouched', () => {

@@ -98,6 +98,15 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/<%(\s|\S)*?%>/.source), true);
     });
 
+    test('Variable quantifiers nested in an unbounded group are risky', () => {
+      assert.strictEqual(hasRiskyQuantifiers(/(a?)+/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\{\{(?:[^}]{1,3})+\}\}/.source), true);
+    });
+
+    test('An exact count nested in an unbounded group passes', () => {
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a{4})+/.source), false);
+    });
+
     test('The same atom repeated unboundedly twice in a row is risky', () => {
       assert.strictEqual(hasRiskyQuantifiers(/.*.*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/<!--[\s\S]*[\s\S]*-->/.source), true);

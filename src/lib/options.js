@@ -602,13 +602,13 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   });
 
-  // Fragments whose quantifiers nest or alternate are the shapes that backtrack
-  // catastrophically, and they are also the ones no linear scan can stand in for; a
-  // lone `[\s\S]*?` up to a literal terminator is linear, so it passes—as it must,
-  // being how the defaults are written
+  // Fragments that compound quantifiers or alternation under unbounded repetition
+  // are the shapes that backtrack catastrophically, and they are also the ones a
+  // linear scan cannot stand in for; a lone `[\s\S]*?` up to a literal terminator
+  // is linear, so it passes—as it must, being how the defaults are written
   for (const re of options.ignoreCustomFragments || []) {
     if (!hasRiskyQuantifiers(re.source)) continue;
-    const problem = `Custom fragment \`/${re.source}/\` nests or alternates unlimited quantifiers, which may cause ReDoS—bound them (e.g., \`{0,1000}\`) instead`;
+    const problem = `Custom fragment \`/${re.source}/\` compounds quantifiers or alternation in a way that may cause ReDoS—bound the repetition (e.g., \`{0,1000}\`) instead`;
     if (options.strictCustomFragments) {
       throw new Error(`HTML Minifier Next: ${problem}`);
     }

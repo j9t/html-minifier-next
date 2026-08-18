@@ -2,26 +2,29 @@
  * Custom fragment matching
  *
  * `ignoreCustomFragments` patterns nearly always describe the same shape: a literal
- * opening delimiter, an any-character body, and a literal closing delimiter, as in
- * `<%[\s\S]*?%>`. Such a fragment can be found with `indexOf` in linear time, where
- * running the pattern as a regex costs O(n²) on input that opens fragments it never
- * closes—and can cost far more than that when the pattern itself backtracks. Patterns
- * of other shapes keep running as regexes, one per pattern, so each keeps its own flags
+ * opening delimiter, an any-character or negated-class body, and a literal closing
+ * delimiter, as in `<%[\s\S]*?%>` or `\{\{[^}]*?\}\}`. Such a fragment can be found
+ * with `indexOf` in linear time, where running the pattern as a regex costs O(n²)
+ * on input that opens fragments it never closes—and can cost far more than that when
+ * the pattern itself backtracks. Patterns of other shapes keep running as regexes,
+ * one per pattern, so each keeps its own flags.
  */
 
 const RE_WHITESPACE = /\s/;
 
-// Any-character bodies; `.` counts only under the `s` flag, which decides whether it
-// matches line terminators
-const RE_DELIMITED = /^(.*?)(?:\[\\s\\S\]|\[\\S\\s\]|\[\^\]|(\.))(?:([*+])|\{(\d+)(?:,(\d*))?\})\?(.*)$/;
+// Any-character and negated-class bodies; without the `s` flag, `.` is itself a
+// negated class, excluding line terminators
+const RE_DELIMITED = /^(.*?)(?:\[\\s\\S\]|\[\\S\\s\]|\[\^\]|(\.)|\[\^((?:\\[^]|[^\]\\])+)\])(?:([*+])|\{(\d+)(?:,(\d*))?\})\?(.*)$/;
 
 // Flags that leave literal matching alone, so a pattern carrying them can still be
 // scanned for; `i` in particular cannot, since case folding moves character indexes
 const FLAGS_LITERAL = /^[gds]*$/;
 
 /**
- * @typedef {{open: string, close: string, min: number, max: number}} DelimitedFragment
- *  Literal delimiters around an any-character body, found by scanning
+ * @typedef {{open: string, close: string, min: number, max: number, excluded: RegExp | null}} DelimitedFragment
+ *  Literal delimiters around a body, found by scanning; `excluded` holds the
+ *  characters a negated-class body cannot cross, null when the body spans every
+ *  character
  * @typedef {{search: RegExp, anchored: RegExp}} PatternFragment
  *  Everything else, found by running the pattern itself
  */
@@ -70,19 +73,22 @@ function toDelimitedFragment(pattern) {
 
   const match = RE_DELIMITED.exec(pattern.source);
   if (!match) return null;
-  // A `.` body only spans every character under the `s` flag
-  if (match[2] && !pattern.flags.includes('s')) return null;
 
-  const open = toLiteral(match[1] ?? '');
-  const close = toLiteral(match[6] ?? '');
+  const [, rawOpen, dot, negated, simple, exact, upper, rawClose] = match;
+  const open = toLiteral(rawOpen ?? '');
+  const close = toLiteral(rawClose ?? '');
   // Both delimiters have to be there: without them a match has no boundary to scan to
   if (!open || !close) return null;
 
-  const [, , , simple, exact, upper] = match;
+  // The class content doubles as the search for characters the body cannot cross;
+  // a `.` body spans every character under the `s` flag, and excludes line
+  // terminators without it
+  const inner = dot ? (pattern.flags.includes('s') ? null : '\\n\\r\\u2028\\u2029') : negated ?? null;
+
   const min = simple ? (simple === '+' ? 1 : 0) : Number(exact);
   const max = simple || upper === '' ? Infinity : Number(upper ?? exact);
 
-  return { open, close, min, max };
+  return { open, close, min, max, excluded: inner === null ? null : new RegExp('[' + inner + ']', 'g') };
 }
 
 /**
@@ -108,11 +114,31 @@ function toFragment(pattern) {
  * @returns {string}
  */
 function replaceCustomFragments(value, fragments, replacer) {
-  // Where each fragment's next match may start, and its next closing delimiter may be
-  // found; both only ever move forward, which is what keeps the whole scan linear
+  // Where each fragment's next match may start, its next closing delimiter may be
+  // found, and its next excluded character sits; all only ever move forward, which
+  // is what keeps the whole scan linear
   const found = fragments.map(() => /** @type {{start: number, end: number} | null} */ (null));
   const closesAt = fragments.map(() => -1);
+  const excludedAt = fragments.map(() => -1);
   const exhausted = fragments.map(() => false);
+
+  /**
+   * Whether a body region holds a character its class excludes
+   * @param {DelimitedFragment} fragment
+   * @param {number} index - Which fragment, for the forward-only bookkeeping
+   * @param {number} bodyStart
+   * @param {number} close
+   * @returns {boolean}
+   */
+  const bodyBlocked = (fragment, index, bodyStart, close) => {
+    if (!fragment.excluded) return false;
+    if (/** @type {number} */ (excludedAt[index]) < bodyStart) {
+      fragment.excluded.lastIndex = bodyStart;
+      const blocked = fragment.excluded.exec(value);
+      excludedAt[index] = blocked ? blocked.index : Infinity;
+    }
+    return /** @type {number} */ (excludedAt[index]) < close;
+  };
 
   /**
    * Earliest match of one delimited fragment at or after `from`
@@ -144,10 +170,11 @@ function replaceCustomFragments(value, fragments, replacer) {
         return null;
       }
 
-      if (close - bodyStart <= fragment.max) {
+      if (close - bodyStart <= fragment.max && !bodyBlocked(fragment, index, bodyStart, close)) {
         return { start: open, end: close + fragment.close.length };
       }
-      // The body is longer than the pattern allows, so the match has to start later
+      // The body is longer than the pattern allows, or holds a character its class
+      // excludes, so the match has to start later
       if (anchored) return null;
       openFrom = open + 1;
     }

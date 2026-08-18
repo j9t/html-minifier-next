@@ -553,9 +553,9 @@ To validate complete HTML markup, use [the W3C validator](https://validator.w3.o
 
 You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular expression to run against your documents. This is also where a regular expression denial of service (ReDoS) could originate:
 
-* Matching without backtracking: A pattern that wraps an any-character body in literal delimiters—`<%[\s\S]*?%>`, and every other shape below—is matched by scanning for those delimiters in linear time, with no regular expression involved. Patterns of other shapes run as regular expressions, one per pattern, so each keeps its own flags.
+* Matching without backtracking: A pattern that wraps an any-character or negated-class body in literal delimiters—`<%[\s\S]*?%>` or `\{\{[^}]*?\}\}`, and every other shape below—is matched by scanning for those delimiters in linear time, with no regular expression involved. Patterns of other shapes run as regular expressions, one per pattern, so each keeps its own flags.
 
-* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself repeats (`(a+)+`) or alternates (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control.
+* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself contains a quantifier (`(a+)+`, `(a?)+`) or alternation (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control.
 
 * Input length limits: The `maxInputLength` option allows you to set a maximum input size to prevent processing of excessively large inputs that could cause performance issues.
 
