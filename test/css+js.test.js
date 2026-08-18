@@ -1286,7 +1286,7 @@ describe('CSS and JS', () => {
 
     test('Keeps what an `iframe srcdoc` document references', async () => {
       // `srcdoc` holds a document of its own, and its style sheets are minified
-      // against the same symbol set, so its own classes have to be in it
+      // against its own symbol set
       const quote = String.fromCharCode(39);
       const input = style('.outer{color:red}') + '<p class="outer"></p>' +
         `<iframe srcdoc=${quote}<style>.inner{color:blue}.gone{color:red}</style><p class="inner">hi</p>${quote}></iframe>`;
@@ -1295,6 +1295,31 @@ describe('CSS and JS', () => {
       assert.ok(output.includes('.inner'), 'A class the nested document uses should survive');
       assert.ok(!output.includes('.gone'), 'A class nothing uses should still go');
       assert.ok(output.includes('.outer'), 'The outer document should be unaffected');
+    });
+
+    test('Scopes `iframe srcdoc` style sheets to the nested document', async () => {
+      // Parent styles do not reach into the nested browsing context, and vice
+      // versa: A parent rule only the `srcdoc` uses goes, the `srcdoc`’s own stays
+      const quote = String.fromCharCode(39);
+      const input = style('.outer{color:red}.inner{color:green}') + '<p class="outer"></p>' +
+        `<iframe srcdoc=${quote}<style>.inner{color:blue}</style><p class="inner">hi</p>${quote}></iframe>`;
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(!output.includes('color:green'), 'A parent rule only the nested document references should go');
+      assert.ok(output.includes('color:#00f'), 'The nested document’s own rule should stay');
+      assert.ok(output.includes('color:red'), 'The parent’s referenced rule should stay');
+    });
+
+    test('Reads an entity-encoded `srcdoc` document', async () => {
+      // Without a literal style element in the parent, the symbols come from the
+      // decoded `srcdoc` markup alone
+      const output = await minify(
+        '<iframe srcdoc="&lt;style&gt;.used{color:red}.gone{color:blue}&lt;/style&gt;&lt;p class=&#39;used&#39;&gt;x&lt;/p&gt;"></iframe>',
+        { minifyCSS: true, removeUnusedCSS: true }
+      );
+
+      assert.ok(output.includes('.used'), 'A class the nested document uses should survive');
+      assert.ok(!output.includes('.gone'), 'A class nothing uses should still go');
     });
 
     test('Reads a start tag past a `>` inside a quoted attribute value', async () => {

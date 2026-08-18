@@ -4864,7 +4864,7 @@ describe('HTML', () => {
 
     // `srcdoc` with inline styles and scripts
     input = '<iframe srcdoc="<div style=\'  color: red;  \' onclick=\'  alert(&quot;Hello&quot;);  \'>Test</div>"></iframe>';
-    output = '<iframe srcdoc="<div style=\'color:red\' onclick=\'alert(&#34;Hello&#34;)\'>Test</div>"></iframe>';
+    output = '<iframe srcdoc="<div style=\'color:red\' onclick=\'alert(&quot;Hello&quot;)\'>Test</div>"></iframe>';
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyJS: true, collapseWhitespace: true }), output);
     await assert.doesNotReject(
       minify(input, { continueOnMinifyError: false, minifyCSS: true, minifyJS: true, collapseWhitespace: true }),
@@ -4897,6 +4897,42 @@ describe('HTML', () => {
     // After collapsing whitespace to empty, iframe with empty `srcdoc` is preserved
     input = '<iframe srcdoc="   \n\t   "></iframe>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), '<iframe srcdoc=""></iframe>');
+  });
+
+  test('Malformed `srcdoc` does not abort the document', async () => {
+    const input = '<p>before</p><iframe srcdoc=\'<p title="a"b">oops</p>\'></iframe><p>after</p>';
+
+    // With `continueOnMinifyError` (the default), the value passes through unminified
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    await assert.rejects(minify(input, { collapseWhitespace: true, continueOnMinifyError: false }));
+  });
+
+  test('Entity-encoded `srcdoc` minification', async () => {
+    let input, output;
+
+    // Browsers resolve character references before parsing `srcdoc`, so an
+    // entity-encoded document is minified without `decodeEntities`
+    input = '<iframe srcdoc="&lt;p&gt;hello  &lt;!-- c --&gt;&lt;/p&gt;"></iframe>';
+    output = '<iframe srcdoc="<p>hello</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, removeComments: true }), output);
+
+    // `&` and a nested `&amp;` in text round-trip
+    input = '<iframe srcdoc="&lt;p&gt;a &amp; b &amp;amp; c&lt;/p&gt;"></iframe>';
+    output = '<iframe srcdoc="<p>a &amp; b &amp;amp; c</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // `&lt;` in text round-trips instead of becoming a tag
+    input = '<iframe srcdoc="&lt;p&gt;1 &amp;lt; 2&lt;/p&gt;"></iframe>';
+    output = '<iframe srcdoc="<p>1 &amp;lt; 2</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // A value carrying both quote characters keeps its delimiters intact
+    input = '<iframe srcdoc=\'<p class="q" title=&#39;he said &quot;hi&quot;&#39;>x</p>\'></iframe>';
+    output = '<iframe srcdoc="<p class=&quot;q&quot; title=\'he said &quot;hi&quot;\'>x</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    // …and under `decodeEntities`, the delimiter gets escaped, not the other quote
+    output = '<iframe srcdoc=\'<p class="q" title=&#39;he said "hi"&#39;>x</p>\'></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, decodeEntities: true }), output);
   });
 
   test('`tfoot` in nested table', async () => {

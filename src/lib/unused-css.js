@@ -37,9 +37,6 @@ const fragmentReferenceAttributes = new Set([
   'xlink:href'
 ]);
 
-// `srcdoc` can nest, and each level costs another scan of its own markup
-const SRCDOC_MAX_DEPTH = 3;
-
 const attributePattern = /(?:^|[\s/])([-\w:.]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 const identifierPattern = /--[\w-]*|-?[A-Za-z_][\w-]*/g;
 // SVG paints and filters reach elements by ID through `url(#gradient)`, in
@@ -173,16 +170,17 @@ function findRawTextElements(haystack, tagName) {
  * Collect the class names and IDs a document references.
  *
  * Style sheet contents are excluded, so that a style sheet never counts as
- * evidence for its own selectors. Over-collecting is safe here (a symbol wrongly
- * considered used is merely kept), under-collecting is not.
+ * evidence for its own selectors. An `iframe srcdoc` value is not scanned
+ * either: It holds a document of its own, minified against its own symbol set.
+ * Over-collecting is safe here (a symbol wrongly considered used is merely
+ * kept), under-collecting is not.
  *
  * @param {string} html - Raw document markup
  * @param {boolean} includeScripts - Also treat identifiers inside inline `script` elements as used
  * @param {((text: string) => string)} [decode] - Resolves character references in attribute values
- * @param {number} [depth] - Nesting level, counted through `srcdoc`
  * @returns {Set<string>} Symbols to keep
  */
-function collectUsedSymbols(html, includeScripts, decode, depth = 0) {
+function collectUsedSymbols(html, includeScripts, decode) {
   const used = new Set();
   const haystack = foldCase(html);
 
@@ -222,9 +220,6 @@ function collectUsedSymbols(html, includeScripts, decode, depth = 0) {
     return element !== undefined && index >= element.start;
   };
 
-  /** @type {string[]} */
-  const nested = [];
-
   attributePattern.lastIndex = 0;
   let match;
   while ((match = attributePattern.exec(html))) {
@@ -244,8 +239,6 @@ function collectUsedSymbols(html, includeScripts, decode, depth = 0) {
     } else if (fragmentReferenceAttributes.has(name) && value.charAt(0) === '#') {
       // Only a leading `#`: `href="/page#sec"` names a section of another document
       addTokens(value.slice(1));
-    } else if (name === 'srcdoc' && depth < SRCDOC_MAX_DEPTH) {
-      nested.push(value);
     }
     if (value.indexOf('(') !== -1) {
       fragmentURLPattern.lastIndex = 0;
@@ -253,16 +246,6 @@ function collectUsedSymbols(html, includeScripts, decode, depth = 0) {
       while ((reference = fragmentURLPattern.exec(value))) {
         addTokens(reference[1] ?? '');
       }
-    }
-  }
-
-  // `iframe srcdoc` holds a document of its own, whose style sheets are minified
-  // against this very set—so what it references has to be in it. The scan runs here
-  // rather than at the attribute: The patterns it shares with this one are
-  // module-level, so no nested scan may start while one of their loops is open.
-  for (const markup of nested) {
-    for (const symbol of collectUsedSymbols(markup, includeScripts, decode, depth + 1)) {
-      used.add(symbol);
     }
   }
 

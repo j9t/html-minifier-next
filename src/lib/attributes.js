@@ -13,10 +13,12 @@ import {
   isBooleanValue,
   collapsibleValues,
   srcsetElements,
-  reEmptyAttribute
+  reEmptyAttribute,
+  RE_STYLE_ELEMENT
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
+import { collectUsedSymbols } from './unused-css.js';
 import { identity, isThenable } from './utils.js';
 
 /** @import { ProcessedOptions } from './options.js' */
@@ -28,7 +30,8 @@ import { identity, isThenable } from './utils.js';
  *  Internal counterpart of the public typedef in htmlminifier.js—keep in sync.
  */
 
-// Lazy-load entities (used for `decodeEntities` and event-handler attribute decode before `minifyJS`)
+// Lazy-load entities (used for `decodeEntities`, event-handler attribute
+// decoding before `minifyJS`, and `srcdoc` decoding/re-encoding)
 
 /** @type {Promise<Function> | undefined} */
 let decodeHTMLStrictPromise;
@@ -37,6 +40,15 @@ async function getDecodeHTMLStrict() {
     decodeHTMLStrictPromise = import('entities').then(m => m.decodeHTMLStrict);
   }
   return decodeHTMLStrictPromise;
+}
+
+/** @type {Promise<Function> | undefined} */
+let escapeAttributePromise;
+async function getEscapeAttribute() {
+  if (!escapeAttributePromise) {
+    escapeAttributePromise = import('entities').then(m => m.escapeAttribute);
+  }
+  return escapeAttributePromise;
 }
 
 // Validators
@@ -593,15 +605,60 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
   }
 
   if (tag === 'iframe' && attrName === 'srcdoc') {
-    // Recursively minify HTML content within `srcdoc` attribute
     // Fast-path: Skip if nothing would change
     if (!shouldMinifyInnerHTML(options)) {
       return attrValue;
     }
-    return minifyHTMLSelf(attrValue, options, true);
+    return minifySrcdoc(attrValue, options, minifyHTMLSelf);
   }
 
   return attrValue;
+}
+
+/**
+ * Recursively minify the document an `iframe srcdoc` attribute holds.
+ *
+ * Browsers resolve character references before parsing `srcdoc`, so an
+ * entity-encoded document is decoded first (unless `decodeEntities` already
+ * did) and re-encoded afterwards—but only then, so a literal value passes
+ * through byte-identical.
+ *
+ * @param {string} attrValue
+ * @param {ProcessedOptions} options
+ * @param {Function} minifyHTMLSelf
+ * @returns {Promise<string>}
+ */
+async function minifySrcdoc(attrValue, options, minifyHTMLSelf) {
+  let markup = attrValue;
+  let wasEncoded = false;
+  if (!options.decodeEntities && attrValue.indexOf('&') !== -1) {
+    const decode = await getDecodeHTMLStrict();
+    markup = decode(attrValue);
+    wasEncoded = markup !== attrValue;
+  }
+
+  let srcdocOptions = options;
+  // The inner document sees none of the parent’s markup, so its style sheets
+  // minify against the symbols the `srcdoc` content references itself
+  if (options.removeUnusedCSS && RE_STYLE_ELEMENT.test(markup)) {
+    const decode = markup.indexOf('&') !== -1 ? await getDecodeHTMLStrict() : undefined;
+    srcdocOptions = {
+      ...options,
+      cssContext: {
+        warned: options.cssContext ? options.cssContext.warned : new Set(),
+        usedSymbols: collectUsedSymbols(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
+      }
+    };
+  }
+
+  try {
+    const minified = await minifyHTMLSelf(markup, srcdocOptions, true);
+    return wasEncoded ? (await getEscapeAttribute())(minified) : minified;
+  } catch (err) {
+    if (!options.continueOnMinifyError) throw err;
+    options.log && options.log(/** @type {Error} */ (err));
+    return attrValue;
+  }
 }
 
 /**
