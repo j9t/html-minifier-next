@@ -887,6 +887,28 @@ describe('CSS and JS', () => {
       assert.ok(!styleOf(unguarded).includes('.js-only'), '`scripts: false` should drop the guard');
     });
 
+    test('Keeps hyphen-leading class names found in scripts and `data-*` values', async () => {
+      // `.-mt-4` and the like are ordinary CSS identifiers a script hands to `classList`
+      const cases = [
+        ['.-foo{color:red}', '<script>document.body.classList.add("-foo")</script>', '.-foo'],
+        ['.-mt-4{margin-top:-1rem}', '<script>el.classList.add("-mt-4")</script>', '.-mt-4'],
+        ['.--foo{color:red}', '<script>el.classList.add("--foo")</script>', '.--foo'],
+        ['.-foo{color:red}', '<p data-toggle="-foo"></p>', '.-foo']
+      ];
+
+      for (const [css, markup, expected] of cases) {
+        const output = await minify(style(css) + '<p></p>' + markup, { minifyCSS: true, removeUnusedCSS: true });
+        assert.ok(styleOf(output).includes(expected), `${markup} should keep ${expected}`);
+      }
+
+      // A hyphen-leading name nothing references should still go
+      const unused = await minify(style('.-gone{color:red}') + '<p></p>', {
+        minifyCSS: true,
+        removeUnusedCSS: true
+      });
+      assert.ok(!styleOf(unused).includes('.-gone'), 'Unreferenced rules should still be removed');
+    });
+
     test('Honors the safelist, as strings and as regular expressions', async () => {
       const input = style('.keep-me{color:red}.keep-prefix-a{color:red}.drop{color:red}') + '<p></p>';
       const output = await minify(input, {
