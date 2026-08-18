@@ -244,7 +244,7 @@ function normalizeConfig(config) {
   // Warn about unrecognized config keys—catches typos as well as options removed in earlier versions
   Object.keys(normalized).forEach(function (key) {
     if (!Object.hasOwn(optionDefinitions, key) && !CONFIG_KEYS_EXTRA.has(key)) {
-      console.error(`Ignoring unknown or deprecated config option “${key}” (see \`--help\` or README for available options)`);
+      console.error(`Ignoring unknown or deprecated config option \`${key}\` (see \`--help\` or README for available options)`);
     }
   });
 
@@ -282,9 +282,9 @@ function normalizeConfig(config) {
 let config = {};
 program.option('-z, --zero', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options)');
 program.option('-I --input-dir <dir>', 'Specify an input directory');
-program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., “libs” or “libs,vendor,node_modules”');
+program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., `libs` or `libs,vendor,node_modules`');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
-program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to “html,htm,shtml,shtm”; use “*” for all files');
+program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to `html,htm,shtml,shtm`; use `*` for all files');
 program.option('-p --preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('-c --config-file <file>', 'Use config file');
 program.version(pkg.version, '-V, --version', 'Output the version number');
@@ -399,7 +399,7 @@ program.helpOption('-h, --help', 'Display help for command');
   } else {
     const configFileDefault = CONFIG_FILES_DEFAULT.find(name => fs.existsSync(path.resolve(name)));
     if (configFileDefault) {
-      console.error(`Using config file “${configFileDefault}”`);
+      console.error(`Using config file ${configFileDefault}`);
       config = normalizeConfig(await loadConfigFromPath(configFileDefault));
     }
   }
@@ -445,7 +445,7 @@ program.helpOption('-h, --help', 'Display help for command');
         // offending content unminified—so say that
         if (message instanceof Error) {
           console.error(`  ${MARK_WARNING}Warning: Minification failed, content left as-is: ${message.message || message}${MARK_RESET}`);
-        } else if (String(message).startsWith('Warning: ')) {
+        } else if (String(message).startsWith('Warning: ') || String(message).startsWith('HTML Minifier Next: ')) {
           console.error(`  ${MARK_WARNING}${message}${MARK_RESET}`);
         } else {
           console.error(`  ${message}`);
@@ -896,7 +896,7 @@ program.helpOption('-h, --help', 'Display help for command');
     for (const file of capturedFiles) {
       const ext = path.extname(file).replace(/^\./, '').toLowerCase();
       if (EXTENSIONS_NON_HTML.has(ext)) {
-        console.error(`${MARK_WARNING}Warning: “${path.basename(file)}” does not appear to be an HTML file—HTML Minifier Next processes CSS, JavaScript, and SVG only when embedded in HTML. The output may be incomplete or broken.${MARK_RESET}`);
+        console.error(`${MARK_WARNING}Warning: ${path.basename(file)} does not appear to be an HTML file—HTML Minifier Next processes CSS, JavaScript, and SVG only when embedded in HTML. The output may be incomplete or broken.${MARK_RESET}`);
       }
     }
 

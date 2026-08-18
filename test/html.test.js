@@ -2500,7 +2500,7 @@ describe('HTML', () => {
 
     input = '<img class="{% foo %} {% bar %}">';
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g] }), input);
-    // `trimCustomFragments` without `collapseWhitespace`, does not break the “{% foo %} {% bar %}” test
+    // `trimCustomFragments` without `collapseWhitespace`, does not break the `{% foo %} {% bar %}` test
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g], trimCustomFragments: true }), input);
     // `trimCustomFragments` with `collapseWhitespace`, changes output
     output = '<img class="{% foo %}{% bar %}">';

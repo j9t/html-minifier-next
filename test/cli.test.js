@@ -603,7 +603,7 @@ describe('CLI', () => {
     const { stdout, stderr, exitCode } = execCliInDir(['input.html'], dir);
 
     assert.strictEqual(exitCode, 0);
-    assert.ok(stderr.includes('Using config file “html-minifier-next.config.json”'));
+    assert.ok(stderr.includes('Using config file html-minifier-next.config.json'));
     assert.strictEqual(stdout, '<p>foo</p>');
   });
 
@@ -615,7 +615,7 @@ describe('CLI', () => {
     const { stdout, stderr, exitCode } = execCliInDir(['input.html'], dir);
 
     assert.strictEqual(exitCode, 0);
-    assert.ok(stderr.includes('Using config file “htmlminifier.config.json”'));
+    assert.ok(stderr.includes('Using config file htmlminifier.config.json'));
     assert.strictEqual(stdout, '<p>foo</p>');
   });
 
@@ -628,7 +628,7 @@ describe('CLI', () => {
     const { stdout, stderr, exitCode } = execCliInDir(['input.html'], dir);
 
     assert.strictEqual(exitCode, 0);
-    assert.ok(stderr.includes('Using config file “html-minifier-next.config.json”'));
+    assert.ok(stderr.includes('Using config file html-minifier-next.config.json'));
     assert.strictEqual(stdout, '<p>foo</p>');
   });
 

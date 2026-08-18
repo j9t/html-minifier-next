@@ -137,7 +137,7 @@ function canRemoveElement(tag, attrs) {
 }
 
 /**
- * @param {string} str - Tag name or HTML-like element spec (e.g., “td” or “<span aria-hidden='true'>”)
+ * @param {string} str - Tag name or HTML-like element spec (e.g., `td` or `<span aria-hidden='true'>`)
  * @param {ProcessedOptions} options - Options object for name normalization
  * @returns {{tag: string, attrs: Object.<string, string|undefined>|null}|null} Parsed spec or null if invalid
  */
@@ -203,12 +203,12 @@ function parseRemoveEmptyElementsExcept(input, options) {
     if (typeof item === 'string') {
       const spec = parseElementSpec(item, options);
       if (!spec && options.log) {
-        options.log('Warning: Unable to parse “removeEmptyElementsExcept” specification: “' + item + '”');
+        options.log('Warning: Unable to parse `removeEmptyElementsExcept` specification: “' + item + '”');
       }
       return spec;
     }
     if (options.log) {
-      options.log('Warning: “removeEmptyElementsExcept” specification must be a string, received: ' + typeof item);
+      options.log('Warning: `removeEmptyElementsExcept` specification must be a string, received: ' + typeof item);
     }
     return null;
   }).filter(Boolean));
