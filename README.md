@@ -41,7 +41,7 @@ Use `npx html-minifier-next --help` to check all available options:
 | `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
 | `--config-file <file>`, `-c <file>` | Use a configuration file (defaults to html-minifier-next.config.json in the working directory, if present) | `--config-file=path/to/config.json` |
-| `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
+| `--verbose`, `-v` | Show detailed processing information (active options, file statistics, and minifier warnings) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `--dry`, `-d` | Dry run: Process and report statistics without writing output | `npx html-minifier-next input.html --dry --collapse-whitespace` |
 
 ### Configuration file
@@ -187,7 +187,7 @@ A few options take functions and are therefore only available programmatically, 
 | --- | --- | --- |
 | `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
-| `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them) | No-op (errors are silent) |
+| `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
 
 ### Sorting attributes and style classes
 

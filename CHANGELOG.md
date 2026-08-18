@@ -14,6 +14,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Names bound by `@keyframes` and `@counter-style` are not removed, even when no element carries them as a class or ID, as those at-rules are referenced from CSS rather than from markup
   - Escaped identifiers (e.g., `.md\:flex`) are resolved before being matched against the markup
   - A manually supplied `minifyCSS.unusedSymbols` list is merged with the computed one rather than replaced
+* Added minifier diagnostics to `--verbose` (and `--dry`, which implies it)
+* Added reporting for CSS rules skipped under `errorRecovery`: With `continueOnMinifyError` enabled (the default), Lightning CSS skips invalid rules instead of throwing, which previously happened without any trace; the rules it drops are now reported through the `log` hook
 
 ## [7.5.3] - 2026-08-13
 

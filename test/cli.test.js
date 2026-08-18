@@ -1007,6 +1007,65 @@ describe('CLI', () => {
     assert.strictEqual(existsFixture('tmp/verbose-stdin.html'), true);
   });
 
+  test('Should report skipped CSS rules in verbose mode', () => {
+    const result = execCliWithStderr([
+      'invalid-css-js.html',
+      '--verbose',
+      '--minify-css',
+      '-o', 'tmp/invalid-css.html'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(
+      result.stderr.includes('Lightning CSS skipped invalid CSS'),
+      'Rules dropped under error recovery should be reported'
+    );
+  });
+
+  test('Should report swallowed minification errors in verbose mode', () => {
+    const result = execCliWithStderr([
+      'invalid-css-js.html',
+      '--verbose',
+      '--minify-js',
+      '-o', 'tmp/invalid-js.html'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(
+      result.stderr.includes('Minification failed, content left as-is'),
+      'Errors swallowed by `continueOnMinifyError` should be reported'
+    );
+  });
+
+  test('Should stay quiet about minifier diagnostics without verbose mode', () => {
+    const result = execCliWithStderr([
+      'invalid-css-js.html',
+      '--minify-css',
+      '--minify-js',
+      '-o', 'tmp/invalid-quiet.html'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(!result.stderr.includes('Lightning CSS skipped invalid CSS'));
+    assert.ok(!result.stderr.includes('Minification failed, content left as-is'));
+    assert.strictEqual(existsFixture('tmp/invalid-quiet.html'), true);
+  });
+
+  test('Should report minifier diagnostics with `--dry` flag', () => {
+    const result = execCliWithStderr([
+      'invalid-css-js.html',
+      '--dry',
+      '--minify-css'
+    ]);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stderr.includes('[DRY RUN]'));
+    assert.ok(
+      result.stderr.includes('Lightning CSS skipped invalid CSS'),
+      '`--dry` implies verbose, so diagnostics should show there too'
+    );
+  });
+
   test('Should automatically enable verbose mode with `--dry` flag', () => {
     const result = execCliWithStderr([
       'default.html',

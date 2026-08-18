@@ -438,6 +438,21 @@ program.helpOption('-h, --help', 'Display help for command');
       }
     });
 
+    // 4. Surface minifier diagnostics when verbose
+    if (programOptions.verbose || programOptions.dry) {
+      options.log = message => {
+        // Only `continueOnMinifyError` passes `Error` objects, always after leaving the
+        // offending content unminified—so say that
+        if (message instanceof Error) {
+          console.error(`  ${MARK_WARNING}Warning: Minification failed, content left as-is: ${message.message || message}${MARK_RESET}`);
+        } else if (String(message).startsWith('Warning: ')) {
+          console.error(`  ${MARK_WARNING}${message}${MARK_RESET}`);
+        } else {
+          console.error(`  ${message}`);
+        }
+      };
+    }
+
     return options;
   }
 
