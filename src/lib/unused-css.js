@@ -53,6 +53,23 @@ function unescapeIdentifier(identifier) {
 }
 
 /**
+ * Lowercase for matching without disturbing offsets.
+ *
+ * `toLowerCase()` can change a string's length—U+0130 becomes two code units—which
+ * would misalign every offset taken from the result. Folding just ASCII preserves
+ * length, and tag names are ASCII anyway.
+ *
+ * @param {string} text
+ * @returns {string} Same length as `text`
+ */
+function foldCase(text) {
+  const lowercased = text.toLowerCase();
+  return lowercased.length === text.length
+    ? lowercased
+    : text.replace(/[A-Z]+/g, uppercase => uppercase.toLowerCase());
+}
+
+/**
  * Locate the bodies of a raw-text element (`style`, `script`).
  *
  * Scanning beats one regular expression here: A pattern permissive enough for the
@@ -60,14 +77,13 @@ function unescapeIdentifier(identifier) {
  * quadratically over a document full of near-matches, and bounding it would make
  * long start tags go unrecognized.
  *
- * @param {string} html - Raw document markup
+ * @param {string} haystack - Case-folded markup, as returned by `foldCase`
  * @param {string} tagName - Lowercase element name
  * @returns {Array<{start: number, bodyStart: number, bodyEnd: number, end: number, closed: boolean}>}
  */
-function findRawTextElements(html, tagName) {
+function findRawTextElements(haystack, tagName) {
   /** @type {Array<{start: number, bodyStart: number, bodyEnd: number, end: number, closed: boolean}>} */
   const found = [];
-  const haystack = html.toLowerCase();
   const openTag = '<' + tagName;
   const closeTag = '</' + tagName;
   // A tag name ends at whitespace, a slash, or the closing bracket—so `<styles>`
@@ -114,11 +130,11 @@ function findRawTextElements(html, tagName) {
     found.push({
       start,
       bodyStart,
-      bodyEnd: closed ? bodyEnd : html.length,
-      end: closed ? end : html.length,
+      bodyEnd: closed ? bodyEnd : haystack.length,
+      end: closed ? end : haystack.length,
       closed
     });
-    cursor = closed ? end : html.length;
+    cursor = closed ? end : haystack.length;
   }
 
   return found;
@@ -138,17 +154,13 @@ function findRawTextElements(html, tagName) {
  */
 function collectUsedSymbols(html, includeScripts, decode) {
   const used = new Set();
+  const haystack = foldCase(html);
 
-  // An unclosed `style` element is left in place: Its contents then read as markup,
-  // which can only add symbols, whereas dropping the rest of the document would lose them
-  let markup = html;
-  const styleElements = findRawTextElements(html, 'style');
-  for (let index = styleElements.length - 1; index >= 0; index--) {
-    const element = styleElements[index];
-    if (element?.closed) {
-      markup = markup.slice(0, element.start) + markup.slice(element.end);
-    }
-  }
+  // Style elements are skipped rather than cut out, so both scans share one folded
+  // copy and offsets keep pointing into `html`. An unclosed one is not skipped:
+  // Reading its contents as markup can only add symbols, whereas ignoring the rest
+  // of the document would lose them.
+  const skipped = findRawTextElements(haystack, 'style').filter(element => element.closed);
 
   const addIdentifiers = (/** @type {string} */ text) => {
     identifierPattern.lastIndex = 0;
@@ -158,14 +170,24 @@ function collectUsedSymbols(html, includeScripts, decode) {
     }
   };
 
+  // Both loops below walk forward, so one cursor over the skipped ranges suffices
+  let skipCursor = 0;
+  const isSkipped = (/** @type {number} */ index) => {
+    while (skipCursor < skipped.length && (skipped[skipCursor]?.end ?? 0) <= index) {
+      skipCursor++;
+    }
+    const element = skipped[skipCursor];
+    return element !== undefined && index >= element.start;
+  };
+
   attributePattern.lastIndex = 0;
   let match;
-  while ((match = attributePattern.exec(markup))) {
-    const name = (match[1] ?? '').toLowerCase();
+  while ((match = attributePattern.exec(html))) {
     const raw = match[2] ?? match[3] ?? match[4] ?? '';
-    if (!raw) {
+    if (!raw || isSkipped(match.index)) {
       continue;
     }
+    const name = (match[1] ?? '').toLowerCase();
     // `class="us&#101;d"` names the class `used`, so compare against the decoded value
     const value = (decode && raw.indexOf('&') !== -1) ? decode(raw) : raw;
     if (name === 'class' || name === 'id' || idReferenceAttributes.has(name)) {
@@ -183,8 +205,11 @@ function collectUsedSymbols(html, includeScripts, decode) {
   if (includeScripts) {
     // Script contents are raw text, so character references stay literal;
     // an unclosed `script` runs to the end of the document, as it does in a browser
-    for (const element of findRawTextElements(markup, 'script')) {
-      addIdentifiers(markup.slice(element.bodyStart, element.bodyEnd));
+    skipCursor = 0;
+    for (const element of findRawTextElements(haystack, 'script')) {
+      if (!isSkipped(element.start)) {
+        addIdentifiers(html.slice(element.bodyStart, element.bodyEnd));
+      }
     }
   }
 

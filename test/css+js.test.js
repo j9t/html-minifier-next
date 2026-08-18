@@ -987,15 +987,39 @@ describe('CSS and JS', () => {
       assert.ok(!styleOf(unrelated).includes('.gone'), 'Unreferenced rules should still be removed');
     });
 
+    test('Keeps offsets aligned when lowercasing changes length', async () => {
+      // U+0130 lowercases to two code units, which would shift every later offset—and
+      // a shifted strip leaves `class` glued to the preceding text, so it stops parsing
+      const input = '<p title="\u0130\u0130\u0130">x</p>' +
+        '<style>.used{color:red}.gone{color:red}</style><p class="used"></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.used'), 'Referenced rule must survive a length-changing character');
+      assert.ok(!styleOf(output).includes('.gone'), 'Unreferenced rule should still be removed');
+    });
+
     test('Scans raw-text elements in linear time', () => {
       // A regular expression permissive enough for malformed end tags backtracked
-      // quadratically here—30,000 near-matches took seconds rather than milliseconds
-      const input = '<style>' + '</style\t'.repeat(15000) + '<script>' + '<script\t'.repeat(15000);
+      // quadratically over near-matches; compare growth rather than absolute time,
+      // which would depend on the machine. No `>` may follow the repetitions—one
+      // lets the pattern succeed immediately, which is what makes the near-matches
+      // pathological rather than merely long.
+      const measure = (/** @type {number} */ count) => {
+        const input = '<style>' + '</style\t'.repeat(count);
+        const started = performance.now();
+        collectUsedSymbols(input, true);
+        return performance.now() - started;
+      };
 
-      const started = Date.now();
-      collectUsedSymbols(input, true);
+      const small = measure(8000);
+      const large = measure(16000);
 
-      assert.ok(Date.now() - started < 2000, 'Near-matches should not degrade into quadratic scanning');
+      // Doubling the input doubles a linear scan but quadruples a quadratic one; the
+      // constant absorbs timer noise, which dominates when both runs are near-instant
+      assert.ok(
+        large <= small * 3 + 50,
+        `Scanning grew from ${small.toFixed(1)} ms to ${large.toFixed(1)} ms on twice the input`
+      );
     });
 
     test('Stops stripping a stylesheet at its own end tag, however malformed', async () => {
