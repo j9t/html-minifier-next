@@ -86,6 +86,8 @@ const presetNamesWarned = new Set();
 // console even without a `log` hook—once per process, like the warnings above
 let customFragmentQuantifierWarned = false;
 const unusedCSSWarned = new Set();
+// Invalid CSS reported by Lightning CSS, warned about once per distinct problem
+const cssWarned = new Set();
 
 // Main options processor
 
@@ -271,11 +273,17 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
             // With `errorRecovery` enabled, Lightning CSS skips invalid rules instead of
             // throwing, and reports each one here; surfacing them keeps a dropped rule
-            // from vanishing without a trace (fires on cache misses only)
+            // from vanishing without a trace. Deduplicating on the warning itself rather
+            // than leaving it to the cache keeps batch runs quiet without making the
+            // output depend on cache size or eviction.
             if (options.log !== identity && result.warnings && result.warnings.length) {
               for (const warning of result.warnings) {
                 const at = warning.loc ? ` (line ${warning.loc.line}, column ${warning.loc.column})` : '';
-                options.log(`Warning: Lightning CSS skipped invalid CSS${at}: ${warning.message}`);
+                const message = `Warning: Lightning CSS skipped invalid CSS${at}: ${warning.message}`;
+                if (!cssWarned.has(message)) {
+                  cssWarned.add(message);
+                  options.log(message);
+                }
               }
             }
 
@@ -557,9 +565,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     const reason = typeof cssOption === 'function'
       ? 'it does not apply when `minifyCSS` is a function'
       : (options.minifyCSS === identity ? 'it requires `minifyCSS` (`--minify-css`)' : '');
-    if (reason && !unusedCSSWarned.has(reason)) {
-      unusedCSSWarned.add(reason);
-      warn(`HTML Minifier Next: Ignoring \`removeUnusedCSS\`—${reason}`);
+    if (reason) {
+      if (!unusedCSSWarned.has(reason)) {
+        unusedCSSWarned.add(reason);
+        warn(`HTML Minifier Next: Ignoring \`removeUnusedCSS\`—${reason}`);
+      }
+      options.removeUnusedCSS = null;
     }
   }
 

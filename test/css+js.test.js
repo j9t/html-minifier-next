@@ -818,6 +818,30 @@ describe('CSS and JS', () => {
     );
   });
 
+  test('Reports a skipped CSS rule once, whatever the cache does', () => {
+    return (async () => {
+      const invalid = '@unknown-thing{foo:bar}';
+      const logs = [];
+      const options = {
+        minifyCSS: true,
+        cacheCSS: 1,
+        log: message => {
+          if (String(message).includes('skipped invalid CSS')) {
+            logs.push(String(message));
+          }
+        }
+      };
+
+      // Alternate two stylesheets through a one-entry cache, evicting on every pass
+      for (let pass = 0; pass < 6; pass++) {
+        const filler = pass % 2 ? '.a{color:red}' : '.b{color:blue}';
+        await minify(`<style>${invalid}${filler}</style><p class="a b"></p>`, options);
+      }
+
+      assert.strictEqual(logs.length, 1, 'The same invalid rule should be reported once, not once per cache miss');
+    })();
+  });
+
   // Unused-CSS removal tests
   describe('Unused CSS removal', () => {
     const style = css => `<!doctype html><html><head><style>${css}</style></head><body>`;
@@ -893,7 +917,11 @@ describe('CSS and JS', () => {
         ['.-foo{color:red}', '<script>document.body.classList.add("-foo")</script>', '.-foo'],
         ['.-mt-4{margin-top:-1rem}', '<script>el.classList.add("-mt-4")</script>', '.-mt-4'],
         ['.--foo{color:red}', '<script>el.classList.add("--foo")</script>', '.--foo'],
-        ['.-foo{color:red}', '<p data-toggle="-foo"></p>', '.-foo']
+        ['.-foo{color:red}', '<p data-toggle="-foo"></p>', '.-foo'],
+        // Two hyphens start an identifier whatever follows them
+        ['.--1foo{color:red}', '<script>el.classList.add("--1foo")</script>', '.--1foo'],
+        ['.---foo{color:red}', '<script>el.classList.add("---foo")</script>', '.---foo'],
+        ['.--1foo{color:red}', '<p data-toggle="--1foo"></p>', '.--1foo']
       ];
 
       for (const [css, markup, expected] of cases) {
@@ -901,12 +929,14 @@ describe('CSS and JS', () => {
         assert.ok(styleOf(output).includes(expected), `${markup} should keep ${expected}`);
       }
 
-      // A hyphen-leading name nothing references should still go
-      const unused = await minify(style('.-gone{color:red}') + '<p></p>', {
-        minifyCSS: true,
-        removeUnusedCSS: true
-      });
-      assert.ok(!styleOf(unused).includes('.-gone'), 'Unreferenced rules should still be removed');
+      // Hyphen-leading names nothing references should still go
+      for (const name of ['-gone', '--gone', '---gone']) {
+        const unused = await minify(style(`.${name}{color:red}`) + '<p></p>', {
+          minifyCSS: true,
+          removeUnusedCSS: true
+        });
+        assert.ok(!styleOf(unused).includes(`.${name}`), `Unreferenced .${name} should still be removed`);
+      }
     });
 
     test('Honors the safelist, as strings and as regular expressions', async () => {

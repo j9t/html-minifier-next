@@ -21,7 +21,7 @@ const idReferenceAttributes = new Set([
 ]);
 
 const attributePattern = /(?:^|[\s/])([-\w:.]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
-const identifierPattern = /-{0,2}[A-Za-z_][\w-]*/g;
+const identifierPattern = /--[\w-]*|-?[A-Za-z_][\w-]*/g;
 
 // CSS identifiers may contain escapes (`.md\:flex`, `.w-1\/2`), which have to be
 // resolved before comparing them against the plain tokens found in the markup
