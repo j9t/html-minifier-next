@@ -126,7 +126,8 @@ async function replaceAsync(str, regex, asyncFn) {
   });
 
   const data = await Promise.all(promises);
-  return str.replace(regex, () => data.shift() ?? '');
+  let next = 0;
+  return str.replace(regex, () => data[next++] ?? '');
 }
 
 // String patterns to RegExp conversion (for JSON config support)
