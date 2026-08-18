@@ -1,5 +1,13 @@
 // Single source of truth for minifier option names, descriptions, types, and shared defaults
 
+/**
+ * @typedef {object} OptionDefinition
+ * @property {string} description Help text, phrased for the option’s primary CLI form
+ * @property {string} [descriptionAffirmative] Help text for what enabling the option does, where `description` describes the negated form
+ * @property {string} type Key into the parser and JSON Schema type maps in cli.js and scripts/build-schema.js
+ */
+
+/** @type {Record<string, OptionDefinition>} */
 const optionDefinitions = {
   cacheCSS: {
     description: 'Set CSS minification cache size (number of entries, default: 500)',

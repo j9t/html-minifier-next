@@ -36,7 +36,9 @@ import readline from 'readline';
 import { Command, Option } from 'commander';
 
 // Simple case conversion for CLI option names (ASCII-only, no Unicode needed)
+/** @param {string} str */
 const paramCase = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+/** @param {string} str */
 const camelCase = (str) => paramCase(str).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
 // Commander derives its internal option key by applying paramCase then camelCase to the flag name,
@@ -44,6 +46,7 @@ const camelCase = (str) => paramCase(str).replace(/-([a-z])/g, (_, c) => c.toUpp
 // because option definition keys may differ from the result of that round-trip (e.g.,
 // `minifyURLs` → Commander key `minifyUrls`, `noNewlinesBeforeTagClose` → `newlinesBeforeTagClose`),
 // `commanderOptionKey` uses the same paramCase + camelCase path to compute the key Commander will use
+/** @param {string} key */
 const commanderOptionKey = (key) => {
   const pc = paramCase(key);
   return pc.startsWith('no-') ? camelCase(pc.slice(3)) : camelCase(pc);
@@ -67,13 +70,21 @@ const MARK_RESET = process.stderr.isTTY ? '\x1b[0m' : '';
 const program = new Command();
 program.name(pkg.name);
 
+/**
+ * @param {string} message
+ * @returns {never}
+ */
 function fatal(message) {
   console.error(`${MARK_ERROR}${message}${MARK_RESET}`);
   process.exit(1);
 }
 
+// `catch` bindings are `unknown`, and throw values need not be `Error`s
+/** @param {unknown} err */
+const errorMessage = (err) => err instanceof Error ? err.message : String(err);
+
 // Handle broken pipe (e.g., when piping to `head`)
-process.stdout.on('error', (err) => {
+process.stdout.on('error', (/** @type {NodeJS.ErrnoException} */ err) => {
   if (err && err.code === 'EPIPE') {
     process.exit(0);
   }
@@ -99,6 +110,7 @@ process.stdout.on('error', (err) => {
  *    --customAttrSurround "[\"//matchString//\"]"
  */
 
+/** @param {string} value */
 function parseJSON(value) {
   if (value) {
     try {
@@ -112,21 +124,24 @@ function parseJSON(value) {
   }
 }
 
+/** @param {string} value */
 function parseJSONArray(value) {
-  if (value) {
-    value = parseJSON(value);
-    return Array.isArray(value) ? value : [value];
-  }
+  if (!value) return undefined;
+  const parsed = parseJSON(value);
+  return Array.isArray(parsed) ? parsed : [parsed];
 }
 
+/** @param {string} value */
 function parseJSONRegExpArray(value) {
-  value = parseJSONArray(value);
-  return value && value.map(parseRegExp);
+  const values = parseJSONArray(value);
+  return values && values.map(parseRegExp);
 }
 
+/** @param {string} value */
 const parseString = value => value;
 
-const parseValidInt = (optionName) => (value) => {
+/** @param {string} optionName */
+const parseValidInt = (optionName) => (/** @type {string} */ value) => {
   const s = String(value).trim();
   // Accept only non-negative whole integers
   if (!/^\d+$/.test(s)) {
@@ -136,21 +151,34 @@ const parseValidInt = (optionName) => (value) => {
   return num;
 };
 
-// Map option types to CLI parsers
+// Map option types to CLI parsers—`int` is resolved by `getParser`, as its
+// parser closes over the option name for error messages
+/** @type {Record<string, (value: string) => any>} */
 const typeParsers = {
   regexp: parseRegExp,
   regexpArray: parseJSONRegExpArray,
   json: parseJSON,
   jsonObject: parseJSON,
   jsonArray: parseJSONArray,
-  string: parseString,
-  int: (key) => parseValidInt(key)
+  string: parseString
 };
+
+/**
+ * @param {string} key Option definition key, for the `int` parser’s error messages
+ * @param {string} type Option definition type
+ * @returns {(value: string) => any}
+ */
+function getParser(key, type) {
+  const parser = type === 'int' ? parseValidInt(key) : typeParsers[type];
+  if (!parser) {
+    fatal(`No CLI parser for option \`${key}\` (type \`${type}\`)—add the type to \`typeParsers\` in cli.js`);
+  }
+  return parser;
+}
 
 // Configure command-line flags from shared option definitions
 const mainOptionKeys = Object.keys(optionDefinitions);
-mainOptionKeys.forEach(function (key) {
-  const { description, descriptionAffirmative, type } = optionDefinitions[key];
+Object.entries(optionDefinitions).forEach(function ([key, { description, descriptionAffirmative, type }]) {
   const flag = paramCase(key);
   if (type === 'invertedBoolean') {
     // The positive form (to re-enable after a preset/config disables it) is hidden from
@@ -167,8 +195,7 @@ mainOptionKeys.forEach(function (key) {
     }
   } else {
     const cliFlag = '--' + flag + (type === 'json' || type === 'jsonObject' ? ' [value]' : ' <value>');
-    const parser = type === 'int' ? typeParsers.int(key) : typeParsers[type];
-    program.option(cliFlag, description, parser);
+    program.option(cliFlag, description, getParser(key, type));
   }
 });
 program.option('-i --input <file>', 'Specify input file (alternative to positional argument; pair with `--output` for output)');
@@ -178,6 +205,7 @@ program.option('-d --dry', 'Dry run: Process and report statistics without writi
 program.addHelpText('after', '\nBoolean options support a `--no-<flag>` form to disable them, overriding a preset or config file (e.g., `--preset=comprehensive --no-collapse-whitespace`).');
 
 // Lazy import wrapper for HMN
+/** @type {Promise<typeof import('./src/htmlminifier.js').minify> | undefined} */
 let minifyFnPromise;
 async function getMinify() {
   if (!minifyFnPromise) {
@@ -186,11 +214,12 @@ async function getMinify() {
   return minifyFnPromise;
 }
 
+/** @param {string} file */
 function readFile(file) {
   try {
     return fs.readFileSync(file, { encoding: 'utf8' });
   } catch (err) {
-    fatal('Cannot read ' + file + '\n' + err.message);
+    fatal('Cannot read ' + file + '\n' + errorMessage(err));
   }
 }
 
@@ -198,7 +227,7 @@ function readFile(file) {
  * Load config from a file path. Extensions .json, .js, and .mjs are handled
  * directly; for unknown extensions, JSON is tried first, then module import.
  * @param {string} configPath - Path to config file
- * @returns {Promise<object>} Loaded config object
+ * @returns {Promise<Record<string, any>>} Loaded config object
  */
 async function loadConfigFromPath(configPath) {
   const abs = path.resolve(configPath);
@@ -206,24 +235,25 @@ async function loadConfigFromPath(configPath) {
 
   if (ext === '.json') {
     try { return JSON.parse(readFile(abs).replace(/^\uFEFF/, '')); }
-    catch (err) { fatal(`Cannot parse config file as JSON: ${err.message}`); }
+    catch (err) { fatal(`Cannot parse config file as JSON: ${errorMessage(err)}`); }
   }
 
   if (ext === '.js' || ext === '.mjs') {
     // `import()` handles both ESM and CJS .js files—Node resolves the type via the
     // nearest package.json `type` field, same as it does for regular module loading
     try { const mod = await import(pathToFileURL(abs).href); return 'default' in mod ? mod.default : mod; }
-    catch (err) { fatal(`Cannot load config file: ${err.message}`); }
+    catch (err) { fatal(`Cannot load config file: ${errorMessage(err)}`); }
   }
 
   // Unknown extension: Try JSON, then module import
+  /** @type {unknown} */
   let jsonErr;
   try { return JSON.parse(readFile(abs).replace(/^\uFEFF/, '')); }
   catch (err) { jsonErr = err; }
 
   try { const mod = await import(pathToFileURL(abs).href); return 'default' in mod ? mod.default : mod; }
   catch (esmErr) {
-    fatal(`Cannot read the specified config file.\nAs JSON: ${jsonErr.message}\nAs module: ${esmErr.message}`);
+    fatal(`Cannot read the specified config file.\nAs JSON: ${errorMessage(jsonErr)}\nAs module: ${errorMessage(esmErr)}`);
   }
 }
 
@@ -236,10 +266,11 @@ const CONFIG_FILES_DEFAULT = ['html-minifier-next.config.json', 'htmlminifier.co
 
 /**
  * Normalize and validate config object by applying parsers and transforming values.
- * @param {object} config - Raw config object
- * @returns {object} Normalized config object
+ * @param {Record<string, any>} config - Raw config object
+ * @returns {Record<string, any>} Normalized config object
  */
 function normalizeConfig(config) {
+  /** @type {Record<string, any>} */
   const normalized = { ...config };
 
   // Warn about unrecognized config keys—catches typos as well as options removed in earlier versions
@@ -250,13 +281,11 @@ function normalizeConfig(config) {
   });
 
   // Apply parsers to main options
-  mainOptionKeys.forEach(function (key) {
+  Object.entries(optionDefinitions).forEach(function ([key, { type }]) {
     if (key in normalized) {
-      const { type } = optionDefinitions[key];
       if (type !== 'boolean' && type !== 'invertedBoolean') {
-        const parser = type === 'int' ? typeParsers.int(key) : typeParsers[type];
         const value = normalized[key];
-        normalized[key] = parser(typeof value === 'string' ? value : JSON.stringify(value));
+        normalized[key] = getParser(key, type)(typeof value === 'string' ? value : JSON.stringify(value));
       }
     }
   });
@@ -280,6 +309,7 @@ function normalizeConfig(config) {
   return normalized;
 }
 
+/** @type {Record<string, any>} */
 let config = {};
 program.option('-z, --zero', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options)');
 program.option('-I --input-dir <dir>', 'Specify an input directory');
@@ -291,9 +321,17 @@ program.option('-c --config-file <file>', 'Use config file');
 program.version(pkg.version, '-V, --version', 'Output the version number');
 program.helpOption('-h, --help', 'Display help for command');
 
+/**
+ * Progress state shared between the file walk and the indicator; `total` stays
+ * `null` until the background count finishes
+ * @typedef {{current: number, total: number | null}} Progress
+ */
+
 (async () => {
+  /** @type {string} */
   let content;
   let filesProvided = false;
+  /** @type {string[]} */
   let capturedFiles = [];
   await program.arguments('[files...]').action(function (files) {
     capturedFiles = files;
@@ -329,11 +367,12 @@ program.helpOption('-h, --help', 'Display help for command');
       console.error('Note: `--zero` was ignored—it can only be used on its own, to minify the current folder at comprehensive settings.');
     } else {
       const cwd = process.cwd();
+      const [execPath = '', scriptPath = ''] = process.argv;
       const commandName = process.env.npm_command === 'exec'
         ? 'npx html-minifier-next'
-        : process.argv[1].endsWith('.js')
-          ? `${path.basename(process.argv[0])} ${process.argv[1]}`
-          : path.basename(process.argv[1]);
+        : scriptPath.endsWith('.js')
+          ? `${path.basename(execPath)} ${scriptPath}`
+          : path.basename(scriptPath);
 
       process.stderr.write(
         `${MARK_WARNING}Zero-config mode minifies all HTML files in the current folder and its subfolders (${cwd}) in place, using comprehensive settings. If you want to compare results and be able to revert, do this under version control.${MARK_RESET}\n` +
@@ -342,7 +381,7 @@ program.helpOption('-h, --help', 'Display help for command');
       );
 
       const answer = await new Promise((resolve) => {
-        const rl = readline.createInterface({ input: process.stdin, output: null });
+        const rl = readline.createInterface({ input: process.stdin });
         rl.once('line', (line) => {
           resolve(line.trim().toLowerCase());
           rl.close();
@@ -363,6 +402,7 @@ program.helpOption('-h, --help', 'Display help for command');
       const ignorePatterns = ['node_modules'];
 
       const showProgress = process.stderr.isTTY;
+      /** @type {Progress | null} */
       let progress = null;
       if (showProgress) {
         progress = { current: 0, total: null };
@@ -406,6 +446,7 @@ program.helpOption('-h, --help', 'Display help for command');
   }
 
   function createOptions() {
+    /** @type {Record<string, any>} */
     const options = {};
 
     // Priority order: preset < config < CLI
@@ -427,8 +468,7 @@ program.helpOption('-h, --help', 'Display help for command');
     });
 
     // 3. Apply CLI options (overrides config and preset)
-    mainOptionKeys.forEach(function (key) {
-      const { type } = optionDefinitions[key];
+    Object.entries(optionDefinitions).forEach(function ([key, { type }]) {
       const ck = commanderOptionKey(key);
       if (program.getOptionValueSource(ck) === 'cli') {
         const val = programOptions[ck];
@@ -441,7 +481,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
     // 4. Surface minifier diagnostics when verbose
     if (programOptions.verbose || programOptions.dry) {
-      options.log = message => {
+      options.log = (/** @type {unknown} */ message) => {
         // The hook carries the minifier’s per-call timing as well, which the run's own
         // per-file statistics already cover
         if (typeof message === 'string' && message.startsWith('minified in: ')) {
@@ -462,6 +502,7 @@ program.helpOption('-h, --help', 'Display help for command');
     return options;
   }
 
+  /** @param {Record<string, unknown>} minifierOptions */
   function getActiveOptionsDisplay(minifierOptions) {
     const presetName = programOptions.preset || config.preset;
     if (presetName) {
@@ -475,6 +516,10 @@ program.helpOption('-h, --help', 'Display help for command');
     }
   }
 
+  /**
+   * @param {string} original
+   * @param {string} minified
+   */
   function calculateStats(original, minified) {
     const originalSize = Buffer.byteLength(original, 'utf8');
     const minifiedSize = Buffer.byteLength(minified, 'utf8');
@@ -489,24 +534,31 @@ program.helpOption('-h, --help', 'Display help for command');
   async function printCacheStats() {
     const { getCacheStats } = await import('./src/htmlminifier.js');
     const cacheStats = getCacheStats();
+    /** @type {Record<string, string>} */
     const labels = { css: 'CSS', js: 'JS', svg: 'SVG' };
 
-    const lines = Object.keys(labels).reduce((acc, key) => {
-      const { gets, hits, size, limit } = cacheStats[key];
-      if (gets === 0) return acc;
+    /** @type {string[]} */
+    const lines = [];
+    for (const [key, { gets, hits, size, limit }] of Object.entries(cacheStats)) {
+      if (gets === 0) continue;
       const misses = gets - hits;
-      acc.push(`  ${labels[key]} cache: ${hits.toLocaleString()} hit${hits === 1 ? '' : 's'}, ${misses.toLocaleString()} miss${misses === 1 ? '' : 'es'}, ${size.toLocaleString()}/${limit.toLocaleString()} entries`);
-      return acc;
-    }, []);
+      lines.push(`  ${labels[key]} cache: ${hits.toLocaleString()} hit${hits === 1 ? '' : 's'}, ${misses.toLocaleString()} miss${misses === 1 ? '' : 'es'}, ${size.toLocaleString()}/${limit.toLocaleString()} entries`);
+    }
 
     if (lines.length === 0) return;
     console.error('Cache stats:');
     lines.forEach(line => console.error(line));
   }
 
+  /**
+   * @param {string} inputFile
+   * @param {string} outputFile
+   * @param {boolean} [isDryRun]
+   * @param {boolean} [isVerbose]
+   */
   async function processFile(inputFile, outputFile, isDryRun = false, isVerbose = false) {
     const data = await fs.promises.readFile(inputFile, { encoding: 'utf8' }).catch(err => {
-      fatal('Cannot read ' + inputFile + '\n' + err.message);
+      fatal('Cannot read ' + inputFile + '\n' + errorMessage(err));
     });
 
     let minified;
@@ -514,7 +566,7 @@ program.helpOption('-h, --help', 'Display help for command');
       const minify = await getMinify();
       minified = await minify(data, createOptions());
     } catch (err) {
-      fatal('Minification error on ' + inputFile + '\n' + err.message);
+      fatal('Minification error on ' + inputFile + '\n' + errorMessage(err));
     }
 
     const stats = calculateStats(data, minified);
@@ -535,6 +587,10 @@ program.helpOption('-h, --help', 'Display help for command');
     return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
   }
 
+  /**
+   * @param {string} fileExt
+   * @returns {string[]}
+   */
   function parseFileExtensions(fileExt) {
     if (!fileExt) return [];
     if (fileExt.trim() === '*') return ['*'];
@@ -545,6 +601,10 @@ program.helpOption('-h, --help', 'Display help for command');
     return [...new Set(list)];
   }
 
+  /**
+   * @param {string} filename
+   * @param {string[]} fileExtensions
+   */
   function shouldProcessFile(filename, fileExtensions) {
     // Wildcard: process all files
     if (fileExtensions.includes('*')) {
@@ -589,6 +649,14 @@ program.helpOption('-h, --help', 'Display help for command');
     });
   }
 
+  /**
+   * @param {string} dir
+   * @param {string[]} extensions
+   * @param {string | undefined} skipRootAbs
+   * @param {string[]} ignorePatterns
+   * @param {string} baseDir
+   * @returns {Promise<number>}
+   */
   async function countFiles(dir, extensions, skipRootAbs, ignorePatterns, baseDir) {
     let count = 0;
 
@@ -624,6 +692,10 @@ program.helpOption('-h, --help', 'Display help for command');
     return count;
   }
 
+  /**
+   * @param {number} current
+   * @param {number | null} total
+   */
   function updateProgress(current, total) {
     // Clear the line first, then write simple progress
     process.stderr.write(`\r\x1b[K`);
@@ -642,7 +714,15 @@ program.helpOption('-h, --help', 'Display help for command');
   }
 
   // Utility: concurrency runner
+  /**
+   * @template T, R
+   * @param {T[]} items
+   * @param {number} limit
+   * @param {(item: T, index: number) => Promise<R>} worker
+   * @returns {Promise<R[]>}
+   */
   async function runWithConcurrency(items, limit, worker) {
+    /** @type {R[]} */
     const results = new Array(items.length);
     let next = 0;
     let active = 0;
@@ -650,8 +730,9 @@ program.helpOption('-h, --help', 'Display help for command');
       const launch = () => {
         while (active < limit && next < items.length) {
           const current = next++;
+          const item = /** @type {T} */ (items[current]);
           active++;
-          Promise.resolve(worker(items[current], current))
+          Promise.resolve(worker(item, current))
             .then((res) => {
               results[current] = res;
               active--;
@@ -667,7 +748,16 @@ program.helpOption('-h, --help', 'Display help for command');
     });
   }
 
+  /**
+   * @param {string} dir
+   * @param {string[]} extensions
+   * @param {string | undefined} skipRootAbs
+   * @param {string[]} ignorePatterns
+   * @param {string} baseDir
+   * @returns {Promise<string[]>}
+   */
   async function collectFiles(dir, extensions, skipRootAbs, ignorePatterns, baseDir) {
+    /** @type {string[]} */
     const out = [];
     const entries = await fs.promises.readdir(dir).catch(() => []);
     for (const name of entries) {
@@ -689,6 +779,17 @@ program.helpOption('-h, --help', 'Display help for command');
     return out;
   }
 
+  /**
+   * @param {string} inputDir
+   * @param {string} outputDir
+   * @param {string | string[]} extensions
+   * @param {boolean} [isDryRun]
+   * @param {boolean} [isVerbose]
+   * @param {string} [skipRootAbs]
+   * @param {Progress | null} [progress]
+   * @param {string[]} [ignorePatterns]
+   * @param {string | null} [baseDir]
+   */
   async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs, progress = null, ignorePatterns = [], baseDir = null) {
     // If first call provided a string, normalize once; otherwise assume pre-parsed array
     if (typeof extensions === 'string') {
@@ -710,7 +811,7 @@ program.helpOption('-h, --help', 'Display help for command');
       const outDir = path.dirname(outFile);
       if (!isDryRun) {
         await fs.promises.mkdir(outDir, { recursive: true }).catch(err => {
-          fatal('Cannot create directory ' + outDir + '\n' + err.message);
+          fatal('Cannot create directory ' + outDir + '\n' + errorMessage(err));
         });
       }
       const stats = await processFile(inputFile, outFile, isDryRun, isVerbose);
@@ -737,7 +838,7 @@ program.helpOption('-h, --help', 'Display help for command');
       const minify = await getMinify();
       minified = await minify(content, minifierOptions);
     } catch (err) {
-      fatal('Minification error:\n' + err.message);
+      fatal('Minification error:\n' + errorMessage(err));
     }
 
     const stats = calculateStats(content, minified);
@@ -766,7 +867,7 @@ program.helpOption('-h, --help', 'Display help for command');
         await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
         await fs.promises.writeFile(programOptions.output, minified, { encoding: 'utf8' });
       } catch (err) {
-        fatal('Cannot write ' + programOptions.output + '\n' + err.message);
+        fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
       }
       return;
     }
@@ -831,6 +932,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
       // Set up progress indicator (only in TTY and when not verbose/dry)
       const showProgress = process.stderr.isTTY && !isVerbose;
+      /** @type {Progress | null} */
       let progress = null;
 
       // Parse ignore patterns
@@ -843,7 +945,7 @@ program.helpOption('-h, --help', 'Display help for command');
           fatal(`${inputDir} is not a directory—to minify a single file, use \`--input\`/\`--output\`: html-minifier-next [options] -i ${inputDir} -o <output-file>`);
         }
       } catch (err) {
-        fatal('Cannot read directory ' + inputDir + '\n' + err.message);
+        fatal('Cannot read directory ' + inputDir + '\n' + errorMessage(err));
       }
 
       // Resolve base directory for consistent path comparisons
@@ -914,13 +1016,13 @@ program.helpOption('-h, --help', 'Display help for command');
     const outputs = new Array(inputs.length);
 
     await runWithConcurrency(inputs, concurrency, async (file, idx) => {
-      const data = await fs.promises.readFile(file, 'utf8').catch(err => fatal('Cannot read ' + file + '\n' + err.message));
+      const data = await fs.promises.readFile(file, 'utf8').catch(err => fatal('Cannot read ' + file + '\n' + errorMessage(err)));
       const minify = await getMinify();
       let out;
       try {
         out = await minify(data, minifierOptions);
       } catch (err) {
-        fatal('Minification error on ' + file + '\n' + err.message);
+        fatal('Minification error on ' + file + '\n' + errorMessage(err));
       }
       originals[idx] = data;
       outputs[idx] = out;
@@ -953,7 +1055,7 @@ program.helpOption('-h, --help', 'Display help for command');
         await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
         await fs.promises.writeFile(programOptions.output, minifiedCombined, 'utf8');
       } catch (err) {
-        fatal('Cannot write ' + programOptions.output + '\n' + err.message);
+        fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
       }
     } else {
       process.stdout.write(minifiedCombined);
@@ -962,7 +1064,7 @@ program.helpOption('-h, --help', 'Display help for command');
   } else { // Minifying input coming from STDIN
     content = '';
     process.stdin.setEncoding('utf8');
-    process.stdin.on('data', function (data) {
+    process.stdin.on('data', function (/** @type {string} */ data) {
       content += data;
     }).on('end', async function() {
       await writeMinify();

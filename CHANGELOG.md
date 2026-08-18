@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.6.1] - 2026-08-18
+
+### Fixed
+
+* Fixed CLI error messages reading `undefined` when the thrown value was not an `Error`
+
+### Changed
+
+* Extended ESLint to the `backtest` scripts and resolved reports
+* Extended type checking beyond `src/` to `cli.js`, `scripts/`, and build configuration
+
 ## [7.6.0] - 2026-08-18
 
 ### Added

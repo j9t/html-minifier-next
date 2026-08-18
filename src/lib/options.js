@@ -191,7 +191,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     // A string carries no configuration for these options. The CLI parses config
     // values as JSON first, so only a value that is not JSON reaches this from
     // there. (`minifyURLs` is deliberately excluded—there, a string names the site.)
-    const definition = /** @type {Record<string, {type?: string}>} */ (optionDefinitions)[key];
+    const definition = optionDefinitions[key];
     if (typeof option === 'string' && definition?.type === 'jsonObject') {
       const message = `HTML Minifier Next: Ignoring \`${key}\`—it takes a boolean or an object, not a string (“${option}”)`;
       if (!stringValuesWarned.has(message)) {

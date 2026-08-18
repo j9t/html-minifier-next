@@ -2,12 +2,21 @@
   // https://aka.ms/tsconfig
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.base.json",
+  // Everything that is checked but not emitted: type tests, CLI, and
+  // project-internal scripts and build configuration (tsconfig.json
+  // covers src; backtest is excluded as a development-only harness)
   "include": [
-    "./test/**/*.ts"
+    "./cli.js",
+    "./eslint.config.js",
+    "./scripts/**/*.js",
+    "./test/**/*.ts",
+    "./vite.config.js"
   ],
   "compilerOptions": {
-    // No Node types—tests don’t use `process`/`Buffer` directly
-    "types": [],
+    // Node type definitions for `process`, `Buffer`, etc.
+    "types": ["node"],
+    // JavaScript support
+    "checkJs": true,
     // Don’t emit files, just check types
     "noEmit": true
   }
