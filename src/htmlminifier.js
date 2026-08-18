@@ -1107,13 +1107,13 @@ async function minifyHTML(value, options, partialMarkup) {
 
           if (options.minifyCSS !== identity) {
             options.minifyCSS = (function (/** @type {ProcessedOptions['minifyCSS']} */ fn) {
-              return function (/** @type {string} */ text, /** @type {string | undefined} */ type) {
+              return function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {Set<string> | undefined} */ usedSymbols) {
                 text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                   const chunks = ignoredCustomMarkupChunks[+index];
                   return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
                 });
 
-                return fn(text, type);
+                return fn(text, type, usedSymbols);
               };
             })(options.minifyCSS);
           }
