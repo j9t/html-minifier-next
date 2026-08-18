@@ -71,7 +71,7 @@ describe('Utils', () => {
     });
   });
 
-  describe('hasRiskyQuantifiers', () => {
+  describe('`hasRiskyQuantifiers`', () => {
     test('A lazy scan up to a literal terminator is linear', () => {
       // The shipped `ignoreCustomFragments` defaults
       assert.strictEqual(hasRiskyQuantifiers(/<%[\s\S]*?%>/.source), false);
