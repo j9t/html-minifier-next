@@ -3,8 +3,8 @@
 // Regression backtest for HTML Minifier Next.
 //
 // Walks Git history and runs the minifier from each sampled commit against the local
-// corpus (`backtest/input`), reporting how output size and median processing time
-// changed from commit to commit. Counterpart to `benchmark.js`, which measures the
+// corpus (backtest/input), reporting how output size and median processing time
+// changed from commit to commit. Counterpart to benchmark.js, which measures the
 // current working tree rather than history.
 //
 // For each commit it checks out src and package.json at that revision and reads the
@@ -20,7 +20,7 @@
 //   npm run backtest 500/10: Test the last COUNT commits, sampling every STEPth commit
 //
 // The corpus is downloaded on first run (sources listed in sites.json) and shared
-// with `benchmark.js`.
+// with benchmark.js.
 
 import { spawn, fork } from 'child_process';
 import { createWriteStream } from 'fs';

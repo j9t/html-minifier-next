@@ -3,8 +3,8 @@
 // Working-tree benchmark for HTML Minifier Next.
 //
 // Times the current working-tree minifier against the local corpus
-// (`backtest/input`) and reports per-file output size and median processing time.
-// Unlike `backtest.js` (which walks Git history), this measures the code exactly as
+// (backtest/input) and reports per-file output size and median processing time.
+// Unlike backtest.js (which walks Git history), this measures the code exactly as
 // it is right now—ideal for A/B testing a branch against a saved baseline.
 //
 // Usage (from the backtest folder):
@@ -14,7 +14,7 @@
 //   npm run benchmark -- --iterations=10
 //   npm run benchmark -- --config=path/to/config.json
 //
-// The corpus is shared with `backtest.js`; run `npm run backtest` once to download it.
+// The corpus is shared with backtest.js; run `npm run backtest` once to download it.
 
 import { execSync } from 'child_process';
 import fs from 'fs/promises';

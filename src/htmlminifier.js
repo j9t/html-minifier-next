@@ -63,7 +63,7 @@ import { processOptions } from './lib/options.js';
 /**
  * @typedef {Object} HTMLAttribute
  *  Representation of an attribute from the HTML parser.
- *  Internal counterpart: `HTMLAttribute` in `lib/attributes.js`—keep in sync.
+ *  Internal counterpart: `HTMLAttribute` in lib/attributes.js—keep in sync.
  *
  * @prop {string} name
  * @prop {string} [value]

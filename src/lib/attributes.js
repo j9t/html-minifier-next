@@ -25,7 +25,7 @@ import { identity, isThenable } from './utils.js';
 
 /**
  * @typedef {{ name: string, value?: string | undefined, quote?: string, customAssign?: string, customOpen?: string, customClose?: string }} HTMLAttribute
- *  Internal counterpart of the public typedef in `htmlminifier.js`—keep in sync.
+ *  Internal counterpart of the public typedef in htmlminifier.js—keep in sync.
  */
 
 // Lazy-load entities (used for `decodeEntities` and event-handler attribute decode before `minifyJS`)
