@@ -1,6 +1,7 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
+import { collectUsedSymbols } from '../src/lib/unused-css.js';
 
 describe('CSS and JS', () => {
   test('CSS minification', async () => {
@@ -802,6 +803,517 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('body{color:red}'), 'CSS should be minified');
     assert.ok(!result.includes('console.log'), 'Console should be dropped');
     assert.ok(result.includes('function test(){}'), 'Empty function after console removal');
+  });
+
+  test('Reports invalid CSS Lightning CSS flags under error recovery', async () => {
+    const input = '<style>@property --p{syntax:"<percentage>";inherits:false;initial-value:0}.a{color:red}</style>';
+    const logs = [];
+    const output = await minify(input, { minifyCSS: true, log: message => logs.push(String(message)) });
+
+    assert.ok(output.includes('.a{color:red}'), 'Valid rules should still be minified');
+    assert.ok(!output.includes('@property'), 'Invalid rule should be skipped, as browsers skip it');
+    assert.ok(
+      logs.some(message => message.startsWith('Warning: Lightning CSS reported invalid CSS')),
+      'The rule should be reported through `log`'
+    );
+  });
+
+  test('Reports invalid CSS Lightning CSS keeps, without claiming it was dropped', async () => {
+    // Lightning CSS passes an unknown at-rule through and still warns, so the
+    // wording may not promise the rule is gone
+    const input = '<style>@unknown-thing{foo:bar}.a{color:red}</style>';
+    const logs = [];
+    const output = await minify(input, { minifyCSS: true, log: message => logs.push(String(message)) });
+
+    assert.ok(output.includes('@unknown-thing'), 'The rule is kept, so the report must not say it was skipped');
+    assert.ok(
+      logs.some(message => message.startsWith('Warning: Lightning CSS reported invalid CSS')),
+      'The rule should still be reported through `log`'
+    );
+    assert.ok(!logs.some(message => message.includes('skipped')), 'Nothing was skipped here');
+  });
+
+  test('Reports invalid CSS once per document, and for every document', async () => {
+    const invalid = '@unknown-thing{foo:bar}';
+    const collect = sink => message => {
+      if (String(message).includes('reported invalid CSS')) {
+        sink.push(String(message));
+      }
+    };
+
+    // One defect across two style sheets: the document should hear about it once
+    const perDocument = [];
+    await minify(
+      `<style>${invalid}.a{color:red}</style><style>${invalid}.b{color:blue}</style><p class="a b"></p>`,
+      { minifyCSS: true, log: collect(perDocument) }
+    );
+    assert.strictEqual(perDocument.length, 1, 'One defect, one warning');
+
+    // The same document four times over, so every pass but the first is a cache
+    // hit: A hit must not swallow the warning for the document that hit it, or a
+    // batch would report the first file and pass the rest off as clean
+    const perBatch = [];
+    const options = { minifyCSS: true, log: collect(perBatch) };
+    for (let pass = 0; pass < 4; pass++) {
+      await minify(`<style>${invalid}.c{color:red}</style><p class="c"></p>`, options);
+    }
+    assert.strictEqual(perBatch.length, 4, 'Every document should hear about its own invalid rule');
+  });
+
+  describe('Object-valued options handed a string', () => {
+    // `'false'` used to switch minification on: Any non-empty string is truthy, and
+    // these options read a non-object as `{}`
+    const cases = [
+      ['minifyCSS', '<style>.a { color : red }</style>'],
+      ['minifyJS', '<script>var x  =  1</script>'],
+      ['minifySVG', '<svg><circle cx="1.00"/></svg>']
+    ];
+
+    for (const [key, input] of cases) {
+      test(`\`${key}\` refuses a string rather than reading it as “on”`, async () => {
+        const logs = [];
+        const output = await minify(input, { [key]: 'false', log: message => logs.push(String(message)) });
+
+        assert.strictEqual(output, input, `\`${key}: "false"\` must not enable minification`);
+        assert.ok(
+          logs.some(message => message.includes(key) && message.includes('string')),
+          `The rejected value should be reported (got ${JSON.stringify(logs)})`
+        );
+      });
+    }
+
+    test('`minifyURLs` still takes a string, which names the site', async () => {
+      // The one object-valued option where a string carries meaning, so it is
+      // deliberately left out of the check above
+      const input = '<a href="https://example.com/x/y.html">y</a>';
+
+      assert.strictEqual(
+        await minify(input, { minifyURLs: 'https://example.com/x/' }),
+        '<a href="y.html">y</a>'
+      );
+    });
+  });
+
+  // Unused-CSS removal tests
+  describe('Unused CSS removal', () => {
+    const style = css => `<!doctype html><html><head><style>${css}</style></head><body>`;
+    const styleOf = html => (html.match(/<style>([\s\S]*?)<\/style>/) ?? ['', ''])[1];
+
+    test('Removes rules the document never references', async () => {
+      const input = style('.used{color:red}.unused{color:red}#gone{color:red}#kept{color:red}') +
+        '<p id="kept" class="used"></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.used'), 'Referenced class should be kept');
+      assert.ok(styleOf(output).includes('#kept'), 'Referenced ID should be kept');
+      assert.ok(!styleOf(output).includes('.unused'), 'Unreferenced class should be removed');
+      assert.ok(!styleOf(output).includes('#gone'), 'Unreferenced ID should be removed');
+    });
+
+    test('Requires `minifyCSS`, and says so', async () => {
+      const input = style('.unused{color:red}') + '<p></p>';
+      const logs = [];
+      const output = await minify(input, { removeUnusedCSS: true, log: message => logs.push(String(message)) });
+
+      assert.ok(styleOf(output).includes('.unused'), 'Without `minifyCSS` nothing should be removed');
+      assert.ok(
+        logs.some(message => message.includes('removeUnusedCSS') && message.includes('requires')),
+        'Silently doing nothing would be the surprise, so it should warn'
+      );
+      assert.ok(
+        logs.some(message => message.includes('--minify-css')),
+        'The warning should name the flag a CLI user would reach for'
+      );
+    });
+
+    test('Refuses a string value instead of reading it as “on”', async () => {
+      // A configuration file holding `"false"` would otherwise delete rules
+      const input = style('.unused{color:red}') + '<p></p>';
+      const logs = [];
+      const output = await minify(input, {
+        minifyCSS: true,
+        removeUnusedCSS: 'false',
+        log: message => logs.push(String(message))
+      });
+
+      assert.ok(styleOf(output).includes('.unused'), 'A string must not enable the option');
+      assert.ok(
+        logs.some(message => message.includes('removeUnusedCSS') && message.includes('string')),
+        'The rejected value should be reported'
+      );
+    });
+
+    test('Reports that a `minifyCSS` function takes over', async () => {
+      // The removal rides along with Lightning CSS, which a custom function replaces
+      const input = style('.unused{color:red}') + '<p></p>';
+      const logs = [];
+      const output = await minify(input, {
+        minifyCSS: text => text,
+        removeUnusedCSS: true,
+        log: message => logs.push(String(message))
+      });
+
+      assert.ok(styleOf(output).includes('.unused'), 'A `minifyCSS` function minifies CSS itself');
+      assert.ok(
+        logs.some(message => message.includes('removeUnusedCSS') && message.includes('function')),
+        'The combination should warn rather than pass silently'
+      );
+    });
+
+    test('Keeps symbols referenced from ID references and `data-*` attributes', async () => {
+      const input = style('.late{color:red}#target{color:red}') +
+        '<button aria-controls="target" data-toggle-class="late"></button>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('#target'), '`aria-controls` should count as a reference');
+      assert.ok(styleOf(output).includes('.late'), '`data-*` values should count as references');
+    });
+
+    test('Keeps symbols named in inline scripts unless `scripts` is disabled', async () => {
+      const input = style('.js-only{color:red}') +
+        '<p></p><script>document.body.classList.add("js-only")</script>';
+
+      const guarded = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+      assert.ok(styleOf(guarded).includes('.js-only'), 'Inline script references should be kept by default');
+
+      const unguarded = await minify(input, { minifyCSS: true, removeUnusedCSS: { scripts: false } });
+      assert.ok(!styleOf(unguarded).includes('.js-only'), '`scripts: false` should drop the guard');
+    });
+
+    test('Keeps hyphen-leading class names found in scripts and `data-*` values', async () => {
+      // `.-mt-4` and the like are ordinary CSS identifiers a script hands to `classList`
+      const cases = [
+        ['.-foo{color:red}', '<script>document.body.classList.add("-foo")</script>', '.-foo'],
+        ['.-mt-4{margin-top:-1rem}', '<script>el.classList.add("-mt-4")</script>', '.-mt-4'],
+        ['.--foo{color:red}', '<script>el.classList.add("--foo")</script>', '.--foo'],
+        ['.-foo{color:red}', '<p data-toggle="-foo"></p>', '.-foo'],
+        // Two hyphens start an identifier whatever follows them
+        ['.--1foo{color:red}', '<script>el.classList.add("--1foo")</script>', '.--1foo'],
+        ['.---foo{color:red}', '<script>el.classList.add("---foo")</script>', '.---foo'],
+        ['.--1foo{color:red}', '<p data-toggle="--1foo"></p>', '.--1foo']
+      ];
+
+      for (const [css, markup, expected] of cases) {
+        const output = await minify(style(css) + '<p></p>' + markup, { minifyCSS: true, removeUnusedCSS: true });
+        assert.ok(styleOf(output).includes(expected), `${markup} should keep ${expected}`);
+      }
+
+      // Hyphen-leading names nothing references should still go
+      for (const name of ['-gone', '--gone', '---gone']) {
+        const unused = await minify(style(`.${name}{color:red}`) + '<p></p>', {
+          minifyCSS: true,
+          removeUnusedCSS: true
+        });
+        assert.ok(!styleOf(unused).includes(`.${name}`), `Unreferenced .${name} should still be removed`);
+      }
+    });
+
+    test('Honors the safelist, as strings and as regular expressions', async () => {
+      const input = style('.keep-me{color:red}.keep-prefix-a{color:red}.drop{color:red}') + '<p></p>';
+      const output = await minify(input, {
+        minifyCSS: true,
+        removeUnusedCSS: { safelist: ['keep-me', /^keep-prefix-/] }
+      });
+
+      assert.ok(styleOf(output).includes('.keep-me'), 'Safelisted string should be kept');
+      assert.ok(styleOf(output).includes('.keep-prefix-a'), 'Safelisted pattern should be kept');
+      assert.ok(!styleOf(output).includes('.drop'), 'Unsafelisted symbol should still be removed');
+    });
+
+    test('Never removes `@keyframes` or `@counter-style` a class name collides with', async () => {
+      const input = style('@keyframes spin{from{opacity:0}}.spin{animation:spin 1s}' +
+        '@counter-style tick{system:cyclic}.tick{list-style:tick}') + '<p></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('@keyframes spin'), '`@keyframes` must survive a colliding class name');
+      assert.ok(styleOf(output).includes('@counter-style tick'), '`@counter-style` must survive a colliding class name');
+    });
+
+    test('Leaves `style` and `media` attributes alone', async () => {
+      const input = '<p style="color:red" class="used"></p><link media="(min-width:0)" rel="stylesheet" href="a.css">';
+      const baseline = await minify(input, { minifyCSS: true });
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      // Attributes carry declarations and media queries, never selectors
+      assert.strictEqual(output, baseline);
+    });
+
+    test('Does not leak one document’s result into another through the CSS cache', async () => {
+      const sheet = '.alpha{color:red}.beta{color:red}';
+      const options = { minifyCSS: true, removeUnusedCSS: true };
+
+      const first = await minify(style(sheet) + '<p class="alpha"></p>', options);
+      const second = await minify(style(sheet) + '<p class="beta"></p>', options);
+
+      assert.ok(styleOf(first).includes('.alpha') && !styleOf(first).includes('.beta'));
+      assert.ok(styleOf(second).includes('.beta'), 'Second document must not inherit the first document’s output');
+      assert.ok(!styleOf(second).includes('.alpha'));
+    });
+
+    test('Resolves escaped identifiers when matching markup', async () => {
+      const input = style('.md\\:flex{display:flex}.lg\\:grid{display:grid}') + '<p class="md:flex"></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('flex'), 'Escaped class present in markup should be kept');
+      assert.ok(!styleOf(output).includes('grid'), 'Escaped class absent from markup should be removed');
+    });
+
+    test('Survives out-of-range escapes instead of throwing', async () => {
+      // `\FFFFFF` exceeds the maximum code point; per CSS Syntax it resolves to U+FFFD
+      const input = style(String.raw`.\FFFFFF{color:red}.b{color:red}`) + '<p class="b"></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.b'), 'Referenced class should survive an out-of-range escape');
+    });
+
+    test('Still applies when a custom fragment is present', async () => {
+      // `<%…%>` is matched by the default `ignoreCustomFragments`, which swaps in a
+      // wrapper around `minifyCSS` that must keep forwarding the symbol set
+      const input = style('.used{color:red}.unused{color:red}') + '<p class="used"></p><%= tpl %>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.used'), 'Referenced class should be kept');
+      assert.ok(!styleOf(output).includes('.unused'), 'Custom fragments must not disable the option');
+    });
+
+    test('Reads raw-text elements whose end tag carries whitespace', async () => {
+      const input = style('.js-x{color:red}') +
+        '<p></p><script>document.body.classList.add("js-x")</script >';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.js-x'), '`</script >` should still be recognized as an end tag');
+    });
+
+    test('Reads raw-text elements whose end tag carries attributes or a slash', async () => {
+      // Browsers close the element on all of these, so the script body still runs
+      const endTags = ['</script\t\n bar>', '</script foo="bar">', '</script/>', '</script >trailing'];
+
+      for (const endTag of endTags) {
+        const input = style('.js-x{color:red}') +
+          `<p></p><script>document.body.classList.add("js-x")${endTag}`;
+        const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+        assert.ok(styleOf(output).includes('.js-x'), `“${endTag}” should be recognized as an end tag`);
+      }
+    });
+
+    test('Does not mistake a longer tag name for a raw-text tag', async () => {
+      // `</scriptfoo>` closes nothing, so what follows is still script content
+      const input = style('.js-x{color:red}') +
+        '<p></p><script>void 0</scriptfoo>document.body.classList.add("js-x")';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.js-x'), 'Script content should run past a non-matching end tag');
+
+      // Likewise, `<styles>` is a different element and must not be stripped as a style sheet
+      const other = '<styles class="kept"></styles>' + style('.kept{color:red}') + '<p></p>';
+      assert.ok(
+        styleOf(await minify(other, { minifyCSS: true, removeUnusedCSS: true })).includes('.kept'),
+        '`<styles>` must not be treated as a `style` element'
+      );
+    });
+
+    test('Decodes character references in attribute values', async () => {
+      const cases = [
+        ['.used{color:red}', '<p class="us&#101;d"></p>', '.used'],
+        ['.used{color:red}', '<p class="us&#x65;d"></p>', '.used'],
+        ['#tgt{color:red}', '<p id="t&#103;t"></p>', '#tgt'],
+        ['.two{color:red}', '<p class="one&#32;two"></p>', '.two']
+      ];
+
+      for (const [css, markup, expected] of cases) {
+        const output = await minify(style(css) + markup, { minifyCSS: true, removeUnusedCSS: true });
+        assert.ok(styleOf(output).includes(expected), `${markup} should reference ${expected}`);
+      }
+
+      // A decoded value must not turn into a match for something else
+      const unrelated = await minify(style('.gone{color:red}') + '<p class="us&#101;d"></p>', {
+        minifyCSS: true,
+        removeUnusedCSS: true
+      });
+      assert.ok(!styleOf(unrelated).includes('.gone'), 'Unreferenced rules should still be removed');
+    });
+
+    test('Keeps offsets aligned when lowercasing changes length', async () => {
+      // U+0130 lowercases to two code units, which would shift every later offset—and
+      // a shifted strip leaves `class` glued to the preceding text, so it stops parsing
+      const input = '<p title="\u0130\u0130\u0130">x</p>' +
+        '<style>.used{color:red}.gone{color:red}</style><p class="used"></p>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(styleOf(output).includes('.used'), 'Referenced rule must survive a length-changing character');
+      assert.ok(!styleOf(output).includes('.gone'), 'Unreferenced rule should still be removed');
+    });
+
+    test('Scans raw-text elements in linear time', () => {
+      // A regular expression permissive enough for malformed end tags backtracked
+      // quadratically over near-matches; compare growth rather than absolute time,
+      // which would depend on the machine, and keep the best of several runs, as a
+      // lone sample largely reports what else the machine was doing. No `>` may
+      // follow the repetitions—one lets the pattern succeed immediately, which is
+      // what makes the near-matches pathological rather than merely long.
+      const measure = (/** @type {number} */ count) => {
+        const input = '<style>' + '</style\t'.repeat(count);
+        let best = Infinity;
+        for (let run = 0; run < 3; run++) {
+          const started = performance.now();
+          collectUsedSymbols(input, true);
+          best = Math.min(best, performance.now() - started);
+        }
+        return best;
+      };
+
+      measure(1000); // Warm up, so the first timed run is not the one that compiles
+      const small = measure(8000);
+      const large = measure(16000);
+
+      // Doubling the input doubles a linear scan but quadruples a quadratic one; the
+      // constant absorbs timer noise, which dominates when both runs are near-instant
+      assert.ok(
+        large <= small * 3 + 50,
+        `Scanning grew from ${small.toFixed(1)} ms to ${large.toFixed(1)} ms on twice the input`
+      );
+    });
+
+    test('Stops stripping a stylesheet at its own end tag, however malformed', async () => {
+      // A missed end tag would let the body run on to the next one, swallowing markup
+      const input = '<style>.a{color:red}</style bar><p class="a b"></p><style>.b{color:red}</style>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(output.includes('.a{color:red}'), 'Class before the second stylesheet should be kept');
+      assert.ok(output.includes('.b{color:red}'), 'Class after the first stylesheet should be kept');
+    });
+
+    test('Honors a safelist entry that is a global regular expression', async () => {
+      const input = style('.js-a{color:red}.js-b{color:red}.js-c{color:red}') + '<p></p>';
+      const output = await minify(input, {
+        minifyCSS: true,
+        removeUnusedCSS: { safelist: [/^js-/g] }
+      });
+
+      // A stateful pattern would otherwise match only every other symbol
+      for (const name of ['.js-a', '.js-b', '.js-c']) {
+        assert.ok(styleOf(output).includes(name), `${name} should be safelisted`);
+      }
+    });
+
+    test('Keeps IDs reached through a fragment URL', async () => {
+      // `:target` rules and SVG sprites name their element by fragment, never by
+      // an `id` attribute on the element doing the referencing
+      const cases = [
+        ['#sec:target{color:red}', '<a href="#sec">go</a>', '#sec'],
+        ['#ic{fill:red}', '<svg><use href="#ic"/></svg>', '#ic'],
+        ['#ic{fill:red}', '<svg><use xlink:href="#ic"/></svg>', '#ic'],
+        ['#m{color:red}', '<img usemap="#m">', '#m'],
+        // Presentation attributes reach a paint server the same way `style` does
+        ['#grad stop{stop-color:red}', '<svg><rect fill="url(#grad)"/></svg>', '#grad'],
+        ['#blur{flood-color:red}', '<p style="filter:url(#blur)"></p>', '#blur']
+      ];
+
+      for (const [css, markup, expected] of cases) {
+        const output = await minify(style(css) + markup, { minifyCSS: true, removeUnusedCSS: true });
+        assert.ok(styleOf(output).includes(expected), `${markup} should keep ${expected}`);
+      }
+
+      // A fragment on another document names nothing here, so it protects nothing
+      const external = await minify(style('#gone{color:red}') + '<a href="/page#gone">x</a>', {
+        minifyCSS: true,
+        removeUnusedCSS: true
+      });
+      assert.ok(!styleOf(external).includes('#gone'), 'A fragment on another document is not a local reference');
+    });
+
+    test('Keeps class names whose characters end a CSS identifier', async () => {
+      // `md:flex`, `w-1/2`, and `p-[3px]` are ordinary class names in utility CSS;
+      // an identifier scan stops at the `:`, `/`, or `[` and would lose them
+      const cases = [
+        ['.md\\:flex{display:flex}', '<script>el.classList.add("md:flex")</script>', 'flex'],
+        ['.w-1\\/2{width:50%}', '<script>el.classList.add(\'w-1/2\')</script>', 'width'],
+        ['.p-\\[3px\\]{padding:3px}', '<script>el.classList.add("p-[3px]")</script>', 'padding'],
+        ['.tpl\\:x{color:red}', '<script>el.className=`tpl:x`</script>', 'color'],
+        // A name may not start with a digit unescaped, but it may be one
+        ['.\\31 col{width:1px}', '<script>el.classList.add("1col")</script>', 'width'],
+        ['.md\\:flex{display:flex}', '<p data-c="md:flex"></p>', 'flex']
+      ];
+
+      for (const [css, markup, expected] of cases) {
+        const output = await minify(style(css) + '<p></p>' + markup, { minifyCSS: true, removeUnusedCSS: true });
+        assert.ok(styleOf(output).includes(expected), `${markup} should keep ${css}`);
+      }
+
+      // Nothing references these, so the widened scan must not keep them either
+      const unused = await minify(style('.md\\:gone{display:flex}.q-\\[1px\\]{padding:1px}') + '<p></p>', {
+        minifyCSS: true,
+        removeUnusedCSS: true
+      });
+      assert.strictEqual(styleOf(unused), '', 'Unreferenced names should still be removed');
+    });
+
+    test('Reads a style sheet’s own attributes, not its contents', async () => {
+      const output = await minify(
+        '<style id="theme" class="t">#theme{color:red}.t{color:red}.gone{color:red}</style><p></p>',
+        { minifyCSS: true, removeUnusedCSS: true }
+      );
+
+      assert.ok(output.includes('#theme'), '`<style id="theme">` is what `#theme` refers to');
+      assert.ok(output.includes('.t'), 'A class on the element itself counts too');
+      assert.ok(!output.includes('.gone'), 'The sheet is still no evidence for its own selectors');
+    });
+
+    test('Reports values it has to ignore rather than silently protecting nothing', async () => {
+      // Each case uses a distinct message: `processOptions` reports a given warning
+      // once per process, as it does for unknown option keys
+      const cases = [
+        [{ safelist: 'js-' }, 'safelist'],
+        [{ safelist: [42] }, 'type number'],
+        [{ scripts: 'false' }, 'scripts'],
+        [{ safeList: ['x'] }, 'safeList']
+      ];
+
+      for (const [config, expected] of cases) {
+        const logs = [];
+        await minify(style('.drop{color:red}') + '<p></p>', {
+          minifyCSS: true,
+          removeUnusedCSS: config,
+          log: message => logs.push(String(message))
+        });
+        assert.ok(
+          logs.some(message => message.includes(expected)),
+          `${JSON.stringify(config)} should be reported (got ${JSON.stringify(logs)})`
+        );
+      }
+    });
+
+    test('Keeps what an `iframe srcdoc` document references', async () => {
+      // `srcdoc` holds a document of its own, and its style sheets are minified
+      // against the same symbol set, so its own classes have to be in it
+      const quote = String.fromCharCode(39);
+      const input = style('.outer{color:red}') + '<p class="outer"></p>' +
+        `<iframe srcdoc=${quote}<style>.inner{color:blue}.gone{color:red}</style><p class="inner">hi</p>${quote}></iframe>`;
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(output.includes('.inner'), 'A class the nested document uses should survive');
+      assert.ok(!output.includes('.gone'), 'A class nothing uses should still go');
+      assert.ok(output.includes('.outer'), 'The outer document should be unaffected');
+    });
+
+    test('Reads a start tag past a `>` inside a quoted attribute value', async () => {
+      // The tag ends where the parser says it does, so `id` is still an attribute
+      const output = await minify(
+        '<style media="(min-width:0)" title="a>b" id="theme">#theme{color:red}.gone{color:red}</style><p></p>',
+        { minifyCSS: true, removeUnusedCSS: true }
+      );
+
+      assert.ok(output.includes('#theme'), '`id` after a `>`-carrying value should still be read');
+      assert.ok(!output.includes('.gone'), 'Unreferenced rules should still be removed');
+    });
+
+    test('Leaves a document without a style sheet exactly as `minifyCSS` alone would', async () => {
+      const input = '<p class="a" data-x="b"></p><script>el.classList.add("c")</script>';
+      const baseline = await minify(input, { minifyCSS: true });
+
+      assert.strictEqual(await minify(input, { minifyCSS: true, removeUnusedCSS: true }), baseline);
+    });
   });
 
   // Cache configuration tests

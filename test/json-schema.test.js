@@ -15,19 +15,19 @@ describe('JSON Schema', () => {
 
   test('Schema covers every option definition', () => {
     for (const key of Object.keys(optionDefinitions)) {
-      assert.ok(key in schemaOnDisk.properties, `Missing schema property for option “${key}”`);
+      assert.ok(key in schemaOnDisk.properties, `Missing schema property for option \`${key}\``);
     }
   });
 
   test('Every schema property has a type or enum (catches option types missing from the generator)', () => {
     for (const [key, property] of Object.entries(schemaOnDisk.properties)) {
-      assert.ok(property.type || property.enum, `Missing type mapping for schema property “${key}”`);
+      assert.ok(property.type || property.enum, `Missing type mapping for schema property \`${key}\``);
     }
   });
 
   test('Every schema property has a description', () => {
     for (const [key, property] of Object.entries(schemaOnDisk.properties)) {
-      assert.ok(typeof property.description === 'string' && property.description.length, `Missing description for schema property “${key}”`);
+      assert.ok(typeof property.description === 'string' && property.description.length, `Missing description for schema property \`${key}\``);
     }
   });
 });

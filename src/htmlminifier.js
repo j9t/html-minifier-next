@@ -2,11 +2,13 @@ import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
+import { LRU, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
+import { collectUsedSymbols } from './lib/unused-css.js';
 
 import {
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
+  RE_STYLE_ELEMENT,
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
   specialContentElements,
@@ -437,6 +439,20 @@ import { processOptions } from './lib/options.js';
  *
  *  Default: `false`
  *
+ * @prop {boolean | {safelist?: Array<string | RegExp>, scripts?: boolean}} [removeUnusedCSS]
+ *  **Note that this can change how a document renders!**
+ *
+ *  Remove rules from `style` elements whose class or ID selectors the document
+ *  never references. Requires `minifyCSS` (removal runs through Lightning CSS)
+ *  and has no effect on `style` or `media` attributes.
+ *
+ *  Class names and IDs are collected from the markup, from `data-*` attributes,
+ *  and—unless `scripts` is set to `false`—from inline `script` elements. Names
+ *  that only ever appear in external scripts cannot be detected; list those
+ *  under `safelist` (strings or regular expressions) to keep them.
+ *
+ *  Default: `false`
+ *
  * @prop {boolean | ((tag: string, attrs: HTMLAttribute[]) => void)} [sortAttributes]
  *  When true, enables sorting of attributes. If a function is provided it
  *  will be used as a custom attribute sorter, which should mutate `attrs`
@@ -569,28 +585,6 @@ const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 const RE_FOREIGN_ELEMENT_PROBE = /<(?:svg|math)[\s/>]/i;
 
 // Script merging
-
-/**
- * Find the index of the `>` that closes an opening tag, correctly skipping
- * over quoted attribute values (which may contain `>`).
- * @param {string} html
- * @param {number} pos - Start position (just after the tag name)
- * @returns {number} Index of the closing `>`, or -1 if not found
- */
-function findTagEnd(html, pos) {
-  let i = pos;
-  while (i < html.length) {
-    const ch = html[i];
-    if (ch === '>') return i;
-    if (ch === '"' || ch === "'") {
-      const q = ch;
-      i++;
-      while (i < html.length && html[i] !== q) i++;
-    }
-    i++;
-  }
-  return -1;
-}
 
 /**
  * Merge consecutive inline script tags into one (`mergeConsecutiveScripts`).
@@ -1092,13 +1086,13 @@ async function minifyHTML(value, options, partialMarkup) {
 
           if (options.minifyCSS !== identity) {
             options.minifyCSS = (function (/** @type {ProcessedOptions['minifyCSS']} */ fn) {
-              return function (/** @type {string} */ text, /** @type {string | undefined} */ type) {
+              return function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {ProcessedOptions['cssContext']} */ context) {
                 text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                   const chunks = ignoredCustomMarkupChunks[+index];
                   return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
                 });
 
-                return fn(text, type);
+                return fn(text, type, context);
               };
             })(options.minifyCSS);
           }
@@ -1758,7 +1752,7 @@ async function minifyHTML(value, options, partialMarkup) {
           text = await options.minifyJS(text, false, isModuleScript);
         }
         if (needsMinifyCSS) {
-          text = await options.minifyCSS(text);
+          text = await options.minifyCSS(text, undefined, options.cssContext);
         }
         charsFinalize(text);
       })();
@@ -2094,6 +2088,25 @@ export const minify = async function (value, options) {
   }
   // Work on a shallow copy so per-call reassignments don’t reach the cached base
   const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase });
+
+  // Warnings are deduplicated per document, so the state has to live on the per-call
+  // copy; the `minifyCSS` closure hangs off the memoized base, shared across calls
+  processedOptions.cssContext = { warned: new Set() };
+
+  // Unused-CSS removal needs the whole document’s symbols before the first `style`
+  // element is minified, so collect them upfront from the raw input. A document
+  // without a style sheet has nothing to remove from, and scanning it would be work
+  // spent on an empty result.
+  if (processedOptions.removeUnusedCSS && RE_STYLE_ELEMENT.test(value)) {
+    processedOptions.cssContext.usedSymbols = collectUsedSymbols(
+      value,
+      processedOptions.removeUnusedCSS.scripts,
+      value.indexOf('&') !== -1
+        ? /** @type {(text: string) => string} */ (await getDecodeHTML())
+        : undefined
+    );
+  }
+
   let result = await minifyHTML(value, processedOptions);
 
   // Post-processing: Merge consecutive inline scripts if enabled

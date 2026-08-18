@@ -3,6 +3,7 @@ import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowe
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
+import { findUnusedSymbols, normalizeUnusedCSSOptions } from './unused-css.js';
 import { getPreset, getPresetNames } from '../presets.js';
 import { optionDefinitions, optionDefaults } from './option-definitions.js';
 
@@ -11,22 +12,39 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
 // Type definitions
 
 /**
+ * Per-document state handed to `minifyCSS`. Its closure hangs off the memoized
+ * options object that every `minify()` call with those options shares, so state
+ * belonging to one document has to be passed in rather than captured.
+ *
+ * @typedef {{usedSymbols?: Set<string>, warned: Set<string>}} CSSContext
+ */
+
+/**
+ * Minified style sheet plus the warnings its transform produced, cached together
+ * so that a cache hit can report what the transform reported
+ *
+ * @typedef {{css: string, warnings: string[]}} CSSResult
+ */
+
+/**
  * Options object produced by `processOptions` and consumed by `minifyHTML` and
  * the `lib/` helpers; normalization guarantees that the function-valued options
  * below are always present (defaulting to identity/built-in functions), and
  * minification adds writable internal state on top of the public options
  * (set on prototype-chain forks during SVG/MathML namespace transitions)
  *
- * @typedef {Omit<MinifierOptions, 'preset' | 'canCollapseWhitespace' | 'canTrimWhitespace' | 'ignoreCustomComments' | 'log' | 'minifyCSS' | 'minifyJS' | 'minifyURLs' | 'minifySVG'> & {
+ * @typedef {Omit<MinifierOptions, 'preset' | 'canCollapseWhitespace' | 'canTrimWhitespace' | 'ignoreCustomComments' | 'log' | 'minifyCSS' | 'minifyJS' | 'minifyURLs' | 'minifySVG' | 'removeUnusedCSS'> & {
  *   name: (name: string) => string,
  *   log: (message: any) => unknown,
  *   ignoreCustomComments: RegExp[],
  *   canCollapseWhitespace: (tag: string, attrs: HTMLAttribute[], defaultFn: (tag: string) => boolean) => boolean,
  *   canTrimWhitespace: (tag: string, attrs: HTMLAttribute[], defaultFn: (tag: string) => boolean) => boolean,
- *   minifyCSS: (text: string, type?: string) => string | Promise<string>,
+ *   minifyCSS: (text: string, type?: string, context?: CSSContext) => string | Promise<string>,
  *   minifyJS: (text: string, inline?: boolean, isModule?: boolean) => string | Promise<string>,
  *   minifyURLs: (text: string) => string | Promise<string>,
  *   minifySVG: ((svgContent: string) => string | Promise<string>) | null,
+ *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
+ *   cssContext?: CSSContext,
  *   nameParent?: (name: string) => string,
  *   nameHTML?: (name: string) => string,
  *   insideSVG?: boolean,
@@ -82,6 +100,9 @@ const presetNamesWarned = new Set();
 // The custom-fragment ReDoS warning is security-relevant, so it reaches the
 // console even without a `log` hook—once per process, like the warnings above
 let customFragmentQuantifierWarned = false;
+const unusedCSSWarned = new Set();
+// Object-valued options handed a string, warned about once per distinct value
+const stringValuesWarned = new Set();
 
 // Main options processor
 
@@ -101,7 +122,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     minifyCSS: identity,
     minifyJS: identity,
     minifyURLs: identity,
-    minifySVG: null
+    minifySVG: null,
+    removeUnusedCSS: null
   };
 
   const parseRegExpArray = (/** @type {unknown} */ arr) => {
@@ -136,7 +158,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   Object.keys(inputOptions).forEach(function (key) {
     if (!Object.hasOwn(optionDefinitions, key) && !optionKeysExtra.has(key) && !optionKeysWarned.has(key)) {
       optionKeysWarned.add(key);
-      warn(`HTML Minifier Next: Ignoring unknown or deprecated option “${key}” (see README for available options)`);
+      warn(`HTML Minifier Next: Ignoring unknown or deprecated option \`${key}\` (see README for available options)`);
     }
   });
 
@@ -166,10 +188,30 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       return;
     }
 
+    // A string carries no configuration for these options. The CLI parses config
+    // values as JSON first, so only a value that is not JSON reaches this from
+    // there. (`minifyURLs` is deliberately excluded—there, a string names the site.)
+    const definition = /** @type {Record<string, {type?: string}>} */ (optionDefinitions)[key];
+    if (typeof option === 'string' && definition?.type === 'jsonObject') {
+      const message = `HTML Minifier Next: Ignoring \`${key}\`—it takes a boolean or an object, not a string (“${option}”)`;
+      if (!stringValuesWarned.has(message)) {
+        stringValuesWarned.add(message);
+        warn(message);
+      }
+      return;
+    }
+
     if (key === 'caseSensitive') {
       if (option) {
         options.name = identity;
       }
+    } else if (key === 'removeUnusedCSS') {
+      optionsDynamic.removeUnusedCSS = normalizeUnusedCSSOptions(option, message => {
+        if (!unusedCSSWarned.has(message)) {
+          unusedCSSWarned.add(message);
+          warn(`HTML Minifier Next: ${message}`);
+        }
+      });
     } else if (key === 'log') {
       if (typeof option === 'function') {
         options.log = option;
@@ -184,11 +226,33 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       const cssLoader = getLightningCSS;
       const cssCache = cssMinifyCache;
 
-      options.minifyCSS = async function (/** @type {string} */ text, /** @type {string | undefined} */ type) {
+      options.minifyCSS = async function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {CSSContext | undefined} */ context) {
         // Fast path: Nothing to minify
         if (!text || !text.trim()) {
           return text;
         }
+
+        // Warnings are stored with the minified result and replayed on every hit, so a
+        // second document with the same defect hears about it, too; `context.warned`
+        // then keeps one document from repeating itself. Reporting from the cache
+        // rather than only from the transform keeps the output independent of cache
+        // size and eviction. They are built and cached even when `log` is the default
+        // no-op, so a later document that does pass a `log` hook still gets them.
+        const report = (/** @type {string[]} */ messages) => {
+          if (!messages.length || options.log === identity) {
+            return;
+          }
+          const warned = context?.warned;
+          for (const message of messages) {
+            if (warned) {
+              if (warned.has(message)) {
+                continue;
+              }
+              warned.add(message);
+            }
+            options.log(message);
+          }
+        };
 
         // Optimization: Only process URLs if minification is enabled (not identity function)
         // This avoids expensive `replaceAsync` when URL minification is disabled
@@ -213,9 +277,22 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           );
         }
 
-        // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys
+        // Unused-symbol removal applies to style sheets only
+        const unusedCSSConfig = type === undefined ? options.removeUnusedCSS : undefined;
+        const unusedSymbols = (unusedCSSConfig && context?.usedSymbols)
+          ? findUnusedSymbols(text, context.usedSymbols, unusedCSSConfig.safelist)
+          : undefined;
+
+        // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys.
+        // The symbol list belongs in the signature: The cache outlives a single `minify()` call, so
+        // identical style sheets in differently marked-up documents must not share an entry.
         const inputCSS = wrapCSS(text, type);
-        const cssSig = stableStringify({ type, opts: lightningCssOptions, cont: !!options.continueOnMinifyError });
+        const cssSig = stableStringify({
+          type,
+          opts: lightningCssOptions,
+          cont: !!options.continueOnMinifyError,
+          unused: unusedSymbols && unusedSymbols.length ? unusedSymbols.slice().sort() : undefined
+        });
         const isCacheable = inputCSS.length <= MAX_CACHE_ENTRY_SIZE;
         const cssKey = isCacheable
           ? (inputCSS.length > 2048
@@ -225,10 +302,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
         try {
           if (cssKey !== undefined) {
-            const cached = /** @type {string | Promise<string> | undefined} */ (cssCache.get(cssKey));
+            const cached = /** @type {CSSResult | Promise<CSSResult> | undefined} */ (cssCache.get(cssKey));
             if (cached !== undefined) {
               // Support both resolved values and in-flight promises
-              return await cached;
+              const settled = await cached;
+              report(settled.warnings);
+              return settled.css;
             }
           }
 
@@ -242,8 +321,25 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
               code: Buffer.from(inputCSS),
               minify: true,
               errorRecovery: !!options.continueOnMinifyError,
-              ...lightningCssOptions
+              ...lightningCssOptions,
+              // Union, so that a manually supplied `unusedSymbols` list survives
+              ...(unusedSymbols && unusedSymbols.length
+                ? { unusedSymbols: lightningCssOptions.unusedSymbols ? [...new Set([...lightningCssOptions.unusedSymbols, ...unusedSymbols])] : unusedSymbols }
+                : {})
             });
+
+            // With `errorRecovery` enabled, Lightning CSS reports what it takes issue
+            // with instead of throwing—dropping the rule in some cases (`@property`
+            // with a bad `syntax`) and passing it through in others (an unknown
+            // at-rule), which is why the wording stops at “reported”
+            /** @type {string[]} */
+            const warnings = [];
+            if (result.warnings) {
+              for (const warning of result.warnings) {
+                const at = warning.loc ? ` (line ${warning.loc.line}, column ${warning.loc.column})` : '';
+                warnings.push(`Warning: Lightning CSS reported invalid CSS${at}: ${warning.message}`);
+              }
+            }
 
             const outputCSS = unwrapCSS(result.code.toString(), type);
 
@@ -259,13 +355,15 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
             // Preserve if output is empty and input had template syntax or UIDs
             // This catches cases where Lightning CSS removed content that should be preserved
-            return (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
+            const css = (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
+            return { css, warnings };
           })();
 
           if (cssKey !== undefined) cssCache.set(cssKey, inFlight);
           const resolved = await inFlight;
           if (cssKey !== undefined) cssCache.set(cssKey, resolved);
-          return resolved;
+          report(resolved.warnings);
+          return resolved.css;
         } catch (err) {
           if (cssKey !== undefined) cssCache.delete(cssKey);
           if (!options.continueOnMinifyError) {
@@ -515,6 +613,23 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       optionsDynamic[key] = option;
     }
   });
+
+  // Unused-CSS removal rides along with Lightning CSS, so it silently does nothing
+  // when `minifyCSS` is off or replaced by a function—say so rather than let it pass
+  if (options.removeUnusedCSS) {
+    const cssOption = /** @type {Record<string, any>} */ (effectiveInput).minifyCSS;
+    const reason = typeof cssOption === 'function'
+      ? 'it does not apply when `minifyCSS` is a function'
+      : (options.minifyCSS === identity ? 'it requires `minifyCSS` (`--minify-css`)' : '');
+    if (reason) {
+      if (!unusedCSSWarned.has(reason)) {
+        unusedCSSWarned.add(reason);
+        warn(`HTML Minifier Next: Ignoring \`removeUnusedCSS\`—${reason}`);
+      }
+      options.removeUnusedCSS = null;
+    }
+  }
+
   return options;
 };
 

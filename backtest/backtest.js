@@ -14,12 +14,12 @@
 // checks out historical files, the working tree must have no uncommitted changes in
 // src, package.json, or html-minifier-next.config.json.
 //
-// Usage (from the “backtest” folder):
+// Usage (from the backtest folder):
 //   npm run backtest: Test the last 50 commits (default)
 //   npm run backtest 100: Test the last COUNT commits
 //   npm run backtest 500/10: Test the last COUNT commits, sampling every STEPth commit
 //
-// The corpus is downloaded on first run (sources listed in “sites.json”) and shared
+// The corpus is downloaded on first run (sources listed in sites.json) and shared
 // with `benchmark.js`.
 
 import { spawn, fork } from 'child_process';
@@ -236,7 +236,7 @@ async function minify(hash, options) {
         try {
           await fs.stat(pathFile);
         } catch {
-          throw new Error(`Source file not found: “${fileName}.html”`);
+          throw new Error(`Source file not found: ${fileName}.html`);
         }
 
         const data = await readText(pathFile);
@@ -390,8 +390,8 @@ if (process.argv.length > 2 || !process.send) {
     if (arg.includes('/')) {
       const parts = arg.split('/');
       if (parts.length !== 2) {
-        console.error(`Error: Invalid format “${arg}”—use “COUNT” or “COUNT/STEP”`);
-        console.error(`Examples: “backtest.js 50” or “backtest.js 500/10”`);
+        console.error(`Error: Invalid format “${arg}”—use \`COUNT\` or \`COUNT/STEP\``);
+        console.error('Examples: `backtest.js 50` or `backtest.js 500/10`');
         process.exit(1);
       }
 
@@ -410,12 +410,12 @@ if (process.argv.length > 2 || !process.send) {
       count = parseInt(arg, 10);
       if (!Number.isInteger(count) || count < 1) {
         console.error(`Error: Invalid commit count “${arg}”—must be a positive integer`);
-        console.error(`Example: “backtest.js 50”`);
+        console.error('Example: `backtest.js 50`');
         process.exit(1);
       }
     }
   } else {
-    console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: “backtest.js COUNT” to specify)`);
+    console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: \`backtest.js COUNT\` to specify)`);
   }
 
   if (count > 0) {
@@ -460,7 +460,7 @@ if (process.argv.length > 2 || !process.send) {
           console.log(`\nCleaning up after ${reason}…`);
         }
 
-        // Restore “src” folder, package.json, and html-minifier-next.config.json from HEAD using Git
+        // Restore src folder, package.json, and html-minifier-next.config.json from HEAD using Git
         await new Promise((resolve) => {
           git('checkout', 'HEAD', '--', pathSrc, pathConfig, pathPkg, function (code) {
             if (code !== 0) {

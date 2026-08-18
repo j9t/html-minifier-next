@@ -4,6 +4,18 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.6.0] - 2026-08-18
+
+### Added
+
+* Added `removeUnusedCSS` option to enable removing rules from `style` elements whose class or ID selectors the document never references (requires `minifyCSS`, since removal runs through Lightning CSS)
+* Added minifier diagnostics to `--verbose` (and `--dry`, which implies it)
+* Added reporting for invalid CSS under `errorRecovery`—with `continueOnMinifyError` enabled (the default), Lightning CSS reports invalid rules instead of throwing, which is done through the `log` hook
+
+### Changed
+
+* Updated `minifyCSS`, `minifyJS`, and `minifySVG` to refuse a string value and report it instead of reading any non-empty string as “on”—pass `true` or an options object instead; config file and CLI values are unaffected where they parse as JSON, so `"true"` and `"false"` keep working
+
 ## [7.5.3] - 2026-08-13
 
 ### Changed
@@ -282,7 +294,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* `collapseBooleanAttributes` now collapses `crossorigin="anonymous"` to `crossorigin`, since “anonymous” is the attribute’s default value (previously only `crossorigin=""` was collapsed)
+* `collapseBooleanAttributes` now collapses `crossorigin="anonymous"` to `crossorigin`, since `anonymous` is the attribute’s default value (previously only `crossorigin=""` was collapsed)
 
 ## [5.1.5] - 2026-02-26
 

@@ -41,7 +41,7 @@ Use `npx html-minifier-next --help` to check all available options:
 | `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
 | `--preset <name>`, `-p <name>` | Use a preset configuration (conservative or comprehensive) | `--preset=conservative` |
 | `--config-file <file>`, `-c <file>` | Use a configuration file (defaults to html-minifier-next.config.json in the working directory, if present) | `--config-file=path/to/config.json` |
-| `--verbose`, `-v` | Show detailed processing information (active options, file statistics) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
+| `--verbose`, `-v` | Show detailed processing information (active options, file statistics, and minifier warnings) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `--dry`, `-d` | Dry run: Process and report statistics without writing output | `npx html-minifier-next input.html --dry --collapse-whitespace` |
 
 ### Configuration file
@@ -91,7 +91,7 @@ const result = await minify('<p title="example" id="moo">foo</p>', {
   removeAttributeQuotes: true,
   removeOptionalTags: true
 });
-console.log(result); // “<p title=example id=moo>foo”
+console.log(result); // `<p title=example id=moo>foo`
 ```
 
 See [the original blog post](https://perfectionkills.com/experimenting-with-html-minifier/) for details of [how it works](https://perfectionkills.com/experimenting-with-html-minifier/#how_it_works), [descriptions of most options](https://perfectionkills.com/experimenting-with-html-minifier/#options), [testing results](https://perfectionkills.com/experimenting-with-html-minifier/#field_testing), and [conclusions](https://perfectionkills.com/experimenting-with-html-minifier/#cost_and_benefits).
@@ -173,6 +173,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
+| `removeUnusedCSS`<br>`--remove-unused-css` | [Remove unused CSS rules](#unused-css-removal) from `style` elements; requires `minifyCSS`; **note that this can change how a document renders** | `false` (could be `true`, `{ safelist, scripts }`) |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
@@ -186,7 +187,7 @@ A few options take functions and are therefore only available programmatically, 
 | --- | --- | --- |
 | `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
-| `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them) | No-op (errors are silent) |
+| `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
 
 ### Sorting attributes and style classes
 
@@ -216,7 +217,7 @@ Available Lightning CSS options when passed as an object:
 
 * `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`).
 * `unusedSymbols`: Array of class names, IDs, keyframe names, and CSS variables to remove.
-* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors. This is disabled by default in Lightning CSS, but enabled in HMN when the `continueOnMinifyError` option is set to `true` (the default). Explicitly setting `errorRecovery` in `minifyCSS` options will override this automatic behavior.
+* `errorRecovery`: Boolean to skip invalid rules instead of throwing errors. This is disabled by default in Lightning CSS, but enabled in HMN when the `continueOnMinifyError` option is set to `true` (the default). Explicitly setting `errorRecovery` in `minifyCSS` options will override this automatic behavior. What Lightning CSS takes issue with is reported through [the `log` hook](#api-only-options)—it drops some of it (`@property` with an invalid `syntax`) and passes the rest through (an unknown at-rule), so that a dropped rule does not go unnoticed. Every document is reported on separately.
 * `sourceMap`: Boolean to generate source maps.
 
 For advanced usage, you can also pass a function:
@@ -230,6 +231,44 @@ const result = await minify(html, {
   }
 });
 ```
+
+### Unused CSS removal
+
+`removeUnusedCSS` removes rules from `style` elements whose class or ID selectors the document doesn’t reference. It requires `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
+
+```js
+const result = await minify(html, {
+  minifyCSS: true,
+  removeUnusedCSS: true
+});
+```
+
+Symbols are considered used when they appear
+
+* in a `class` or `id` attribute,
+* in an attribute that references an ID (`for`, `headers`, `list`, `popovertarget`, `aria-controls`, and similar),
+* in a same-document fragment URL, as `href="#main"`, `<use href="#icon">`, or `usemap="#map"`, and in a `url(#gradient)` reference from any attribute,
+* anywhere in a `data-*` attribute value, or
+* anywhere inside an inline `script` element, unless `scripts` is set to `false`.
+
+Names carrying characters that end a CSS identifier—`md:flex`, `w-1/2`, `p-[3px]`—are matched as whole tokens, so utility-CSS class names survive whether they come from markup, a `data-*` value, or a string in an inline script.
+
+**Class names that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a class added by `bundle.js` looks exactly like a class nobody uses. List those under `safelist`, as strings or regular expressions:
+
+```js
+const result = await minify(html, {
+  minifyCSS: true,
+  removeUnusedCSS: {
+    safelist: ['is-open', /^js-/],
+    // Set to `false` to also drop rules only referenced from inline scripts
+    scripts: true
+  }
+});
+```
+
+Names used by `@keyframes` and `@counter-style` rules are not removed, even when no element carries them as a class or ID, since those at-rules are referenced from CSS rather than from markup.
+
+Values that cannot be honored—a `safelist` that isn’t an array, an entry that is neither a string nor a regular expression, a misspelled key—are reported through the `log` hook.
 
 ### JavaScript minification
 

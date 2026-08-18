@@ -16,6 +16,7 @@ const RE_ESCAPE_LT = /</g;
 const RE_ATTR_WS_CHECK = /[ \n\r\t\f]/;
 const RE_ATTR_WS_COLLAPSE = /[ \n\r\t\f]+/g;
 const RE_ATTR_WS_TRIM = /^[ \n\r\t\f]+|[ \n\r\t\f]+$/g;
+const RE_STYLE_ELEMENT = /<style[\s/>]/i;
 
 // Inline element sets for whitespace handling
 
@@ -192,6 +193,7 @@ export {
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
   RE_ATTR_WS_TRIM,
+  RE_STYLE_ELEMENT,
   // Inline element sets
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,

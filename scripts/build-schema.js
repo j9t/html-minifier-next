@@ -20,6 +20,7 @@ const typeSchemas = {
   regexp: { type: 'string' },
   regexpArray: { type: ['string', 'array'], items: { type: 'string' } },
   json: { type: ['boolean', 'string', 'object'] },
+  jsonObject: { type: ['boolean', 'object'] },
   jsonArray: { type: ['string', 'array'], items: { type: 'string' } }
 };
 

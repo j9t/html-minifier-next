@@ -146,8 +146,31 @@ function parseRegExp(value) {
 
 // Exports
 
+/**
+ * Find the index of the `>` that closes an opening tag, correctly skipping
+ * over quoted attribute values (which may contain `>`).
+ * @param {string} html
+ * @param {number} pos - Start position (just after the tag name)
+ * @returns {number} Index of the closing `>`, or -1 if not found
+ */
+function findTagEnd(html, pos) {
+  let i = pos;
+  while (i < html.length) {
+    const ch = html[i];
+    if (ch === '>') return i;
+    if (ch === '"' || ch === "'") {
+      const q = ch;
+      i++;
+      while (i < html.length && html[i] !== q) i++;
+    }
+    i++;
+  }
+  return -1;
+}
+
 export {
   stableStringify,
+  findTagEnd,
   LRU,
   MAX_CACHE_ENTRY_SIZE,
   hashContent,

@@ -470,7 +470,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
         attrValue = attrValue.replace(/\s*;$/, ';');
       }
       const originalAttrValue = attrValue;
-      const cssResult = options.minifyCSS(attrValue, 'inline');
+      const cssResult = options.minifyCSS(attrValue, 'inline', options.cssContext);
       if (isThenable(cssResult)) {
         return cssResult
           .then((/** @type {string} */ minified) => {
@@ -581,7 +581,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       return attrValue;
     }
     const originalAttrValue = attrValue;
-    const cssResult = options.minifyCSS(attrValue, 'media');
+    const cssResult = options.minifyCSS(attrValue, 'media', options.cssContext);
     if (isThenable(cssResult)) {
       return cssResult.catch((/** @type {Error} */ err) => {
         if (!options.continueOnMinifyError) throw err;
