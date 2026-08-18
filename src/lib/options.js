@@ -236,7 +236,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         // second document with the same defect hears about it, too; `context.warned`
         // then keeps one document from repeating itself. Reporting from the cache
         // rather than only from the transform keeps the output independent of cache
-        // size and eviction.
+        // size and eviction. They are built and cached even when `log` is the default
+        // no-op, so a later document that does pass a `log` hook still gets them.
         const report = (/** @type {string[]} */ messages) => {
           if (!messages.length || options.log === identity) {
             return;

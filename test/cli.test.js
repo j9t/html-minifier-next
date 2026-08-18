@@ -635,15 +635,25 @@ describe('CLI', () => {
   });
 
   test('Should still read `"true"` and `"false"` in a config file as booleans', () => {
-    const dir = setupConfigDir('config-boolean-string', {
+    const input = '<style>.a { color : red }</style>';
+
+    const dirOn = setupConfigDir('config-boolean-string-on', {
       'html-minifier-next.config.json': { minifyCSS: 'true' }
     });
-    fs.writeFileSync(path.join(dir, 'input.html'), '<style>.a { color : red }</style>');
+    fs.writeFileSync(path.join(dirOn, 'input.html'), input);
+    const on = execCliInDir(['input.html'], dirOn);
 
-    const { stdout, exitCode } = execCliInDir(['input.html'], dir);
+    assert.strictEqual(on.exitCode, 0);
+    assert.strictEqual(on.stdout, '<style>.a{color:red}</style>', '`"true"` should enable minification');
 
-    assert.strictEqual(exitCode, 0);
-    assert.strictEqual(stdout, '<style>.a{color:red}</style>', 'JSON-parsed config values keep working');
+    const dirOff = setupConfigDir('config-boolean-string-off', {
+      'html-minifier-next.config.json': { minifyCSS: 'false' }
+    });
+    fs.writeFileSync(path.join(dirOff, 'input.html'), input);
+    const off = execCliInDir(['input.html'], dirOff);
+
+    assert.strictEqual(off.exitCode, 0);
+    assert.strictEqual(off.stdout, input, '`"false"` should leave the CSS alone');
   });
 
   test('Should prefer html-minifier-next.config.json over htmlminifier.config.json', () => {

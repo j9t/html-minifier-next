@@ -442,6 +442,11 @@ program.helpOption('-h, --help', 'Display help for command');
     // 4. Surface minifier diagnostics when verbose
     if (programOptions.verbose || programOptions.dry) {
       options.log = message => {
+        // The hook carries the minifier’s per-call timing as well, which the run's own
+        // per-file statistics already cover
+        if (typeof message === 'string' && message.startsWith('minified in: ')) {
+          return;
+        }
         // Only `continueOnMinifyError` passes `Error` objects, always after leaving the
         // offending content unminified—so say that
         if (message instanceof Error) {

@@ -1284,6 +1284,30 @@ describe('CSS and JS', () => {
       }
     });
 
+    test('Keeps what an `iframe srcdoc` document references', async () => {
+      // `srcdoc` holds a document of its own, and its style sheets are minified
+      // against the same symbol set, so its own classes have to be in it
+      const quote = String.fromCharCode(39);
+      const input = style('.outer{color:red}') + '<p class="outer"></p>' +
+        `<iframe srcdoc=${quote}<style>.inner{color:blue}.gone{color:red}</style><p class="inner">hi</p>${quote}></iframe>`;
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+
+      assert.ok(output.includes('.inner'), 'A class the nested document uses should survive');
+      assert.ok(!output.includes('.gone'), 'A class nothing uses should still go');
+      assert.ok(output.includes('.outer'), 'The outer document should be unaffected');
+    });
+
+    test('Reads a start tag past a `>` inside a quoted attribute value', async () => {
+      // The tag ends where the parser says it does, so `id` is still an attribute
+      const output = await minify(
+        '<style media="(min-width:0)" title="a>b" id="theme">#theme{color:red}.gone{color:red}</style><p></p>',
+        { minifyCSS: true, removeUnusedCSS: true }
+      );
+
+      assert.ok(output.includes('#theme'), '`id` after a `>`-carrying value should still be read');
+      assert.ok(!output.includes('.gone'), 'Unreferenced rules should still be removed');
+    });
+
     test('Leaves a document without a style sheet exactly as `minifyCSS` alone would', async () => {
       const input = '<p class="a" data-x="b"></p><script>el.classList.add("c")</script>';
       const baseline = await minify(input, { minifyCSS: true });

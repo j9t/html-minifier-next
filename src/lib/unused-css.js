@@ -1,5 +1,7 @@
 // Unused-CSS removal
 
+import { findTagEnd } from './utils.js';
+
 // Attributes whose values name elements by ID or hold space-separated ID lists
 const idReferenceAttributes = new Set([
   'aria-activedescendant',
@@ -34,6 +36,9 @@ const fragmentReferenceAttributes = new Set([
   'usemap',
   'xlink:href'
 ]);
+
+// `srcdoc` can nest, and each level costs another scan of its own markup
+const SRCDOC_MAX_DEPTH = 3;
 
 const attributePattern = /(?:^|[\s/])([-\w:.]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/g;
 const identifierPattern = /--[\w-]*|-?[A-Za-z_][\w-]*/g;
@@ -123,7 +128,9 @@ function findRawTextElements(haystack, tagName) {
       cursor = start + openTag.length;
       continue;
     }
-    const startTagEnd = haystack.indexOf('>', start + openTag.length);
+    // A quoted attribute value may hold a `>`, so the tag ends where the parser
+    // says it does, not at the next bracket
+    const startTagEnd = findTagEnd(haystack, start + openTag.length);
     if (startTagEnd === -1) {
       break;
     }
@@ -138,7 +145,7 @@ function findRawTextElements(haystack, tagName) {
         break;
       }
       if (endsName(haystack.charAt(candidate + closeTag.length))) {
-        const closeEnd = haystack.indexOf('>', candidate + closeTag.length);
+        const closeEnd = findTagEnd(haystack, candidate + closeTag.length);
         if (closeEnd !== -1) {
           bodyEnd = candidate;
           end = closeEnd + 1;
@@ -172,9 +179,10 @@ function findRawTextElements(haystack, tagName) {
  * @param {string} html - Raw document markup
  * @param {boolean} includeScripts - Also treat identifiers inside inline `script` elements as used
  * @param {((text: string) => string)} [decode] - Resolves character references in attribute values
+ * @param {number} [depth] - Nesting level, counted through `srcdoc`
  * @returns {Set<string>} Symbols to keep
  */
-function collectUsedSymbols(html, includeScripts, decode) {
+function collectUsedSymbols(html, includeScripts, decode, depth = 0) {
   const used = new Set();
   const haystack = foldCase(html);
 
@@ -214,6 +222,9 @@ function collectUsedSymbols(html, includeScripts, decode) {
     return element !== undefined && index >= element.start;
   };
 
+  /** @type {string[]} */
+  const nested = [];
+
   attributePattern.lastIndex = 0;
   let match;
   while ((match = attributePattern.exec(html))) {
@@ -233,6 +244,8 @@ function collectUsedSymbols(html, includeScripts, decode) {
     } else if (fragmentReferenceAttributes.has(name) && value.charAt(0) === '#') {
       // Only a leading `#`: `href="/page#sec"` names a section of another document
       addTokens(value.slice(1));
+    } else if (name === 'srcdoc' && depth < SRCDOC_MAX_DEPTH) {
+      nested.push(value);
     }
     if (value.indexOf('(') !== -1) {
       fragmentURLPattern.lastIndex = 0;
@@ -240,6 +253,16 @@ function collectUsedSymbols(html, includeScripts, decode) {
       while ((reference = fragmentURLPattern.exec(value))) {
         addTokens(reference[1] ?? '');
       }
+    }
+  }
+
+  // `iframe srcdoc` holds a document of its own, whose style sheets are minified
+  // against this very set—so what it references has to be in it. The scan runs here
+  // rather than at the attribute: The patterns it shares with this one are
+  // module-level, so no nested scan may start while one of their loops is open.
+  for (const markup of nested) {
+    for (const symbol of collectUsedSymbols(markup, includeScripts, decode, depth + 1)) {
+      used.add(symbol);
     }
   }
 
