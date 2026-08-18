@@ -874,6 +874,23 @@ describe('CSS and JS', () => {
       );
     });
 
+    test('Refuses a string value instead of reading it as “on”', async () => {
+      // A configuration file holding `"false"` would otherwise delete rules
+      const input = style('.unused{color:red}') + '<p></p>';
+      const logs = [];
+      const output = await minify(input, {
+        minifyCSS: true,
+        removeUnusedCSS: 'false',
+        log: message => logs.push(String(message))
+      });
+
+      assert.ok(styleOf(output).includes('.unused'), 'A string must not enable the option');
+      assert.ok(
+        logs.some(message => message.includes('removeUnusedCSS') && message.includes('string')),
+        'The rejected value should be reported'
+      );
+    });
+
     test('Reports that a `minifyCSS` function takes over', async () => {
       // The removal rides along with Lightning CSS, which a custom function replaces
       const input = style('.unused{color:red}') + '<p></p>';

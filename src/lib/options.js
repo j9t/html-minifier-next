@@ -562,9 +562,13 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   // when `minifyCSS` is off or replaced by a function—say so rather than let it pass
   if (options.removeUnusedCSS) {
     const cssOption = /** @type {Record<string, any>} */ (effectiveInput).minifyCSS;
-    const reason = typeof cssOption === 'function'
-      ? 'it does not apply when `minifyCSS` is a function'
-      : (options.minifyCSS === identity ? 'it requires `minifyCSS` (`--minify-css`)' : '');
+    // A string carries no meaning here, and treating one as “on” would let
+    // `"false"` in a configuration file delete rules the document still needs
+    const reason = typeof (/** @type {Record<string, any>} */ (effectiveInput).removeUnusedCSS) === 'string'
+      ? 'it takes a boolean or an object, not a string'
+      : typeof cssOption === 'function'
+        ? 'it does not apply when `minifyCSS` is a function'
+        : (options.minifyCSS === identity ? 'it requires `minifyCSS` (`--minify-css`)' : '');
     if (reason) {
       if (!unusedCSSWarned.has(reason)) {
         unusedCSSWarned.add(reason);
