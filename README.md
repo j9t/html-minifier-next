@@ -559,7 +559,7 @@ You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular express
 
 * Input length limits: The `maxInputLength` option allows you to set a maximum input size to prevent processing of excessively large inputs that could cause performance issues.
 
-**Important:** A single unlimited quantifier is not one of those shapes: `[\s\S]*?` running up to a literal terminator matches in linear time, and it is how HMN’s own defaults are written. Bounds are still worth adding where you know the maximum length of a fragment, since they cap how far a failing match can scan.
+**Important:** A single unlimited quantifier is not one of those shapes: `[\s\S]*?` running up to a literal terminator matches in linear time, and it is how HMN’s defaults are written. Bounds are still worth adding where you know the maximum length of a fragment, since they cap how far a failing match can scan.
 
 #### Custom fragment examples
 
@@ -679,11 +679,11 @@ Parameters:
 
 * No argument: Runs and, if a baseline exists, shows size and time deltas
 * `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
-* `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s own processing time
+* `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s processing time
 * `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
 * `--config=PATH`: Uses an alternative options file (default html-minifier-next.config.json)
 
-To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN’s own code rather than the bundled minifiers.
+To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers.
 
 #### Profiling
 

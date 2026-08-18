@@ -604,8 +604,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
   // Fragments that compound quantifiers or alternation under unbounded repetition
   // are the shapes that backtrack catastrophically, and they are also the ones a
-  // linear scan cannot stand in for; a lone `[\s\S]*?` up to a literal terminator
-  // is linear, so it passes—as it must, being how the defaults are written
+  // linear scan cannot stand in for. A lone `[\s\S]*?` up to a literal terminator
+  // is linear and passes; HMN’s default fragments have exactly that shape, so
+  // the check flagging it would mean warning about the defaults themselves.
   for (const re of options.ignoreCustomFragments || []) {
     if (!hasRiskyQuantifiers(re.source)) continue;
     const problem = `Custom fragment \`/${re.source}/\` compounds quantifiers or alternation in a way that may cause ReDoS—bound the repetition (e.g., \`{0,1000}\`) instead`;

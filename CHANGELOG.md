@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 * Fixed `ignoreCustomFragments` patterns losing their flags (`/…/i` matched case-sensitively and `/…/s` left `.` stopping at line terminators)
-* Fixed the `ignoreCustomFragments` ReDoS warning firing for every `*` or `+`, which flagged linear patterns—among them HMN’s own defaults, whenever they were passed explicitly
+* Fixed the `ignoreCustomFragments` ReDoS warning firing for every `*` or `+`, which flagged linear patterns—among them HMN’s defaults, whenever they were passed explicitly
 * Fixed custom fragment matching costing O(n²) on documents that open fragments they never close—`ignoreCustomFragments` patterns that wrap an any-character or negated-class body in literal delimiters are matched by scanning for those delimiters in linear time
 * Fixed CLI error messages reading `undefined` when the thrown value was not an `Error`
 

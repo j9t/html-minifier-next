@@ -10,7 +10,7 @@
 // Usage (from the backtest folder):
 //   npm run benchmark: Run; if a baseline exists, show deltas
 //   npm run benchmark -- --save: Run and save the result as the baseline
-//   npm run benchmark -- --core: Disable external minifiers (CSS/JS/SVG/URLs) to isolate HMN’s own processing time
+//   npm run benchmark -- --core: Disable external minifiers (CSS/JS/SVG/URLs) to isolate HMN’s processing time
 //   npm run benchmark -- --iterations=10
 //   npm run benchmark -- --config=path/to/config.json
 //
@@ -27,7 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BENCH_WARMUP = 1;
 const DEFAULT_ITERATIONS = 5;
 
-// External minifiers disabled by `--core` to surface HMN’s own time
+// External minifiers disabled by `--core` to surface HMN’s time
 const CORE_DISABLED_OPTIONS = ['minifyCSS', 'minifyJS', 'minifySVG', 'minifyURLs'];
 
 const PATH_BASELINE = path.join(__dirname, 'benchmark-baseline.json');
