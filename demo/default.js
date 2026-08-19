@@ -187,7 +187,7 @@ const demoConfig = {
 // Options to show in demo (subset of all options)
 const demoOptionIds = Object.keys(demoConfig);
 
-// Build defaultOptions from optionDefinitions + demoConfig
+// Build `defaultOptions` from `optionDefinitions` + `demoConfig`
 const defaultOptions = demoOptionIds.map(id => {
   const def = optionDefinitions[id];
   const cfg = demoConfig[id];
@@ -207,12 +207,16 @@ const sillyClone = (o) => JSON.parse(JSON.stringify(o));
 
 const formatNumber = (num) => num.toLocaleString('en-US');
 
-// URL State Management
+// URL state management
 const MAX_URL_LENGTH = 2000; // Conservative limit for URL hash
 
-// Option migration map for backward compatibility
-// When renaming options, add entries here to preserve old URLs
+// Option migration map for backward compatibility;
+// when renaming options, add entries here to preserve old URLs
+//
 // Example: `{ 'oldOptionName': 'newOptionName' }`
+//
+// @@ Split the mapping out of `decodeState` (as `getOptions` was)
+// (so that an entry silently loading the wrong options is caught by a test)
 const OPTION_MIGRATIONS = {
   customFragmentQuantifierLimit: null, // Removed in 8.0.0; discard from old URLs
   html5: null, // Removed in 5.0.0; discard from old URLs
