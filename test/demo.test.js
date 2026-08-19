@@ -45,8 +45,8 @@ describe('Demo', () => {
 
     test('A risky fragment pattern is warned about, not dropped', (t) => {
       const warn = t.mock.method(console, 'warn', () => {});
-      const options = getOptions([textOption('ignoreCustomFragments', '/(a+)+/')]);
-      assert.deepStrictEqual(options.ignoreCustomFragments.map(re => re.source), ['(a+)+']);
+      const options = getOptions([textOption('ignoreCustomFragments', '/a*a*/')]);
+      assert.deepStrictEqual(options.ignoreCustomFragments.map(re => re.source), ['a*a*']);
       assert.ok(warn.mock.calls.length > 0);
     });
 
