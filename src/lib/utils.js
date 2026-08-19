@@ -151,6 +151,16 @@ function parseRegExp(value) {
 // the upper bound of a `{n,m}` form, which is empty when the form is `{n,}`
 const RE_QUANTIFIER = /(?:[*+?]|\{\d+(?:,(\d*))?\})\??/y;
 
+// Bounds for the walk below: Patterns beyond either are judged risky unread,
+// which keeps a pathological source from nesting the analysis into a stack
+// overflow or making it rescan its groups once per level
+const MAX_PATTERN_LENGTH = 10000;
+const MAX_PATTERN_DEPTH = 50;
+
+// A group that only wraps its body backtracks the way that body does, so
+// `(?:a)` and `a` count as the same atom; lookarounds are left alone
+const RE_TRANSPARENT_GROUP = /^\((?:\?:|\?<[^>=!][^>]*>)?([\s\S]*)\)$/;
+
 /** @param {string} source @param {number} index - Index of the opening `[` */
 function skipCharacterClass(source, index) {
   let i = index + 1;
@@ -160,6 +170,17 @@ function skipCharacterClass(source, index) {
   return i + 1;
 }
 
+/** @param {string} atom - Atom as it reads in the source */
+function unwrapAtom(atom) {
+  let inner = atom;
+  for (let level = 0; level < MAX_PATTERN_DEPTH; level++) {
+    const match = RE_TRANSPARENT_GROUP.exec(inner);
+    if (!match) break;
+    inner = match[1] ?? '';
+  }
+  return inner;
+}
+
 /**
  * Walk a regex source for the shapes whose backtracking blows up: an unlimited
  * quantifier over a group that itself contains a variable quantifier (`(a+)+`,
@@ -167,9 +188,12 @@ function skipCharacterClass(source, index) {
  * row. A lone unlimited quantifier stays linear, so `[\s\S]*?` up to a literal
  * terminator passes
  * @param {string} source - Regex source, assumed syntactically valid
+ * @param {number} [depth] - Group nesting level of this call
  * @returns {{risky: boolean, varies: boolean, alternates: boolean}}
  */
-function analyzeQuantifiers(source) {
+function analyzeQuantifiers(source, depth = 0) {
+  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true };
+
   let risky = false;
   let varies = false;
   let alternates = false;
@@ -194,22 +218,22 @@ function analyzeQuantifiers(source) {
     } else if (char === '[') {
       i = skipCharacterClass(source, i);
     } else if (char === '(') {
-      let depth = 1;
+      let open = 1;
       i++;
-      while (i < source.length && depth > 0) {
+      while (i < source.length && open > 0) {
         const inner = source[i];
         if (inner === '\\') {
           i += 2;
         } else if (inner === '[') {
           i = skipCharacterClass(source, i);
         } else {
-          if (inner === '(') depth++;
-          else if (inner === ')') depth--;
+          if (inner === '(') open++;
+          else if (inner === ')') open--;
           i++;
         }
       }
       // Drop the group prefix (`?:`, `?=`, `?<name>`, …) before reading the body
-      group = analyzeQuantifiers(source.slice(start + 1, i - 1).replace(/^\?(?:[:=!]|<[=!]|<[^>]*>)/, ''));
+      group = analyzeQuantifiers(source.slice(start + 1, i - 1).replace(/^\?(?:[:=!]|<[=!]|<[^>]*>)/, ''), depth + 1);
     } else {
       i++;
     }
@@ -230,8 +254,9 @@ function analyzeQuantifiers(source) {
       if (group.alternates) alternates = true;
     }
     if (variable) varies = true;
-    if (repeats && previous?.repeats && previous.text === atom) risky = true;
-    previous = { text: atom, repeats };
+    const text = unwrapAtom(atom);
+    if (repeats && previous?.repeats && previous.text === text) risky = true;
+    previous = { text, repeats };
   }
 
   return { risky, varies, alternates };
@@ -242,7 +267,7 @@ function analyzeQuantifiers(source) {
  * @returns {boolean} Whether the pattern can backtrack catastrophically
  */
 function hasRiskyQuantifiers(source) {
-  return analyzeQuantifiers(source).risky;
+  return source.length > MAX_PATTERN_LENGTH || analyzeQuantifiers(source).risky;
 }
 
 /**

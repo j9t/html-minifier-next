@@ -114,6 +114,33 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/<!--[\s\S]*[\s\S]*-->/.source), true);
     });
 
+    test('A group wrapping the atom does not hide the repetition', () => {
+      // `^(?:a)*a*$` backtracks quadratically on `aaa…b`, the way `a*a*` does
+      assert.strictEqual(hasRiskyQuantifiers(/^(?:a)*a*$/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/(a)*a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/.*(?:.)*/.source), true);
+      // Only matching atoms count, and lookarounds are not wrappers
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a)*b*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/(?=a)a*/.source), false);
+    });
+
+    test('Analysis stays bounded on pathological patterns', () => {
+      // Nesting past the depth limit is judged risky rather than recursed into,
+      // while nesting within it is read for what it is
+      assert.strictEqual(hasRiskyQuantifiers('('.repeat(60) + 'a' + ')'.repeat(60)), true);
+      assert.strictEqual(hasRiskyQuantifiers('('.repeat(40) + 'a' + ')'.repeat(40)), false);
+
+      // A pattern past the length limit is judged risky unread, whatever its shape
+      assert.strictEqual(hasRiskyQuantifiers('a'.repeat(10001)), true);
+      assert.strictEqual(hasRiskyQuantifiers('a'.repeat(10000)), false);
+
+      // Extreme nesting trips the length limit before the walk ever starts
+      const nested = '('.repeat(20000) + 'a' + ')'.repeat(20000);
+      const start = Date.now();
+      assert.strictEqual(hasRiskyQuantifiers(nested), true);
+      assert.ok(Date.now() - start < 1000, 'Expected the analysis to bail out, not to walk every level');
+    });
+
     test('A repeated group repeating only within a bound passes', () => {
       // The shape HMN itself composes from the fragment patterns
       assert.strictEqual(hasRiskyQuantifiers(/(?:<%[\s\S]*?%>|<\?[\s\S]*?\?>){1,200}/.source), false);

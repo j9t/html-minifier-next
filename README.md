@@ -555,7 +555,7 @@ You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular express
 
 * Matching without backtracking: A pattern that wraps an any-character or negated-class body in literal delimiters—`<%[\s\S]*?%>` or `\{\{[^}]*?\}\}`, and every other shape below—is matched by scanning for those delimiters in linear time, with no regular expression involved. Patterns of other shapes run as regular expressions, one per pattern, so each keeps its own flags.
 
-* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself contains a quantifier (`(a+)+`, `(a?)+`) or alternation (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control.
+* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself contains a quantifier (`(a+)+`, `(a?)+`) or alternation (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control. A pattern longer than 10,000 characters or nested more than 50 groups deep is judged risky without being analyzed further, so that reading the pattern cannot itself become the expensive step.
 
 * Input length limits: The `maxInputLength` option allows you to set a maximum input size to prevent processing of excessively large inputs that could cause performance issues.
 
