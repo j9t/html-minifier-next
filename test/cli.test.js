@@ -25,6 +25,22 @@ const removeFixture = async (p) => {
   await fs.promises.rm(pathToDelete, { recursive: true, force: true });
 };
 
+/**
+ * Write a temporary config file, run the body, and remove the file either way
+ * @param {string} name - File name, relative to the fixtures folder
+ * @param {unknown} config - Config to write as JSON
+ * @param {(configPath: string) => void | Promise<void>} run
+ */
+const withConfigFile = async (name, config, run) => {
+  const configPath = path.resolve(fixturesDir, name);
+  await fs.promises.writeFile(configPath, JSON.stringify(config));
+  try {
+    await run(configPath);
+  } finally {
+    await fs.promises.rm(configPath, { force: true });
+  }
+};
+
 const execCli = (args = []) => {
   const spawnOptions = {
     cwd: fixturesDir
@@ -1395,59 +1411,50 @@ describe('CLI', () => {
   });
 
   test('Should use preset from config file', async () => {
-    const configPath = path.resolve(fixturesDir, 'tmp-preset-config.json');
-    await fs.promises.writeFile(configPath, JSON.stringify({ preset: 'conservative' }));
+    await withConfigFile('tmp-preset-config.json', { preset: 'conservative' }, async configPath => {
+      const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p>  Hello  </p>  </body></html>';
+      const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--verbose'], {
+        cwd: fixturesDir,
+        input: input
+      });
 
-    const input = '<!DOCTYPE html><html>  <body>  <!-- comment -->  <p>  Hello  </p>  </body></html>';
-    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--verbose'], {
-      cwd: fixturesDir,
-      input: input
+      assert.strictEqual(status, 0);
+      assert.ok(stderr.toString().includes('Using preset: conservative'));
+      assert.ok(!stdout.toString().includes('<!-- comment -->'));
     });
-
-    assert.strictEqual(status, 0);
-    assert.ok(stderr.toString().includes('Using preset: conservative'));
-    assert.ok(!stdout.toString().includes('<!-- comment -->'));
-
-    await fs.promises.rm(configPath, { force: true });
   });
 
   test('Should warn about unknown config options', async () => {
-    const configPath = path.resolve(fixturesDir, 'tmp-unknown-option-config.json');
-    await fs.promises.writeFile(configPath, JSON.stringify({ removeScriptTypeAttributes: true, removeComments: true }));
+    await withConfigFile('tmp-unknown-option-config.json', { removeScriptTypeAttributes: true, removeComments: true }, async configPath => {
+      const input = '<p><!-- comment -->Hello</p>';
+      const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath], {
+        cwd: fixturesDir,
+        input: input
+      });
 
-    const input = '<p><!-- comment -->Hello</p>';
-    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath], {
-      cwd: fixturesDir,
-      input: input
+      assert.strictEqual(status, 0);
+      // Unknown config keys warn but don’t fail
+      assert.ok(stderr.toString().includes('removeScriptTypeAttributes'));
+      assert.ok(!stdout.toString().includes('<!-- comment -->'));
     });
-
-    assert.strictEqual(status, 0);
-    // Unknown config keys warn but don’t fail
-    assert.ok(stderr.toString().includes('removeScriptTypeAttributes'));
-    assert.ok(!stdout.toString().includes('<!-- comment -->'));
-
-    await fs.promises.rm(configPath, { force: true });
   });
 
   test('Should accept cache options from config file and CLI flags', async () => {
-    const configPath = path.resolve(fixturesDir, 'tmp-cache-options-config.json');
-    await fs.promises.writeFile(configPath, JSON.stringify({ cacheCSS: 300, removeComments: true }));
+    await withConfigFile('tmp-cache-options-config.json', { cacheCSS: 300, removeComments: true }, async configPath => {
+      const input = '<p><!-- comment -->Hello</p>';
+      const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--cache-js', '300', '--verbose'], {
+        cwd: fixturesDir,
+        input: input
+      });
 
-    const input = '<p><!-- comment -->Hello</p>';
-    const { stdout, stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--cache-js', '300', '--verbose'], {
-      cwd: fixturesDir,
-      input: input
+      assert.strictEqual(status, 0);
+      // Cache options are valid config keys and must not trigger the unknown-option warning
+      assert.ok(!stderr.toString().includes('cacheCSS'));
+      // The flag value must reach the options passed to `minify` (regression: values used to be parsed but dropped)—
+      // verbose mode lists the CLI-provided options that made it into the final options object
+      assert.ok(stderr.toString().includes('cacheJS'));
+      assert.ok(!stdout.toString().includes('<!-- comment -->'));
     });
-
-    assert.strictEqual(status, 0);
-    // Cache options are valid config keys and must not trigger the unknown-option warning
-    assert.ok(!stderr.toString().includes('cacheCSS'));
-    // The flag value must reach the options passed to `minify` (regression: values used to be parsed but dropped)—
-    // verbose mode lists the CLI-provided options that made it into the final options object
-    assert.ok(stderr.toString().includes('cacheJS'));
-    assert.ok(!stdout.toString().includes('<!-- comment -->'));
-
-    await fs.promises.rm(configPath, { force: true });
   });
 
   test('Verbose mode prints cache stats, omitting caches that were never touched', () => {
@@ -1503,41 +1510,33 @@ describe('CLI', () => {
   });
 
   test('Should override config file options with CLI flags when using preset', async () => {
-    const configPath = path.resolve(fixturesDir, 'tmp-preset-config2.json');
-    await fs.promises.writeFile(configPath, JSON.stringify({
-      preset: 'conservative',
-      useShortDoctype: false // Override preset’s `useShortDoctype`
-    }));
+    const config = { preset: 'conservative', useShortDoctype: false }; // Override preset’s `useShortDoctype`
+    await withConfigFile('tmp-preset-config2.json', config, async configPath => {
+      const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p>test</p>';
+      // Config says `useShortDoctype: false`, but CLI should override to true
+      const { stdout, status } = spawnSync('node', [cliPath, '-c', configPath, '--use-short-doctype'], {
+        cwd: fixturesDir,
+        input: input
+      });
 
-    const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><p>test</p>';
-    // Config says `useShortDoctype: false`, but CLI should override to true
-    const { stdout, status } = spawnSync('node', [cliPath, '-c', configPath, '--use-short-doctype'], {
-      cwd: fixturesDir,
-      input: input
+      assert.strictEqual(status, 0);
+      // Short doctype should be used due to CLI override
+      assert.ok(stdout.toString().includes('<!doctype html>'));
     });
-
-    assert.strictEqual(status, 0);
-    // Short doctype should be used due to CLI override
-    assert.ok(stdout.toString().includes('<!doctype html>'));
-
-    await fs.promises.rm(configPath, { force: true });
   });
 
   test('Should prioritize CLI preset over config preset', async () => {
-    const configPath = path.resolve(fixturesDir, 'tmp-preset-config3.json');
-    await fs.promises.writeFile(configPath, JSON.stringify({ preset: 'conservative' }));
+    await withConfigFile('tmp-preset-config3.json', { preset: 'conservative' }, async configPath => {
+      const input = '<!DOCTYPE html><html><body><p class="z a">Hello</p></body></html>';
+      // CLI preset should override config preset
+      const { stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--preset', 'comprehensive', '--verbose'], {
+        cwd: fixturesDir,
+        input: input
+      });
 
-    const input = '<!DOCTYPE html><html><body><p class="z a">Hello</p></body></html>';
-    // CLI preset should override config preset
-    const { stderr, status } = spawnSync('node', [cliPath, '-c', configPath, '--preset', 'comprehensive', '--verbose'], {
-      cwd: fixturesDir,
-      input: input
+      assert.strictEqual(status, 0);
+      assert.ok(stderr.toString().includes('Using preset: comprehensive'));
     });
-
-    assert.strictEqual(status, 0);
-    assert.ok(stderr.toString().includes('Using preset: comprehensive'));
-
-    await fs.promises.rm(configPath, { force: true });
   });
 
   test('Should ignore single directory by name', async () => {
