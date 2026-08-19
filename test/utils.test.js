@@ -102,15 +102,31 @@ describe('Utils', () => {
       assert.strictEqual(embedSource(/[ü-ÿ]/i), '[ü-ÿ]');
     });
 
+    test('What `i` cannot reach is left alone, never widened', () => {
+      // Each of these would need the flag itself; the source keeps its own meaning
+      assert.strictEqual(embedSource(/(a)\1/i), '([aA])\\1'); // a backreference compares literally
+      assert.strictEqual(embedSource(/[ü-ÿ]/i), '[ü-ÿ]'); // `ÿ` uppercases far past the range
+      assert.strictEqual(embedSource(/[*-[]/i), '[*-[]'); // spans `A`–`Z` without being a letter range
+    });
+
     test('The rewrite never matches more than the pattern would', () => {
-      const cases = [/abc/i, /[a-z]+/i, /[^a-z]/i, /a.c/s, /a.c/is, /<%[A-Z]+%>/i, /[a-z\d]/i, /(?:ab)+/i];
-      const inputs = ['abc', 'ABC', 'aBc', 'a\nc', 'a.c', 'xyz', 'XYZ', '<%AB%>', '<%ab%>', 'ab', 'ABAB', '0', 'ü'];
-      for (const pattern of cases) {
+      const exact = [/abc/i, /[a-z]+/i, /[^a-z]/i, /a.c/s, /a.c/is, /<%[A-Z]+%>/i, /[a-z\d]/i, /(?:ab)+/i];
+      const conservative = [/(a)\1/i, /[ü-ÿ]/i, /[*-[]/i, /\x6a/i];
+      const inputs = ['abc', 'ABC', 'aBc', 'a\nc', 'a.c', 'xyz', 'XYZ', '<%AB%>', '<%ab%>', 'ab', 'AB',
+        'ABAB', 'abAB', 'aA', '0', 'ü', 'Ü', 'ÿ', 'Ÿ', 'j', 'J'];
+      for (const pattern of exact.concat(conservative)) {
         const rewritten = new RegExp('^(?:' + embedSource(pattern) + ')$');
         const original = new RegExp('^(?:' + pattern.source + ')$', pattern.flags);
         for (const input of inputs) {
-          assert.strictEqual(rewritten.test(input), original.test(input),
-            `${pattern} vs ${rewritten} on ${JSON.stringify(input)}`);
+          const got = rewritten.exec(input);
+          const want = original.exec(input);
+          // Never wider than the pattern, and exact for everything `i` can reach
+          if (got) {
+            assert.ok(want, `${pattern} rewritten as ${rewritten} matched ${JSON.stringify(input)}, which it should not`);
+            assert.deepStrictEqual([...got], [...want], `${pattern} captured differently on ${JSON.stringify(input)}`);
+          } else if (exact.includes(pattern)) {
+            assert.strictEqual(want, null, `${pattern} rewritten as ${rewritten} missed ${JSON.stringify(input)}`);
+          }
         }
       }
     });

@@ -327,7 +327,10 @@ function foldCase(source) {
 /**
  * A pattern’s source, rewritten to match the way its own flags make it match, for
  * embedding in a larger regex that cannot carry them. `i` and `s` fit into a
- * source; `m`, `u`, and `v` do not, and are left to the pattern it joins.
+ * source; `m`, `u`, and `v` do not, and are left to the pattern it joins. Where
+ * `i` cannot be written in—a backreference, a range outside ASCII, a range that
+ * spans letters without being one—the source stands as it is, matching less than
+ * the pattern would rather than more.
  * @param {RegExp} pattern
  * @returns {string}
  */
