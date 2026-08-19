@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.1] - 2026-08-19
+
+### Fixed
+
+* Fixed the `ignoreCustomFragments` risk analysis missing two unbounded repeats that overlap without being spelled alike—`[a]*a*` and `\w*\d*` split a run of input the same way `a*a*` does, and are now flagged the same way
+
 ## [8.0.0] - 2026-08-19
 
 ### Fixed

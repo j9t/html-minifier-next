@@ -145,24 +145,11 @@ function parseRegExp(value) {
   return value;
 }
 
-// ReDoS risk detection for user-supplied patterns
+// Regex source reading, shared by the analysis and the rewriting below
 
-// Quantifier following an atom, with its optional lazy `?`; the captures hold
-// the bounds of a `{n,m}` form, the upper one empty when the form is `{n,}`
-const RE_QUANTIFIER = /(?:[*+?]|\{(\d+)(?:,(\d*))?\})\??/y;
-
-// Bounds for the walk below: Patterns beyond either are judged risky unread,
-// which keeps a pathological source from nesting the analysis into a stack
-// overflow or making it rescan its groups once per level
-const MAX_PATTERN_LENGTH = 10000;
-const MAX_PATTERN_DEPTH = 50;
-
-// A group that only wraps its body backtracks the way that body does, so
-// `(?:a)` and `a` count as the same atom; lookarounds are left alone
-const RE_TRANSPARENT_GROUP = /^\((?:\?:|\?<[^>=!][^>]*>)?([\s\S]*)\)$/;
-
-// A quantifier of exactly one repetition, which is notation rather than shape
-const RE_EXACT_ONE = /\{1(?:,1)?\}\??$/;
+const RE_ASCII_LETTER = /^[a-zA-Z]$/;
+const RE_HEX_PAIR = /^[0-9a-fA-F]{2}$/;
+const RE_HEX_QUAD = /^[0-9a-fA-F]{4}$/;
 
 /** @param {string} source @param {number} index - Index of the opening `[` */
 function skipCharacterClass(source, index) {
@@ -171,38 +158,6 @@ function skipCharacterClass(source, index) {
     i += source[i] === '\\' ? 2 : 1;
   }
   return i + 1;
-}
-
-/** @param {string} atom - Atom as it reads in the source */
-function unwrapAtom(atom) {
-  let inner = atom;
-  for (let level = 0; level < MAX_PATTERN_DEPTH; level++) {
-    const next = inner.replace(RE_EXACT_ONE, '').replace(RE_TRANSPARENT_GROUP, '$1');
-    if (next === inner) break;
-    inner = next;
-  }
-  return inner;
-}
-
-// Embedding a pattern in a larger regex drops the flags it carried, so the two
-// a source can carry on its own are rewritten into it
-//
-// @@ Replace with inline `(?i:…)` and `(?s:…)` modifiers once Node floor reaches 24
-
-const RE_ASCII_LETTER = /^[a-zA-Z]$/;
-const RE_HEX_PAIR = /^[0-9a-fA-F]{2}$/;
-const RE_HEX_QUAD = /^[0-9a-fA-F]{4}$/;
-
-/** @param {string} char @returns {boolean} Whether the character has a single-character counterpart */
-function foldsCase(char) {
-  const lower = char.toLowerCase();
-  const upper = char.toUpperCase();
-  return lower !== upper && lower.length === 1 && upper.length === 1;
-}
-
-/** @param {string} char */
-function isLower(char) {
-  return char === char.toLowerCase();
 }
 
 /**
@@ -232,6 +187,175 @@ function tokenLength(source, index) {
     if (close !== -1) return close - index + 1;
   }
   return 2;
+}
+
+// ReDoS risk detection for user-supplied patterns
+
+// Quantifier following an atom, with its optional lazy `?`; the captures hold
+// the bounds of a `{n,m}` form, the upper one empty when the form is `{n,}`
+const RE_QUANTIFIER = /(?:[*+?]|\{(\d+)(?:,(\d*))?\})\??/y;
+
+// Bounds for the walk below: Patterns beyond either are judged risky unread,
+// which keeps a pathological source from nesting the analysis into a stack
+// overflow or making it rescan its groups once per level
+const MAX_PATTERN_LENGTH = 10000;
+const MAX_PATTERN_DEPTH = 50;
+
+// A group that only wraps its body backtracks the way that body does, so
+// `(?:a)` and `a` count as the same atom; lookarounds are left alone
+const RE_TRANSPARENT_GROUP = /^\((?:\?:|\?<[^>=!][^>]*>)?([\s\S]*)\)$/;
+
+// A quantifier of exactly one repetition, which is notation rather than shape
+const RE_EXACT_ONE = /\{1(?:,1)?\}\??$/;
+
+/** @param {string} atom - Atom as it reads in the source */
+function unwrapAtom(atom) {
+  let inner = atom;
+  for (let level = 0; level < MAX_PATTERN_DEPTH; level++) {
+    const next = inner.replace(RE_EXACT_ONE, '').replace(RE_TRANSPARENT_GROUP, '$1');
+    if (next === inner) break;
+    inner = next;
+  }
+  return inner;
+}
+
+// Two atoms that repeat unboundedly side by side split a run between them in as
+// many ways as the run is long, whenever both can consume the same character.
+// Comparing what they match, rather than how they are spelled, is what catches
+// `[a]*a*` and `\w*\d*` alongside `a*a*`.
+
+const MAX_CODE_POINT = 0x10FFFF;
+
+/** @type {Record<string, [number, number][]>} */
+const CLASS_ESCAPE_RANGES = {
+  d: [[0x30, 0x39]],
+  w: [[0x30, 0x39], [0x41, 0x5A], [0x5F, 0x5F], [0x61, 0x7A]],
+  s: [[0x09, 0x0D], [0x20, 0x20], [0xA0, 0xA0], [0x1680, 0x1680], [0x2000, 0x200A],
+    [0x2028, 0x2029], [0x202F, 0x202F], [0x205F, 0x205F], [0x3000, 0x3000], [0xFEFF, 0xFEFF]]
+};
+
+/** @type {Record<string, number>} */
+const CONTROL_ESCAPE_CODES = { 0: 0x00, f: 0x0C, n: 0x0A, r: 0x0D, t: 0x09, v: 0x0B };
+
+// An escape that stands for something other than one character of text
+const RE_NON_CHARACTER_ESCAPE = /[bBdDkpPsSwW1-9]/;
+
+/** @param {[number, number][]} ranges */
+function complement(ranges) {
+  const sorted = [...ranges].sort((one, other) => one[0] - other[0]);
+  /** @type {[number, number][]} */
+  const out = [];
+  let next = 0;
+  for (const [low, high] of sorted) {
+    if (low > next) out.push([next, low - 1]);
+    next = Math.max(next, high + 1);
+  }
+  if (next <= MAX_CODE_POINT) out.push([next, MAX_CODE_POINT]);
+  return out;
+}
+
+// `.` as a bare source reads it, without the `s` flag the source cannot carry
+const DOT_RANGES = complement([[0x0A, 0x0A], [0x0D, 0x0D], [0x2028, 0x2029]]);
+
+/**
+ * @param {string} token - One token, as `tokenLength` measures it
+ * @returns {[number, number][] | null} What it matches, or `null` where it is not
+ *   one character of text
+ */
+function tokenRanges(token) {
+  if (token[0] !== '\\') {
+    const code = token.codePointAt(0) ?? 0;
+    return String.fromCodePoint(code) === token ? [[code, code]] : null;
+  }
+
+  const kind = token[1] ?? '';
+  const named = CLASS_ESCAPE_RANGES[kind.toLowerCase()];
+  if (named) return kind === kind.toLowerCase() ? named : complement(named);
+
+  const control = CONTROL_ESCAPE_CODES[kind];
+  if (control !== undefined) return [[control, control]];
+
+  if (kind === 'x' || kind === 'u') {
+    const code = Number.parseInt(token[2] === '{' ? token.slice(3, -1) : token.slice(2), 16);
+    return Number.isNaN(code) || code > MAX_CODE_POINT ? null : [[code, code]];
+  }
+  if (kind === 'c') {
+    const code = token.charCodeAt(2) % 32;
+    return [[code, code]];
+  }
+  if (RE_NON_CHARACTER_ESCAPE.test(kind)) return null;
+
+  // The rest is punctuation escaped to be read as itself
+  const code = token.codePointAt(1) ?? 0;
+  return String.fromCodePoint(code) === token.slice(1) ? [[code, code]] : null;
+}
+
+/** @param {[number, number][] | null} ranges @returns {number | null} The one code point it holds */
+function singleCode(ranges) {
+  const [range] = ranges ?? [];
+  return ranges?.length === 1 && range && range[0] === range[1] ? range[0] : null;
+}
+
+/**
+ * @param {string} atom - Atom as it reads in the source, already unwrapped
+ * @returns {[number, number][] | null} What it matches, or `null` where it is not
+ *   one character of text, or one this does not read
+ */
+function atomRanges(atom) {
+  if (atom === '.') return DOT_RANGES;
+  if (atom[0] !== '[') return tokenRanges(atom);
+  if (!atom.endsWith(']')) return null;
+
+  let i = atom[1] === '^' ? 2 : 1;
+  const negated = i === 2;
+  const end = atom.length - 1;
+  /** @type {[number, number][]} */
+  const members = [];
+
+  while (i < end) {
+    const fromLength = tokenLength(atom, i);
+    const from = tokenRanges(atom.slice(i, i + fromLength));
+    if (!from) return null;
+    i += fromLength;
+
+    // A dash right before the closing `]` is a member, not the start of a range
+    if (atom[i] !== '-' || i + 1 >= end) {
+      members.push(...from);
+      continue;
+    }
+    const toLength = tokenLength(atom, i + 1);
+    // Only single characters bound a range; `\d-z` is not a range at all
+    const low = singleCode(from);
+    const high = singleCode(tokenRanges(atom.slice(i + 1, i + 1 + toLength)));
+    if (low === null || high === null) return null;
+    members.push([low, high]);
+    i += 1 + toLength;
+  }
+
+  return negated ? complement(members) : members;
+}
+
+/** @param {[number, number][]} ranges @param {[number, number][]} other */
+function rangesIntersect(ranges, other) {
+  return ranges.some(([low, high]) => other.some(([otherLow, otherHigh]) =>
+    low <= otherHigh && otherLow <= high));
+}
+
+// Embedding a pattern in a larger regex drops the flags it carried, so the two
+// a source can carry on its own are rewritten into it
+//
+// @@ Replace with inline `(?i:…)` and `(?s:…)` modifiers once Node floor reaches 24
+
+/** @param {string} char @returns {boolean} Whether the character has a single-character counterpart */
+function foldsCase(char) {
+  const lower = char.toLowerCase();
+  const upper = char.toUpperCase();
+  return lower !== upper && lower.length === 1 && upper.length === 1;
+}
+
+/** @param {string} char */
+function isLower(char) {
+  return char === char.toLowerCase();
 }
 
 /** @param {string} source - Regex source, assumed syntactically valid */
@@ -344,9 +468,9 @@ function embedSource(pattern) {
 /**
  * Walk a regex source for the shapes whose backtracking blows up: an unlimited
  * quantifier over a group that itself contains a variable quantifier (`(a+)+`,
- * `(a?)+`) or alternates, and the same atom repeated unboundedly twice in a
- * row. A lone unlimited quantifier stays linear, so `[\s\S]*?` up to a literal
- * terminator passes.
+ * `(a?)+`) or alternates, and two unbounded repeats in a row that can consume
+ * the same character (`.*.*`, `[a]*a*`, `\w*\d*`). A lone unlimited quantifier
+ * stays linear, so `[\s\S]*?` up to a literal terminator passes.
  * @param {string} source - Regex source, assumed syntactically valid
  * @param {number} [depth] - Group nesting level of this call
  * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean}}
@@ -358,7 +482,7 @@ function analyzeQuantifiers(source, depth = 0) {
   let varies = false;
   let alternates = false;
   let deep = false;
-  /** @type {{text: string, repeats: boolean} | null} */
+  /** @type {{text: string, repeats: boolean, ranges: [number, number][] | null} | null} */
   let previous = null;
   let i = 0;
 
@@ -375,7 +499,7 @@ function analyzeQuantifiers(source, depth = 0) {
       i++;
       continue;
     } else if (char === '\\') {
-      i += 2;
+      i += tokenLength(source, i);
     } else if (char === '[') {
       i = skipCharacterClass(source, i);
     } else if (char === '(') {
@@ -384,7 +508,7 @@ function analyzeQuantifiers(source, depth = 0) {
       while (i < source.length && open > 0) {
         const inner = source[i];
         if (inner === '\\') {
-          i += 2;
+          i += tokenLength(source, i);
         } else if (inner === '[') {
           i = skipCharacterClass(source, i);
         } else {
@@ -421,8 +545,10 @@ function analyzeQuantifiers(source, depth = 0) {
     }
     if (variable) varies = true;
     const text = unwrapAtom(atom);
-    if (repeats && previous?.repeats && previous.text === text) risky = true;
-    previous = { text, repeats };
+    const ranges = atomRanges(text);
+    const overlaps = !!ranges && !!previous?.ranges && rangesIntersect(ranges, previous.ranges);
+    if (repeats && previous?.repeats && (previous.text === text || overlaps)) risky = true;
+    previous = { text, repeats, ranges };
   }
 
   return { risky, varies, alternates, deep };

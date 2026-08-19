@@ -184,6 +184,23 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/<!--[\s\S]*[\s\S]*-->/.source), true);
     });
 
+    test('Two unbounded repeats that can consume the same character are risky', () => {
+      // Spelled differently, but `[a]` and `a` split a run of `a`s the same way
+      assert.strictEqual(hasRiskyQuantifiers(/[a]*a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\w*\d*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/[a-z]*[a-c]*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/[^a]*b*/.source), true);
+      // A multi-character escape counts as the one character it stands for
+      assert.strictEqual(hasRiskyQuantifiers(/\u0041*\u0041*/.source), true);
+      // Repeats that share nothing leave nothing ambiguous to split
+      assert.strictEqual(hasRiskyQuantifiers(/x*y*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/\s*\S*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/\d*[a-z]*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/[^a]*a*/.source), false);
+      // Without the `s` flag a source cannot carry, `.` stops at a line break
+      assert.strictEqual(hasRiskyQuantifiers(/.*\n*/.source), false);
+    });
+
     test('A group wrapping the atom does not hide the repetition', () => {
       // `^(?:a)*a*$` backtracks quadratically on `aaa…b`, the way `a*a*` does
       assert.strictEqual(hasRiskyQuantifiers(/^(?:a)*a*$/.source), true);
