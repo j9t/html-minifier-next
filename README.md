@@ -549,7 +549,7 @@ To validate complete HTML markup, use [the W3C validator](https://validator.w3.o
 
 ### Regex options and flags
 
-`customAttrAssign` and `customAttrSurround` patterns are merged into one attribute pattern which carries no flags of its own. `i` and `s` are written into each pattern’s source instead, so they survive the merge. `u`, `v`, and `m` cannot be, and none fails loudly when dropped—both only narrow what syntax is legal, so a source valid under either stays valid without it and quietly matches something else: a dropped `u` leaves `\p{L}` matching the literal text `p{L}`.
+`customAttrAssign` and `customAttrSurround` patterns are merged into one attribute pattern which carries no flags of its own. `i` and `s` are written into each pattern’s source instead, so they survive the merge. `u`, `v`, and `m` cannot be, and none of them fails loudly when dropped: `u` and `v` only narrow what syntax is legal, so a source valid under either stays valid without it and quietly matches something else—a dropped `u` leaves `\p{L}` matching the literal text `p{L}`—while a dropped `m` leaves `^` and `$` matching at the ends of the input rather than of each line.
 
 A pattern is therefore refused with an error where the flag changes what its source matches—a property or code point escape, a character past the BMP, a character `i` folds by Unicode rules only while `u` is there (`/s/iu` matches `\u017F`, `/k/iu` matches `\u212A`), a `v` class that nests, subtracts, intersects, or holds strings, or—under `m`—an anchor whose meaning moves. A flag the source does not depend on, as in `/x=/u`, is left alone.
 
