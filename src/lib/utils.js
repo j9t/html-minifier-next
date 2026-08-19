@@ -192,14 +192,15 @@ function unwrapAtom(atom) {
  * terminator passes
  * @param {string} source - Regex source, assumed syntactically valid
  * @param {number} [depth] - Group nesting level of this call
- * @returns {{risky: boolean, varies: boolean, alternates: boolean}}
+ * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean}}
  */
 function analyzeQuantifiers(source, depth = 0) {
-  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true };
+  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true, deep: true };
 
   let risky = false;
   let varies = false;
   let alternates = false;
+  let deep = false;
   /** @type {{text: string, repeats: boolean} | null} */
   let previous = null;
   let i = 0;
@@ -259,6 +260,7 @@ function analyzeQuantifiers(source, depth = 0) {
       if (group.varies) varies = true;
       // A group alternates whether the `|` sits at its top level or deeper
       if (group.alternates) alternates = true;
+      if (group.deep) deep = true;
     }
     if (variable) varies = true;
     const text = unwrapAtom(atom);
@@ -266,15 +268,26 @@ function analyzeQuantifiers(source, depth = 0) {
     previous = { text, repeats };
   }
 
-  return { risky, varies, alternates };
+  return { risky, varies, alternates, deep };
 }
 
 /**
  * @param {string} source - Regex source to judge
- * @returns {boolean} Whether the pattern can backtrack catastrophically
+ * @returns {string | null} What makes the pattern a backtracking risk, phrased
+ *   to follow the pattern itself, or `null` where it is none
  */
-function hasRiskyQuantifiers(source) {
-  return source.length > MAX_PATTERN_LENGTH || analyzeQuantifiers(source).risky;
+function describeQuantifierRisk(source) {
+  // A pattern too big to read is refused for that, not for a shape nobody saw
+  if (source.length > MAX_PATTERN_LENGTH) {
+    return `runs past ${MAX_PATTERN_LENGTH.toLocaleString()} characters, too long to analyze for catastrophic backtracking—shorten it, or split it into several patterns`;
+  }
+  const analysis = analyzeQuantifiers(source);
+  if (analysis.deep) {
+    return `nests groups more than ${MAX_PATTERN_DEPTH.toLocaleString()} deep, too deep to analyze for catastrophic backtracking—flatten it, or split it into several patterns`;
+  }
+  return analysis.risky
+    ? 'compounds quantifiers or alternation in a way that may cause ReDoS—bound the repetition (e.g., `{0,1000}`) instead'
+    : null;
 }
 
 /**
@@ -313,5 +326,5 @@ export {
   lowercase,
   replaceAsync,
   parseRegExp,
-  hasRiskyQuantifiers
+  describeQuantifierRisk
 };

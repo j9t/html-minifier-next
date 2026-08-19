@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `strictCustomFragments` to reject `ignoreCustomFragments` patterns that compound quantifiers or alternation, rather than warning about them—those are the patterns that reach the backtracking path, so an error is the safer answer where the patterns or the input are not fully under your control
+* Added `strictCustomFragments` to reject `ignoreCustomFragments` patterns that risk catastrophic backtracking, rather than warning about them—those are the patterns that reach the backtracking path, so an error is the safer answer where the patterns or the input are not fully under your control
   - The risk analysis is capped: Patterns longer than 10,000 characters or nested deeper than 50 groups are judged risky rather than analyzed further
 
 ### Changed

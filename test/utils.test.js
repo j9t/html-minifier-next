@@ -1,6 +1,9 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { LRU, hasRiskyQuantifiers } from '../src/lib/utils.js';
+import { LRU, describeQuantifierRisk } from '../src/lib/utils.js';
+
+/** @param {string} source */
+const hasRiskyQuantifiers = source => describeQuantifierRisk(source) !== null;
 
 describe('Utils', () => {
   describe('LRU', () => {
@@ -71,7 +74,7 @@ describe('Utils', () => {
     });
   });
 
-  describe('`hasRiskyQuantifiers`', () => {
+  describe('`describeQuantifierRisk`', () => {
     test('A lazy scan up to a literal terminator is linear', () => {
       // The shipped `ignoreCustomFragments` defaults
       assert.strictEqual(hasRiskyQuantifiers(/<%[\s\S]*?%>/.source), false);
@@ -152,6 +155,15 @@ describe('Utils', () => {
     test('A repeated group repeating only within a bound passes', () => {
       // The shape HMN itself composes from the fragment patterns
       assert.strictEqual(hasRiskyQuantifiers(/(?:<%[\s\S]*?%>|<\?[\s\S]*?\?>){1,200}/.source), false);
+    });
+
+    test('The reason names what was found, not a shape nobody read', () => {
+      // A pattern refused for its size carries no quantifier to bound
+      assert.match(String(describeQuantifierRisk('a'.repeat(10001))), /too long to analyze/);
+      assert.match(String(describeQuantifierRisk('('.repeat(60) + 'a' + ')'.repeat(60))), /too deep to analyze/);
+      assert.match(String(describeQuantifierRisk(/(a+)+/.source)), /compounds quantifiers or alternation/);
+      assert.match(String(describeQuantifierRisk(/.*.*/.source)), /compounds quantifiers or alternation/);
+      assert.strictEqual(describeQuantifierRisk(/<%[\s\S]*?%>/.source), null);
     });
 
     test('Risk nested deeper in a group still surfaces', () => {

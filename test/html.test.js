@@ -2620,6 +2620,12 @@ describe('HTML', () => {
       /compounds quantifiers or alternation/
     );
 
+    // A pattern too big to analyze is refused for that, not for a shape
+    await assert.rejects(
+      () => minify('<p>x</p>', { ignoreCustomFragments: [new RegExp('a'.repeat(10001))], strictCustomFragments: true }),
+      /too long to analyze/
+    );
+
     // Patterns that stay linear are accepted, the defaults among them
     const safe = { ignoreCustomFragments: [/<%[\s\S]*?%>/, /\{\{[^}]{0,500}\}\}/], strictCustomFragments: true };
     assert.strictEqual(await minify('<p><% a %></p>', safe), '<p><% a %></p>');

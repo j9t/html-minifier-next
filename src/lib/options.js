@@ -1,5 +1,5 @@
 import { createUrlMinifier } from './urls.js';
-import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp, hasRiskyQuantifiers } from './utils.js';
+import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp, describeQuantifierRisk } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -604,12 +604,15 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
   // Fragments that compound quantifiers or alternation under unbounded repetition
   // are the shapes that backtrack catastrophically, and they are also the ones a
-  // linear scan cannot stand in for. A lone `[\s\S]*?` up to a literal terminator
-  // is linear and passes; HMN’s default fragments have exactly that shape, so
-  // the check flagging it would mean warning about the defaults themselves.
+  // linear scan cannot stand in for; so are patterns too long or too deeply
+  // nested to read, which are refused for that rather than for a shape. A lone
+  // `[\s\S]*?` up to a literal terminator is linear and passes; HMN’s default
+  // fragments have exactly that shape, so the check flagging it would mean
+  // warning about the defaults themselves.
   for (const re of options.ignoreCustomFragments || []) {
-    if (!hasRiskyQuantifiers(re.source)) continue;
-    const problem = `Custom fragment \`/${re.source}/\` compounds quantifiers or alternation in a way that may cause ReDoS—bound the repetition (e.g., \`{0,1000}\`) instead`;
+    const risk = describeQuantifierRisk(re.source);
+    if (!risk) continue;
+    const problem = `Custom fragment \`/${re.source}/\` ${risk}`;
     if (options.strictCustomFragments) {
       throw new Error(`HTML Minifier Next: ${problem}`);
     }

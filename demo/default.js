@@ -1,6 +1,6 @@
 import HTMLMinifier, { getPreset } from '../src/htmlminifier.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
-import { hasRiskyQuantifiers } from '../src/lib/utils.js';
+import { describeQuantifierRisk } from '../src/lib/utils.js';
 import pkg from '../package.json' with { type: 'json' };
 
 // Escape HTML entities for safe rendering inside `<code>` elements
@@ -244,9 +244,10 @@ const getOptions = (options) => {
       value = patterns.map(pattern => {
         try {
           // Warn about potentially dangerous patterns (ReDoS risk)
-          if (hasRiskyQuantifiers(pattern)) {
+          const risk = describeQuantifierRisk(pattern);
+          if (risk) {
             console.warn(`Potentially dangerous regex pattern detected: ${pattern}`);
-            console.warn('The pattern compounds quantifiers or alternation and can backtrack catastrophically. Bound them, as in `{0,1000}`.');
+            console.warn(`The pattern ${risk}.`);
           }
           return new RegExp(pattern);
         } catch (err) {
