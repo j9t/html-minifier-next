@@ -1,6 +1,6 @@
 import HTMLMinifier, { getPreset } from '../src/htmlminifier.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
-import { describeQuantifierRisk } from '../src/lib/utils.js';
+import { describeQuantifierRisk, parseRegExp } from '../src/lib/utils.js';
 import pkg from '../package.json' with { type: 'json' };
 
 // Escape HTML entities for safe rendering inside `<code>` elements
@@ -231,7 +231,7 @@ const getOptions = (options) => {
 
     if (option.id === 'customAttrCollapse') {
       try {
-        value = new RegExp(value);
+        value = parseRegExp(value);
       } catch (err) {
         console.warn(`Invalid regex pattern: ${value}`, err);
         return;
@@ -239,17 +239,18 @@ const getOptions = (options) => {
     }
 
     if (option.id === 'ignoreCustomComments' || option.id === 'customAttrAssign' || option.id === 'ignoreCustomFragments') {
-      // Split by whitespace and convert each pattern to RegExp
+      // Split by whitespace and convert each pattern to RegExp, `/…/flags` included
       const patterns = value.split(/\s+/).filter(p => p.trim());
       value = patterns.map(pattern => {
         try {
+          const parsed = parseRegExp(pattern);
           // Warn about potentially dangerous patterns (ReDoS risk)
-          const risk = describeQuantifierRisk(pattern);
+          const risk = describeQuantifierRisk(parsed);
           if (risk) {
             console.warn(`Potentially dangerous regex pattern detected: ${pattern}`);
             console.warn(`The pattern ${risk}.`);
           }
-          return new RegExp(pattern);
+          return parsed;
         } catch (err) {
           console.warn(`Invalid regex pattern: ${pattern}`, err);
           return null;
