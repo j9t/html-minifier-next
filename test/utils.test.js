@@ -105,7 +105,7 @@ describe('Utils', () => {
     test('What `i` cannot reach is left alone, never widened', () => {
       // Each of these would need the flag itself; the source keeps its own meaning.
       // Built with `RegExp` so they read as the fixtures they are, not as patterns
-      // for scanners to flag
+      // for scanners to flag.
       assert.strictEqual(embedSource(new RegExp('(a)\\1', 'i')), '([aA])\\1'); // a backreference compares literally
       assert.strictEqual(embedSource(new RegExp('[ü-ÿ]', 'i')), '[ü-ÿ]'); // `ÿ` uppercases far past the range
       assert.strictEqual(embedSource(new RegExp('[*-[]', 'i')), '[*-[]'); // spans `A`–`Z` without being a letter range
