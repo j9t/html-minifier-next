@@ -2641,6 +2641,24 @@ describe('HTML', () => {
     assert.strictEqual(logged.filter(message => String(message).includes('compounds quantifiers')).length, 1);
   });
 
+  test('`customAttrSurround` and `customAttrAssign` keep their flags', async () => {
+    // The parser merges these into one attribute pattern, which carries no flags
+    // of its own, so each pattern's `i` has to survive the merge
+    const surround = (/** @type {string} */ flags) => ({
+      customAttrSurround: [[new RegExp('\\{\\{#if\\s+\\w+\\}\\}', flags), new RegExp('\\{\\{/if\\}\\}', flags)]]
+    });
+    const upper = '<input {{#IF value}}checked="checked"{{/IF}}>';
+
+    // Without the flag the pattern stays case-sensitive, and the markup does not parse
+    await assert.rejects(() => minify(upper, surround('')), /Parse error/);
+    assert.strictEqual(await minify(upper, surround('i')), upper);
+
+    const lower = '<input {{#if value}}checked="checked"{{/if}}>';
+    assert.strictEqual(await minify(lower, surround('')), lower);
+
+    assert.strictEqual(await minify('<div flagX="v">y</div>', { customAttrAssign: [/x=/i] }), '<div flagx="v">y</div>');
+  });
+
   test('`caseSensitive`', async () => {
     const input = '<div mixedCaseAttribute="value"></div>';
     const caseSensitiveOutput = '<div mixedCaseAttribute="value"></div>';

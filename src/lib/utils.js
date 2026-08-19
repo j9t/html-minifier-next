@@ -184,12 +184,166 @@ function unwrapAtom(atom) {
   return inner;
 }
 
+// Embedding a pattern in a larger regex drops the flags it carried, so the two
+// a source can carry on its own are rewritten into it
+//
+// @@ Replace with inline `(?i:…)` and `(?s:…)` modifiers once Node floor reaches 24
+
+const RE_ASCII_LETTER = /^[a-zA-Z]$/;
+const RE_HEX_PAIR = /^[0-9a-fA-F]{2}$/;
+const RE_HEX_QUAD = /^[0-9a-fA-F]{4}$/;
+
+/** @param {string} char @returns {boolean} Whether the character has a single-character counterpart */
+function foldsCase(char) {
+  const lower = char.toLowerCase();
+  const upper = char.toUpperCase();
+  return lower !== upper && lower.length === 1 && upper.length === 1;
+}
+
+/** @param {string} char */
+function isLower(char) {
+  return char === char.toLowerCase();
+}
+
+/**
+ * Length of the token at `index`, so that a multi-character escape is read whole
+ * rather than leaving its tail to be mistaken for literals.
+ * @param {string} source @param {number} index
+ */
+function tokenLength(source, index) {
+  if (source[index] !== '\\') return 1;
+  const next = source[index + 1];
+  if (next === 'x' && RE_HEX_PAIR.test(source.slice(index + 2, index + 4))) return 4;
+  if (next === 'u') {
+    if (source[index + 2] === '{') {
+      const close = source.indexOf('}', index + 3);
+      if (close !== -1) return close - index + 1;
+    }
+    if (RE_HEX_QUAD.test(source.slice(index + 2, index + 6))) return 6;
+  }
+  if (next === 'c' && RE_ASCII_LETTER.test(source[index + 2] ?? '')) return 3;
+  // A property name or a group name is syntax, not text to fold
+  if ((next === 'p' || next === 'P') && source[index + 2] === '{') {
+    const close = source.indexOf('}', index + 3);
+    if (close !== -1) return close - index + 1;
+  }
+  if (next === 'k' && source[index + 2] === '<') {
+    const close = source.indexOf('>', index + 3);
+    if (close !== -1) return close - index + 1;
+  }
+  return 2;
+}
+
+/** @param {string} source - Regex source, assumed syntactically valid */
+function expandDotAll(source) {
+  let out = '';
+  let i = 0;
+  while (i < source.length) {
+    const char = source[i];
+    if (char === '\\') {
+      const length = tokenLength(source, i);
+      out += source.slice(i, i + length);
+      i += length;
+    } else if (char === '[') {
+      const end = skipCharacterClass(source, i);
+      out += source.slice(i, end);
+      i = end;
+    } else if (char === '.') {
+      out += '[\\s\\S]';
+      i++;
+    } else {
+      out += char;
+      i++;
+    }
+  }
+  return out;
+}
+
+/** @param {string} source - Regex source, assumed syntactically valid */
+function foldCase(source) {
+  let out = '';
+  let i = 0;
+  let inClass = false;
+
+  while (i < source.length) {
+    const char = source[i] ?? '';
+
+    if (!inClass) {
+      if (char === '\\') {
+        const length = tokenLength(source, i);
+        out += source.slice(i, i + length);
+        i += length;
+      } else if (char === '[') {
+        inClass = true;
+        out += char;
+        i++;
+      } else if (char === '(' && source.startsWith('(?<', i) &&
+                 source[i + 3] !== '=' && source[i + 3] !== '!') {
+        // A capture group’s name is syntax, and folding it is a syntax error
+        const close = source.indexOf('>', i + 3);
+        const end = close === -1 ? i + 3 : close + 1;
+        out += source.slice(i, end);
+        i = end;
+      } else {
+        out += foldsCase(char) ? '[' + char.toLowerCase() + char.toUpperCase() + ']' : char;
+        i++;
+      }
+      continue;
+    }
+
+    if (char === ']') {
+      inClass = false;
+      out += char;
+      i++;
+      continue;
+    }
+
+    const fromLength = tokenLength(source, i);
+    const from = source.slice(i, i + fromLength);
+    const afterFrom = i + fromLength;
+
+    // A range needs the other case’s range beside it—only where both ends are
+    // ASCII letters, the one span whose two cases are contiguous and parallel
+    // (`ÿ` uppercases to `Ÿ`, 150 code points past where its range ends)
+    if (source[afterFrom] === '-' && afterFrom + 1 < source.length && source[afterFrom + 1] !== ']') {
+      const toLength = tokenLength(source, afterFrom + 1);
+      const to = source.slice(afterFrom + 1, afterFrom + 1 + toLength);
+      out += RE_ASCII_LETTER.test(from) && RE_ASCII_LETTER.test(to) && isLower(from) === isLower(to)
+        ? from + '-' + to + (isLower(from)
+          ? from.toUpperCase() + '-' + to.toUpperCase()
+          : from.toLowerCase() + '-' + to.toLowerCase())
+        : from + '-' + to;
+      i = afterFrom + 1 + toLength;
+      continue;
+    }
+
+    out += fromLength === 1 && foldsCase(from) ? from.toLowerCase() + from.toUpperCase() : from;
+    i = afterFrom;
+  }
+
+  return out;
+}
+
+/**
+ * A pattern’s source, rewritten to match the way its own flags make it match, for
+ * embedding in a larger regex that cannot carry them. `i` and `s` fit into a
+ * source; `m`, `u`, and `v` do not, and are left to the pattern it joins.
+ * @param {RegExp} pattern
+ * @returns {string}
+ */
+function embedSource(pattern) {
+  let source = pattern.source;
+  if (pattern.dotAll) source = expandDotAll(source);
+  if (pattern.ignoreCase) source = foldCase(source);
+  return source;
+}
+
 /**
  * Walk a regex source for the shapes whose backtracking blows up: an unlimited
  * quantifier over a group that itself contains a variable quantifier (`(a+)+`,
  * `(a?)+`) or alternates, and the same atom repeated unboundedly twice in a
  * row. A lone unlimited quantifier stays linear, so `[\s\S]*?` up to a literal
- * terminator passes
+ * terminator passes.
  * @param {string} source - Regex source, assumed syntactically valid
  * @param {number} [depth] - Group nesting level of this call
  * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean}}
@@ -326,5 +480,6 @@ export {
   lowercase,
   replaceAsync,
   parseRegExp,
+  embedSource,
   describeQuantifierRisk
 };

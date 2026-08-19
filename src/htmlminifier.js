@@ -829,13 +829,12 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   const originalContinueOnParseError = options.continueOnParseError;
   options.continueOnParseError = true;
 
-  // Pre-compile regex patterns for UID replacement and custom fragments
+  // Pre-compile the UID replacement pattern, and read the fragments the way the
+  // main path does, so each keeps its own flags
   const uidReplacePattern = uidIgnore && ignoredMarkupChunks
     ? new RegExp('<!--' + uidIgnore + '(\\d+)-->', 'g')
     : null;
-  const customFragmentPattern = options.ignoreCustomFragments && options.ignoreCustomFragments.length > 0
-    ? new RegExp('(' + options.ignoreCustomFragments.map(re => re.source).join('|') + ')', 'g')
-    : null;
+  const customFragments = (options.ignoreCustomFragments || []).map(toFragment);
 
   try {
     // Expand UID tokens back to the original content for frequency analysis
@@ -855,8 +854,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     // because HTML comments in opening tags prevent proper attribute parsing;
     // removed with a space to preserve attribute boundaries
     let scanValue = firstPassOutput;
-    if (customFragmentPattern) {
-      scanValue = firstPassOutput.replace(customFragmentPattern, ' ');
+    if (customFragments.length) {
+      scanValue = replaceCustomFragments(firstPassOutput, customFragments, () => ' ');
     }
 
     await scan(scanValue);

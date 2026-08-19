@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { LRU, describeQuantifierRisk } from '../src/lib/utils.js';
+import { LRU, describeQuantifierRisk, embedSource } from '../src/lib/utils.js';
 
 /** @param {string} source */
 const hasRiskyQuantifiers = source => describeQuantifierRisk(source) !== null;
@@ -71,6 +71,48 @@ describe('Utils', () => {
 
       assert.strictEqual(cache.get('a'), 1);
       assert.strictEqual(cache.get('b'), undefined);
+    });
+  });
+
+  describe('`embedSource`', () => {
+    test('A pattern without flags is its own source', () => {
+      assert.strictEqual(embedSource(/\{\{#if\}\}/), '\\{\\{#if\\}\\}');
+      assert.strictEqual(embedSource(/a.c/), 'a.c');
+    });
+
+    test('`i` is written into the source, since the merged pattern cannot carry it', () => {
+      assert.strictEqual(embedSource(/abc/i), '[aA][bB][cC]');
+      assert.strictEqual(embedSource(/[a-z]/i), '[a-zA-Z]');
+      assert.strictEqual(embedSource(/[^a-z0-9]/i), '[^a-zA-Z0-9]');
+    });
+
+    test('`s` becomes the class it stands for', () => {
+      assert.strictEqual(embedSource(/a.c/s), 'a[\\s\\S]c');
+      // Only where `.` is the wildcard, not where it is a literal
+      assert.strictEqual(embedSource(/a\.[.]c/s), 'a\\.[.]c');
+    });
+
+    test('Syntax is left alone, and so is what cannot fold in place', () => {
+      // Folding a group or property name would be a syntax error
+      assert.strictEqual(embedSource(/(?<name>ab)/i), '(?<name>[aA][bB])');
+      assert.strictEqual(embedSource(/\k<n>/i), '\\k<n>');
+      // A multi-character escape is read whole, not split into letters
+      assert.strictEqual(embedSource(/\x6a/i), '\\x6a');
+      // Outside ASCII the two case blocks are not parallel, so the range stands
+      assert.strictEqual(embedSource(/[ü-ÿ]/i), '[ü-ÿ]');
+    });
+
+    test('The rewrite never matches more than the pattern would', () => {
+      const cases = [/abc/i, /[a-z]+/i, /[^a-z]/i, /a.c/s, /a.c/is, /<%[A-Z]+%>/i, /[a-z\d]/i, /(?:ab)+/i];
+      const inputs = ['abc', 'ABC', 'aBc', 'a\nc', 'a.c', 'xyz', 'XYZ', '<%AB%>', '<%ab%>', 'ab', 'ABAB', '0', 'ü'];
+      for (const pattern of cases) {
+        const rewritten = new RegExp('^(?:' + embedSource(pattern) + ')$');
+        const original = new RegExp('^(?:' + pattern.source + ')$', pattern.flags);
+        for (const input of inputs) {
+          assert.strictEqual(rewritten.test(input), original.test(input),
+            `${pattern} vs ${rewritten} on ${JSON.stringify(input)}`);
+        }
+      }
     });
   });
 

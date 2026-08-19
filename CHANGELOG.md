@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed `ignoreCustomFragments` patterns losing their flags (`/…/i` matched case-sensitively and `/…/s` left `.` stopping at line terminators)
 * Fixed the `ignoreCustomFragments` ReDoS warning firing for every `*` or `+`, which flagged linear patterns—among them HMN’s defaults, whenever they were passed explicitly
 * Fixed custom fragment matching costing O(n²) on documents that open fragments they never close—`ignoreCustomFragments` patterns that wrap an any-character or negated-class body in literal delimiters are matched by scanning for those delimiters in linear time
+* Fixed a whitespace run longer than 200 characters next to a custom fragment being split at that bound, which discarded the excess—or, under `collapseWhitespace`, left two spaces where one belonged
+* Fixed `customAttrAssign` and `customAttrSurround` patterns losing their flags, so that a `/…/i` pattern matched case-sensitively
 * Fixed an entity-encoded `iframe srcdoc` not being minified
 * Fixed a malformed `iframe srcdoc` document aborting the whole run despite `continueOnMinifyError`
 * Fixed `removeUnusedCSS` minifying `iframe srcdoc` style sheets against the parent document’s symbols—the nested document now gets its own set
@@ -24,7 +26,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * **BREAKING:** Removed `customFragmentQuantifierLimit` in favor of linear matching, `strictCustomFragments`, and `maxInputLength`
-  - **Migration:** Drop the option; whitespace around a fragment match and adjacent fragments now join the match however long the run, where the default limit of 200 used to cut them off
+  - **Migration:** Drop the option
 * Sped up `sortAttributes` and `sortClassNames` on documents with many distinct attribute names or classes
 * Sped up URL minification in style sheets with many `url()` references (by consuming replacement results by index instead of quadratic array shifting)
 * Moved the web demo onto the same ReDoS pattern check as the minifier, which had drifted from its own copy
