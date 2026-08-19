@@ -4,6 +4,24 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.1.0] - 2026-08-19
+
+### Fixed
+
+* Fixed the `ignoreCustomFragments` risk analysis missing two unbounded repeats that overlap without being spelled alike—`[a]*a*` and `\w*\d*` split a run of input the same way `a*a*` does, and are now flagged the same way
+* Fixed the `ignoreCustomFragments` risk analysis reading patterns without their flags, so that `/.*\n*/s` and `/[a]*A*/i` passed as the flagless sources they are spelled as
+* Fixed the `ignoreCustomFragments` risk analysis reading `\b` inside a character class as a word boundary rather than the backspace it stands for
+* Fixed regex sources being read as though a character class could not nest, so that a `v` pattern like `/[[a][b]]*b*/v` was analyzed—and, under `i`, rewritten—from the wrong class boundary
+* Fixed the demo building regex options with `new RegExp` rather than the `/…/flags` parsing the library itself uses, so that a pattern entered as `/ng-class/`—the form the demo’s `customAttrCollapse` example shows—matched literal slashes, and no pattern could carry flags
+
+### Changed
+
+* Updated `customAttrAssign` and `customAttrSurround` patterns carrying `u`, `v`, or `m` to refuse with an error, where the flag changes what the source matches (a flag the source does not depend on, as in `/x=/u`, is left alone)
+* Updated `ignoreCustomFragments` patterns whose unbounded repeats reach each other across atoms that can match empty—`a*b*a*`, `\s*\w*\s*`—to be flagged as backtracking risks, which `strictCustomFragments` rejects outright
+* Updated the same analysis to read a group by what its body can match
+* Updated the same analysis to compare repeats across a group boundary, flagging `(a*)a*` like `a*a*`
+* Split the demo’s option building out into demo/get-options.js, which puts the regex options it assembles under test without a page to run in
+
 ## [8.0.0] - 2026-08-19
 
 ### Fixed

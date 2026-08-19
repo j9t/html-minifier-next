@@ -105,10 +105,11 @@ describe('Utils', () => {
     test('What `i` cannot reach is left alone, never widened', () => {
       // Each of these would need the flag itself; the source keeps its own meaning.
       // Built with `RegExp` so they read as the fixtures they are, not as patterns
-      // for scanners to flag
+      // for scanners to flag.
       assert.strictEqual(embedSource(new RegExp('(a)\\1', 'i')), '([aA])\\1'); // a backreference compares literally
       assert.strictEqual(embedSource(new RegExp('[ü-ÿ]', 'i')), '[ü-ÿ]'); // `ÿ` uppercases far past the range
       assert.strictEqual(embedSource(new RegExp('[*-[]', 'i')), '[*-[]'); // spans `A`–`Z` without being a letter range
+      assert.strictEqual(embedSource(/[\q{ab|cd}]/vi), '[\\q{ab|cd}]'); // `\q` holds strings, which fold as strings or not at all
     });
 
     test('The rewrite never matches more than the pattern would', () => {
@@ -184,6 +185,93 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/<!--[\s\S]*[\s\S]*-->/.source), true);
     });
 
+    test('Two unbounded repeats that can consume the same character are risky', () => {
+      // Spelled differently, but `[a]` and `a` split a run of `a`s the same way
+      assert.strictEqual(hasRiskyQuantifiers(/[a]*a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\w*\d*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/[a-z]*[a-c]*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/[^a]*b*/.source), true);
+      // A multi-character escape counts as the one character it stands for
+      assert.strictEqual(hasRiskyQuantifiers(/\u0041*\u0041*/.source), true);
+      // Repeats that share nothing leave nothing ambiguous to split
+      assert.strictEqual(hasRiskyQuantifiers(/x*y*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/\s*\S*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/\d*[a-z]*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/[^a]*a*/.source), false);
+      // Without the `s` flag a source cannot carry, `.` stops at a line break
+      assert.strictEqual(hasRiskyQuantifiers(/.*\n*/.source), false);
+    });
+
+    test('An escape is read as what it stands for where it stands', () => {
+      // `\b` is a backspace inside a class, where outside one it is a boundary
+      assert.strictEqual(hasRiskyQuantifiers('[\\b]*\\x08*'), true);
+      // And a backspace is not the letter the escape is spelled with
+      assert.strictEqual(hasRiskyQuantifiers('[\\b]*b*'), false);
+    });
+
+    test('A pattern is judged the way its own flags make it match', () => {
+      // `s` and `S` fit into a source, and are written in before it is read
+      assert.strictEqual(describeQuantifierRisk(/.*\n*/s) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/.*\n*/) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[a]*A*/i) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[a]*A*/) !== null, false);
+      // Folding case inflates a source; its own length is what the bound counts
+      assert.strictEqual(describeQuantifierRisk(new RegExp('ab'.repeat(4000), 'i')), null);
+      // The defaults keep passing whatever flags they carry
+      assert.strictEqual(describeQuantifierRisk(/<%[\s\S]*?%>/i), null);
+      assert.strictEqual(describeQuantifierRisk(/(?:a{4})+/i), null);
+    });
+
+    test('A `v` class is read past the `]` that only closes a nested one', () => {
+      // Under `v` a class nests, so `[[a][b]]` is one atom holding `a` and `b`
+      assert.strictEqual(describeQuantifierRisk(/[[a][b]]*b*/v) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[[a][b]]*c*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[^[a][b]]*c*/v) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[^[a][b]]*a*/v) !== null, false);
+      // Subtraction, intersection, and string literals are not unions to read
+      assert.strictEqual(describeQuantifierRisk(/[[a]--[b]]*b*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[[ab]&&[bc]]*b*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[\q{ab}]*a*/v) !== null, false);
+      // Without `v` a `[` inside a class is a member, and the first `]` closes it
+      assert.strictEqual(hasRiskyQuantifiers('[[a]*a*'), true);
+      // Nesting past the bound is declined rather than recursed into
+      const deep = new RegExp('['.repeat(3000) + 'a' + ']'.repeat(3000) + '*a*', 'v');
+      assert.strictEqual(describeQuantifierRisk(deep), null);
+    });
+
+    test('Repeats reach each other across atoms that can match empty', () => {
+      // `b*` can match nothing, which leaves the two `a*` splitting the same run
+      assert.strictEqual(hasRiskyQuantifiers(/a*b*a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\s*\w*\s*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*b?a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*b{0,3}a*/.source), true);
+      // A lookaround consumes nothing, either
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?=x)a*/.source), true);
+      // An atom that has to consume something separates them again
+      assert.strictEqual(hasRiskyQuantifiers(/a*b+a*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*ba*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*b{1,3}a*/.source), false);
+      // Repeats that never overlap stay linear however they are separated
+      assert.strictEqual(hasRiskyQuantifiers(/a*b*c*/.source), false);
+    });
+
+    test('A group whose body can match empty does not separate repeats', () => {
+      // A quantifier inside the group, where the group itself carries none
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b*)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\s*(\w*)\s*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b?)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/<%[\s\S]*?(\s*)[\s\S]*?%>/.source), true);
+      // Nesting does not change what the body can match
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?:(b*))a*/.source), true);
+      // One branch matching empty is enough for the alternation to
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b*|c)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(|c)a*/.source), true);
+      // A body that has to consume something separates the repeats again
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b+)a*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b*c)a*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b|c)a*/.source), false);
+    });
+
     test('A group wrapping the atom does not hide the repetition', () => {
       // `^(?:a)*a*$` backtracks quadratically on `aaa…b`, the way `a*a*` does
       assert.strictEqual(hasRiskyQuantifiers(/^(?:a)*a*$/.source), true);
@@ -197,6 +285,33 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(?=a)a*/.source), false);
     });
 
+    test('Repeats reach each other across a group boundary', () => {
+      // A group is no wall: the repeat inside it and the one outside split the
+      // same run, wherever the boundary falls between them
+      assert.strictEqual(hasRiskyQuantifiers(/(a*)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(a*)/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/(a*)(a*)/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\{\{(\s*)[\s\S]*?\}\}/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b*a*)/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/(a*b*)a*/.source), true);
+      // What the group has to consume separates only what stands before it
+      assert.strictEqual(hasRiskyQuantifiers(/(b+a*)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b+a*)/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a*b)b*/.source), false);
+      // A branch reaches out of the group on its own
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?:x|a*)/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?:x|b*)/.source), false);
+      // Repeats that share nothing stay linear across the boundary, too
+      assert.strictEqual(hasRiskyQuantifiers(/(a*)b*/.source), false);
+      // A lookaround is atomic, so what it holds reaches nothing outside it
+      assert.strictEqual(hasRiskyQuantifiers(/(?=a*)a*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?!a*)/.source), false);
+      // The patterns people write for real keep passing
+      assert.strictEqual(hasRiskyQuantifiers(/<(WC@[\s\S]*?)>(.*?)<\/\1>/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/(\{\{)([\s\S]*?)(\}\})/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/<%[-=]?([\s\S]*?)%>/.source), false);
+    });
+
     test('Analysis stays bounded on pathological patterns', () => {
       // Nesting past the depth limit is judged risky rather than recursed into,
       // while nesting within it is read for what it is
@@ -206,6 +321,13 @@ describe('Utils', () => {
       // A pattern past the length limit is judged risky unread, whatever its shape
       assert.strictEqual(hasRiskyQuantifiers('a'.repeat(10001)), true);
       assert.strictEqual(hasRiskyQuantifiers('a'.repeat(10000)), false);
+
+      // A pattern that is nothing but repeats compares against a bounded number
+      // of them, rather than against every one that came before
+      const repeats = 'a*b*'.repeat(2500);
+      const started = Date.now();
+      assert.strictEqual(hasRiskyQuantifiers(repeats), true);
+      assert.ok(Date.now() - started < 1000, 'Expected the reach to stay bounded');
 
       // Extreme nesting trips the length limit before the walk ever starts
       const nested = '('.repeat(20000) + 'a' + ')'.repeat(20000);

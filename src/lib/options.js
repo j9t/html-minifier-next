@@ -1,5 +1,5 @@
 import { createUrlMinifier } from './urls.js';
-import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp, describeQuantifierRisk } from './utils.js';
+import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -602,6 +602,25 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   });
 
+  // The parser merges these into one attribute pattern, and a merged pattern
+  // carries no flags of its own. `i` and `s` are written into the source instead,
+  // but `u` and `v` change how a source reads and cannot be: dropped, `\p{L}`
+  // stops being a property escape and matches the literal text `p{L}`, silently
+  // and without failing to compile. Refusing them beats matching the wrong thing.
+  /** @type {[string, RegExp[]][]} */
+  const merged = [
+    ['customAttrAssign', options.customAttrAssign || []],
+    ['customAttrSurround', (options.customAttrSurround || []).flat()]
+  ];
+  for (const [key, patterns] of merged) {
+    for (const re of patterns) {
+      if (!(re instanceof RegExp)) continue;
+      const flag = lostFlag(re);
+      if (!flag) continue;
+      throw new Error(`HTML Minifier Next: \`${key}\` pattern \`/${re.source}/${re.flags}\` carries \`${flag}\`, which the merged attribute pattern cannot carry—rewrite it without \`${flag}\``);
+    }
+  }
+
   // Fragments that compound quantifiers or alternation under unbounded repetition
   // are the shapes that backtrack catastrophically, and they are also the ones a
   // linear scan cannot stand in for; so are patterns too long or too deeply
@@ -610,7 +629,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   // fragments have exactly that shape, so the check flagging it would mean
   // warning about the defaults themselves.
   for (const re of options.ignoreCustomFragments || []) {
-    const risk = describeQuantifierRisk(re.source);
+    const risk = describeQuantifierRisk(re);
     if (!risk) continue;
     const problem = `Custom fragment \`/${re.source}/\` ${risk}`;
     if (options.strictCustomFragments) {

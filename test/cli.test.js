@@ -1097,7 +1097,7 @@ describe('CLI', () => {
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(
       result.stderr.includes('Lightning CSS reported invalid CSS'),
-      '`--dry` implies verbose, so diagnostics should show there too'
+      '`--dry` implies verbose, so diagnostics should show there, too'
     );
   });
 

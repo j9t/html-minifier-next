@@ -145,64 +145,31 @@ function parseRegExp(value) {
   return value;
 }
 
-// ReDoS risk detection for user-supplied patterns
-
-// Quantifier following an atom, with its optional lazy `?`; the captures hold
-// the bounds of a `{n,m}` form, the upper one empty when the form is `{n,}`
-const RE_QUANTIFIER = /(?:[*+?]|\{(\d+)(?:,(\d*))?\})\??/y;
-
-// Bounds for the walk below: Patterns beyond either are judged risky unread,
-// which keeps a pathological source from nesting the analysis into a stack
-// overflow or making it rescan its groups once per level
-const MAX_PATTERN_LENGTH = 10000;
-const MAX_PATTERN_DEPTH = 50;
-
-// A group that only wraps its body backtracks the way that body does, so
-// `(?:a)` and `a` count as the same atom; lookarounds are left alone
-const RE_TRANSPARENT_GROUP = /^\((?:\?:|\?<[^>=!][^>]*>)?([\s\S]*)\)$/;
-
-// A quantifier of exactly one repetition, which is notation rather than shape
-const RE_EXACT_ONE = /\{1(?:,1)?\}\??$/;
-
-/** @param {string} source @param {number} index - Index of the opening `[` */
-function skipCharacterClass(source, index) {
-  let i = index + 1;
-  while (i < source.length && source[i] !== ']') {
-    i += source[i] === '\\' ? 2 : 1;
-  }
-  return i + 1;
-}
-
-/** @param {string} atom - Atom as it reads in the source */
-function unwrapAtom(atom) {
-  let inner = atom;
-  for (let level = 0; level < MAX_PATTERN_DEPTH; level++) {
-    const next = inner.replace(RE_EXACT_ONE, '').replace(RE_TRANSPARENT_GROUP, '$1');
-    if (next === inner) break;
-    inner = next;
-  }
-  return inner;
-}
-
-// Embedding a pattern in a larger regex drops the flags it carried, so the two
-// a source can carry on its own are rewritten into it
-//
-// @@ Replace with inline `(?i:…)` and `(?s:…)` modifiers once Node floor reaches 24
+// Regex source reading, shared by the analysis and the rewriting below
 
 const RE_ASCII_LETTER = /^[a-zA-Z]$/;
 const RE_HEX_PAIR = /^[0-9a-fA-F]{2}$/;
 const RE_HEX_QUAD = /^[0-9a-fA-F]{4}$/;
 
-/** @param {string} char @returns {boolean} Whether the character has a single-character counterpart */
-function foldsCase(char) {
-  const lower = char.toLowerCase();
-  const upper = char.toUpperCase();
-  return lower !== upper && lower.length === 1 && upper.length === 1;
-}
-
-/** @param {string} char */
-function isLower(char) {
-  return char === char.toLowerCase();
+/**
+ * @param {string} source @param {number} index - Index of the opening `[`
+ * @param {boolean} [nested] - Whether the pattern carries `v`, where a class nests
+ *   inside a class and the first `]` need not be the one that closes it
+ * @returns {number} Index just past the closing `]`
+ */
+function skipCharacterClass(source, index, nested = false) {
+  let i = index + 1;
+  let open = 1;
+  while (i < source.length && open > 0) {
+    const char = source[i];
+    if (char === '\\') i += tokenLength(source, i);
+    else {
+      if (nested && char === '[') open++;
+      else if (char === ']') open--;
+      i++;
+    }
+  }
+  return i;
 }
 
 /**
@@ -222,6 +189,11 @@ function tokenLength(source, index) {
     if (RE_HEX_QUAD.test(source.slice(index + 2, index + 6))) return 6;
   }
   if (next === 'c' && RE_ASCII_LETTER.test(source[index + 2] ?? '')) return 3;
+  // A `v` class holds string literals, which fold as strings or not at all
+  if (next === 'q' && source[index + 2] === '{') {
+    const close = source.indexOf('}', index + 3);
+    if (close !== -1) return close - index + 1;
+  }
   // A property name or a group name is syntax, not text to fold
   if ((next === 'p' || next === 'P') && source[index + 2] === '{') {
     const close = source.indexOf('}', index + 3);
@@ -234,8 +206,213 @@ function tokenLength(source, index) {
   return 2;
 }
 
-/** @param {string} source - Regex source, assumed syntactically valid */
-function expandDotAll(source) {
+// ReDoS risk detection for user-supplied patterns
+
+// Quantifier following an atom, with its optional lazy `?`; the captures hold
+// the bounds of a `{n,m}` form, the upper one empty when the form is `{n,}`
+const RE_QUANTIFIER = /(?:[*+?]|\{(\d+)(?:,(\d*))?\})\??/y;
+
+// Bounds for the walk below: Patterns beyond either are judged risky unread,
+// which keeps a pathological source from nesting the analysis into a stack
+// overflow or making it rescan its groups once per level
+const MAX_PATTERN_LENGTH = 10000;
+const MAX_PATTERN_DEPTH = 50;
+
+// A group that only wraps its body backtracks the way that body does, so
+// `(?:a)` and `a` count as the same atom; lookarounds are left alone
+const RE_TRANSPARENT_GROUP = /^\((?:\?:|\?<[^>=!][^>]*>)?([\s\S]*)\)$/;
+
+// A quantifier of exactly one repetition, which is notation rather than shape
+const RE_EXACT_ONE = /\{1(?:,1)?\}\??$/;
+
+// An atom that matches without consuming, so what precedes it stays adjacent to
+// what follows; a group that can match empty is left out, being rare enough that
+// missing it costs less than reading every body for it
+const RE_ZERO_WIDTH = /^(?:[$^]|\\[bB]|\((?:\?[=!]|\?<[=!]))/;
+
+// How many repeats an atom may still be adjacent to across atoms matching empty;
+// comparing against every one of them is what the bound keeps from turning
+// quadratic on a pattern that is nothing but repeats
+const MAX_REACHABLE = 50;
+
+/** @param {string} atom - Atom as it reads in the source */
+function unwrapAtom(atom) {
+  let inner = atom;
+  for (let level = 0; level < MAX_PATTERN_DEPTH; level++) {
+    const next = inner.replace(RE_EXACT_ONE, '').replace(RE_TRANSPARENT_GROUP, '$1');
+    if (next === inner) break;
+    inner = next;
+  }
+  return inner;
+}
+
+// Two atoms that repeat unboundedly side by side split a run between them in as
+// many ways as the run is long, whenever both can consume the same character.
+// Comparing what they match, rather than how they are spelled, is what catches
+// `[a]*a*` and `\w*\d*` alongside `a*a*`.
+
+const MAX_CODE_POINT = 0x10FFFF;
+
+/** @type {Record<string, [number, number][]>} */
+const CLASS_ESCAPE_RANGES = {
+  d: [[0x30, 0x39]],
+  w: [[0x30, 0x39], [0x41, 0x5A], [0x5F, 0x5F], [0x61, 0x7A]],
+  s: [[0x09, 0x0D], [0x20, 0x20], [0xA0, 0xA0], [0x1680, 0x1680], [0x2000, 0x200A],
+    [0x2028, 0x2029], [0x202F, 0x202F], [0x205F, 0x205F], [0x3000, 0x3000], [0xFEFF, 0xFEFF]]
+};
+
+/** @type {Record<string, number>} */
+const CONTROL_ESCAPE_CODES = { 0: 0x00, f: 0x0C, n: 0x0A, r: 0x0D, t: 0x09, v: 0x0B };
+
+// An escape that stands for something other than one character of text
+const RE_NON_CHARACTER_ESCAPE = /[bBdDkpPsSwW1-9]/;
+
+/** @param {[number, number][]} ranges */
+function complement(ranges) {
+  const sorted = [...ranges].sort((one, other) => one[0] - other[0]);
+  /** @type {[number, number][]} */
+  const out = [];
+  let next = 0;
+  for (const [low, high] of sorted) {
+    if (low > next) out.push([next, low - 1]);
+    next = Math.max(next, high + 1);
+  }
+  if (next <= MAX_CODE_POINT) out.push([next, MAX_CODE_POINT]);
+  return out;
+}
+
+// `.` as a bare source reads it, without the `s` flag the source cannot carry
+const DOT_RANGES = complement([[0x0A, 0x0A], [0x0D, 0x0D], [0x2028, 0x2029]]);
+
+/**
+ * @param {string} token - One token, as `tokenLength` measures it
+ * @param {boolean} [inClass] - Whether the token sits inside a character class
+ * @returns {[number, number][] | null} What it matches, or `null` where it is not
+ *   one character of text
+ */
+function tokenRanges(token, inClass = false) {
+  if (token[0] !== '\\') {
+    const code = token.codePointAt(0) ?? 0;
+    return String.fromCodePoint(code) === token ? [[code, code]] : null;
+  }
+
+  const kind = token[1] ?? '';
+  const named = CLASS_ESCAPE_RANGES[kind.toLowerCase()];
+  if (named) return kind === kind.toLowerCase() ? named : complement(named);
+
+  const control = CONTROL_ESCAPE_CODES[kind];
+  if (control !== undefined) return [[control, control]];
+
+  if (kind === 'x' || kind === 'u') {
+    const code = Number.parseInt(token[2] === '{' ? token.slice(3, -1) : token.slice(2), 16);
+    return Number.isNaN(code) || code > MAX_CODE_POINT ? null : [[code, code]];
+  }
+  if (kind === 'c') {
+    const code = token.charCodeAt(2) % 32;
+    return [[code, code]];
+  }
+  // `\b` asserts a word boundary on its own, and is a backspace inside a class
+  if (kind === 'b' && inClass) return [[0x08, 0x08]];
+  // `\q{…}` stands for whole strings, not for a character
+  if (token.startsWith('\\q{')) return null;
+  if (RE_NON_CHARACTER_ESCAPE.test(kind)) return null;
+
+  // The rest is punctuation escaped to be read as itself
+  const code = token.codePointAt(1) ?? 0;
+  return String.fromCodePoint(code) === token.slice(1) ? [[code, code]] : null;
+}
+
+/** @param {[number, number][] | null} ranges @returns {number | null} The one code point it holds */
+function singleCode(ranges) {
+  const [range] = ranges ?? [];
+  return ranges?.length === 1 && range && range[0] === range[1] ? range[0] : null;
+}
+
+/**
+ * @param {string} atom - Atom as it reads in the source, already unwrapped
+ * @param {boolean} [nested] - Whether the pattern carries `v`
+ * @param {number} [depth] - Class nesting level of this call
+ * @returns {[number, number][] | null} What it matches, or `null` where it is not
+ *   one character of text, or one this does not read
+ */
+function atomRanges(atom, nested = false, depth = 0) {
+  if (depth > MAX_PATTERN_DEPTH) return null;
+  if (atom === '.') return DOT_RANGES;
+  if (atom[0] !== '[') return tokenRanges(atom);
+  if (!atom.endsWith(']')) return null;
+
+  let i = atom[1] === '^' ? 2 : 1;
+  const negated = i === 2;
+  const end = atom.length - 1;
+  /** @type {[number, number][]} */
+  const members = [];
+
+  while (i < end) {
+    // A `v` class nests, and nesting alone is a union to read through
+    if (nested && atom[i] === '[') {
+      const close = skipCharacterClass(atom, i, true);
+      const inner = atomRanges(atom.slice(i, close), true, depth + 1);
+      if (!inner) return null;
+      members.push(...inner);
+      i = close;
+      continue;
+    }
+    // Subtraction and intersection are not unions, and are left unread
+    //
+    // @@ Read `--` and `&&` as set difference and intersection
+    // (so that a `v` class built is compared rather than passed unjudged)
+    if (nested && (atom.startsWith('--', i) || atom.startsWith('&&', i))) return null;
+
+    const fromLength = tokenLength(atom, i);
+    const from = tokenRanges(atom.slice(i, i + fromLength), true);
+    if (!from) return null;
+    i += fromLength;
+
+    // A dash right before the closing `]` is a member, not the start of a range
+    if (atom[i] !== '-' || i + 1 >= end) {
+      members.push(...from);
+      continue;
+    }
+    const toLength = tokenLength(atom, i + 1);
+    // Only single characters bound a range; `\d-z` is not a range at all
+    const low = singleCode(from);
+    const high = singleCode(tokenRanges(atom.slice(i + 1, i + 1 + toLength), true));
+    if (low === null || high === null) return null;
+    members.push([low, high]);
+    i += 1 + toLength;
+  }
+
+  return negated ? complement(members) : members;
+}
+
+/** @param {[number, number][]} ranges @param {[number, number][]} other */
+function rangesIntersect(ranges, other) {
+  return ranges.some(([low, high]) => other.some(([otherLow, otherHigh]) =>
+    low <= otherHigh && otherLow <= high));
+}
+
+// Embedding a pattern in a larger regex drops the flags it carried, so the two
+// a source can carry on its own are rewritten into it
+//
+// @@ Replace with inline `(?i:…)` and `(?s:…)` modifiers once Node floor reaches 24
+
+/** @param {string} char @returns {boolean} Whether the character has a single-character counterpart */
+function foldsCase(char) {
+  const lower = char.toLowerCase();
+  const upper = char.toUpperCase();
+  return lower !== upper && lower.length === 1 && upper.length === 1;
+}
+
+/** @param {string} char */
+function isLower(char) {
+  return char === char.toLowerCase();
+}
+
+/**
+ * @param {string} source - Regex source, assumed syntactically valid
+ * @param {boolean} [nested] - Whether the pattern carries `v`
+ */
+function expandDotAll(source, nested = false) {
   let out = '';
   let i = 0;
   while (i < source.length) {
@@ -245,7 +422,7 @@ function expandDotAll(source) {
       out += source.slice(i, i + length);
       i += length;
     } else if (char === '[') {
-      const end = skipCharacterClass(source, i);
+      const end = skipCharacterClass(source, i, nested);
       out += source.slice(i, end);
       i = end;
     } else if (char === '.') {
@@ -259,22 +436,25 @@ function expandDotAll(source) {
   return out;
 }
 
-/** @param {string} source - Regex source, assumed syntactically valid */
-function foldCase(source) {
+/**
+ * @param {string} source - Regex source, assumed syntactically valid
+ * @param {boolean} [nested] - Whether the pattern carries `v`
+ */
+function foldCase(source, nested = false) {
   let out = '';
   let i = 0;
-  let inClass = false;
+  let open = 0;
 
   while (i < source.length) {
     const char = source[i] ?? '';
 
-    if (!inClass) {
+    if (open === 0) {
       if (char === '\\') {
         const length = tokenLength(source, i);
         out += source.slice(i, i + length);
         i += length;
       } else if (char === '[') {
-        inClass = true;
+        open = 1;
         out += char;
         i++;
       } else if (char === '(' && source.startsWith('(?<', i) &&
@@ -291,8 +471,15 @@ function foldCase(source) {
       continue;
     }
 
+    if (nested && char === '[') {
+      open++;
+      out += char;
+      i++;
+      continue;
+    }
+
     if (char === ']') {
-      inClass = false;
+      open--;
       out += char;
       i++;
       continue;
@@ -325,6 +512,93 @@ function foldCase(source) {
 }
 
 /**
+ * Whether a source anchors anywhere, so that `m` would move where it matches
+ * @param {string} source @param {boolean} [nested] - Whether the pattern carries `v`
+ */
+function hasAnchor(source, nested = false) {
+  let i = 0;
+  while (i < source.length) {
+    if (source[i] === '\\') i += tokenLength(source, i);
+    // Inside a class `^` negates and `$` is a member, so neither anchors there
+    else if (source[i] === '[') i = skipCharacterClass(source, i, nested);
+    else if (source[i] === '^' || source[i] === '$') return true;
+    else i++;
+  }
+  return false;
+}
+
+// A property escape or a code point escape, both of which read as literal text
+// where the flag that gives them meaning is gone
+const RE_UNICODE_ESCAPE = /\\[pP]\{|\\u\{/;
+
+// The characters `u` folds by Unicode rules and a source without it does not:
+// `/s/iu` matches `\u017F` and `/k/iu` matches `\u212A`, where neither does on its
+// own. Characters past the BMP fold this way, too, and are caught as astral first.
+const RE_UNICODE_FOLDING = /[\u004B\u0053\u006B\u0073\u00C5\u00DF\u00E5\u017F\u0398\u03A9\u03B8\u03C9\u03D1\u03F4\u1E9E\u1F80-\u1FAF\u1FB3\u1FBC\u1FC3\u1FCC\u1FF3\u1FFC\u2126\u212A\u212B]/;
+
+/**
+ * Which flag changes what a source matches, so that embedding the source where the
+ * flag cannot follow would silently match something else. `u` and `v` only narrow
+ * what syntax is legal, so a source valid under either stays valid without it—the
+ * difference never surfaces as a syntax error, and this stands in for the one that
+ * would otherwise be raised.
+ * @param {RegExp} pattern
+ * @returns {'u' | 'v' | 'm' | null} The flag the source depends on, or `null` where
+ *   every flag it carries would leave the source matching the same
+ */
+function lostFlag(pattern) {
+  const { source, unicode, unicodeSets } = pattern;
+  // `m` moves where `^` and `$` match, and only matters where the source has one
+  if (pattern.multiline && hasAnchor(source, unicodeSets)) return 'm';
+  if (!unicode && !unicodeSets) return null;
+  const flag = unicodeSets ? 'v' : 'u';
+  if (RE_UNICODE_ESCAPE.test(source)) return flag;
+  // Case folding under `i` follows Unicode rules only while the flag is there. A
+  // character can be written literally or as an escape, so the source is read
+  // token by token rather than scanned for the characters themselves; `singleCode`
+  // leaves out `\d` and friends, which fold alike with the flag and without it.
+  if (pattern.ignoreCase) {
+    for (let i = 0; i < source.length;) {
+      const length = tokenLength(source, i);
+      const code = singleCode(tokenRanges(source.slice(i, i + length), true));
+      if (code !== null && RE_UNICODE_FOLDING.test(String.fromCodePoint(code))) return flag;
+      i += length;
+    }
+  }
+  // Past the BMP a character is one code point with the flag, two units without,
+  // which is what a quantifier or a class beside it would go on to read wrongly
+  for (const char of source) {
+    if ((char.codePointAt(0) ?? 0) > 0xFFFF) return flag;
+  }
+  if (!unicodeSets) return null;
+
+  // `v` alone lets a class nest, subtract, intersect, and hold whole strings
+  let i = 0;
+  while (i < source.length) {
+    if (source[i] === '\\') {
+      i += tokenLength(source, i);
+      continue;
+    }
+    if (source[i] !== '[') {
+      i++;
+      continue;
+    }
+    const end = skipCharacterClass(source, i, true);
+    for (let j = i + 1; j < end - 1;) {
+      if (source[j] === '\\') {
+        if (source.startsWith('\\q{', j)) return 'v';
+        j += tokenLength(source, j);
+        continue;
+      }
+      if (source[j] === '[' || source.startsWith('--', j) || source.startsWith('&&', j)) return 'v';
+      j++;
+    }
+    i = end;
+  }
+  return null;
+}
+
+/**
  * A pattern’s source, rewritten to match the way its own flags make it match, for
  * embedding in a larger regex that cannot carry them. `i` and `s` fit into a
  * source; `m`, `u`, and `v` do not, and are left to the pattern it joins. Where
@@ -336,30 +610,77 @@ function foldCase(source) {
  */
 function embedSource(pattern) {
   let source = pattern.source;
-  if (pattern.dotAll) source = expandDotAll(source);
-  if (pattern.ignoreCase) source = foldCase(source);
+  if (pattern.dotAll) source = expandDotAll(source, pattern.unicodeSets);
+  if (pattern.ignoreCase) source = foldCase(source, pattern.unicodeSets);
   return source;
+}
+
+/**
+ * @typedef {{text: string, ranges: [number, number][] | null}} Repeat - An unbounded
+ *   repeat, as it reads and as the set of characters it matches
+ */
+
+/**
+ * @param {Repeat[]} reachable - Repeats that could still sit adjacent to what comes next
+ * @param {Repeat} repeat
+ * @returns {boolean} Whether the two can consume the same character, and so split
+ *   the same run of input between them
+ */
+function splitsWith(reachable, repeat) {
+  return reachable.some(earlier => earlier.text === repeat.text ||
+    (!!repeat.ranges && !!earlier.ranges && rangesIntersect(repeat.ranges, earlier.ranges)));
+}
+
+/**
+ * @param {Repeat[]} into
+ * @param {Repeat[]} repeats
+ * @returns {void} Adds the repeats, keeping only the most recent ones the walk
+ *   still compares against
+ */
+function collectReachable(into, repeats) {
+  for (const repeat of repeats) {
+    into.push(repeat);
+    if (into.length > MAX_REACHABLE) into.shift();
+  }
 }
 
 /**
  * Walk a regex source for the shapes whose backtracking blows up: an unlimited
  * quantifier over a group that itself contains a variable quantifier (`(a+)+`,
- * `(a?)+`) or alternates, and the same atom repeated unboundedly twice in a
- * row. A lone unlimited quantifier stays linear, so `[\s\S]*?` up to a literal
- * terminator passes.
+ * `(a?)+`) or alternates, and two unbounded repeats that can consume the same
+ * character with only atoms matching empty between them (`.*.*`, `[a]*a*`,
+ * `\w*\d*`, `a*b*a*`, `a*(b*)a*`, `(a*)a*`). A lone unlimited quantifier stays
+ * linear, so `[\s\S]*?` up to a literal terminator passes.
  * @param {string} source - Regex source, assumed syntactically valid
  * @param {number} [depth] - Group nesting level of this call
- * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean}}
+ * @param {boolean} [nested] - Whether the pattern carries `v`
+ * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean,
+ *   empty: boolean, leading: Repeat[], trailing: Repeat[]}} What the walk found,
+ *   with the repeats that reach the source’s start and end for a caller to compare
+ *   against what stands beside it
  */
-function analyzeQuantifiers(source, depth = 0) {
-  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true, deep: true };
+function analyzeQuantifiers(source, depth = 0, nested = false) {
+  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true, deep: true, empty: true, leading: [], trailing: [] };
 
   let risky = false;
   let varies = false;
   let alternates = false;
   let deep = false;
-  /** @type {{text: string, repeats: boolean} | null} */
-  let previous = null;
+  // Whether every atom of the branch being read matches empty, and whether any
+  // branch before it did
+  let branchEmpty = true;
+  let anyBranchEmpty = false;
+  // The unbounded repeats that could still sit adjacent to what comes next, most
+  // recent last; an atom matching empty leaves the ones before it reachable
+  /** @type {Repeat[]} */
+  const reachable = [];
+  // The repeats a caller can reach from either end, gathered across branches
+  /** @type {Repeat[]} */
+  const leading = [];
+  /** @type {Repeat[]} */
+  const trailing = [];
+  /** @type {Repeat[]} */
+  let branchLeading = [];
   let i = 0;
 
   while (i < source.length) {
@@ -371,22 +692,27 @@ function analyzeQuantifiers(source, depth = 0) {
     if (char === '|') {
       // Alternatives are separate expressions, so nothing carries across
       alternates = true;
-      previous = null;
+      anyBranchEmpty ||= branchEmpty;
+      branchEmpty = true;
+      collectReachable(leading, branchLeading);
+      collectReachable(trailing, reachable);
+      branchLeading = [];
+      reachable.length = 0;
       i++;
       continue;
     } else if (char === '\\') {
-      i += 2;
+      i += tokenLength(source, i);
     } else if (char === '[') {
-      i = skipCharacterClass(source, i);
+      i = skipCharacterClass(source, i, nested);
     } else if (char === '(') {
       let open = 1;
       i++;
       while (i < source.length && open > 0) {
         const inner = source[i];
         if (inner === '\\') {
-          i += 2;
+          i += tokenLength(source, i);
         } else if (inner === '[') {
-          i = skipCharacterClass(source, i);
+          i = skipCharacterClass(source, i, nested);
         } else {
           if (inner === '(') open++;
           else if (inner === ')') open--;
@@ -394,7 +720,7 @@ function analyzeQuantifiers(source, depth = 0) {
         }
       }
       // Drop the group prefix (`?:`, `?=`, `?<name>`, …) before reading the body
-      group = analyzeQuantifiers(source.slice(start + 1, i - 1).replace(/^\?(?:[:=!]|<[=!]|<[^>]*>)/, ''), depth + 1);
+      group = analyzeQuantifiers(source.slice(start + 1, i - 1).replace(/^\?(?:[:=!]|<[=!]|<[^>]*>)/, ''), depth + 1, nested);
     } else {
       i++;
     }
@@ -410,35 +736,71 @@ function analyzeQuantifiers(source, depth = 0) {
     const exact = !!quantifier && quantifier[0][0] === '{' &&
       (upper === undefined || (upper !== '' && Number(upper) === Number(quantifier[1])));
     const variable = !!quantifier && !exact;
+    // An atom matches empty where it is zero-width, where its quantifier may
+    // repeat none, or where a group body matches empty however often it repeats—
+    // `(b*)`, carrying the quantifier inside the group rather than on it
+    const least = quantifier && (quantifier[0][0] === '+' ? 1
+      : quantifier[0][0] === '{' ? Number(quantifier[1]) : 0);
+    const body = RE_ZERO_WIDTH.test(atom) || (!!group && group.empty);
+    const nullable = body || (!!quantifier && least === 0);
     if (quantifier) i = RE_QUANTIFIER.lastIndex;
 
+    // A lookaround is atomic: It backtracks nothing, so what it holds neither
+    // reaches out of it nor is reached into
+    const opaque = RE_ZERO_WIDTH.test(atom);
     if (group) {
       if (group.risky || (repeats && (group.varies || group.alternates))) risky = true;
       if (group.varies) varies = true;
       // A group alternates whether the `|` sits at its top level or deeper
       if (group.alternates) alternates = true;
       if (group.deep) deep = true;
+      // A group is no wall: What it repeats at its start splits the same run as
+      // what stands unbounded before it
+      if (!opaque && group.leading.some(repeat => splitsWith(reachable, repeat))) risky = true;
     }
     if (variable) varies = true;
     const text = unwrapAtom(atom);
-    if (repeats && previous?.repeats && previous.text === text) risky = true;
-    previous = { text, repeats };
+    const ranges = atomRanges(text, nested);
+    if (repeats && splitsWith(reachable, { text, ranges })) risky = true;
+
+    // Whatever a caller could reach before this atom, it reaches this one, too
+    if (branchEmpty) {
+      if (repeats) collectReachable(branchLeading, [{ text, ranges }]);
+      if (group && !opaque) collectReachable(branchLeading, group.leading);
+    }
+    // Nothing reaches past an atom that has to consume something
+    if (!nullable) {
+      reachable.length = 0;
+      branchEmpty = false;
+    }
+    if (group && !opaque) collectReachable(reachable, group.trailing);
+    if (repeats) collectReachable(reachable, [{ text, ranges }]);
   }
 
-  return { risky, varies, alternates, deep };
+  collectReachable(leading, branchLeading);
+  collectReachable(trailing, reachable);
+
+  return { risky, varies, alternates, deep, empty: anyBranchEmpty || branchEmpty, leading, trailing };
 }
 
 /**
- * @param {string} source - Regex source to judge
+ * @param {RegExp | string} pattern - Pattern to judge, or a bare source to read
+ *   as it stands
  * @returns {string | null} What makes the pattern a backtracking risk, phrased
  *   to follow the pattern itself, or `null` where it is none
  */
-function describeQuantifierRisk(source) {
-  // A pattern too big to read is refused for that, not for a shape nobody saw
+function describeQuantifierRisk(pattern) {
+  const source = typeof pattern === 'string' ? pattern : pattern.source;
+  // A pattern too big to read is refused for that, not for a shape nobody saw;
+  // its own length is what counts, not the length folding case inflates it to
   if (source.length > MAX_PATTERN_LENGTH) {
     return `runs past ${MAX_PATTERN_LENGTH.toLocaleString()} characters, too long to analyze for catastrophic backtracking—shorten it, or split it into several patterns`;
   }
-  const analysis = analyzeQuantifiers(source);
+  // `i` and `s` change what the source matches, so they are written into it
+  // before the shapes are read
+  const analysis = typeof pattern === 'string'
+    ? analyzeQuantifiers(source)
+    : analyzeQuantifiers(embedSource(pattern), 0, pattern.unicodeSets);
   if (analysis.deep) {
     return `nests groups more than ${MAX_PATTERN_DEPTH.toLocaleString()} deep, too deep to analyze for catastrophic backtracking—flatten it, or split it into several patterns`;
   }
@@ -484,5 +846,6 @@ export {
   replaceAsync,
   parseRegExp,
   embedSource,
+  lostFlag,
   describeQuantifierRisk
 };

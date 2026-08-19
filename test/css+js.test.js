@@ -1241,7 +1241,7 @@ describe('CSS and JS', () => {
         assert.ok(styleOf(output).includes(expected), `${markup} should keep ${css}`);
       }
 
-      // Nothing references these, so the widened scan must not keep them either
+      // Nothing references these, so the widened scan must not keep them, either
       const unused = await minify(style('.md\\:gone{display:flex}.q-\\[1px\\]{padding:1px}') + '<p></p>', {
         minifyCSS: true,
         removeUnusedCSS: true
@@ -1256,7 +1256,7 @@ describe('CSS and JS', () => {
       );
 
       assert.ok(output.includes('#theme'), '`<style id="theme">` is what `#theme` refers to');
-      assert.ok(output.includes('.t'), 'A class on the element itself counts too');
+      assert.ok(output.includes('.t'), 'A class on the element itself counts, too');
       assert.ok(!output.includes('.gone'), 'The sheet is still no evidence for its own selectors');
     });
 

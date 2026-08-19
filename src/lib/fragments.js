@@ -225,7 +225,7 @@ function replaceCustomFragments(value, fragments, replacer) {
           ? previous
           : ('open' in fragment ? scan(fragment, i, from, false) : run(fragment, from, false));
         found[i] = match;
-        // Nothing ahead now means nothing ahead later either
+        // Nothing ahead now means nothing ahead later, either
         if (!match) exhausted[i] = true;
       }
 

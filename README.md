@@ -547,6 +547,14 @@ For partial HTML fragments (such as template includes, SSI fragments, or closing
 
 To validate complete HTML markup, use [the W3C validator](https://validator.w3.org/) or one of [several validator packages](https://meiert.com/blog/html-validator-packages/).
 
+### Regex options and flags
+
+`customAttrAssign` and `customAttrSurround` patterns are merged into one attribute pattern which carries no flags of its own. `i` and `s` are written into each pattern’s source instead, so they survive the merge. `u`, `v`, and `m` cannot be, and none of them fails loudly when dropped: `u` and `v` only narrow what syntax is legal, so a source valid under either stays valid without it and quietly matches something else—a dropped `u` leaves `\p{L}` matching the literal text `p{L}`—while a dropped `m` leaves `^` and `$` matching at the ends of the input rather than of each line.
+
+A pattern is therefore refused with an error where the flag changes what its source matches—a property or code point escape, a character past the BMP, a character `i` folds by Unicode rules only while `u` is there (`/s/iu` matches `\u017F`, `/k/iu` matches `\u212A`), a `v` class that nests, subtracts, intersects, or holds strings, or—under `m`—an anchor whose meaning moves. A flag the source does not depend on, as in `/x=/u`, is left alone.
+
+Patterns given as strings, in a configuration file or on the command line, may be written either bare (`ng-class`) or delimited with flags (`/ng-class/i`).
+
 ## Security
 
 ### ReDoS protection
@@ -555,7 +563,11 @@ You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular express
 
 * Matching without backtracking: A pattern that wraps an any-character or negated-class body in literal delimiters—`<%[\s\S]*?%>` or `\{\{[^}]*?\}\}`, and every other shape below—is matched by scanning for those delimiters in linear time, with no regular expression involved. Patterns of other shapes run as regular expressions, one per pattern, so each keeps its own flags.
 
-* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself contains a quantifier that can vary (`(a+)+`, `(a?)+`) or alternation (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). A fixed count does not vary, so `(?:a{4})+` passes. These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control. A pattern longer than 10,000 characters or nested more than 50 groups deep is judged risky without being analyzed further, so that reading the pattern cannot itself become the expensive step.
+* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself contains a quantifier that can vary (`(a+)+`, `(a?)+`) or alternation (`(a|b)*`), and two unbounded repeats that can consume the same character with only atoms matching empty between them (`.*.*`, `[a]*a*`, `\w*\d*`, `a*b*a*`).
+
+  A group is no wall: It counts by what its body can match, and repeats meet across its boundary, so `\s*(\w*)\s*` and `(a*)a*` are flagged like `\s*\w*\s*` and `a*a*`. A lookaround backtracks nothing, so `(?=a*)a*` passes. A fixed count does not vary, so `(?:a{4})+` passes; repeats that share no character leave nothing ambiguous to split, so `\s*\S*` passes. A pattern is read the way its own flags make it match, so `/.*\n*/s` and `/[a]*A*/i` are flagged where those same sources without the flags are not. Under `v`, a class that nests reads as the union it is, while one that subtracts (`--`) or intersects (`&&`) is left unread and passes.
+
+  These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control. A pattern longer than 10,000 characters or nested more than 50 groups deep is judged risky without being analyzed further, so that reading the pattern cannot itself become the expensive step. The check reads shapes, not languages: It warns about the common ones rather than proving a pattern linear, and misses repeats that overlap only across whole subexpressions (`(ab)*(abab)*`). **Treat a pattern that passes as unflagged, not as vetted.**
 
 * Input length limits: The `maxInputLength` option allows you to set a maximum input size to prevent processing of excessively large inputs that could cause performance issues.
 
@@ -579,7 +591,8 @@ ignoreCustomFragments: [
 ignoreCustomFragments: [
   /<%(\s|\S)*?%>/,               // Unlimited quantifier over an alternating group
   /\{\{([^}]+)+\}\}/,            // Nested unlimited quantifiers
-  /<!--[\s\S]*[\s\S]*-->/        // The same atom repeated unboundedly twice
+  /<!--[\s\S]*[\s\S]*-->/,       // Two unbounded repeats in a row
+  /<%\w*\d*%>/                   // Two unbounded repeats over overlapping sets
 ]
 ```
 
