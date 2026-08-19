@@ -285,6 +285,33 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(?=a)a*/.source), false);
     });
 
+    test('Repeats reach each other across a group boundary', () => {
+      // A group is no wall: the repeat inside it and the one outside split the
+      // same run, wherever the boundary falls between them
+      assert.strictEqual(hasRiskyQuantifiers(/(a*)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(a*)/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/(a*)(a*)/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\{\{(\s*)[\s\S]*?\}\}/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b*a*)/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/(a*b*)a*/.source), true);
+      // What the group has to consume separates only what stands before it
+      assert.strictEqual(hasRiskyQuantifiers(/(b+a*)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b+a*)/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a*b)b*/.source), false);
+      // A branch reaches out of the group on its own
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?:x|a*)/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?:x|b*)/.source), false);
+      // Repeats that share nothing stay linear across the boundary, too
+      assert.strictEqual(hasRiskyQuantifiers(/(a*)b*/.source), false);
+      // A lookaround is atomic, so what it holds reaches nothing outside it
+      assert.strictEqual(hasRiskyQuantifiers(/(?=a*)a*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?!a*)/.source), false);
+      // The patterns people write for real keep passing
+      assert.strictEqual(hasRiskyQuantifiers(/<(WC@[\s\S]*?)>(.*?)<\/\1>/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/(\{\{)([\s\S]*?)(\}\})/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/<%[-=]?([\s\S]*?)%>/.source), false);
+    });
+
     test('Analysis stays bounded on pathological patterns', () => {
       // Nesting past the depth limit is judged risky rather than recursed into,
       // while nesting within it is read for what it is

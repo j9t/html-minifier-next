@@ -616,19 +616,51 @@ function embedSource(pattern) {
 }
 
 /**
+ * @typedef {{text: string, ranges: [number, number][] | null}} Repeat - An unbounded
+ *   repeat, as it reads and as the set of characters it matches
+ */
+
+/**
+ * @param {Repeat[]} reachable - Repeats that could still sit adjacent to what comes next
+ * @param {Repeat} repeat
+ * @returns {boolean} Whether the two can consume the same character, and so split
+ *   the same run of input between them
+ */
+function splitsWith(reachable, repeat) {
+  return reachable.some(earlier => earlier.text === repeat.text ||
+    (!!repeat.ranges && !!earlier.ranges && rangesIntersect(repeat.ranges, earlier.ranges)));
+}
+
+/**
+ * @param {Repeat[]} into
+ * @param {Repeat[]} repeats
+ * @returns {void} Adds the repeats, keeping only the most recent ones the walk
+ *   still compares against
+ */
+function collectReachable(into, repeats) {
+  for (const repeat of repeats) {
+    into.push(repeat);
+    if (into.length > MAX_REACHABLE) into.shift();
+  }
+}
+
+/**
  * Walk a regex source for the shapes whose backtracking blows up: an unlimited
  * quantifier over a group that itself contains a variable quantifier (`(a+)+`,
  * `(a?)+`) or alternates, and two unbounded repeats that can consume the same
  * character with only atoms matching empty between them (`.*.*`, `[a]*a*`,
- * `\w*\d*`, `a*b*a*`, `a*(b*)a*`). A lone unlimited quantifier stays linear, so `[\s\S]*?`
- * up to a literal terminator passes.
+ * `\w*\d*`, `a*b*a*`, `a*(b*)a*`, `(a*)a*`). A lone unlimited quantifier stays
+ * linear, so `[\s\S]*?` up to a literal terminator passes.
  * @param {string} source - Regex source, assumed syntactically valid
  * @param {number} [depth] - Group nesting level of this call
  * @param {boolean} [nested] - Whether the pattern carries `v`
- * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean, empty: boolean}}
+ * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean,
+ *   empty: boolean, leading: Repeat[], trailing: Repeat[]}} What the walk found,
+ *   with the repeats that reach the source’s start and end for a caller to compare
+ *   against what stands beside it
  */
 function analyzeQuantifiers(source, depth = 0, nested = false) {
-  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true, deep: true, empty: true };
+  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true, deep: true, empty: true, leading: [], trailing: [] };
 
   let risky = false;
   let varies = false;
@@ -640,8 +672,15 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
   let anyBranchEmpty = false;
   // The unbounded repeats that could still sit adjacent to what comes next, most
   // recent last; an atom matching empty leaves the ones before it reachable
-  /** @type {{text: string, ranges: [number, number][] | null}[]} */
+  /** @type {Repeat[]} */
   const reachable = [];
+  // The repeats a caller can reach from either end, gathered across branches
+  /** @type {Repeat[]} */
+  const leading = [];
+  /** @type {Repeat[]} */
+  const trailing = [];
+  /** @type {Repeat[]} */
+  let branchLeading = [];
   let i = 0;
 
   while (i < source.length) {
@@ -655,6 +694,9 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
       alternates = true;
       anyBranchEmpty ||= branchEmpty;
       branchEmpty = true;
+      collectReachable(leading, branchLeading);
+      collectReachable(trailing, reachable);
+      branchLeading = [];
       reachable.length = 0;
       i++;
       continue;
@@ -703,31 +745,42 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
     const nullable = body || (!!quantifier && least === 0);
     if (quantifier) i = RE_QUANTIFIER.lastIndex;
 
+    // A lookaround is atomic: It backtracks nothing, so what it holds neither
+    // reaches out of it nor is reached into
+    const opaque = RE_ZERO_WIDTH.test(atom);
     if (group) {
       if (group.risky || (repeats && (group.varies || group.alternates))) risky = true;
       if (group.varies) varies = true;
       // A group alternates whether the `|` sits at its top level or deeper
       if (group.alternates) alternates = true;
       if (group.deep) deep = true;
+      // A group is no wall: What it repeats at its start splits the same run as
+      // what stands unbounded before it
+      if (!opaque && group.leading.some(repeat => splitsWith(reachable, repeat))) risky = true;
     }
     if (variable) varies = true;
     const text = unwrapAtom(atom);
     const ranges = atomRanges(text, nested);
-    if (repeats && reachable.some(earlier => earlier.text === text ||
-      (!!ranges && !!earlier.ranges && rangesIntersect(ranges, earlier.ranges)))) risky = true;
+    if (repeats && splitsWith(reachable, { text, ranges })) risky = true;
 
+    // Whatever a caller could reach before this atom, it reaches this one, too
+    if (branchEmpty) {
+      if (repeats) collectReachable(branchLeading, [{ text, ranges }]);
+      if (group && !opaque) collectReachable(branchLeading, group.leading);
+    }
     // Nothing reaches past an atom that has to consume something
     if (!nullable) {
       reachable.length = 0;
       branchEmpty = false;
     }
-    if (repeats) {
-      reachable.push({ text, ranges });
-      if (reachable.length > MAX_REACHABLE) reachable.shift();
-    }
+    if (group && !opaque) collectReachable(reachable, group.trailing);
+    if (repeats) collectReachable(reachable, [{ text, ranges }]);
   }
 
-  return { risky, varies, alternates, deep, empty: anyBranchEmpty || branchEmpty };
+  collectReachable(leading, branchLeading);
+  collectReachable(trailing, reachable);
+
+  return { risky, varies, alternates, deep, empty: anyBranchEmpty || branchEmpty, leading, trailing };
 }
 
 /**
