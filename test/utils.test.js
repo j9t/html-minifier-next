@@ -255,6 +255,23 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/a*b*c*/.source), false);
     });
 
+    test('A group whose body can match empty does not separate repeats', () => {
+      // A quantifier inside the group, where the group itself carries none
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b*)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\s*(\w*)\s*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b?)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/<%[\s\S]*?(\s*)[\s\S]*?%>/.source), true);
+      // Nesting does not change what the body can match
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?:(b*))a*/.source), true);
+      // One branch matching empty is enough for the alternation to
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b*|c)a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(|c)a*/.source), true);
+      // A body that has to consume something separates the repeats again
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b+)a*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b*c)a*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*(b|c)a*/.source), false);
+    });
+
     test('A group wrapping the atom does not hide the repetition', () => {
       // `^(?:a)*a*$` backtracks quadratically on `aaa…b`, the way `a*a*` does
       assert.strictEqual(hasRiskyQuantifiers(/^(?:a)*a*$/.source), true);

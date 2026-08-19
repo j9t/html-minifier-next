@@ -358,6 +358,9 @@ function atomRanges(atom, nested = false, depth = 0) {
       continue;
     }
     // Subtraction and intersection are not unions, and are left unread
+    //
+    // @@ Read `--` and `&&` as set difference and intersection
+    // (so that a `v` class built is compared rather than passed unjudged)
     if (nested && (atom.startsWith('--', i) || atom.startsWith('&&', i))) return null;
 
     const fromLength = tokenLength(atom, i);
@@ -617,20 +620,24 @@ function embedSource(pattern) {
  * quantifier over a group that itself contains a variable quantifier (`(a+)+`,
  * `(a?)+`) or alternates, and two unbounded repeats that can consume the same
  * character with only atoms matching empty between them (`.*.*`, `[a]*a*`,
- * `\w*\d*`, `a*b*a*`). A lone unlimited quantifier stays linear, so `[\s\S]*?`
+ * `\w*\d*`, `a*b*a*`, `a*(b*)a*`). A lone unlimited quantifier stays linear, so `[\s\S]*?`
  * up to a literal terminator passes.
  * @param {string} source - Regex source, assumed syntactically valid
  * @param {number} [depth] - Group nesting level of this call
  * @param {boolean} [nested] - Whether the pattern carries `v`
- * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean}}
+ * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean, empty: boolean}}
  */
 function analyzeQuantifiers(source, depth = 0, nested = false) {
-  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true, deep: true };
+  if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true, deep: true, empty: true };
 
   let risky = false;
   let varies = false;
   let alternates = false;
   let deep = false;
+  // Whether every atom of the branch being read matches empty, and whether any
+  // branch before it did
+  let branchEmpty = true;
+  let anyBranchEmpty = false;
   // The unbounded repeats that could still sit adjacent to what comes next, most
   // recent last; an atom matching empty leaves the ones before it reachable
   /** @type {{text: string, ranges: [number, number][] | null}[]} */
@@ -646,6 +653,8 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
     if (char === '|') {
       // Alternatives are separate expressions, so nothing carries across
       alternates = true;
+      anyBranchEmpty ||= branchEmpty;
+      branchEmpty = true;
       reachable.length = 0;
       i++;
       continue;
@@ -685,11 +694,13 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
     const exact = !!quantifier && quantifier[0][0] === '{' &&
       (upper === undefined || (upper !== '' && Number(upper) === Number(quantifier[1])));
     const variable = !!quantifier && !exact;
-    // A quantifier that may repeat none leaves the atom matching empty; without
-    // one, only a zero-width atom does
+    // An atom matches empty where it is zero-width, where its quantifier may
+    // repeat none, or where a group body matches empty however often it repeats—
+    // `(b*)`, carrying the quantifier inside the group rather than on it
     const least = quantifier && (quantifier[0][0] === '+' ? 1
       : quantifier[0][0] === '{' ? Number(quantifier[1]) : 0);
-    const nullable = quantifier ? least === 0 : RE_ZERO_WIDTH.test(atom);
+    const body = RE_ZERO_WIDTH.test(atom) || (!!group && group.empty);
+    const nullable = body || (!!quantifier && least === 0);
     if (quantifier) i = RE_QUANTIFIER.lastIndex;
 
     if (group) {
@@ -706,14 +717,17 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
       (!!ranges && !!earlier.ranges && rangesIntersect(ranges, earlier.ranges)))) risky = true;
 
     // Nothing reaches past an atom that has to consume something
-    if (!nullable) reachable.length = 0;
+    if (!nullable) {
+      reachable.length = 0;
+      branchEmpty = false;
+    }
     if (repeats) {
       reachable.push({ text, ranges });
       if (reachable.length > MAX_REACHABLE) reachable.shift();
     }
   }
 
-  return { risky, varies, alternates, deep };
+  return { risky, varies, alternates, deep, empty: anyBranchEmpty || branchEmpty };
 }
 
 /**
