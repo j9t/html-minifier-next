@@ -2692,19 +2692,46 @@ describe('HTML', () => {
   });
 
   test('`customAttrSurround` and `customAttrAssign` refuse flags that cannot survive the merge', async () => {
+    const assign = (/** @type {string} */ source, /** @type {string} */ flags) =>
+      minify('<div flagX="v">y</div>', { customAttrAssign: [new RegExp(source, flags)] });
+
     // `u` and `v` change how a source reads, and the merged pattern carries
-    // neither—`\p{L}` would quietly match the literal text `p{L}` instead
+    // neither—dropped, `\p{L}` quietly matches the literal text `p{L}` instead
+    await assert.rejects(() => assign('\\p{L}=', 'u'), /`customAttrAssign` pattern .* carries `u`/);
+    await assert.rejects(() => assign('\\u{78}=', 'u'), /carries `u`/);
+    await assert.rejects(() => assign('\u{1F600}=', 'u'), /carries `u`/); // one code point with the flag, two units without
+    await assert.rejects(() => assign('[[x][y]]=', 'v'), /carries `v`/); // a class nests only under `v`
+    await assert.rejects(() => assign('[\\w--[a]]=', 'v'), /carries `v`/);
+    await assert.rejects(() => assign('[\\q{xy}]=', 'v'), /carries `v`/);
     await assert.rejects(
-      () => minify('<div flag="v">y</div>', { customAttrAssign: [new RegExp('\\p{L}=', 'u')] }),
-      /`customAttrAssign` pattern .* carries `u`/
-    );
-    await assert.rejects(
-      () => minify('<div flag="v">y</div>', { customAttrSurround: [[new RegExp('\\{\\{#if\\}\\}', 'v'), /\{\{\/if\}\}/]] }),
+      () => minify('<div flag="v">y</div>', { customAttrSurround: [[new RegExp('[[a][b]]', 'v'), /\{\{\/if\}\}/]] }),
       /`customAttrSurround` pattern .* carries `v`/
     );
+
+    // Under `i`, `u` folds case by Unicode rules the merged pattern cannot reach:
+    // `/s/iu` matches `\u017F`, and `/k/iu` matches `\u212A`, where neither does
+    // without it
+    await assert.rejects(() => assign('s=', 'iu'), /carries `u`/);
+    await assert.rejects(() => assign('K=', 'iu'), /carries `u`/);
+    await assert.rejects(() => assign('\u00DF=', 'iu'), /carries `u`/);
+    // Written as an escape rather than as itself, which the source reads the same
+    await assert.rejects(() => assign('\\u017F=', 'iu'), /carries `u`/);
+    await assert.rejects(() => assign('\\x73=', 'iu'), /carries `u`/);
+
+    // `m` is lost the same way, and moves where `^` and `$` match
+    await assert.rejects(() => assign('^x=', 'm'), /carries `m`/);
+    await assert.rejects(() => assign('x=$', 'm'), /carries `m`/);
+
+    // A flag that changes nothing about the source is no reason to refuse it
+    assert.strictEqual(await assign('x=', 'u'), '<div flagx="v">y</div>');
+    assert.strictEqual(await assign('[x]=', 'v'), '<div flagx="v">y</div>');
+    assert.strictEqual(await assign('x=', 'iu'), '<div flagx="v">y</div>');
+    assert.strictEqual(await assign('[x\u00E9]=', 'iu'), '<div flagx="v">y</div>');
+
     // The flags a source can carry, and the ones that change nothing here, pass
-    assert.strictEqual(await minify('<div flagX="v">y</div>', { customAttrAssign: [/x=/i] }), '<div flagx="v">y</div>');
-    assert.strictEqual(await minify('<div flagx="v">y</div>', { customAttrAssign: [/x=/gm] }), '<div flagx="v">y</div>');
+    assert.strictEqual(await assign('x=', 'i'), '<div flagx="v">y</div>');
+    assert.strictEqual(await assign('x=', 'gm'), '<div flagx="v">y</div>');
+    assert.strictEqual(await assign('[$^]x=', 'm'), '<div flagx="v">y</div>'); // both are members here, not anchors
   });
 
   test('`caseSensitive`', async () => {

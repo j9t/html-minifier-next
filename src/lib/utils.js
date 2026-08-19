@@ -509,6 +509,93 @@ function foldCase(source, nested = false) {
 }
 
 /**
+ * Whether a source anchors anywhere, so that `m` would move where it matches
+ * @param {string} source @param {boolean} [nested] - Whether the pattern carries `v`
+ */
+function hasAnchor(source, nested = false) {
+  let i = 0;
+  while (i < source.length) {
+    if (source[i] === '\\') i += tokenLength(source, i);
+    // Inside a class `^` negates and `$` is a member, so neither anchors there
+    else if (source[i] === '[') i = skipCharacterClass(source, i, nested);
+    else if (source[i] === '^' || source[i] === '$') return true;
+    else i++;
+  }
+  return false;
+}
+
+// A property escape or a code point escape, both of which read as literal text
+// where the flag that gives them meaning is gone
+const RE_UNICODE_ESCAPE = /\\[pP]\{|\\u\{/;
+
+// The characters `u` folds by Unicode rules and a source without it does not:
+// `/s/iu` matches `\u017F` and `/k/iu` matches `\u212A`, where neither does on its
+// own. Characters past the BMP fold this way too, and are caught as astral first.
+const RE_UNICODE_FOLDING = /[\u004B\u0053\u006B\u0073\u00C5\u00DF\u00E5\u017F\u0398\u03A9\u03B8\u03C9\u03D1\u03F4\u1E9E\u1F80-\u1FAF\u1FB3\u1FBC\u1FC3\u1FCC\u1FF3\u1FFC\u2126\u212A\u212B]/;
+
+/**
+ * Which flag changes what a source matches, so that embedding the source where the
+ * flag cannot follow would silently match something else. `u` and `v` only narrow
+ * what syntax is legal, so a source valid under either stays valid without it—the
+ * difference never surfaces as a syntax error, and this stands in for the one that
+ * would otherwise be raised.
+ * @param {RegExp} pattern
+ * @returns {'u' | 'v' | 'm' | null} The flag the source depends on, or `null` where
+ *   every flag it carries would leave the source matching the same
+ */
+function lostFlag(pattern) {
+  const { source, unicode, unicodeSets } = pattern;
+  // `m` moves where `^` and `$` match, and only matters where the source has one
+  if (pattern.multiline && hasAnchor(source, unicodeSets)) return 'm';
+  if (!unicode && !unicodeSets) return null;
+  const flag = unicodeSets ? 'v' : 'u';
+  if (RE_UNICODE_ESCAPE.test(source)) return flag;
+  // Case folding under `i` follows Unicode rules only while the flag is there. A
+  // character can be written literally or as an escape, so the source is read
+  // token by token rather than scanned for the characters themselves; `singleCode`
+  // leaves out `\d` and friends, which fold alike with the flag and without it.
+  if (pattern.ignoreCase) {
+    for (let i = 0; i < source.length;) {
+      const length = tokenLength(source, i);
+      const code = singleCode(tokenRanges(source.slice(i, i + length), true));
+      if (code !== null && RE_UNICODE_FOLDING.test(String.fromCodePoint(code))) return flag;
+      i += length;
+    }
+  }
+  // Past the BMP a character is one code point with the flag, two units without,
+  // which is what a quantifier or a class beside it would go on to read wrongly
+  for (const char of source) {
+    if ((char.codePointAt(0) ?? 0) > 0xFFFF) return flag;
+  }
+  if (!unicodeSets) return null;
+
+  // `v` alone lets a class nest, subtract, intersect, and hold whole strings
+  let i = 0;
+  while (i < source.length) {
+    if (source[i] === '\\') {
+      i += tokenLength(source, i);
+      continue;
+    }
+    if (source[i] !== '[') {
+      i++;
+      continue;
+    }
+    const end = skipCharacterClass(source, i, true);
+    for (let j = i + 1; j < end - 1;) {
+      if (source[j] === '\\') {
+        if (source.startsWith('\\q{', j)) return 'v';
+        j += tokenLength(source, j);
+        continue;
+      }
+      if (source[j] === '[' || source.startsWith('--', j) || source.startsWith('&&', j)) return 'v';
+      j++;
+    }
+    i = end;
+  }
+  return null;
+}
+
+/**
  * A pattern’s source, rewritten to match the way its own flags make it match, for
  * embedding in a larger regex that cannot carry them. `i` and `s` fit into a
  * source; `m`, `u`, and `v` do not, and are left to the pattern it joins. Where
@@ -692,5 +779,6 @@ export {
   replaceAsync,
   parseRegExp,
   embedSource,
+  lostFlag,
   describeQuantifierRisk
 };

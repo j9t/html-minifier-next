@@ -1,5 +1,5 @@
 import { createUrlMinifier } from './urls.js';
-import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp, describeQuantifierRisk } from './utils.js';
+import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -615,7 +615,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   for (const [key, patterns] of merged) {
     for (const re of patterns) {
       if (!(re instanceof RegExp)) continue;
-      const flag = re.unicodeSets ? 'v' : (re.unicode ? 'u' : '');
+      const flag = lostFlag(re);
       if (!flag) continue;
       throw new Error(`HTML Minifier Next: \`${key}\` pattern \`/${re.source}/${re.flags}\` carries \`${flag}\`, which the merged attribute pattern cannot carry—rewrite it without \`${flag}\``);
     }

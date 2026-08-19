@@ -16,7 +16,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Updated `customAttrAssign` and `customAttrSurround` patterns carrying `u` or `v` to refuse with an error
+* Updated `customAttrAssign` and `customAttrSurround` patterns carrying `u`, `v`, or `m` to refuse with an error, where the flag changes what the source matches (a flag the source does not depend on, as in `/x=/u`, is left alone)
 * Updated `ignoreCustomFragments` patterns whose unbounded repeats reach each other across atoms that can match empty—`a*b*a*`, `\s*\w*\s*`—to be flagged as backtracking risks, which `strictCustomFragments` rejects outright
 
 ## [8.0.0] - 2026-08-19
