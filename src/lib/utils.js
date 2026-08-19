@@ -533,7 +533,7 @@ const RE_UNICODE_ESCAPE = /\\[pP]\{|\\u\{/;
 
 // The characters `u` folds by Unicode rules and a source without it does not:
 // `/s/iu` matches `\u017F` and `/k/iu` matches `\u212A`, where neither does on its
-// own. Characters past the BMP fold this way too, and are caught as astral first.
+// own. Characters past the BMP fold this way, too, and are caught as astral first.
 const RE_UNICODE_FOLDING = /[\u004B\u0053\u006B\u0073\u00C5\u00DF\u00E5\u017F\u0398\u03A9\u03B8\u03C9\u03D1\u03F4\u1E9E\u1F80-\u1FAF\u1FB3\u1FBC\u1FC3\u1FCC\u1FF3\u1FFC\u2126\u212A\u212B]/;
 
 /**

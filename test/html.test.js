@@ -282,7 +282,7 @@ describe('HTML', () => {
 
     // Must also work without decodeEntities
     const result2 = await minify(input, { continueOnParseError: true });
-    assert.ok(result2.includes('<img'), '`img` element must be preserved without `decodeEntities` too');
+    assert.ok(result2.includes('<img'), '`img` element must be preserved without `decodeEntities`, too');
 
     // Attributes must be present
     assert.ok(result.includes('class="screenshot"'), '`class` attribute must be preserved');

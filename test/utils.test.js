@@ -245,7 +245,7 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/\s*\w*\s*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/a*b?a*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/a*b{0,3}a*/.source), true);
-      // A lookaround consumes nothing either
+      // A lookaround consumes nothing, either
       assert.strictEqual(hasRiskyQuantifiers(/a*(?=x)a*/.source), true);
       // An atom that has to consume something separates them again
       assert.strictEqual(hasRiskyQuantifiers(/a*b+a*/.source), false);

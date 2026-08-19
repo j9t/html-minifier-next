@@ -170,7 +170,7 @@ function findRawTextElements(haystack, tagName) {
  * Collect the class names and IDs a document references.
  *
  * Style sheet contents are excluded, so that a style sheet never counts as
- * evidence for its own selectors. An `iframe srcdoc` value is not scanned
+ * evidence for its own selectors. An `iframe srcdoc` value is not scanned,
  * either: It holds a document of its own, minified against its own symbol set.
  * Over-collecting is safe here (a symbol wrongly considered used is merely
  * kept), under-collecting is not.
