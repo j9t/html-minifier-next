@@ -151,13 +151,25 @@ const RE_ASCII_LETTER = /^[a-zA-Z]$/;
 const RE_HEX_PAIR = /^[0-9a-fA-F]{2}$/;
 const RE_HEX_QUAD = /^[0-9a-fA-F]{4}$/;
 
-/** @param {string} source @param {number} index - Index of the opening `[` */
-function skipCharacterClass(source, index) {
+/**
+ * @param {string} source @param {number} index - Index of the opening `[`
+ * @param {boolean} [nested] - Whether the pattern carries `v`, where a class nests
+ *   inside a class and the first `]` need not be the one that closes it
+ * @returns {number} Index just past the closing `]`
+ */
+function skipCharacterClass(source, index, nested = false) {
   let i = index + 1;
-  while (i < source.length && source[i] !== ']') {
-    i += source[i] === '\\' ? 2 : 1;
+  let open = 1;
+  while (i < source.length && open > 0) {
+    const char = source[i];
+    if (char === '\\') i += tokenLength(source, i);
+    else {
+      if (nested && char === '[') open++;
+      else if (char === ']') open--;
+      i++;
+    }
   }
-  return i + 1;
+  return i;
 }
 
 /**
@@ -177,6 +189,11 @@ function tokenLength(source, index) {
     if (RE_HEX_QUAD.test(source.slice(index + 2, index + 6))) return 6;
   }
   if (next === 'c' && RE_ASCII_LETTER.test(source[index + 2] ?? '')) return 3;
+  // A `v` class holds string literals, which fold as strings or not at all
+  if (next === 'q' && source[index + 2] === '{') {
+    const close = source.indexOf('}', index + 3);
+    if (close !== -1) return close - index + 1;
+  }
   // A property name or a group name is syntax, not text to fold
   if ((next === 'p' || next === 'P') && source[index + 2] === '{') {
     const close = source.indexOf('}', index + 3);
@@ -259,10 +276,11 @@ const DOT_RANGES = complement([[0x0A, 0x0A], [0x0D, 0x0D], [0x2028, 0x2029]]);
 
 /**
  * @param {string} token - One token, as `tokenLength` measures it
+ * @param {boolean} [inClass] - Whether the token sits inside a character class
  * @returns {[number, number][] | null} What it matches, or `null` where it is not
  *   one character of text
  */
-function tokenRanges(token) {
+function tokenRanges(token, inClass = false) {
   if (token[0] !== '\\') {
     const code = token.codePointAt(0) ?? 0;
     return String.fromCodePoint(code) === token ? [[code, code]] : null;
@@ -283,6 +301,10 @@ function tokenRanges(token) {
     const code = token.charCodeAt(2) % 32;
     return [[code, code]];
   }
+  // `\b` asserts a word boundary on its own, and is a backspace inside a class
+  if (kind === 'b' && inClass) return [[0x08, 0x08]];
+  // `\q{…}` stands for whole strings, not for a character
+  if (token.startsWith('\\q{')) return null;
   if (RE_NON_CHARACTER_ESCAPE.test(kind)) return null;
 
   // The rest is punctuation escaped to be read as itself
@@ -298,10 +320,13 @@ function singleCode(ranges) {
 
 /**
  * @param {string} atom - Atom as it reads in the source, already unwrapped
+ * @param {boolean} [nested] - Whether the pattern carries `v`
+ * @param {number} [depth] - Class nesting level of this call
  * @returns {[number, number][] | null} What it matches, or `null` where it is not
  *   one character of text, or one this does not read
  */
-function atomRanges(atom) {
+function atomRanges(atom, nested = false, depth = 0) {
+  if (depth > MAX_PATTERN_DEPTH) return null;
   if (atom === '.') return DOT_RANGES;
   if (atom[0] !== '[') return tokenRanges(atom);
   if (!atom.endsWith(']')) return null;
@@ -313,8 +338,20 @@ function atomRanges(atom) {
   const members = [];
 
   while (i < end) {
+    // A `v` class nests, and nesting alone is a union to read through
+    if (nested && atom[i] === '[') {
+      const close = skipCharacterClass(atom, i, true);
+      const inner = atomRanges(atom.slice(i, close), true, depth + 1);
+      if (!inner) return null;
+      members.push(...inner);
+      i = close;
+      continue;
+    }
+    // Subtraction and intersection are not unions, and are left unread
+    if (nested && (atom.startsWith('--', i) || atom.startsWith('&&', i))) return null;
+
     const fromLength = tokenLength(atom, i);
-    const from = tokenRanges(atom.slice(i, i + fromLength));
+    const from = tokenRanges(atom.slice(i, i + fromLength), true);
     if (!from) return null;
     i += fromLength;
 
@@ -326,7 +363,7 @@ function atomRanges(atom) {
     const toLength = tokenLength(atom, i + 1);
     // Only single characters bound a range; `\d-z` is not a range at all
     const low = singleCode(from);
-    const high = singleCode(tokenRanges(atom.slice(i + 1, i + 1 + toLength)));
+    const high = singleCode(tokenRanges(atom.slice(i + 1, i + 1 + toLength), true));
     if (low === null || high === null) return null;
     members.push([low, high]);
     i += 1 + toLength;
@@ -358,8 +395,11 @@ function isLower(char) {
   return char === char.toLowerCase();
 }
 
-/** @param {string} source - Regex source, assumed syntactically valid */
-function expandDotAll(source) {
+/**
+ * @param {string} source - Regex source, assumed syntactically valid
+ * @param {boolean} [nested] - Whether the pattern carries `v`
+ */
+function expandDotAll(source, nested = false) {
   let out = '';
   let i = 0;
   while (i < source.length) {
@@ -369,7 +409,7 @@ function expandDotAll(source) {
       out += source.slice(i, i + length);
       i += length;
     } else if (char === '[') {
-      const end = skipCharacterClass(source, i);
+      const end = skipCharacterClass(source, i, nested);
       out += source.slice(i, end);
       i = end;
     } else if (char === '.') {
@@ -383,22 +423,25 @@ function expandDotAll(source) {
   return out;
 }
 
-/** @param {string} source - Regex source, assumed syntactically valid */
-function foldCase(source) {
+/**
+ * @param {string} source - Regex source, assumed syntactically valid
+ * @param {boolean} [nested] - Whether the pattern carries `v`
+ */
+function foldCase(source, nested = false) {
   let out = '';
   let i = 0;
-  let inClass = false;
+  let open = 0;
 
   while (i < source.length) {
     const char = source[i] ?? '';
 
-    if (!inClass) {
+    if (open === 0) {
       if (char === '\\') {
         const length = tokenLength(source, i);
         out += source.slice(i, i + length);
         i += length;
       } else if (char === '[') {
-        inClass = true;
+        open = 1;
         out += char;
         i++;
       } else if (char === '(' && source.startsWith('(?<', i) &&
@@ -415,8 +458,15 @@ function foldCase(source) {
       continue;
     }
 
+    if (nested && char === '[') {
+      open++;
+      out += char;
+      i++;
+      continue;
+    }
+
     if (char === ']') {
-      inClass = false;
+      open--;
       out += char;
       i++;
       continue;
@@ -460,8 +510,8 @@ function foldCase(source) {
  */
 function embedSource(pattern) {
   let source = pattern.source;
-  if (pattern.dotAll) source = expandDotAll(source);
-  if (pattern.ignoreCase) source = foldCase(source);
+  if (pattern.dotAll) source = expandDotAll(source, pattern.unicodeSets);
+  if (pattern.ignoreCase) source = foldCase(source, pattern.unicodeSets);
   return source;
 }
 
@@ -473,9 +523,10 @@ function embedSource(pattern) {
  * stays linear, so `[\s\S]*?` up to a literal terminator passes.
  * @param {string} source - Regex source, assumed syntactically valid
  * @param {number} [depth] - Group nesting level of this call
+ * @param {boolean} [nested] - Whether the pattern carries `v`
  * @returns {{risky: boolean, varies: boolean, alternates: boolean, deep: boolean}}
  */
-function analyzeQuantifiers(source, depth = 0) {
+function analyzeQuantifiers(source, depth = 0, nested = false) {
   if (depth > MAX_PATTERN_DEPTH) return { risky: true, varies: true, alternates: true, deep: true };
 
   let risky = false;
@@ -501,7 +552,7 @@ function analyzeQuantifiers(source, depth = 0) {
     } else if (char === '\\') {
       i += tokenLength(source, i);
     } else if (char === '[') {
-      i = skipCharacterClass(source, i);
+      i = skipCharacterClass(source, i, nested);
     } else if (char === '(') {
       let open = 1;
       i++;
@@ -510,7 +561,7 @@ function analyzeQuantifiers(source, depth = 0) {
         if (inner === '\\') {
           i += tokenLength(source, i);
         } else if (inner === '[') {
-          i = skipCharacterClass(source, i);
+          i = skipCharacterClass(source, i, nested);
         } else {
           if (inner === '(') open++;
           else if (inner === ')') open--;
@@ -518,7 +569,7 @@ function analyzeQuantifiers(source, depth = 0) {
         }
       }
       // Drop the group prefix (`?:`, `?=`, `?<name>`, …) before reading the body
-      group = analyzeQuantifiers(source.slice(start + 1, i - 1).replace(/^\?(?:[:=!]|<[=!]|<[^>]*>)/, ''), depth + 1);
+      group = analyzeQuantifiers(source.slice(start + 1, i - 1).replace(/^\?(?:[:=!]|<[=!]|<[^>]*>)/, ''), depth + 1, nested);
     } else {
       i++;
     }
@@ -545,7 +596,7 @@ function analyzeQuantifiers(source, depth = 0) {
     }
     if (variable) varies = true;
     const text = unwrapAtom(atom);
-    const ranges = atomRanges(text);
+    const ranges = atomRanges(text, nested);
     const overlaps = !!ranges && !!previous?.ranges && rangesIntersect(ranges, previous.ranges);
     if (repeats && previous?.repeats && (previous.text === text || overlaps)) risky = true;
     previous = { text, repeats, ranges };
@@ -555,16 +606,23 @@ function analyzeQuantifiers(source, depth = 0) {
 }
 
 /**
- * @param {string} source - Regex source to judge
+ * @param {RegExp | string} pattern - Pattern to judge, or a bare source to read
+ *   as it stands
  * @returns {string | null} What makes the pattern a backtracking risk, phrased
  *   to follow the pattern itself, or `null` where it is none
  */
-function describeQuantifierRisk(source) {
-  // A pattern too big to read is refused for that, not for a shape nobody saw
+function describeQuantifierRisk(pattern) {
+  const source = typeof pattern === 'string' ? pattern : pattern.source;
+  // A pattern too big to read is refused for that, not for a shape nobody saw;
+  // its own length is what counts, not the length folding case inflates it to
   if (source.length > MAX_PATTERN_LENGTH) {
     return `runs past ${MAX_PATTERN_LENGTH.toLocaleString()} characters, too long to analyze for catastrophic backtracking—shorten it, or split it into several patterns`;
   }
-  const analysis = analyzeQuantifiers(source);
+  // `i` and `s` change what the source matches, so they are written into it
+  // before the shapes are read
+  const analysis = typeof pattern === 'string'
+    ? analyzeQuantifiers(source)
+    : analyzeQuantifiers(embedSource(pattern), 0, pattern.unicodeSets);
   if (analysis.deep) {
     return `nests groups more than ${MAX_PATTERN_DEPTH.toLocaleString()} deep, too deep to analyze for catastrophic backtracking—flatten it, or split it into several patterns`;
   }

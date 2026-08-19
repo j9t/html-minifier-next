@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 * Fixed the `ignoreCustomFragments` risk analysis missing two unbounded repeats that overlap without being spelled alike—`[a]*a*` and `\w*\d*` split a run of input the same way `a*a*` does, and are now flagged the same way
+* Fixed the `ignoreCustomFragments` risk analysis reading patterns without their flags, so that `/.*\n*/s` and `/[a]*A*/i` passed as the flagless sources they are spelled as
+* Fixed the `ignoreCustomFragments` risk analysis reading `\b` inside a character class as a word boundary rather than the backspace it stands for
+* Fixed regex sources being read as though a character class could not nest, so that a `v` pattern like `/[[a][b]]*b*/v` was analyzed—and, under `i`, rewritten—from the wrong class boundary
+* Fixed the demo building regex options with `new RegExp` rather than the `/…/flags` parsing the library itself uses, so that a pattern entered as `/ng-class/`—the form the demo’s `customAttrCollapse` example shows—matches literal slashes, and no pattern could carry flags
 
 ## [8.0.0] - 2026-08-19
 

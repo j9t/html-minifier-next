@@ -610,7 +610,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   // fragments have exactly that shape, so the check flagging it would mean
   // warning about the defaults themselves.
   for (const re of options.ignoreCustomFragments || []) {
-    const risk = describeQuantifierRisk(re.source);
+    const risk = describeQuantifierRisk(re);
     if (!risk) continue;
     const problem = `Custom fragment \`/${re.source}/\` ${risk}`;
     if (options.strictCustomFragments) {

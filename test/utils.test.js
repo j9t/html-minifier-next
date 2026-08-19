@@ -109,6 +109,7 @@ describe('Utils', () => {
       assert.strictEqual(embedSource(new RegExp('(a)\\1', 'i')), '([aA])\\1'); // a backreference compares literally
       assert.strictEqual(embedSource(new RegExp('[ü-ÿ]', 'i')), '[ü-ÿ]'); // `ÿ` uppercases far past the range
       assert.strictEqual(embedSource(new RegExp('[*-[]', 'i')), '[*-[]'); // spans `A`–`Z` without being a letter range
+      assert.strictEqual(embedSource(/[\q{ab|cd}]/vi), '[\\q{ab|cd}]'); // `\q` holds strings, which fold as strings or not at all
     });
 
     test('The rewrite never matches more than the pattern would', () => {
@@ -199,6 +200,43 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/[^a]*a*/.source), false);
       // Without the `s` flag a source cannot carry, `.` stops at a line break
       assert.strictEqual(hasRiskyQuantifiers(/.*\n*/.source), false);
+    });
+
+    test('An escape is read as what it stands for where it stands', () => {
+      // `\b` is a backspace inside a class, where outside one it is a boundary
+      assert.strictEqual(hasRiskyQuantifiers('[\\b]*\\x08*'), true);
+      // And a backspace is not the letter the escape is spelled with
+      assert.strictEqual(hasRiskyQuantifiers('[\\b]*b*'), false);
+    });
+
+    test('A pattern is judged the way its own flags make it match', () => {
+      // `s` and `S` fit into a source, and are written in before it is read
+      assert.strictEqual(describeQuantifierRisk(/.*\n*/s) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/.*\n*/) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[a]*A*/i) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[a]*A*/) !== null, false);
+      // Folding case inflates a source; its own length is what the bound counts
+      assert.strictEqual(describeQuantifierRisk(new RegExp('ab'.repeat(4000), 'i')), null);
+      // The defaults keep passing whatever flags they carry
+      assert.strictEqual(describeQuantifierRisk(/<%[\s\S]*?%>/i), null);
+      assert.strictEqual(describeQuantifierRisk(/(?:a{4})+/i), null);
+    });
+
+    test('A `v` class is read past the `]` that only closes a nested one', () => {
+      // Under `v` a class nests, so `[[a][b]]` is one atom holding `a` and `b`
+      assert.strictEqual(describeQuantifierRisk(/[[a][b]]*b*/v) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[[a][b]]*c*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[^[a][b]]*c*/v) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[^[a][b]]*a*/v) !== null, false);
+      // Subtraction, intersection, and string literals are not unions to read
+      assert.strictEqual(describeQuantifierRisk(/[[a]--[b]]*b*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[[ab]&&[bc]]*b*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[\q{ab}]*a*/v) !== null, false);
+      // Without `v` a `[` inside a class is a member, and the first `]` closes it
+      assert.strictEqual(hasRiskyQuantifiers('[[a]*a*'), true);
+      // Nesting past the bound is declined rather than recursed into
+      const deep = new RegExp('['.repeat(3000) + 'a' + ']'.repeat(3000) + '*a*', 'v');
+      assert.strictEqual(describeQuantifierRisk(deep), null);
     });
 
     test('A group wrapping the atom does not hide the repetition', () => {

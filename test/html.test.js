@@ -2626,7 +2626,24 @@ describe('HTML', () => {
       /too long to analyze/
     );
 
-    // Patterns that stay linear are accepted, the defaults among them
+    // A pattern is judged the way its own flags make it match: `s` puts a line
+    // break within reach of `.`, and `i` makes `A` the same character as `a`
+    await assert.rejects(
+      () => minify('<p>x</p>', { ignoreCustomFragments: [new RegExp('<%.*\\n*%>', 's')], strictCustomFragments: true }),
+      /compounds quantifiers or alternation/
+    );
+    await assert.rejects(
+      () => minify('<p>x</p>', { ignoreCustomFragments: [new RegExp('<%[a]*A*%>', 'i')], strictCustomFragments: true }),
+      /compounds quantifiers or alternation/
+    );
+
+    // Patterns that stay linear are accepted, the defaults among them—and the
+    // same shapes stay linear without the flags that make them overlap
+    const flagless = {
+      ignoreCustomFragments: [new RegExp('<%.*\\n*%>'), new RegExp('<%[a]*A*%>')],
+      strictCustomFragments: true
+    };
+    assert.strictEqual(await minify('<p>x</p>', flagless), '<p>x</p>');
     const safe = { ignoreCustomFragments: [/<%[\s\S]*?%>/, /\{\{[^}]{0,500}\}\}/], strictCustomFragments: true };
     assert.strictEqual(await minify('<p><% a %></p>', safe), '<p><% a %></p>');
 
