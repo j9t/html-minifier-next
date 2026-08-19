@@ -175,7 +175,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeUnusedCSS`<br>`--remove-unused-css` | [Remove unused CSS rules](#unused-css-removal) from `style` elements; requires `minifyCSS`; **note that this can change how a document renders** | `false` (could be `true`, `{ safelist, scripts }`) |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
-| `strictCustomFragments`<br>`--strict-custom-fragments` | [Reject `ignoreCustomFragments` patterns whose quantifiers nest or alternate](#redos-protection), rather than warning about them | `false` |
+| `strictCustomFragments`<br>`--strict-custom-fragments` | [Reject `ignoreCustomFragments` patterns that compound quantifiers or alternation](#redos-protection) (rather than warning about them) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
 | `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype) | `false` |
 
@@ -555,7 +555,7 @@ You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular express
 
 * Matching without backtracking: A pattern that wraps an any-character or negated-class body in literal delimiters—`<%[\s\S]*?%>` or `\{\{[^}]*?\}\}`, and every other shape below—is matched by scanning for those delimiters in linear time, with no regular expression involved. Patterns of other shapes run as regular expressions, one per pattern, so each keeps its own flags.
 
-* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself contains a quantifier (`(a+)+`, `(a?)+`) or alternation (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control. A pattern longer than 10,000 characters or nested more than 50 groups deep is judged risky without being analyzed further, so that reading the pattern cannot itself become the expensive step.
+* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself contains a quantifier that can vary (`(a+)+`, `(a?)+`) or alternation (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). A fixed count does not vary, so `(?:a{4})+` passes. These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control. A pattern longer than 10,000 characters or nested more than 50 groups deep is judged risky without being analyzed further, so that reading the pattern cannot itself become the expensive step.
 
 * Input length limits: The `maxInputLength` option allows you to set a maximum input size to prevent processing of excessively large inputs that could cause performance issues.
 

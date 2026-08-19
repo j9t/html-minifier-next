@@ -199,7 +199,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   strictCustomFragments: {
-    description: 'Reject `ignoreCustomFragments` patterns whose quantifiers nest or alternate, rather than warning about them',
+    description: 'Reject `ignoreCustomFragments` patterns that compound quantifiers or alternation (rather than warning about them)',
     type: 'boolean'
   },
   useShortDoctype: {

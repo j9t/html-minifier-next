@@ -107,6 +107,11 @@ describe('Utils', () => {
 
     test('An exact count nested in an unbounded group passes', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(?:a{4})+/.source), false);
+      // `{n,n}` is the same count, spelled with a range
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a{2,2})+/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a{1,1})+/.source), false);
+      // A range that can actually vary still counts
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a{2,3})+/.source), true);
     });
 
     test('The same atom repeated unboundedly twice in a row is risky', () => {
@@ -119,6 +124,9 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/^(?:a)*a*$/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/(a)*a*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/.*(?:.)*/.source), true);
+      // A quantifier of exactly one is notation, not a different atom
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a{1})*a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/(?:a{1,1})*a*/.source), true);
       // Only matching atoms count, and lookarounds are not wrappers
       assert.strictEqual(hasRiskyQuantifiers(/(?:a)*b*/.source), false);
       assert.strictEqual(hasRiskyQuantifiers(/(?=a)a*/.source), false);

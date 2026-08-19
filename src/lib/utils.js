@@ -147,9 +147,9 @@ function parseRegExp(value) {
 
 // ReDoS risk detection for user-supplied patterns
 
-// Quantifier following an atom, with its optional lazy `?`; the capture holds
-// the upper bound of a `{n,m}` form, which is empty when the form is `{n,}`
-const RE_QUANTIFIER = /(?:[*+?]|\{\d+(?:,(\d*))?\})\??/y;
+// Quantifier following an atom, with its optional lazy `?`; the captures hold
+// the bounds of a `{n,m}` form, the upper one empty when the form is `{n,}`
+const RE_QUANTIFIER = /(?:[*+?]|\{(\d+)(?:,(\d*))?\})\??/y;
 
 // Bounds for the walk below: Patterns beyond either are judged risky unread,
 // which keeps a pathological source from nesting the analysis into a stack
@@ -160,6 +160,9 @@ const MAX_PATTERN_DEPTH = 50;
 // A group that only wraps its body backtracks the way that body does, so
 // `(?:a)` and `a` count as the same atom; lookarounds are left alone
 const RE_TRANSPARENT_GROUP = /^\((?:\?:|\?<[^>=!][^>]*>)?([\s\S]*)\)$/;
+
+// A quantifier of exactly one repetition, which is notation rather than shape
+const RE_EXACT_ONE = /\{1(?:,1)?\}\??$/;
 
 /** @param {string} source @param {number} index - Index of the opening `[` */
 function skipCharacterClass(source, index) {
@@ -174,9 +177,9 @@ function skipCharacterClass(source, index) {
 function unwrapAtom(atom) {
   let inner = atom;
   for (let level = 0; level < MAX_PATTERN_DEPTH; level++) {
-    const match = RE_TRANSPARENT_GROUP.exec(inner);
-    if (!match) break;
-    inner = match[1] ?? '';
+    const next = inner.replace(RE_EXACT_ONE, '').replace(RE_TRANSPARENT_GROUP, '$1');
+    if (next === inner) break;
+    inner = next;
   }
   return inner;
 }
@@ -241,10 +244,14 @@ function analyzeQuantifiers(source, depth = 0) {
     const atom = source.slice(start, i);
     RE_QUANTIFIER.lastIndex = i;
     const quantifier = RE_QUANTIFIER.exec(source);
-    const repeats = !!quantifier && (quantifier[0][0] === '*' || quantifier[0][0] === '+' || quantifier[1] === '');
-    // A count that can vary—anything but `{n}`—makes the group ambiguous about
-    // how much it consumes, which multiplies under an unlimited repeat
-    const variable = !!quantifier && (quantifier[0][0] !== '{' || quantifier[1] !== undefined);
+    const upper = quantifier?.[2];
+    const repeats = !!quantifier && (quantifier[0][0] === '*' || quantifier[0][0] === '+' || upper === '');
+    // A count that can vary—anything but `{n}` and its `{n,n}` spelling—makes
+    // the group ambiguous about how much it consumes, which multiplies under an
+    // unlimited repeat
+    const exact = !!quantifier && quantifier[0][0] === '{' &&
+      (upper === undefined || (upper !== '' && Number(upper) === Number(quantifier[1])));
+    const variable = !!quantifier && !exact;
     if (quantifier) i = RE_QUANTIFIER.lastIndex;
 
     if (group) {

@@ -198,7 +198,7 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  Default: `[/^on[a-z]{3,}$/]`
  *
  * @prop {boolean} [strictCustomFragments]
- *  Rejects `ignoreCustomFragments` patterns whose quantifiers nest or alternate,
+ *  Rejects `ignoreCustomFragments` patterns that compound quantifiers or alternation,
  *  rather than warning about them.
  *
  *  Default: `false`

@@ -246,7 +246,7 @@ const getOptions = (options) => {
           // Warn about potentially dangerous patterns (ReDoS risk)
           if (hasRiskyQuantifiers(pattern)) {
             console.warn(`Potentially dangerous regex pattern detected: ${pattern}`);
-            console.warn('The pattern’s quantifiers nest or alternate and can backtrack catastrophically. Bound them, as in `{0,1000}`.');
+            console.warn('The pattern compounds quantifiers or alternation and can backtrack catastrophically. Bound them, as in `{0,1000}`.');
           }
           return new RegExp(pattern);
         } catch (err) {
