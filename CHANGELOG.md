@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Updated `customAttrAssign` and `customAttrSurround` patterns carrying `u`, `v`, or `m` to refuse with an error, where the flag changes what the source matches (a flag the source does not depend on, as in `/x=/u`, is left alone)
 * Updated `ignoreCustomFragments` patterns whose unbounded repeats reach each other across atoms that can match empty—`a*b*a*`, `\s*\w*\s*`—to be flagged as backtracking risks, which `strictCustomFragments` rejects outright
+* Updated the same analysis to read a group by what its body can match
+* Split the demo’s option building out into demo/get-options.js, which puts the regex options it assembles under test without a page to run in
 
 ## [8.0.0] - 2026-08-19
 
