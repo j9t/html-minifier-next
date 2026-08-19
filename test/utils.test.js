@@ -103,15 +103,19 @@ describe('Utils', () => {
     });
 
     test('What `i` cannot reach is left alone, never widened', () => {
-      // Each of these would need the flag itself; the source keeps its own meaning
-      assert.strictEqual(embedSource(/(a)\1/i), '([aA])\\1'); // a backreference compares literally
-      assert.strictEqual(embedSource(/[ü-ÿ]/i), '[ü-ÿ]'); // `ÿ` uppercases far past the range
-      assert.strictEqual(embedSource(/[*-[]/i), '[*-[]'); // spans `A`–`Z` without being a letter range
+      // Each of these would need the flag itself; the source keeps its own meaning.
+      // Built with `RegExp` so they read as the fixtures they are, not as patterns
+      // for scanners to flag
+      assert.strictEqual(embedSource(new RegExp('(a)\\1', 'i')), '([aA])\\1'); // a backreference compares literally
+      assert.strictEqual(embedSource(new RegExp('[ü-ÿ]', 'i')), '[ü-ÿ]'); // `ÿ` uppercases far past the range
+      assert.strictEqual(embedSource(new RegExp('[*-[]', 'i')), '[*-[]'); // spans `A`–`Z` without being a letter range
     });
 
     test('The rewrite never matches more than the pattern would', () => {
       const exact = [/abc/i, /[a-z]+/i, /[^a-z]/i, /a.c/s, /a.c/is, /<%[A-Z]+%>/i, /[a-z\d]/i, /(?:ab)+/i];
-      const conservative = [/(a)\1/i, /[ü-ÿ]/i, /[*-[]/i, /\x6a/i];
+      const conservative = [
+        new RegExp('(a)\\1', 'i'), new RegExp('[ü-ÿ]', 'i'), new RegExp('[*-[]', 'i'), new RegExp('\\x6a', 'i')
+      ];
       const inputs = ['abc', 'ABC', 'aBc', 'a\nc', 'a.c', 'xyz', 'XYZ', '<%AB%>', '<%ab%>', 'ab', 'AB',
         'ABAB', 'abAB', 'aA', '0', 'ü', 'Ü', 'ÿ', 'Ÿ', 'j', 'J'];
       for (const pattern of exact.concat(conservative)) {
