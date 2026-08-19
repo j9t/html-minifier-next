@@ -2641,6 +2641,21 @@ describe('HTML', () => {
     assert.strictEqual(logged.filter(message => String(message).includes('compounds quantifiers')).length, 1);
   });
 
+  test('Frequency analysis reads fragments with their own flags', async () => {
+    // The scan blanks fragments out so the markup around them parses. `q` is the
+    // frequent attribute, but only in tags carrying an uppercase fragment, which
+    // are read at all only where the matcher honors the pattern's `i`
+    const input = '<x q="2" <%IF a%>></x>'.repeat(8) + '<x p="1" q="2"></x>';
+    const output = await minify(input, {
+      ignoreCustomFragments: [/<%if[\s\S]*?%>/i],
+      sortAttributes: true
+    });
+
+    // Sorted by frequency, `q` leads—which it cannot do if those eight tags were
+    // dropped from the scan for failing to parse around the fragment
+    assert.ok(output.endsWith('<x q="2" p="1"></x>'), `Expected \`q\` to sort first, got ${JSON.stringify(output.slice(-30))}`);
+  });
+
   test('`customAttrSurround` and `customAttrAssign` keep their flags', async () => {
     // The parser merges these into one attribute pattern, which carries no flags
     // of its own, so each pattern's `i` has to survive the merge
