@@ -602,6 +602,25 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   });
 
+  // The parser merges these into one attribute pattern, and a merged pattern
+  // carries no flags of its own. `i` and `s` are written into the source instead,
+  // but `u` and `v` change how a source reads and cannot be: dropped, `\p{L}`
+  // stops being a property escape and matches the literal text `p{L}`, silently
+  // and without failing to compile. Refusing them beats matching the wrong thing.
+  /** @type {[string, RegExp[]][]} */
+  const merged = [
+    ['customAttrAssign', options.customAttrAssign || []],
+    ['customAttrSurround', (options.customAttrSurround || []).flat()]
+  ];
+  for (const [key, patterns] of merged) {
+    for (const re of patterns) {
+      if (!(re instanceof RegExp)) continue;
+      const flag = re.unicodeSets ? 'v' : (re.unicode ? 'u' : '');
+      if (!flag) continue;
+      throw new Error(`HTML Minifier Next: \`${key}\` pattern \`/${re.source}/${re.flags}\` carries \`${flag}\`, which the merged attribute pattern cannot carry—rewrite it without \`${flag}\``);
+    }
+  }
+
   // Fragments that compound quantifiers or alternation under unbounded repetition
   // are the shapes that backtrack catastrophically, and they are also the ones a
   // linear scan cannot stand in for; so are patterns too long or too deeply

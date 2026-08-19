@@ -225,6 +225,16 @@ const RE_TRANSPARENT_GROUP = /^\((?:\?:|\?<[^>=!][^>]*>)?([\s\S]*)\)$/;
 // A quantifier of exactly one repetition, which is notation rather than shape
 const RE_EXACT_ONE = /\{1(?:,1)?\}\??$/;
 
+// An atom that matches without consuming, so what precedes it stays adjacent to
+// what follows; a group that can match empty is left out, being rare enough that
+// missing it costs less than reading every body for it
+const RE_ZERO_WIDTH = /^(?:[$^]|\\[bB]|\((?:\?[=!]|\?<[=!]))/;
+
+// How many repeats an atom may still be adjacent to across atoms matching empty;
+// comparing against every one of them is what the bound keeps from turning
+// quadratic on a pattern that is nothing but repeats
+const MAX_REACHABLE = 50;
+
 /** @param {string} atom - Atom as it reads in the source */
 function unwrapAtom(atom) {
   let inner = atom;
@@ -518,9 +528,10 @@ function embedSource(pattern) {
 /**
  * Walk a regex source for the shapes whose backtracking blows up: an unlimited
  * quantifier over a group that itself contains a variable quantifier (`(a+)+`,
- * `(a?)+`) or alternates, and two unbounded repeats in a row that can consume
- * the same character (`.*.*`, `[a]*a*`, `\w*\d*`). A lone unlimited quantifier
- * stays linear, so `[\s\S]*?` up to a literal terminator passes.
+ * `(a?)+`) or alternates, and two unbounded repeats that can consume the same
+ * character with only atoms matching empty between them (`.*.*`, `[a]*a*`,
+ * `\w*\d*`, `a*b*a*`). A lone unlimited quantifier stays linear, so `[\s\S]*?`
+ * up to a literal terminator passes.
  * @param {string} source - Regex source, assumed syntactically valid
  * @param {number} [depth] - Group nesting level of this call
  * @param {boolean} [nested] - Whether the pattern carries `v`
@@ -533,8 +544,10 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
   let varies = false;
   let alternates = false;
   let deep = false;
-  /** @type {{text: string, repeats: boolean, ranges: [number, number][] | null} | null} */
-  let previous = null;
+  // The unbounded repeats that could still sit adjacent to what comes next, most
+  // recent last; an atom matching empty leaves the ones before it reachable
+  /** @type {{text: string, ranges: [number, number][] | null}[]} */
+  const reachable = [];
   let i = 0;
 
   while (i < source.length) {
@@ -546,7 +559,7 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
     if (char === '|') {
       // Alternatives are separate expressions, so nothing carries across
       alternates = true;
-      previous = null;
+      reachable.length = 0;
       i++;
       continue;
     } else if (char === '\\') {
@@ -585,6 +598,11 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
     const exact = !!quantifier && quantifier[0][0] === '{' &&
       (upper === undefined || (upper !== '' && Number(upper) === Number(quantifier[1])));
     const variable = !!quantifier && !exact;
+    // A quantifier that may repeat none leaves the atom matching empty; without
+    // one, only a zero-width atom does
+    const least = quantifier && (quantifier[0][0] === '+' ? 1
+      : quantifier[0][0] === '{' ? Number(quantifier[1]) : 0);
+    const nullable = quantifier ? least === 0 : RE_ZERO_WIDTH.test(atom);
     if (quantifier) i = RE_QUANTIFIER.lastIndex;
 
     if (group) {
@@ -597,9 +615,15 @@ function analyzeQuantifiers(source, depth = 0, nested = false) {
     if (variable) varies = true;
     const text = unwrapAtom(atom);
     const ranges = atomRanges(text, nested);
-    const overlaps = !!ranges && !!previous?.ranges && rangesIntersect(ranges, previous.ranges);
-    if (repeats && previous?.repeats && (previous.text === text || overlaps)) risky = true;
-    previous = { text, repeats, ranges };
+    if (repeats && reachable.some(earlier => earlier.text === text ||
+      (!!ranges && !!earlier.ranges && rangesIntersect(ranges, earlier.ranges)))) risky = true;
+
+    // Nothing reaches past an atom that has to consume something
+    if (!nullable) reachable.length = 0;
+    if (repeats) {
+      reachable.push({ text, ranges });
+      if (reachable.length > MAX_REACHABLE) reachable.shift();
+    }
   }
 
   return { risky, varies, alternates, deep };

@@ -2691,6 +2691,22 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div flagX="v">y</div>', { customAttrAssign: [/x=/i] }), '<div flagx="v">y</div>');
   });
 
+  test('`customAttrSurround` and `customAttrAssign` refuse flags that cannot survive the merge', async () => {
+    // `u` and `v` change how a source reads, and the merged pattern carries
+    // neither—`\p{L}` would quietly match the literal text `p{L}` instead
+    await assert.rejects(
+      () => minify('<div flag="v">y</div>', { customAttrAssign: [new RegExp('\\p{L}=', 'u')] }),
+      /`customAttrAssign` pattern .* carries `u`/
+    );
+    await assert.rejects(
+      () => minify('<div flag="v">y</div>', { customAttrSurround: [[new RegExp('\\{\\{#if\\}\\}', 'v'), /\{\{\/if\}\}/]] }),
+      /`customAttrSurround` pattern .* carries `v`/
+    );
+    // The flags a source can carry, and the ones that change nothing here, pass
+    assert.strictEqual(await minify('<div flagX="v">y</div>', { customAttrAssign: [/x=/i] }), '<div flagx="v">y</div>');
+    assert.strictEqual(await minify('<div flagx="v">y</div>', { customAttrAssign: [/x=/gm] }), '<div flagx="v">y</div>');
+  });
+
   test('`caseSensitive`', async () => {
     const input = '<div mixedCaseAttribute="value"></div>';
     const caseSensitiveOutput = '<div mixedCaseAttribute="value"></div>';

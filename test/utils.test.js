@@ -239,6 +239,22 @@ describe('Utils', () => {
       assert.strictEqual(describeQuantifierRisk(deep), null);
     });
 
+    test('Repeats reach each other across atoms that can match empty', () => {
+      // `b*` can match nothing, which leaves the two `a*` splitting the same run
+      assert.strictEqual(hasRiskyQuantifiers(/a*b*a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/\s*\w*\s*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*b?a*/.source), true);
+      assert.strictEqual(hasRiskyQuantifiers(/a*b{0,3}a*/.source), true);
+      // A lookaround consumes nothing either
+      assert.strictEqual(hasRiskyQuantifiers(/a*(?=x)a*/.source), true);
+      // An atom that has to consume something separates them again
+      assert.strictEqual(hasRiskyQuantifiers(/a*b+a*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*ba*/.source), false);
+      assert.strictEqual(hasRiskyQuantifiers(/a*b{1,3}a*/.source), false);
+      // Repeats that never overlap stay linear however they are separated
+      assert.strictEqual(hasRiskyQuantifiers(/a*b*c*/.source), false);
+    });
+
     test('A group wrapping the atom does not hide the repetition', () => {
       // `^(?:a)*a*$` backtracks quadratically on `aaa…b`, the way `a*a*` does
       assert.strictEqual(hasRiskyQuantifiers(/^(?:a)*a*$/.source), true);
@@ -261,6 +277,13 @@ describe('Utils', () => {
       // A pattern past the length limit is judged risky unread, whatever its shape
       assert.strictEqual(hasRiskyQuantifiers('a'.repeat(10001)), true);
       assert.strictEqual(hasRiskyQuantifiers('a'.repeat(10000)), false);
+
+      // A pattern that is nothing but repeats compares against a bounded number
+      // of them, rather than against every one that came before
+      const repeats = 'a*b*'.repeat(2500);
+      const started = Date.now();
+      assert.strictEqual(hasRiskyQuantifiers(repeats), true);
+      assert.ok(Date.now() - started < 1000, 'Expected the reach to stay bounded');
 
       // Extreme nesting trips the length limit before the walk ever starts
       const nested = '('.repeat(20000) + 'a' + ')'.repeat(20000);
