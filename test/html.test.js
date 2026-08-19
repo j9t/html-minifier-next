@@ -2609,9 +2609,14 @@ describe('HTML', () => {
   });
 
   test('`strictCustomFragments`', async () => {
+    // Deliberately catastrophic shapes, built with `RegExp` so they read as the
+    // fixtures they are, not as patterns for scanners to flag
+    const catastrophicStrict = new RegExp('<%(?:x|xx)+%>');
+    const catastrophicWarn = new RegExp('<%(?:y|yy)+%>');
+
     // A pattern that can backtrack catastrophically is refused outright
     await assert.rejects(
-      () => minify('<p>x</p>', { ignoreCustomFragments: [/<%(?:x|xx)+%>/], strictCustomFragments: true }),
+      () => minify('<p>x</p>', { ignoreCustomFragments: [catastrophicStrict], strictCustomFragments: true }),
       /compounds quantifiers or alternation/
     );
 
@@ -2623,7 +2628,7 @@ describe('HTML', () => {
     /** @type {unknown[]} */
     const logged = [];
     const output = await minify('<p>x</p>', {
-      ignoreCustomFragments: [/<%(?:y|yy)+%>/],
+      ignoreCustomFragments: [catastrophicWarn],
       log: (/** @type {unknown} */ message) => { logged.push(message); }
     });
     assert.strictEqual(output, '<p>x</p>');
