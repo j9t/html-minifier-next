@@ -96,6 +96,8 @@ describe('Utils', () => {
     test('Unlimited quantifiers over an alternating group are risky', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(a|b)*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/<%(\s|\S)*?%>/.source), true);
+      // The alternation counts however deeply it nests inside the repeated group
+      assert.strictEqual(hasRiskyQuantifiers('(?:(?:a|aa))*b'), true);
     });
 
     test('Variable quantifiers nested in an unbounded group are risky', () => {

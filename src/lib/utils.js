@@ -226,6 +226,8 @@ function analyzeQuantifiers(source) {
     if (group) {
       if (group.risky || (repeats && (group.varies || group.alternates))) risky = true;
       if (group.varies) varies = true;
+      // A group alternates whether the `|` sits at its top level or deeper
+      if (group.alternates) alternates = true;
     }
     if (variable) varies = true;
     if (repeats && previous?.repeats && previous.text === atom) risky = true;
