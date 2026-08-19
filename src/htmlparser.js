@@ -5,7 +5,7 @@
  * http://erik.eae.net/simplehtmlparser/simplehtmlparser.js
  */
 
-import { isThenable } from './lib/utils.js';
+import { isThenable, embedSource } from './lib/utils.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -141,9 +141,9 @@ function buildAttrRegex(handler) {
         throw new Error('`customAttrSurround` entries must be `[RegExp, RegExp]` pairs');
       }
       attrClauses[i] = '(?:' +
-        '(' + pair[0].source + ')\\s*' +
+        '(' + embedSource(pair[0]) + ')\\s*' +
         pattern +
-        '\\s*(' + pair[1].source + ')' +
+        '\\s*(' + embedSource(pair[1]) + ')' +
         ')';
     }
     attrClauses.push('(?:' + pattern + ')');
@@ -180,7 +180,7 @@ function joinSingleAttrAssigns(handler) {
   return singleAttrAssigns.concat(
     handler.customAttrAssign || []
   ).map(function (assign) {
-    return '(?:' + assign.source + ')';
+    return '(?:' + embedSource(assign) + ')';
   }).join('|');
 }
 

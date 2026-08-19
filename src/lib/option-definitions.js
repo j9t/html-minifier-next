@@ -1,5 +1,13 @@
 // Single source of truth for minifier option names, descriptions, types, and shared defaults
 
+/**
+ * @typedef {object} OptionDefinition
+ * @property {string} description Help text, phrased for the option’s primary CLI form
+ * @property {string} [descriptionAffirmative] Help text for what enabling the option does, where `description` describes the negated form
+ * @property {string} type Key into the parser and JSON Schema type maps in cli.js and scripts/build-schema.js
+ */
+
+/** @type {Record<string, OptionDefinition>} */
 const optionDefinitions = {
   cacheCSS: {
     description: 'Set CSS minification cache size (number of entries, default: 500)',
@@ -61,10 +69,6 @@ const optionDefinitions = {
   customEventAttributes: {
     description: 'Array of regexes that allow to support custom event attributes for minifyJS (e.g., `ng-click`)',
     type: 'regexpArray'
-  },
-  customFragmentQuantifierLimit: {
-    description: 'Set maximum quantifier limit for custom fragments to prevent ReDoS attacks (default: 200)',
-    type: 'int'
   },
   decodeEntities: {
     description: 'Use direct Unicode characters whenever possible',
@@ -192,6 +196,10 @@ const optionDefinitions = {
   },
   trimCustomFragments: {
     description: 'Trim whitespace around custom fragments (`--ignore-custom-fragments`)',
+    type: 'boolean'
+  },
+  strictCustomFragments: {
+    description: 'Reject `ignoreCustomFragments` patterns that risk catastrophic backtracking (rather than warning about them)',
     type: 'boolean'
   },
   useShortDoctype: {

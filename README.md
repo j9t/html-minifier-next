@@ -69,7 +69,7 @@ For editor support (validation, autocomplete, and inline documentation) in JSON 
 }
 ```
 
-(If HMN is installed locally, you can also use the path `./node_modules/html-minifier-next/html-minifier-next.schema.json` instead of the URL.)
+(If HMN is installed locally, you can also use the path ./node_modules/html-minifier-next/html-minifier-next.schema.json instead of the URL.)
 
 **JavaScript module configuration example** (requires `"type": "module"` in the project’s package.json, or use a .mjs extension):
 
@@ -144,7 +144,6 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | `undefined` |
 | `customAttrSurround`<br>`--custom-attr-surround` | Array of regexes that allow to support custom attribute surround expressions (e.g., `<input {{#if value}}checked="checked"{{/if}}>`) | `[]` |
 | `customEventAttributes`<br>`--custom-event-attributes` | Array of regexes that allow to support custom event attributes for `minifyJS` (e.g., `ng-click`) | `[ /^on[a-z]{3,}$/ ]` |
-| `customFragmentQuantifierLimit`<br>`--custom-fragment-quantifier-limit` | Set maximum quantifier limit for custom fragments to prevent ReDoS attacks | `200` |
 | `decodeEntities`<br>`--decode-entities` | Use direct Unicode characters whenever possible | `false` |
 | `ignoreCustomComments`<br>`--ignore-custom-comments` | Array of regexes that allow to ignore matching comments | `[ /^!/, /^\s*#/ ]` |
 | `ignoreCustomFragments`<br>`--ignore-custom-fragments` | Array of regexes that allow to ignore certain fragments, when matched (e.g., `<?php … ?>`, `{{ … }}`, etc.) | `[ /<%[\s\S]*?%>/, /<\?[\s\S]*?\?>/ ]` |
@@ -176,6 +175,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeUnusedCSS`<br>`--remove-unused-css` | [Remove unused CSS rules](#unused-css-removal) from `style` elements; requires `minifyCSS`; **note that this can change how a document renders** | `false` (could be `true`, `{ safelist, scripts }`) |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
+| `strictCustomFragments`<br>`--strict-custom-fragments` | [Reject `ignoreCustomFragments` patterns that risk catastrophic backtracking](#redos-protection) (rather than warning about them) | `false` |
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) | `false` |
 | `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype) | `false` |
 
@@ -253,7 +253,7 @@ Symbols are considered used when they appear
 
 Names carrying characters that end a CSS identifier—`md:flex`, `w-1/2`, `p-[3px]`—are matched as whole tokens, so utility-CSS class names survive whether they come from markup, a `data-*` value, or a string in an inline script.
 
-**Class names that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a class added by `bundle.js` looks exactly like a class nobody uses. List those under `safelist`, as strings or regular expressions:
+**Class names that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a class added by bundle.js looks exactly like a class nobody uses. List those under `safelist`, as strings or regular expressions:
 
 ```js
 const result = await minify(html, {
@@ -539,7 +539,7 @@ SVG and MathML elements are automatically recognized as foreign elements, and wh
 
 ### Working with invalid or partial markup
 
-By default, HTML Minifier Next parses markup into a complete tree structure, then modifies it (removing anything that was specified for removal, ignoring anything that was specified to be ignored, etc.), then creates markup from that tree and returns it.
+By default, HMN parses markup into a complete tree structure, then modifies it (removing anything that was specified for removal, ignoring anything that was specified to be ignored, etc.), then creates markup from that tree and returns it.
 
 _Input markup (e.g., `<p id="">foo`) → Internal representation of markup in a form of tree (e.g., `{ tag: "p", attr: "id", children: ["foo"] }`) → Transformation of internal representation (e.g., removal of `id` attribute) → Output of resulting markup (e.g., `<p>foo</p>`)_
 
@@ -551,36 +551,35 @@ To validate complete HTML markup, use [the W3C validator](https://validator.w3.o
 
 ### ReDoS protection
 
-This minifier includes protection against regular expression denial of service (ReDoS) attacks:
+You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular expression to run against your documents. This is also where a regular expression denial of service (ReDoS) could originate:
 
-* Custom fragment quantifier limits: The `customFragmentQuantifierLimit` option (default: 200) prevents exponential backtracking by replacing unlimited quantifiers (`*`, `+`) with bounded ones in regular expressions.
+* Matching without backtracking: A pattern that wraps an any-character or negated-class body in literal delimiters—`<%[\s\S]*?%>` or `\{\{[^}]*?\}\}`, and every other shape below—is matched by scanning for those delimiters in linear time, with no regular expression involved. Patterns of other shapes run as regular expressions, one per pattern, so each keeps its own flags.
+
+* Pattern detection: HMN warns about the shapes that backtrack catastrophically—an unlimited quantifier over a group that itself contains a quantifier that can vary (`(a+)+`, `(a?)+`) or alternation (`(a|b)*`), and the same atom repeated unboundedly twice in a row (`.*.*`). A fixed count does not vary, so `(?:a{4})+` passes. These are also shapes a linear scan cannot stand in for. `strictCustomFragments` refuses them with an error instead, which is worth enabling where the patterns or the input are not entirely under your control. A pattern longer than 10,000 characters or nested more than 50 groups deep is judged risky without being analyzed further, so that reading the pattern cannot itself become the expensive step.
 
 * Input length limits: The `maxInputLength` option allows you to set a maximum input size to prevent processing of excessively large inputs that could cause performance issues.
 
-* Enhanced pattern detection: The minifier detects and warns about various ReDoS-prone patterns including nested quantifiers, alternation with quantifiers, and multiple unlimited quantifiers.
-
-**Important:** When using custom `ignoreCustomFragments`, ensure your regular expressions don’t contain unlimited quantifiers (`*`, `+`) without bounds, as these can lead to ReDoS vulnerabilities.
+**Important:** A single unlimited quantifier is not one of those shapes: `[\s\S]*?` running up to a literal terminator matches in linear time, and it is how HMN’s defaults are written. Bounds are still worth adding where you know the maximum length of a fragment, since they cap how far a failing match can scan.
 
 #### Custom fragment examples
 
-**Safe patterns** (recommended):
+**Safe patterns:**
 
 ```js
 ignoreCustomFragments: [
-  /<%[\s\S]{0,1000}?%>/,         // JSP/ASP with explicit bounds
-  /<\?php[\s\S]{0,5000}?\?>/,    // PHP with bounds
+  /<%[\s\S]*?%>/,                // Lazy scan up to a literal terminator
+  /<\?php[\s\S]{0,5000}?\?>/,    // PHP with explicit bounds
   /\{\{[^}]{0,500}\}\}/          // Handlebars without nested braces
 ]
 ```
 
-**Potentially unsafe patterns** (will trigger warnings):
+**Unsafe patterns** (these trigger warnings):
 
 ```js
 ignoreCustomFragments: [
-  /<%[\s\S]*?%>/,                // Unlimited quantifiers
-  /<!--[\s\S]*?-->/,             // Could cause issues with very long comments
-  /\{\{.*?\}\}/,                 // Nested unlimited quantifiers
-  /(script|style)[\s\S]*?/       // Multiple unlimited quantifiers
+  /<%(\s|\S)*?%>/,               // Unlimited quantifier over an alternating group
+  /\{\{([^}]+)+\}\}/,            // Nested unlimited quantifiers
+  /<!--[\s\S]*[\s\S]*-->/        // The same atom repeated unboundedly twice
 ]
 ```
 
@@ -599,8 +598,6 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 // Vue.js
 ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 ```
-
-**Important:** When using custom `ignoreCustomFragments`, the minifier automatically applies bounded quantifiers to prevent ReDoS attacks, but you can also write safer patterns yourself using explicit bounds.
 
 ##### Escaping patterns in different contexts
 
@@ -682,11 +679,11 @@ Parameters:
 
 * No argument: Runs and, if a baseline exists, shows size and time deltas
 * `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
-* `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s own processing time
+* `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s processing time
 * `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
 * `--config=PATH`: Uses an alternative options file (default html-minifier-next.config.json)
 
-To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN’s own code rather than the bundled minifiers.
+To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers.
 
 #### Profiling
 

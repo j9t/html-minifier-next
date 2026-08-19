@@ -13,7 +13,6 @@
   "customAttrAssign": [],
   "customAttrSurround": [],
   "customEventAttributes": [],
-  "customFragmentQuantifierLimit": 200,
   "decodeEntities": true,
   "ignoreCustomComments": [],
   "ignoreCustomFragments": [

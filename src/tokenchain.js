@@ -1,7 +1,9 @@
 class Sorter {
   constructor() {
-    /** @type {string[]} */
-    this.keys = [];
+    // Rank per token, in the order the keys were added—looked up per token, so a
+    // token list sorts in one pass instead of one scan per known key
+    /** @type {Map<string, number>} */
+    this.rank = new Map();
     /** @type {Map<string, Sorter>} */
     this.sorterMap = new Map();
   }
@@ -12,36 +14,41 @@ class Sorter {
    * @returns {string[]}
    */
   sort(tokens, fromIndex = 0) {
-    for (const token of this.keys) {
-
-      // Single pass: Count matches and collect non-matches
-      let matchCount = 0;
-      const others = [];
-
-      for (let j = fromIndex; j < tokens.length; j++) {
-        const t = /** @type {string} */ (tokens[j]);
-        if (t === token) {
-          matchCount++;
-        } else {
-          others.push(t);
-        }
-      }
-
-      if (matchCount > 0) {
-        // Rebuild: `matchCount` instances of token first, then others
-        let writeIdx = fromIndex;
-        for (let j = 0; j < matchCount; j++) {
-          tokens[writeIdx++] = token;
-        }
-        for (const other of others) {
-          tokens[writeIdx++] = other;
-        }
-
-        const newFromIndex = fromIndex + matchCount;
-        return this.sorterMap.get(token)?.sort(tokens, newFromIndex) ?? tokens;
+    // The present token with the lowest rank comes first—the same choice scanning
+    // the keys in order would make
+    let best = null;
+    let bestRank = Infinity;
+    for (let j = fromIndex; j < tokens.length; j++) {
+      const rank = this.rank.get(/** @type {string} */ (tokens[j]));
+      if (rank !== undefined && rank < bestRank) {
+        bestRank = rank;
+        best = /** @type {string} */ (tokens[j]);
       }
     }
-    return tokens;
+    if (best === null) return tokens;
+
+    // Single pass: Count matches and collect non-matches
+    let matchCount = 0;
+    const others = [];
+    for (let j = fromIndex; j < tokens.length; j++) {
+      const t = /** @type {string} */ (tokens[j]);
+      if (t === best) {
+        matchCount++;
+      } else {
+        others.push(t);
+      }
+    }
+
+    // Rebuild: `matchCount` instances of the best token first, then others
+    let writeIdx = fromIndex;
+    for (let j = 0; j < matchCount; j++) {
+      tokens[writeIdx++] = best;
+    }
+    for (const other of others) {
+      tokens[writeIdx++] = other;
+    }
+
+    return this.sorterMap.get(best)?.sort(tokens, fromIndex + matchCount) ?? tokens;
   }
 }
 
@@ -104,7 +111,7 @@ class TokenChain {
           }
         });
 
-        sorter.keys.push(token);
+        sorter.rank.set(token, sorter.rank.size);
         sorter.sorterMap.set(token, chain.createSorter());
       }
     });

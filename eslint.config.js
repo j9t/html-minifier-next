@@ -4,12 +4,9 @@ import globals from 'globals';
 export default [
   {
     ignores: [
-      'backtest/**',
-      'build/**',
       'demo/build/**',
       'demo/public/**',
-      'dist/**',
-      'node_modules/**'
+      'dist/**'
     ]
   },
   js.configs.recommended,

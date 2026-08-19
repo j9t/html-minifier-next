@@ -12,6 +12,7 @@ const schemaPath = fileURLToPath(new URL('../html-minifier-next.schema.json', im
 // the JSON configuration file format, not the programmatic API—regexes are
 // expressed as strings (e.g., `"/ng-class/"` or `"ng-class"`), and options
 // that take functions are not available in JSON at all
+/** @type {Record<string, Record<string, unknown>>} */
 const typeSchemas = {
   boolean: { type: 'boolean' },
   invertedBoolean: { type: 'boolean' },
@@ -26,6 +27,7 @@ const typeSchemas = {
 
 // Keys that are valid in config files but not part of `optionDefinitions`
 // (mirrors `CONFIG_KEYS_EXTRA` in cli.js)
+/** @type {Record<string, Record<string, unknown>>} */
 const propertiesExtra = {
   $schema: {
     description: 'JSON Schema reference for this configuration file (enables editor validation and autocomplete)',

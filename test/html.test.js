@@ -2592,6 +2592,88 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
   });
 
+  test('Custom fragment patterns keep their flags', async () => {
+    const input = '<p>  {A%  x  %a}  </p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/\{a%[\s\S]*?%a\}/i] }), '<p> {A%  x  %a} </p>');
+    // Without the flag the pattern does not match, so the fragment is text like any other
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/\{a%[\s\S]*?%a\}/] }), '<p>{A% x %a}</p>');
+  });
+
+  test('Custom fragments that are never closed stay cheap', async () => {
+    // Running the patterns as a regex costs O(n²) here, seconds at this size
+    const input = '<p>' + '<% '.repeat(200000) + '</p>';
+    const start = Date.now();
+    await minify(input, { continueOnParseError: true });
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed < 5000, `Expected a linear scan, took ${elapsed}ms`);
+  });
+
+  test('`strictCustomFragments`', async () => {
+    // Deliberately catastrophic shapes, built with `RegExp` so they read as the
+    // fixtures they are, not as patterns for scanners to flag
+    const catastrophicStrict = new RegExp('<%(?:x|xx)+%>');
+    const catastrophicWarn = new RegExp('<%(?:y|yy)+%>');
+
+    // A pattern that can backtrack catastrophically is refused outright
+    await assert.rejects(
+      () => minify('<p>x</p>', { ignoreCustomFragments: [catastrophicStrict], strictCustomFragments: true }),
+      /compounds quantifiers or alternation/
+    );
+
+    // A pattern too big to analyze is refused for that, not for a shape
+    await assert.rejects(
+      () => minify('<p>x</p>', { ignoreCustomFragments: [new RegExp('a'.repeat(10001))], strictCustomFragments: true }),
+      /too long to analyze/
+    );
+
+    // Patterns that stay linear are accepted, the defaults among them
+    const safe = { ignoreCustomFragments: [/<%[\s\S]*?%>/, /\{\{[^}]{0,500}\}\}/], strictCustomFragments: true };
+    assert.strictEqual(await minify('<p><% a %></p>', safe), '<p><% a %></p>');
+
+    // Without the option the same pattern warns instead—once, and through `log`
+    /** @type {unknown[]} */
+    const logged = [];
+    const output = await minify('<p>x</p>', {
+      ignoreCustomFragments: [catastrophicWarn],
+      log: (/** @type {unknown} */ message) => { logged.push(message); }
+    });
+    assert.strictEqual(output, '<p>x</p>');
+    assert.strictEqual(logged.filter(message => String(message).includes('compounds quantifiers')).length, 1);
+  });
+
+  test('Frequency analysis reads fragments with their own flags', async () => {
+    // The scan blanks fragments out so the markup around them parses. `q` is the
+    // frequent attribute, but only in tags carrying an uppercase fragment, which
+    // are read at all only where the matcher honors the pattern's `i`
+    const input = '<x q="2" <%IF a%>></x>'.repeat(8) + '<x p="1" q="2"></x>';
+    const output = await minify(input, {
+      ignoreCustomFragments: [/<%if[\s\S]*?%>/i],
+      sortAttributes: true
+    });
+
+    // Sorted by frequency, `q` leads—which it cannot do if those eight tags were
+    // dropped from the scan for failing to parse around the fragment
+    assert.ok(output.endsWith('<x q="2" p="1"></x>'), `Expected \`q\` to sort first, got ${JSON.stringify(output.slice(-30))}`);
+  });
+
+  test('`customAttrSurround` and `customAttrAssign` keep their flags', async () => {
+    // The parser merges these into one attribute pattern, which carries no flags
+    // of its own, so each pattern's `i` has to survive the merge
+    const surround = (/** @type {string} */ flags) => ({
+      customAttrSurround: [[new RegExp('\\{\\{#if\\s+\\w+\\}\\}', flags), new RegExp('\\{\\{/if\\}\\}', flags)]]
+    });
+    const upper = '<input {{#IF value}}checked="checked"{{/IF}}>';
+
+    // Without the flag the pattern stays case-sensitive, and the markup does not parse
+    await assert.rejects(() => minify(upper, surround('')), /Parse error/);
+    assert.strictEqual(await minify(upper, surround('i')), upper);
+
+    const lower = '<input {{#if value}}checked="checked"{{/if}}>';
+    assert.strictEqual(await minify(lower, surround('')), lower);
+
+    assert.strictEqual(await minify('<div flagX="v">y</div>', { customAttrAssign: [/x=/i] }), '<div flagx="v">y</div>');
+  });
+
   test('`caseSensitive`', async () => {
     const input = '<div mixedCaseAttribute="value"></div>';
     const caseSensitiveOutput = '<div mixedCaseAttribute="value"></div>';
@@ -4826,7 +4908,7 @@ describe('HTML', () => {
 
     // `srcdoc` with inline styles and scripts
     input = '<iframe srcdoc="<div style=\'  color: red;  \' onclick=\'  alert(&quot;Hello&quot;);  \'>Test</div>"></iframe>';
-    output = '<iframe srcdoc="<div style=\'color:red\' onclick=\'alert(&#34;Hello&#34;)\'>Test</div>"></iframe>';
+    output = '<iframe srcdoc="<div style=\'color:red\' onclick=\'alert(&quot;Hello&quot;)\'>Test</div>"></iframe>';
     assert.strictEqual(await minify(input, { minifyCSS: true, minifyJS: true, collapseWhitespace: true }), output);
     await assert.doesNotReject(
       minify(input, { continueOnMinifyError: false, minifyCSS: true, minifyJS: true, collapseWhitespace: true }),
@@ -4859,6 +4941,42 @@ describe('HTML', () => {
     // After collapsing whitespace to empty, iframe with empty `srcdoc` is preserved
     input = '<iframe srcdoc="   \n\t   "></iframe>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), '<iframe srcdoc=""></iframe>');
+  });
+
+  test('Malformed `srcdoc` does not abort the document', async () => {
+    const input = '<p>before</p><iframe srcdoc=\'<p title="a"b">oops</p>\'></iframe><p>after</p>';
+
+    // With `continueOnMinifyError` (the default), the value passes through unminified
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    await assert.rejects(minify(input, { collapseWhitespace: true, continueOnMinifyError: false }));
+  });
+
+  test('Entity-encoded `srcdoc` minification', async () => {
+    let input, output;
+
+    // Browsers resolve character references before parsing `srcdoc`, so an
+    // entity-encoded document is minified without `decodeEntities`
+    input = '<iframe srcdoc="&lt;p&gt;hello  &lt;!-- c --&gt;&lt;/p&gt;"></iframe>';
+    output = '<iframe srcdoc="<p>hello</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, removeComments: true }), output);
+
+    // `&` and a nested `&amp;` in text round-trip
+    input = '<iframe srcdoc="&lt;p&gt;a &amp; b &amp;amp; c&lt;/p&gt;"></iframe>';
+    output = '<iframe srcdoc="<p>a &amp; b &amp;amp; c</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // `&lt;` in text round-trips instead of becoming a tag
+    input = '<iframe srcdoc="&lt;p&gt;1 &amp;lt; 2&lt;/p&gt;"></iframe>';
+    output = '<iframe srcdoc="<p>1 &amp;lt; 2</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // A value carrying both quote characters keeps its delimiters intact
+    input = '<iframe srcdoc=\'<p class="q" title=&#39;he said &quot;hi&quot;&#39;>x</p>\'></iframe>';
+    output = '<iframe srcdoc="<p class=&quot;q&quot; title=\'he said &quot;hi&quot;\'>x</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    // …and under `decodeEntities`, the delimiter gets escaped, not the other quote
+    output = '<iframe srcdoc=\'<p class="q" title=&#39;he said "hi"&#39;>x</p>\'></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, decodeEntities: true }), output);
   });
 
   test('`tfoot` in nested table', async () => {

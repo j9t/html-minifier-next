@@ -22,12 +22,14 @@ const config = defineConfig({
       '@swc/core': '\0virtual:swc-stub'
     }
   },
+  // Returning `undefined` from a hook hands the id back to Vite’s default handling
   plugins: [{
     name: 'native-stub',
     resolveId(id) {
       if (id === '\0virtual:lightningcss-stub' || id === '\0virtual:swc-stub') {
         return id;
       }
+      return undefined;
     },
     load(id) {
       if (id === '\0virtual:lightningcss-stub') {
@@ -40,6 +42,7 @@ const config = defineConfig({
   throw new Error('SWC is not available in browser environments. JavaScript minification uses Terser in web demo.');
 }`;
       }
+      return undefined;
     }
   }]
 });

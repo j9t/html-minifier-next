@@ -3,8 +3,8 @@
 // Regression backtest for HTML Minifier Next.
 //
 // Walks Git history and runs the minifier from each sampled commit against the local
-// corpus (`backtest/input`), reporting how output size and median processing time
-// changed from commit to commit. Counterpart to `benchmark.js`, which measures the
+// corpus (backtest/input), reporting how output size and median processing time
+// changed from commit to commit. Counterpart to benchmark.js, which measures the
 // current working tree rather than history.
 //
 // For each commit it checks out src and package.json at that revision and reads the
@@ -20,7 +20,7 @@
 //   npm run backtest 500/10: Test the last COUNT commits, sampling every STEPth commit
 //
 // The corpus is downloaded on first run (sources listed in sites.json) and shared
-// with `benchmark.js`.
+// with benchmark.js.
 
 import { spawn, fork } from 'child_process';
 import { createWriteStream } from 'fs';
@@ -133,7 +133,7 @@ async function ensureHistoricalDeps() {
   if (missing.length === 0) return;
 
   console.log(`Installing ${missing.length} historical dependency(ies)…`);
-  await new Promise((resolve, reject) => {
+  await new Promise((resolve) => {
     const proc = spawn('npm', ['install', '--no-save', ...missing], {
       cwd: dirRoot,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -207,8 +207,8 @@ async function writeText(pathFile, data) {
 }
 
 async function loadModule() {
-  const { minify } = await import('../src/htmlminifier.js');
-  return minify || global.minify;
+  const { minify: minifyModule } = await import('../src/htmlminifier.js');
+  return minifyModule || global.minify;
 }
 
 function getOptions(fileName, options) {
@@ -307,7 +307,7 @@ async function print(table, step = 1) {
     // Delete errors.log if it exists and is empty/not needed
     try {
       await fs.unlink(pathErrors);
-    } catch (err) {
+    } catch {
       // Ignore if file doesn’t exist
     }
   }
@@ -424,8 +424,8 @@ if (process.argv.length > 2 || !process.send) {
     const pathSrc = path.join(__dirname, '..', 'src');
     const pathConfig = path.join(__dirname, 'html-minifier-next.config.json');
     const pathPkg = path.join(dirRoot, 'package.json');
-    git('status', '--porcelain', '--', pathSrc, pathConfig, pathPkg, async function (code, output) {
-      if (output.trim().length > 0) {
+    git('status', '--porcelain', '--', pathSrc, pathConfig, pathPkg, async function (_codeStatus, outputStatus) {
+      if (outputStatus.trim().length > 0) {
         console.error('Error: Uncommitted changes detected in src, package.json, or html-minifier-next.config.json');
         console.error('Please commit or stash your changes before running backtest');
         console.error('This is required because backtest temporarily modifies these files for testing');
@@ -501,9 +501,9 @@ if (process.argv.length > 2 || !process.send) {
       process.on('uncaughtException', uncaughtExceptionHandler);
       process.on('unhandledRejection', unhandledRejectionHandler);
 
-      git('log', '--date=iso', '--pretty=format:%h %cd', '-' + count, async function (code, data) {
+      git('log', '--date=iso', '--pretty=format:%h %cd', '-' + count, async function (_codeLog, outputLog) {
       const table = {};
-      let commits = data.split(/\s*?\n/).map(function (line) {
+      let commits = outputLog.split(/\s*?\n/).map(function (line) {
         const index = line.indexOf(' ');
         const hash = line.substring(0, index);
         table[hash] = {

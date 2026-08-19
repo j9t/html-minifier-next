@@ -52,6 +52,7 @@ async function testBooleanOptions() {
     removeOptionalTags: false,
     removeRedundantAttributes: true,
     removeTagWhitespace: false,
+    strictCustomFragments: false,
     trimCustomFragments: false,
     useShortDoctype: true,
   };
@@ -210,7 +211,6 @@ async function testNumberOptions() {
   const options: MinifierOptions = {
     maxInputLength: 1000000,
     maxLineLength: 80,
-    customFragmentQuantifierLimit: 200,
   };
 
   return await minify(html, options);

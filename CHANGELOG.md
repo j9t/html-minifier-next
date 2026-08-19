@@ -4,6 +4,35 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.0.0] - 2026-08-19
+
+### Fixed
+
+* Fixed `ignoreCustomFragments` patterns losing their flags (`/…/i` matched case-sensitively and `/…/s` left `.` stopping at line terminators)
+* Fixed the `ignoreCustomFragments` ReDoS warning firing for every `*` or `+`, which flagged linear patterns—among them HMN’s defaults, whenever they were passed explicitly
+* Fixed custom fragment matching costing O(n²) on documents that open fragments they never close—`ignoreCustomFragments` patterns that wrap an any-character or negated-class body in literal delimiters are matched by scanning for those delimiters in linear time
+* Fixed a whitespace run longer than 200 characters next to a custom fragment being split at that bound, which discarded the excess—or, under `collapseWhitespace`, left two spaces where one belonged
+* Fixed `customAttrAssign` and `customAttrSurround` patterns losing their flags, so that a `/…/i` pattern matched case-sensitively
+* Fixed an entity-encoded `iframe srcdoc` not being minified
+* Fixed a malformed `iframe srcdoc` document aborting the whole run despite `continueOnMinifyError`
+* Fixed `removeUnusedCSS` minifying `iframe srcdoc` style sheets against the parent document’s symbols—the nested document now gets its own set
+* Fixed CLI error messages reading `undefined` when the thrown value was not an `Error`
+
+### Added
+
+* Added `strictCustomFragments` to reject `ignoreCustomFragments` patterns that risk catastrophic backtracking, rather than warning about them—those are the patterns that reach the backtracking path, so an error is the safer answer where the patterns or the input are not fully under your control
+  - The risk analysis is capped: Patterns longer than 10,000 characters or nested deeper than 50 groups are judged risky rather than analyzed further
+
+### Changed
+
+* **BREAKING:** Removed `customFragmentQuantifierLimit` in favor of linear matching, `strictCustomFragments`, and `maxInputLength`
+  - **Migration:** Drop the option
+* Sped up `sortAttributes` and `sortClassNames` on documents with many distinct attribute names or classes
+* Sped up URL minification in style sheets with many `url()` references (by consuming replacement results by index instead of quadratic array shifting)
+* Moved the web demo onto the same ReDoS pattern check as the minifier, which had drifted from its own copy
+* Extended ESLint to the backtest scripts and resolved reports
+* Extended type checking beyond src/ to cli.js, scripts/, and build configuration
+
 ## [7.6.0] - 2026-08-18
 
 ### Added
@@ -103,7 +132,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * **BREAKING:** Dropped CommonJS support—HMN is now ESM-only
-  - **Migration:** Consumers using `require('html-minifier-next')` must migrate to `import`; the `"main"` field and `dist/htmlminifier.cjs` are no longer shipped
+  - **Migration:** Consumers using `require('html-minifier-next')` must migrate to `import`; the `"main"` field and dist/htmlminifier.cjs are no longer shipped
 * **BREAKING:** Merged `removeScriptTypeAttributes` and `removeStyleLinkTypeAttributes` into a single `removeDefaultTypeAttributes` option
   - **Migration:** Replace either or both old options with `removeDefaultTypeAttributes: true`
 * **BREAKING:** Removed an undocumented `name` option—it was the internal mechanism behind `caseSensitive`, and user-supplied values are now ignored (with a warning)
@@ -306,7 +335,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Replaced O(n²) global regex replacements (`[\s\S]*?` between fixed string delimiters) with O(n) `indexOf`-based loops in `htmlparser.js` (HTML comment and CDATA stripping inside stacked tags) and `htmlminifier.js` (`htmlmin:ignore` block extraction)
+* Replaced O(n²) global regex replacements (`[\s\S]*?` between fixed string delimiters) with O(n) `indexOf`-based loops in htmlparser.js (HTML comment and CDATA stripping inside stacked tags) and htmlminifier.js (`htmlmin:ignore` block extraction)
 * Tightened the doctype regex from `[^>]+` to `[^<>]+`, preventing the match from spanning across `<!DOCTYPE` prefixes on adversarial input
 
 ## [5.1.3] - 2026-02-24
@@ -382,7 +411,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (`src/lib/option-definitions.js`, `src/lib/utils.js`)
+* Deduplicated option definitions and `parseRegExp` between CLI, library, and web demo into shared modules (src/lib/option-definitions.js, src/lib/utils.js)
 
 ## [5.0.1] - 2026-02-02
 
@@ -659,7 +688,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Refactored htmlminifier.js into modular architecture (`src/lib/*`)
+* Refactored htmlminifier.js into modular architecture (src/lib/*)
   - Refactored comments for brevity and consistency
 
 ## [4.12.2] - 2025-12-18
@@ -936,7 +965,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Added `.editorconfig` file to standardize editor settings across the project (UTF-8 encoding, LF line endings, 2-space tabs, trailing whitespace trimming)
+* Added .editorconfig file to standardize editor settings across the project (UTF-8 encoding, LF line endings, 2-space tabs, trailing whitespace trimming)
 * Removed redundant pre-push git hook since tests already run on every commit via pre-commit hook
 
 ## [4.3.0] - 2025-11-24
@@ -993,7 +1022,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Updated build process to clean the `dist` directory before each build via new `prebuild` script
+* Updated build process to clean the dist directory before each build via new `prebuild` script
 * Added `@types/relateurl` as a dependency to ensure proper TypeScript type resolution for the `minifyURLs` option
 * Updated test suite to include TypeScript type-checking as part of standard test run
 * Added TypeScript configuration file (tsconfig.json) with modern compiler options for declaration generation
@@ -1210,7 +1239,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 ### Changed
 
 * Replaced Husky with native Git hooks for development workflow
-* Migrated from Husky-managed Git hooks to native `.githooks/` directory
+* Migrated from Husky-managed Git hooks to native .githooks/ directory
 * Updated `prepare` script to configure Git hooks path automatically
 * Maintained identical pre-commit and pre-push test execution
 * Simplified development setup with zero external dependencies for Git hooks
@@ -1218,7 +1247,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 ### Removed
 
 * Removed Husky dependency (2.4kB package size reduction)
-* Removed `.husky/` directory in favor of `.githooks/`
+* Removed .husky/ directory in favor of .githooks/
 * Removed unused `commitlint-config-non-conventional` dependency
 
 ## [2.0.0] - 2025-09-12

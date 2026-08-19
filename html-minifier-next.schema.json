@@ -117,11 +117,6 @@
         "type": "string"
       }
     },
-    "customFragmentQuantifierLimit": {
-      "description": "Set maximum quantifier limit for custom fragments to prevent ReDoS attacks (default: 200)",
-      "type": "integer",
-      "minimum": 0
-    },
     "decodeEntities": {
       "description": "Use direct Unicode characters whenever possible",
       "type": "boolean"
@@ -296,6 +291,10 @@
     },
     "trimCustomFragments": {
       "description": "Trim whitespace around custom fragments (`--ignore-custom-fragments`)",
+      "type": "boolean"
+    },
+    "strictCustomFragments": {
+      "description": "Reject `ignoreCustomFragments` patterns that risk catastrophic backtracking (rather than warning about them)",
       "type": "boolean"
     },
     "useShortDoctype": {
