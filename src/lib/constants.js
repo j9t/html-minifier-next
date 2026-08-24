@@ -2,6 +2,8 @@
 
 const RE_WS_START = /^[ \n\r\t\f]+/;
 const RE_WS_END = /[ \n\r\t\f]+$/;
+const RE_WS_ONLY = /^[ \n\r\t\f]+$/;
+const RE_WS_NBSP_END = /[ \n\r\t\f\xA0]$/;
 const RE_ALL_WS_NBSP = /[ \n\r\t\f\xA0]+/g;
 const RE_NBSP_LEADING_GROUP = /(^|\xA0+)[^\xA0]+/g;
 const RE_NBSP_LEAD_GROUP = /(\xA0+)[^\xA0]+/g;
@@ -176,6 +178,8 @@ export {
   // Regex patterns
   RE_WS_START,
   RE_WS_END,
+  RE_WS_ONLY,
+  RE_WS_NBSP_END,
   RE_ALL_WS_NBSP,
   RE_NBSP_LEADING_GROUP,
   RE_NBSP_LEAD_GROUP,

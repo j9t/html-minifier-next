@@ -2226,6 +2226,53 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
   });
 
+  test('Remove optional tags around whitespace', async () => {
+    let input, output;
+
+    // Whitespace between elements must not block end tag omission (issue #329)
+    input = '<!doctype html>\n<title>Test</title>\n<p>First</p>\n<p>Second</p>\n';
+    output = '<!doctype html>\n<title>Test</title>\n<p>First\n<p>Second\n';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Whitespace itself is left untouched
+    input = '<p>foo</p>  <p>bar</p>';
+    output = '<p>foo  <p>bar';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    input = '<ul>\n\t<li>one</li>\n\t<li>two</li>\n</ul>';
+    output = '<ul>\n\t<li>one\n\t<li>two\n</ul>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Same with `conservativeCollapse`, which keeps a single space
+    input = '<p>foo</p>\n<p>bar</p>';
+    output = '<p>foo <p>bar';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true }), output);
+
+    // `</head>`, `</colgroup>`, and `</caption>` may not be omitted before whitespace
+    input = '<head><title>x</title></head>\n<body><p>y</p></body>';
+    output = '<title>x</title></head>\n<p>y';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    input = '<table><caption>c</caption>\n<tr><td>d</td></tr></table>';
+    output = '<table><caption>c</caption>\n<tr><td>d</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Only ASCII whitespace counts as whitespace; a no-break space is content
+    input = '<p>foo</p>\u00a0<p>bar</p>';
+    output = '<p>foo</p>\u00a0<p>bar';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Comments still prevent omission
+    input = '<p>foo</p>\n<!-- bar --><p>baz</p>';
+    output = '<p>foo</p>\n<!-- bar --><p>baz';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Per HTML spec, `</p>` cannot be omitted at the end of a custom element parent
+    input = '<my-card><p>First</p>\n<p>Second</p>\n</my-card>';
+    output = '<my-card><p>First\n<p>Second</p>\n</my-card>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+  });
+
   test('Remove optional tags in tables', async () => {
     let input, output;
 
@@ -2237,9 +2284,9 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
 
     output = '<table>' +
-      '<thead><tr><th>foo<th>bar</th> <th>baz</thead> ' +
-      '<tr><td>boo<td>moo<td>loo</tr> ' +
-      '<tfoot><tr><th>baz</th> <th>qux<td>boo' +
+      '<thead><tr><th>foo<th>bar <th>baz ' +
+      '<tbody><tr><td>boo<td>moo<td>loo ' +
+      '<tfoot><tr><th>baz <th>qux<td>boo' +
       '</table>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
@@ -2320,9 +2367,9 @@ describe('HTML', () => {
     output = '<dl><dt>Term 1<dd>Definition 1<dt>Term 2<dd>Definition 2<dt>Term 3<dd>Definition 3</dl>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-    // Mixed `dt` and `dd` with whitespace (closing tags remain due to whitespace)
+    // Mixed `dt` and `dd` with whitespace (closing tags go, whitespace stays)
     input = '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n</dl>';
-    output = '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n</dl>';
+    output = '<dl>\n  <dt>Term\n  <dd>Definition\n</dl>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '<dl><dt>Term<dd>Definition</dl>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
@@ -2344,10 +2391,11 @@ describe('HTML', () => {
       '  <option>foo</option>\n' +
       '  <option>bar</option>\n' +
       '</select>';
-    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+    output = '<select>\n  <option>foo\n  <option>bar\n</select>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '<select><option>foo<option>bar</select>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
-    output = '<select> <option>foo</option> <option>bar</option> </select>';
+    output = '<select> <option>foo <option>bar </select>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true }), output);
 
     // Example from htmldog.com
