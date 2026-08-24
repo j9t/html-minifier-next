@@ -2257,6 +2257,16 @@ describe('HTML', () => {
     output = '<table><caption>c</caption>\n<tr><td>d</table>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
+    // The `<colgroup>` start tag still goes, as `<col>` is the first thing inside it
+    input = '<table><colgroup><col></colgroup>\n<tr><td>d</td></tr></table>';
+    output = '<table><col></colgroup>\n<tr><td>d</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Without the whitespace, `</colgroup>` goes as well
+    input = '<table><colgroup><col></colgroup><tr><td>d</td></tr></table>';
+    output = '<table><col><tr><td>d</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
     // Only ASCII whitespace counts as whitespace; a no-break space is content
     input = '<p>foo</p>\u00a0<p>bar</p>';
     output = '<p>foo</p>\u00a0<p>bar';
@@ -2271,6 +2281,54 @@ describe('HTML', () => {
     input = '<my-card><p>First</p>\n<p>Second</p>\n</my-card>';
     output = '<my-card><p>First\n<p>Second</p>\n</my-card>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+  });
+
+  test('Remove optional tags with `preserveLineBreaks`', async () => {
+    let input, output;
+
+    const options = { removeOptionalTags: true, collapseWhitespace: true, preserveLineBreaks: true };
+
+    // The line break `preserveLineBreaks` keeps must survive the tag that is omitted next to it
+    input = '<p>a</p>\n<p>b</p>';
+    output = '<p>a\n<p>b';
+    assert.strictEqual(await minify(input, options), output);
+    assert.strictEqual(await minify(output, options), output);
+
+    input = '<ul>\n  <li>one</li>\n  <li>two</li>\n</ul>';
+    output = '<ul>\n<li>one\n<li>two\n</ul>';
+    assert.strictEqual(await minify(input, options), output);
+    assert.strictEqual(await minify(output, options), output);
+
+    // A whitespace run without a line break still collapses away
+    input = '<p>a</p>   <p>b</p>';
+    output = '<p>a<p>b';
+    assert.strictEqual(await minify(input, options), output);
+
+    // Loose tags may not be omitted before the line break that is kept
+    input = '<head><title>x</title></head>\n<body><p>y</p></body>';
+    output = '<title>x</title></head>\n<p>y';
+    assert.strictEqual(await minify(input, options), output);
+
+    input = '<table><colgroup><col></colgroup>\n<tr><td>d</td></tr></table>';
+    output = '<table><col></colgroup>\n<tr><td>d</table>';
+    assert.strictEqual(await minify(input, options), output);
+
+    input = '<table><caption>c</caption>\n<tr><td>d</td></tr></table>';
+    output = '<table><caption>c</caption>\n<tr><td>d</table>';
+    assert.strictEqual(await minify(input, options), output);
+
+    // Where the merged run holds a line break, that break outranks the space
+    // `conservativeCollapse` would otherwise leave
+    const conservative = { ...options, conservativeCollapse: true };
+    input = '<p>x </p>\n<p>y</p>';
+    output = '<p>x\n<p>y';
+    assert.strictEqual(await minify(input, conservative), output);
+    assert.strictEqual(await minify(output, conservative), output);
+
+    input = '<ul>\n  <li>a </li>\n  <li>b</li>\n</ul>';
+    output = '<ul>\n<li>a\n<li>b\n</ul>';
+    assert.strictEqual(await minify(input, conservative), output);
+    assert.strictEqual(await minify(output, conservative), output);
   });
 
   test('Remove optional tags in tables', async () => {

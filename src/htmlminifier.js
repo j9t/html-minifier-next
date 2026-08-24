@@ -9,6 +9,7 @@ import {
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
   RE_WS_START,
+  RE_WS_END,
   RE_WS_ONLY,
   RE_WS_NBSP_END,
   RE_STYLE_ELEMENT,
@@ -1124,11 +1125,12 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // Whether whitespace-only text between tags survives minification
   function keepsWhitespace() {
-    return !options.collapseWhitespace || Boolean(options.conservativeCollapse);
+    return !options.collapseWhitespace || Boolean(options.conservativeCollapse) || Boolean(options.preserveLineBreaks);
   }
 
-  // The two whitespace runs an omitted tag separated become one run, which `conservativeCollapse`
-  // renders as a single space (or, where the run holds a no-break space, as that space)
+  // The two whitespace runs an omitted tag separated become one run, which collapses to the
+  // single character it is due: a line break under `preserveLineBreaks`, a no-break space
+  // where the run holds one, a space under `conservativeCollapse`
   function mergeWhitespaceRuns(/** @type {number} */ index) {
     let before = index - 1;
     while (before >= 0 && buffer[before] === '') {
@@ -1138,8 +1140,19 @@ async function minifyHTML(value, options, partialMarkup) {
     while (after < buffer.length && buffer[after] === '') {
       after++;
     }
-    if (before >= 0 && after < buffer.length && RE_WS_NBSP_END.test(buffer[before] ?? '') && RE_WS_START.test(buffer[after] ?? '')) {
-      buffer[after] = (buffer[after] ?? '').replace(RE_WS_START, '');
+    if (before < 0 || after >= buffer.length) {
+      return;
+    }
+    const prev = buffer[before] ?? '';
+    const next = buffer[after] ?? '';
+    if (!RE_WS_NBSP_END.test(prev) || !RE_WS_START.test(next)) {
+      return;
+    }
+    // A line break the run already carries outranks the whitespace ahead of it
+    if (options.preserveLineBreaks && RE_WS_END.test(prev) && (next.match(RE_WS_START) ?? [''])[0].includes('\n')) {
+      buffer[before] = prev.replace(RE_WS_END, '');
+    } else {
+      buffer[after] = next.replace(RE_WS_START, '');
     }
   }
 
@@ -1151,7 +1164,8 @@ async function minifyHTML(value, options, partialMarkup) {
     // Text that follows the end tag is kept as is, so drop the tag alone
     if (index < buffer.length - 1 && keepsWhitespace() && RE_END_TAG.test(buffer[index] ?? '')) {
       buffer.splice(index, 1);
-      if (options.conservativeCollapse) {
+      // Only collapsed whitespace can merge; verbatim whitespace stays as written
+      if (options.collapseWhitespace) {
         mergeWhitespaceRuns(index);
       }
       return;
