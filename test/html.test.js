@@ -6168,6 +6168,29 @@ describe('HTML', () => {
     assert.ok(result.includes('{"289":"itsct"}'), 'Should preserve JSON data in attribute');
   });
 
+  test('Omitting a tag next to `pre` whitespace leaves it verbatim', async () => {
+    // Whitespace in `pre`, in `textarea`, or wherever `canTrimWhitespace` says so is never
+    // collapsed, so a tag omitted next to it must not take any of it along
+    const options = { removeOptionalTags: true, collapseWhitespace: true, preserveLineBreaks: true };
+    for (const [name, nl] of [['LF', '\n'], ['CRLF', '\r\n'], ['CR', '\r']]) {
+      let input = `<pre><p>a </p>${nl}<p>b</p></pre>`;
+      let output = `<pre><p>a ${nl}<p>b</pre>`;
+      assert.strictEqual(await minify(input, options), output, `${name}: in pre`);
+      assert.strictEqual(await minify(output, options), output, `${name}: in pre, twice`);
+
+      input = `<div><textarea><p>a </p>${nl}<p>b</p></textarea></div>`;
+      output = `<div><textarea><p>a ${nl}<p>b</textarea></div>`;
+      assert.strictEqual(await minify(input, options), output, `${name}: in textarea`);
+
+      input = `<x-el><p>a </p>${nl}<p>b</p></x-el>`;
+      output = `<x-el><p>a ${nl}<p>b</p></x-el>`;
+      assert.strictEqual(await minify(input, {
+        ...options,
+        canTrimWhitespace: (tag, attrs, defaultFn) => tag === 'x-el' ? false : defaultFn(tag, attrs)
+      }), output, `${name}: under canTrimWhitespace`);
+    }
+  });
+
   test('Trim trailing newline in `pre`/`textarea` with `collapseWhitespace`', async () => {
     let input, output;
 

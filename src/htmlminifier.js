@@ -1150,7 +1150,7 @@ async function minifyHTML(value, options, partialMarkup) {
     }
     // A line break the run already carries outranks the whitespace ahead of it; trimming
     // the other side takes ASCII whitespace only, so a no-break space stays as is
-    if (options.preserveLineBreaks && (next.match(RE_WS_START) ?? [''])[0].includes('\n')) {
+    if (options.preserveLineBreaks && /[\n\r]/.test((next.match(RE_WS_START) ?? [''])[0])) {
       buffer[before] = prev.replace(RE_WS_END, '');
     } else {
       buffer[after] = next.replace(RE_WS_START, '');
@@ -1165,8 +1165,9 @@ async function minifyHTML(value, options, partialMarkup) {
     // Text that follows the end tag is kept as is, so drop the tag alone
     if (index < buffer.length - 1 && keepsWhitespace() && RE_END_TAG.test(buffer[index] ?? '')) {
       buffer.splice(index, 1);
-      // Only collapsed whitespace can merge; verbatim whitespace stays as written
-      if (options.collapseWhitespace) {
+      // Only collapsed whitespace can merge; whitespace kept verbatim—in `pre`, in
+      // `textarea`, or wherever `canTrimWhitespace` says so—stays exactly as written
+      if (options.collapseWhitespace && !stackNoTrimWhitespace.length) {
         mergeWhitespaceRuns(index);
       }
       return;
