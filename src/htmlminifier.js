@@ -8,6 +8,10 @@ import { collectUsedSymbols } from './lib/unused-css.js';
 import {
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
+  RE_WS_START,
+  RE_WS_END,
+  RE_WS_ONLY,
+  RE_WS_NBSP_END,
   RE_STYLE_ELEMENT,
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
@@ -574,6 +578,8 @@ const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript
 // Pre-compiled patterns for buffer scanning
 const RE_START_TAG = /^<[^/!]/;
 const RE_END_TAG = /^<\//;
+const RE_WHITESPACE_ONLY = /^\s+$/;
+const RE_TRAILING_WHITESPACE = /\s$/;
 
 // Pre-compiled patterns for `htmlmin:ignore` block content analysis
 const RE_HTML_COMMENT_START = /^\s*<!--/;
@@ -1117,10 +1123,56 @@ async function minifyHTML(value, options, partialMarkup) {
     buffer.length = Math.max(0, index);
   }
 
+  // Whether whitespace-only text between tags survives minification
+  function keepsWhitespace() {
+    return !options.collapseWhitespace || Boolean(options.conservativeCollapse) || Boolean(options.preserveLineBreaks);
+  }
+
+  // The two whitespace runs an omitted tag separated become one run, which collapses to the
+  // single character it is due: a line break under `preserveLineBreaks`, a no-break space
+  // where the run holds one, a space under `conservativeCollapse`
+  function mergeWhitespaceRuns(/** @type {number} */ index) {
+    let before = index - 1;
+    while (before >= 0 && buffer[before] === '') {
+      before--;
+    }
+    let after = index;
+    while (after < buffer.length && buffer[after] === '') {
+      after++;
+    }
+    if (before < 0 || after >= buffer.length) {
+      return;
+    }
+    const prev = buffer[before] ?? '';
+    const next = buffer[after] ?? '';
+    if (!RE_WS_NBSP_END.test(prev) || !RE_WS_START.test(next)) {
+      return;
+    }
+    // A line break the run already carries outranks the whitespace ahead of it; trimming
+    // the other side takes ASCII whitespace only, so a no-break space stays as is
+    if (options.preserveLineBreaks && /[\n\r]/.test((next.match(RE_WS_START) ?? [''])[0])) {
+      buffer[before] = prev.replace(RE_WS_END, '');
+    } else {
+      buffer[after] = next.replace(RE_WS_START, '');
+    }
+  }
+
   function removeEndTag() {
     let index = buffer.length - 1;
     while (index > 0 && !RE_END_TAG.test(buffer[index] ?? '')) {
       index--;
+    }
+    // Text that follows the end tag is kept as is, so drop the tag alone. Whitespace kept
+    // verbatim—in `pre`, in `textarea`, or wherever `canTrimWhitespace` says so—counts as
+    // kept text too, no matter how whitespace is collapsed elsewhere.
+    const noTrim = stackNoTrimWhitespace.length > 0;
+    if (index < buffer.length - 1 && (keepsWhitespace() || noTrim) && RE_END_TAG.test(buffer[index] ?? '')) {
+      buffer.splice(index, 1);
+      // Only collapsed whitespace can merge
+      if (options.collapseWhitespace && !noTrim) {
+        mergeWhitespaceRuns(index);
+      }
+      return;
     }
     buffer.length = Math.max(0, index);
   }
@@ -1143,11 +1195,15 @@ async function minifyHTML(value, options, partialMarkup) {
   // element which has now been removed
   function squashTrailingWhitespace(/** @type {string} */ nextTag) {
     let charsIndex = buffer.length - 1;
-    if (buffer.length > 1) {
-      const item = buffer[buffer.length - 1] ?? '';
-      if (/^(?:<!|$)/.test(item) && (!uidIgnore || item.indexOf(uidIgnore) === -1)) {
-        charsIndex--;
+    // Step back over every trailing comment and empty entry, not just one—a single step
+    // stops the search at the comment itself, leaving whitespace behind that a second
+    // minification run then removes
+    while (charsIndex > 0) {
+      const item = buffer[charsIndex] ?? '';
+      if (!/^(?:<!|$)/.test(item) || (uidIgnore && item.indexOf(uidIgnore) !== -1)) {
+        break;
       }
+      charsIndex--;
     }
     trimTrailingWhitespace(charsIndex, nextTag);
   }
@@ -1240,7 +1296,7 @@ async function minifyHTML(value, options, partialMarkup) {
         } else {
           text = collapseWhitespace(text, options, true, true);
         }
-        if (!text && /\s$/.test(currentChars) && textPrevTag && textPrevTag.charAt(0) === '/') {
+        if (!text && RE_TRAILING_WHITESPACE.test(currentChars) && textPrevTag && textPrevTag.charAt(0) === '/') {
           trimTrailingWhitespace(buffer.length - 1, textNextTag);
         }
       }
@@ -1277,9 +1333,16 @@ async function minifyHTML(value, options, partialMarkup) {
       // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
       if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(effectiveText)))) {
         removeEndTag();
+        // The tag is gone from the buffer, so nothing is left to omit later
+        optionalEndTag = '';
+        optionalEndTagEmitted = false;
       }
-      // Don’t reset `optionalEndTag` if text is only whitespace and will be collapsed (not conservatively)
-      if (!/^\s+$/.test(text) || !options.collapseWhitespace || options.conservativeCollapse) {
+      // Whitespace-only text doesn’t prevent omission of the pending end tag: It’s either
+      // collapsed away, or kept in place while the tag alone is dropped—except for
+      // `</head>`, `</colgroup>`, and `</caption>`, which may not be followed by space.
+      // Only ASCII whitespace counts, as no-break space and friends are content
+      // https://html.spec.whatwg.org/multipage/syntax.html#optional-tags
+      if (!RE_WS_ONLY.test(text) || (keepsWhitespace() && looseElements.has(optionalEndTag))) {
         optionalEndTag = '';
         optionalEndTagEmitted = false;
       }
@@ -1347,7 +1410,7 @@ async function minifyHTML(value, options, partialMarkup) {
           const prevComment = buffer[buffer.length - 2];
 
           // Check if previous item is whitespace-only and item before that is ignore-placeholder
-          if (prevText && /^\s+$/.test(prevText) && prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
+          if (prevText && RE_WHITESPACE_ONLY.test(prevText) && prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
             // Extract the index from both placeholders to check their content
             const currentMatch = comment.match(uidIgnorePlaceholderPattern);
             const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
@@ -1390,7 +1453,11 @@ async function minifyHTML(value, options, partialMarkup) {
                       // Apply `collapseWhitespace` with appropriate context
                       if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
                         // Not in pre or other no-collapse context
-                        if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
+                        if (prevText.includes('\xA0')) {
+                          // No-break spaces are content, so every one of them survives in place;
+                          // the ASCII whitespace around them collapses as it would anywhere else
+                          collapsedText = collapseWhitespace(prevText, options, true, true, true);
+                        } else if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
                           // Preserve line break as single newline
                           collapsedText = '\n';
                         } else if (options.conservativeCollapse) {
@@ -1639,10 +1706,11 @@ async function minifyHTML(value, options, partialMarkup) {
           removeStartTag();
         }
         optionalStartTag = '';
-        // `</html>` or `</body>` may be omitted if not followed by comment
-        // `</head>` may be omitted if not followed by space or comment
-        // `</p>` may be omitted if no more content in parent, unless parent is in `pInlineElements` or is a custom element
-        // https://html.spec.whatwg.org/multipage/syntax.html#optional-tags
+        // `</html>` or `</body>` may be omitted if not followed by comment,
+        // `</head>` may be omitted if not followed by space or comment,
+        // `</p>` may be omitted if no more content in parent,
+        // unless parent is in `pInlineElements` or is a custom element
+        // (https://html.spec.whatwg.org/multipage/syntax.html#optional-tags);
         // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
         if (tag && optionalEndTag && optionalEndTagEmitted && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || (!pInlineElements.has(tag) && !tag.includes('-')))) {
           removeEndTag();

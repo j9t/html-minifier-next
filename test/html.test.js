@@ -2226,6 +2226,139 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
   });
 
+  test('Remove optional tags around whitespace', async () => {
+    let input, output;
+
+    // Whitespace between elements must not block end tag omission (issue #329)
+    input = '<!doctype html>\n<title>Test</title>\n<p>First</p>\n<p>Second</p>\n';
+    output = '<!doctype html>\n<title>Test</title>\n<p>First\n<p>Second\n';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Whitespace itself is left untouched
+    input = '<p>foo</p>  <p>bar</p>';
+    output = '<p>foo  <p>bar';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    input = '<ul>\n\t<li>one</li>\n\t<li>two</li>\n</ul>';
+    output = '<ul>\n\t<li>one\n\t<li>two\n</ul>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Same with `conservativeCollapse`, which keeps a single space
+    input = '<p>foo</p>\n<p>bar</p>';
+    output = '<p>foo <p>bar';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true }), output);
+
+    // `</head>`, `</colgroup>`, and `</caption>` may not be omitted before whitespace
+    input = '<head><title>x</title></head>\n<body><p>y</p></body>';
+    output = '<title>x</title></head>\n<p>y';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    input = '<table><caption>c</caption>\n<tr><td>d</td></tr></table>';
+    output = '<table><caption>c</caption>\n<tr><td>d</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // The `<colgroup>` start tag still goes, as `<col>` is the first thing inside it
+    input = '<table><colgroup><col></colgroup>\n<tr><td>d</td></tr></table>';
+    output = '<table><col></colgroup>\n<tr><td>d</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Without the whitespace, `</colgroup>` goes as well
+    input = '<table><colgroup><col></colgroup><tr><td>d</td></tr></table>';
+    output = '<table><col><tr><td>d</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Only ASCII whitespace counts as whitespace; a no-break space is content
+    input = '<p>foo</p>\u00a0<p>bar</p>';
+    output = '<p>foo</p>\u00a0<p>bar';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Two omissions in a row: The whitespace runs merge once per omitted tag
+    input = '<ul>\n<li><p>text\n</p>\n</li>\n<li>b</li>\n</ul>';
+    output = '<ul> <li><p>text <li>b </ul>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true }), output);
+    assert.strictEqual(await minify(output, { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true }), output);
+
+    // The no-break space stays as the content it is, while the space that follows the
+    // omitted end tag is trimmed—it now trails the paragraph’s content
+    input = '<p>foo\u00a0</p> <p>bar</p>';
+    output = '<p>foo\u00a0<p>bar';
+    const conservativeOptions = { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true };
+    assert.strictEqual(await minify(input, conservativeOptions), output);
+    assert.strictEqual(await minify(output, conservativeOptions), output);
+
+    // Comments still prevent omission
+    input = '<p>foo</p>\n<!-- bar --><p>baz</p>';
+    output = '<p>foo</p>\n<!-- bar --><p>baz';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // Per HTML spec, `</p>` cannot be omitted at the end of a custom element parent
+    input = '<my-card><p>First</p>\n<p>Second</p>\n</my-card>';
+    output = '<my-card><p>First\n<p>Second</p>\n</my-card>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+  });
+
+  test('Remove optional tags with `preserveLineBreaks`', async () => {
+    let input, output;
+
+    const options = { removeOptionalTags: true, collapseWhitespace: true, preserveLineBreaks: true };
+
+    // The line break `preserveLineBreaks` keeps must survive the tag that is omitted next to it
+    input = '<p>a</p>\n<p>b</p>';
+    output = '<p>a\n<p>b';
+    assert.strictEqual(await minify(input, options), output);
+    assert.strictEqual(await minify(output, options), output);
+
+    input = '<ul>\n  <li>one</li>\n  <li>two</li>\n</ul>';
+    output = '<ul>\n<li>one\n<li>two\n</ul>';
+    assert.strictEqual(await minify(input, options), output);
+    assert.strictEqual(await minify(output, options), output);
+
+    // A whitespace run without a line break still collapses away
+    input = '<p>a</p>   <p>b</p>';
+    output = '<p>a<p>b';
+    assert.strictEqual(await minify(input, options), output);
+
+    // Loose tags may not be omitted before the line break that is kept
+    input = '<head><title>x</title></head>\n<body><p>y</p></body>';
+    output = '<title>x</title></head>\n<p>y';
+    assert.strictEqual(await minify(input, options), output);
+
+    input = '<table><colgroup><col></colgroup>\n<tr><td>d</td></tr></table>';
+    output = '<table><col></colgroup>\n<tr><td>d</table>';
+    assert.strictEqual(await minify(input, options), output);
+
+    input = '<table><caption>c</caption>\n<tr><td>d</td></tr></table>';
+    output = '<table><caption>c</caption>\n<tr><td>d</table>';
+    assert.strictEqual(await minify(input, options), output);
+
+    // Whitespace kept around an inline element merges with the run after the omitted tag,
+    // which leaves one line break rather than two
+    input = '<p><a href="/x">t</a>\n</p>\n<p>b</p>';
+    output = '<p><a href="/x">t</a>\n<p>b';
+    assert.strictEqual(await minify(input, options), output);
+    assert.strictEqual(await minify(output, options), output);
+
+    // Where the merged run holds a line break, that break outranks the space
+    // `conservativeCollapse` would otherwise leave
+    const conservative = { ...options, conservativeCollapse: true };
+    input = '<p>x </p>\n<p>y</p>';
+    output = '<p>x\n<p>y';
+    assert.strictEqual(await minify(input, conservative), output);
+    assert.strictEqual(await minify(output, conservative), output);
+
+    input = '<ul>\n  <li>a </li>\n  <li>b</li>\n</ul>';
+    output = '<ul>\n<li>a\n<li>b\n</ul>';
+    assert.strictEqual(await minify(input, conservative), output);
+    assert.strictEqual(await minify(output, conservative), output);
+
+    // A no-break space at the end of an element is content and must not be
+    // treated as the whitespace `preserveLineBreaks` would merge with
+    input = '<p>x\u00a0</p>\n<p>y</p>';
+    output = '<p>x\u00a0\n<p>y';
+    assert.strictEqual(await minify(input, options), output);
+    assert.strictEqual(await minify(output, options), output);
+  });
+
   test('Remove optional tags in tables', async () => {
     let input, output;
 
@@ -2237,9 +2370,9 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
 
     output = '<table>' +
-      '<thead><tr><th>foo<th>bar</th> <th>baz</thead> ' +
-      '<tr><td>boo<td>moo<td>loo</tr> ' +
-      '<tfoot><tr><th>baz</th> <th>qux<td>boo' +
+      '<thead><tr><th>foo<th>bar <th>baz ' +
+      '<tbody><tr><td>boo<td>moo<td>loo ' +
+      '<tfoot><tr><th>baz <th>qux<td>boo' +
       '</table>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
@@ -2320,9 +2453,9 @@ describe('HTML', () => {
     output = '<dl><dt>Term 1<dd>Definition 1<dt>Term 2<dd>Definition 2<dt>Term 3<dd>Definition 3</dl>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
-    // Mixed `dt` and `dd` with whitespace (closing tags remain due to whitespace)
+    // Mixed `dt` and `dd` with whitespace (closing tags go, whitespace stays)
     input = '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n</dl>';
-    output = '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n</dl>';
+    output = '<dl>\n  <dt>Term\n  <dd>Definition\n</dl>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '<dl><dt>Term<dd>Definition</dl>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
@@ -2344,10 +2477,11 @@ describe('HTML', () => {
       '  <option>foo</option>\n' +
       '  <option>bar</option>\n' +
       '</select>';
-    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+    output = '<select>\n  <option>foo\n  <option>bar\n</select>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '<select><option>foo<option>bar</select>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true }), output);
-    output = '<select> <option>foo</option> <option>bar</option> </select>';
+    output = '<select> <option>foo <option>bar </select>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true }), output);
 
     // Example from htmldog.com
@@ -4020,6 +4154,55 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<p>text</p></div><p>next</p>');
   });
 
+  test('Trailing whitespace before comments at the end of an element', async () => {
+    let input, output;
+
+    // Whitespace at the end of an inline element is trimmed when the element it sits in
+    // ends, whatever number of comments trails behind it
+    input = '<div><a href="/x"><span>t</span><!--a-->\n  </a>\n  <!--c-->\n</div>';
+    output = '<div><a href="/x"><span>t</span><!--a--></a><!--c--></div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(output, { collapseWhitespace: true }), output);
+
+    input = '<div><a href="/x"><span>t</span><!--a--><!--b-->\n  </a>\n  <!--c-->\n  <!--d-->\n</div>';
+    output = '<div><a href="/x"><span>t</span><!--a--><!--b--></a><!--c--><!--d--></div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(output, { collapseWhitespace: true }), output);
+  });
+
+  test('No-break space between consecutive `htmlmin:ignore` blocks', async () => {
+    let output;
+
+    // A no-break space is content: The run between the blocks collapses to it, exactly as
+    // it would without the blocks around it
+    const ignore = '<!-- htmlmin:ignore -->';
+    const blocks = separator => `${ignore}<div>a</div>${ignore}${separator}${ignore}<div>b</div>${ignore}`;
+
+    for (const separator of ['\u00a0', ' \u00a0 ', '\n\u00a0\n']) {
+      output = '<div>a</div>\u00a0<div>b</div>';
+      assert.strictEqual(await minify(blocks(separator), { collapseWhitespace: true }), output, JSON.stringify(separator));
+      assert.strictEqual(await minify(blocks(separator), { collapseWhitespace: true, conservativeCollapse: true }), output, JSON.stringify(separator));
+    }
+
+    // `preserveLineBreaks` keeps the breaks around it
+    output = '<div>a</div>\n\u00a0\n<div>b</div>';
+    assert.strictEqual(await minify(blocks('\n\u00a0\n'), { collapseWhitespace: true, preserveLineBreaks: true }), output);
+    assert.strictEqual(await minify(output, { collapseWhitespace: true, preserveLineBreaks: true }), output);
+
+    // Every no-break space in the run is content, so they all stay, in order
+    output = '<div>a</div>\u00a0\u00a0<div>b</div>';
+    assert.strictEqual(await minify(blocks('\u00a0\u00a0'), { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(blocks('\n\u00a0\u00a0\n'), { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(output, { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(blocks('\n\u00a0\u00a0\n'), { collapseWhitespace: true, preserveLineBreaks: true }), '<div>a</div>\n\u00a0\u00a0\n<div>b</div>');
+
+    // Whitespace between them collapses, as whitespace between content does
+    assert.strictEqual(await minify(blocks(' \u00a0 \u00a0 '), { collapseWhitespace: true }), '<div>a</div>\u00a0 \u00a0<div>b</div>');
+
+    // Whitespace that is only whitespace still goes
+    assert.strictEqual(await minify(blocks(' \n '), { collapseWhitespace: true }), '<div>a</div><div>b</div>');
+  });
+
   test('Whitespace-collapse between consecutive `htmlmin:ignore` blocks', async () => {
     let input, output;
 
@@ -5070,6 +5253,43 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { includeAutoGeneratedTags: false }), input);
   });
 
+  test('`tr` and `td` auto-close the open row and cell', async () => {
+    let input;
+
+    // Per the HTML spec (“in row” and “in cell” insertion modes), a `<tr>` start tag closes
+    // an open row and its cell, and a `<td>` or `<th>` start tag closes an open cell
+    input = '<table><tr><td>a<tr><td>b</table>';
+    assert.strictEqual(await minify(input, { includeAutoGeneratedTags: true }),
+      '<table><tr><td>a</td></tr><tr><td>b</td></tr></table>');
+
+    // Without auto-generated tags, the implicit end tags are omitted
+    assert.strictEqual(await minify(input, { includeAutoGeneratedTags: false }), input);
+
+    input = '<table><tr><td>a<td>b</tr></table>';
+    assert.strictEqual(await minify(input, { includeAutoGeneratedTags: true }),
+      '<table><tr><td>a</td><td>b</td></tr></table>');
+
+    input = '<table><tr><td>a<th>b</table>';
+    assert.strictEqual(await minify(input, { includeAutoGeneratedTags: true }),
+      '<table><tr><td>a</td><th>b</th></tr></table>');
+
+    // A row of a nested table leaves the row of the outer table open
+    input = '<table><tr><td><table><tr><td>x</table><tr><td>y</table>';
+    assert.strictEqual(await minify(input, { includeAutoGeneratedTags: true }),
+      '<table><tr><td><table><tr><td>x</td></tr></table></td></tr><tr><td>y</td></tr></table>');
+
+    // Closing an implied `</p>` must not stop the section that follows from closing the cell
+    input = '<table><tfoot><tr><td><p>x<tbody><tr><td>y</table>';
+    assert.strictEqual(await minify(input, { includeAutoGeneratedTags: true }),
+      '<table><tfoot><tr><td><p>x</p></td></tr></tfoot><tbody><tr><td>y</td></tr></tbody></table>');
+
+    // Re-minifying stays idempotent, as the cell that ends before the next row is closed there
+    input = '<table><tr><td><p>x</p>\n</td>\n</tr>\n<tr><td>y</td></tr></table>';
+    const output = '<table><tr><td><p>x\n\n\n<tr><td>y</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, includeAutoGeneratedTags: true }), output);
+    assert.strictEqual(await minify(output, { removeOptionalTags: true, includeAutoGeneratedTags: true }), output);
+  });
+
   test('Synthetic `colgroup` auto-closes before non-`col` element', async () => {
     // When bare `<col>` appears without explicit `<colgroup>`, the parser inserts
     // a synthetic one; it must be closed before the next non-`col` element
@@ -5981,6 +6201,38 @@ describe('HTML', () => {
     assert.ok(result.includes('{"289":"itsct"}'), 'Should preserve JSON data in attribute');
   });
 
+  test('Omitting a tag next to `pre` whitespace leaves it verbatim', async () => {
+    // Whitespace in `pre`, in `textarea`, or wherever `canTrimWhitespace` says so is never
+    // collapsed, so a tag omitted next to it must not take any of it along
+    const options = { removeOptionalTags: true, collapseWhitespace: true, preserveLineBreaks: true };
+    for (const [name, nl] of [['LF', '\n'], ['CRLF', '\r\n'], ['CR', '\r']]) {
+      let input = `<pre><p>a </p>${nl}<p>b</p></pre>`;
+      let output = `<pre><p>a ${nl}<p>b</pre>`;
+      assert.strictEqual(await minify(input, options), output, `${name}: in pre`);
+      assert.strictEqual(await minify(output, options), output, `${name}: in pre, twice`);
+
+      // Content in `textarea` is escapable raw text, so no tag is omitted inside it;
+      // the whitespace it holds stays verbatim all the same
+      input = `<div><p>a </p>${nl}<textarea>  x${nl}${nl}y  </textarea></div>`;
+      output = `<div><p>a</p>\n<textarea>  x${nl}${nl}y  </textarea></div>`;
+      assert.strictEqual(await minify(input, options), output, `${name}: in textarea`);
+
+      input = `<x-el><p>a </p>${nl}<p>b</p></x-el>`;
+      output = `<x-el><p>a ${nl}<p>b</p></x-el>`;
+      assert.strictEqual(await minify(input, {
+        ...options,
+        canTrimWhitespace: (tag, attrs, defaultFn) => tag === 'x-el' ? false : defaultFn(tag, attrs)
+      }), output, `${name}: under canTrimWhitespace`);
+    }
+
+    // Whitespace kept verbatim survives however whitespace collapses elsewhere
+    const aggressive = { removeOptionalTags: true, collapseWhitespace: true };
+    assert.strictEqual(await minify('<pre><p>a </p>  <p>b</p></pre>', aggressive), '<pre><p>a   <p>b</pre>');
+    assert.strictEqual(await minify('<pre><p>a   <p>b</pre>', aggressive), '<pre><p>a   <p>b</pre>');
+    assert.strictEqual(await minify('<pre><p>a </p>\n<p>b</p></pre>', aggressive), '<pre><p>a \n<p>b</pre>');
+    assert.strictEqual(await minify('<div><p>a </p>  <p>b</p></div>', aggressive), '<div><p>a<p>b</div>');
+  });
+
   test('Trim trailing newline in `pre`/`textarea` with `collapseWhitespace`', async () => {
     let input, output;
 
@@ -6083,5 +6335,41 @@ describe('HTML', () => {
     const withOverride = await minify(input, { preset: 'comprehensive', collapseWhitespace: false });
     assert.notStrictEqual(withPreset, withOverride);
     assert.strictEqual(withOverride, input);
+  });
+
+  test('Minifying twice changes nothing', async () => {
+    // Whatever a run produces must be a fixed point: Feeding the output back in has to
+    // return it unchanged. Tag omission and whitespace collapsing decide together what
+    // survives, and each has been caught relocating or dropping the other’s whitespace.
+    const documents = {
+      'line-broken document': '<!doctype html>\n<title>Test</title>\n<p>First</p>\n<p>Second</p>\n',
+      'nested lists': '<ul>\n  <li>one</li>\n  <li><ol>\n    <li>a</li>\n    <li>b</li>\n  </ol></li>\n</ul>\n',
+      'table sections': '<table>\n  <caption>c</caption>\n  <colgroup><col></colgroup>\n  <thead><tr><th>h</th></tr></thead>\n  <tbody><tr><td>d</td></tr></tbody>\n</table>\n',
+      'implied row and cell closes': '<table><tr><td>a<tr><td>b</table>',
+      'comments inside an inline element': '<div><a href="/x"><span>t</span><!--a--><!--b-->\n  </a>\n  <!--c-->\n</div>',
+      'no-break space next to tags': '<p>foo\u00a0</p>\n<p>bar</p>\n<p>baz <a href="/x">l</a>\u00a0</p>\n',
+      'description list': '<dl>\n  <dt>Term</dt>\n  <dd>Definition</dd>\n  <dt>Other</dt>\n</dl>\n',
+      'paragraphs in cells': '<table><tr><td><p>x</p>\n</td>\n</tr>\n<tr><td>y</td></tr></table>',
+      'whole document': '<!DOCTYPE html>\n<html lang="en">\n\t<head>\n\t\t<meta charset="utf-8">\n\t\t<title>HTML Minifier Next</title>\n\t</head>\n\t<body>\n\t\t<!-- Body -->\n\t</body>\n</html>',
+      'ruby': '<ruby>\n  <rb>base</rb>\n  <rt>text</rt>\n</ruby>\n',
+      'select and options': '<select>\n  <option>foo</option>\n  <option>bar</option>\n</select>\n'
+    };
+
+    const optionSets = {
+      'removeOptionalTags': { removeOptionalTags: true },
+      'and collapseWhitespace': { removeOptionalTags: true, collapseWhitespace: true },
+      'and conservativeCollapse': { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true },
+      'and preserveLineBreaks': { removeOptionalTags: true, collapseWhitespace: true, preserveLineBreaks: true },
+      'and includeAutoGeneratedTags': { removeOptionalTags: true, includeAutoGeneratedTags: true },
+      'collapseWhitespace with removeComments': { collapseWhitespace: true, removeComments: true }
+    };
+
+    for (const [documentName, html] of Object.entries(documents)) {
+      for (const [optionsName, options] of Object.entries(optionSets)) {
+        const once = await minify(html, options);
+        const twice = await minify(once, options);
+        assert.strictEqual(twice, once, `Failed for: ${documentName} / ${optionsName}`);
+      }
+    }
   });
 });
