@@ -1148,8 +1148,9 @@ async function minifyHTML(value, options, partialMarkup) {
     if (!RE_WS_NBSP_END.test(prev) || !RE_WS_START.test(next)) {
       return;
     }
-    // A line break the run already carries outranks the whitespace ahead of it
-    if (options.preserveLineBreaks && RE_WS_END.test(prev) && (next.match(RE_WS_START) ?? [''])[0].includes('\n')) {
+    // A line break the run already carries outranks the whitespace ahead of it; trimming
+    // the other side takes ASCII whitespace only, so a no-break space stays as is
+    if (options.preserveLineBreaks && (next.match(RE_WS_START) ?? [''])[0].includes('\n')) {
       buffer[before] = prev.replace(RE_WS_END, '');
     } else {
       buffer[after] = next.replace(RE_WS_START, '');
