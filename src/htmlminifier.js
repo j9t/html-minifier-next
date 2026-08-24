@@ -1162,12 +1162,14 @@ async function minifyHTML(value, options, partialMarkup) {
     while (index > 0 && !RE_END_TAG.test(buffer[index] ?? '')) {
       index--;
     }
-    // Text that follows the end tag is kept as is, so drop the tag alone
-    if (index < buffer.length - 1 && keepsWhitespace() && RE_END_TAG.test(buffer[index] ?? '')) {
+    // Text that follows the end tag is kept as is, so drop the tag alone. Whitespace kept
+    // verbatim—in `pre`, in `textarea`, or wherever `canTrimWhitespace` says so—counts as
+    // kept text too, no matter how whitespace is collapsed elsewhere.
+    const noTrim = stackNoTrimWhitespace.length > 0;
+    if (index < buffer.length - 1 && (keepsWhitespace() || noTrim) && RE_END_TAG.test(buffer[index] ?? '')) {
       buffer.splice(index, 1);
-      // Only collapsed whitespace can merge; whitespace kept verbatim—in `pre`, in
-      // `textarea`, or wherever `canTrimWhitespace` says so—stays exactly as written
-      if (options.collapseWhitespace && !stackNoTrimWhitespace.length) {
+      // Only collapsed whitespace can merge
+      if (options.collapseWhitespace && !noTrim) {
         mergeWhitespaceRuns(index);
       }
       return;
@@ -1452,13 +1454,9 @@ async function minifyHTML(value, options, partialMarkup) {
                       if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
                         // Not in pre or other no-collapse context
                         if (prevText.includes('\xA0')) {
-                          // A no-break space is content, so the run collapses to it—with the
-                          // line breaks around it kept where `preserveLineBreaks` asks for them
-                          const first = prevText.indexOf('\xA0');
-                          const last = prevText.lastIndexOf('\xA0');
-                          const breakBefore = options.preserveLineBreaks && /[\n\r]/.test(prevText.slice(0, first));
-                          const breakAfter = options.preserveLineBreaks && /[\n\r]/.test(prevText.slice(last + 1));
-                          collapsedText = (breakBefore ? '\n' : '') + '\xA0' + (breakAfter ? '\n' : '');
+                          // No-break spaces are content, so every one of them survives in place;
+                          // the ASCII whitespace around them collapses as it would anywhere else
+                          collapsedText = collapseWhitespace(prevText, options, true, true, true);
                         } else if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
                           // Preserve line break as single newline
                           collapsedText = '\n';

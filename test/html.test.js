@@ -4189,6 +4189,16 @@ describe('HTML', () => {
     assert.strictEqual(await minify(blocks('\n\u00a0\n'), { collapseWhitespace: true, preserveLineBreaks: true }), output);
     assert.strictEqual(await minify(output, { collapseWhitespace: true, preserveLineBreaks: true }), output);
 
+    // Every no-break space in the run is content, so they all stay, in order
+    output = '<div>a</div>\u00a0\u00a0<div>b</div>';
+    assert.strictEqual(await minify(blocks('\u00a0\u00a0'), { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(blocks('\n\u00a0\u00a0\n'), { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(output, { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(blocks('\n\u00a0\u00a0\n'), { collapseWhitespace: true, preserveLineBreaks: true }), '<div>a</div>\n\u00a0\u00a0\n<div>b</div>');
+
+    // Whitespace between them collapses, as whitespace between content does
+    assert.strictEqual(await minify(blocks(' \u00a0 \u00a0 '), { collapseWhitespace: true }), '<div>a</div>\u00a0 \u00a0<div>b</div>');
+
     // Whitespace that is only whitespace still goes
     assert.strictEqual(await minify(blocks(' \n '), { collapseWhitespace: true }), '<div>a</div><div>b</div>');
   });
@@ -6201,8 +6211,10 @@ describe('HTML', () => {
       assert.strictEqual(await minify(input, options), output, `${name}: in pre`);
       assert.strictEqual(await minify(output, options), output, `${name}: in pre, twice`);
 
-      input = `<div><textarea><p>a </p>${nl}<p>b</p></textarea></div>`;
-      output = `<div><textarea><p>a ${nl}<p>b</textarea></div>`;
+      // Content in `textarea` is escapable raw text, so no tag is omitted inside it;
+      // the whitespace it holds stays verbatim all the same
+      input = `<div><p>a </p>${nl}<textarea>  x${nl}${nl}y  </textarea></div>`;
+      output = `<div><p>a</p>\n<textarea>  x${nl}${nl}y  </textarea></div>`;
       assert.strictEqual(await minify(input, options), output, `${name}: in textarea`);
 
       input = `<x-el><p>a </p>${nl}<p>b</p></x-el>`;
@@ -6212,6 +6224,13 @@ describe('HTML', () => {
         canTrimWhitespace: (tag, attrs, defaultFn) => tag === 'x-el' ? false : defaultFn(tag, attrs)
       }), output, `${name}: under canTrimWhitespace`);
     }
+
+    // Whitespace kept verbatim survives however whitespace collapses elsewhere
+    const aggressive = { removeOptionalTags: true, collapseWhitespace: true };
+    assert.strictEqual(await minify('<pre><p>a </p>  <p>b</p></pre>', aggressive), '<pre><p>a   <p>b</pre>');
+    assert.strictEqual(await minify('<pre><p>a   <p>b</pre>', aggressive), '<pre><p>a   <p>b</pre>');
+    assert.strictEqual(await minify('<pre><p>a </p>\n<p>b</p></pre>', aggressive), '<pre><p>a \n<p>b</pre>');
+    assert.strictEqual(await minify('<div><p>a </p>  <p>b</p></div>', aggressive), '<div><p>a<p>b</div>');
   });
 
   test('Trim trailing newline in `pre`/`textarea` with `collapseWhitespace`', async () => {
