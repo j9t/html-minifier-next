@@ -703,7 +703,17 @@ export class HTMLParser {
 
       if (lastTagLower === 'p' && nonPhrasing.has(lowerTagName)) {
         await parseEndTag('', lastTag);
-      } else if (lowerTagName === 'tbody') {
+      }
+      // A row or cell start tag closes the row or cell still open in the same table,
+      // which may sit deeper down the stack than the element that was opened last
+      if (lowerTagName === 'tr') {
+        closeIfFoundInCurrentTable('tr');
+      } else if (lowerTagName === 'td' || lowerTagName === 'th') {
+        if (!closeIfFoundInCurrentTable('td')) {
+          closeIfFoundInCurrentTable('th');
+        }
+      }
+      if (lowerTagName === 'tbody') {
         if (!closeIfFoundInCurrentTable('tfoot')) {
           closeIfFoundInCurrentTable('thead');
         }

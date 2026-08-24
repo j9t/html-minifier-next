@@ -1177,11 +1177,15 @@ async function minifyHTML(value, options, partialMarkup) {
   // element which has now been removed
   function squashTrailingWhitespace(/** @type {string} */ nextTag) {
     let charsIndex = buffer.length - 1;
-    if (buffer.length > 1) {
-      const item = buffer[buffer.length - 1] ?? '';
-      if (/^(?:<!|$)/.test(item) && (!uidIgnore || item.indexOf(uidIgnore) === -1)) {
-        charsIndex--;
+    // Step back over every trailing comment and empty entry, not just one—a single step
+    // stops the search at the comment itself, leaving whitespace behind that a second
+    // minification run then removes
+    while (charsIndex > 0) {
+      const item = buffer[charsIndex] ?? '';
+      if (!/^(?:<!|$)/.test(item) || (uidIgnore && item.indexOf(uidIgnore) !== -1)) {
+        break;
       }
+      charsIndex--;
     }
     trimTrailingWhitespace(charsIndex, nextTag);
   }
