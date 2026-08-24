@@ -4170,6 +4170,29 @@ describe('HTML', () => {
     assert.strictEqual(await minify(output, { collapseWhitespace: true }), output);
   });
 
+  test('No-break space between consecutive `htmlmin:ignore` blocks', async () => {
+    let output;
+
+    // A no-break space is content: The run between the blocks collapses to it, exactly as
+    // it would without the blocks around it
+    const ignore = '<!-- htmlmin:ignore -->';
+    const blocks = separator => `${ignore}<div>a</div>${ignore}${separator}${ignore}<div>b</div>${ignore}`;
+
+    for (const separator of ['\u00a0', ' \u00a0 ', '\n\u00a0\n']) {
+      output = '<div>a</div>\u00a0<div>b</div>';
+      assert.strictEqual(await minify(blocks(separator), { collapseWhitespace: true }), output, JSON.stringify(separator));
+      assert.strictEqual(await minify(blocks(separator), { collapseWhitespace: true, conservativeCollapse: true }), output, JSON.stringify(separator));
+    }
+
+    // `preserveLineBreaks` keeps the breaks around it
+    output = '<div>a</div>\n\u00a0\n<div>b</div>';
+    assert.strictEqual(await minify(blocks('\n\u00a0\n'), { collapseWhitespace: true, preserveLineBreaks: true }), output);
+    assert.strictEqual(await minify(output, { collapseWhitespace: true, preserveLineBreaks: true }), output);
+
+    // Whitespace that is only whitespace still goes
+    assert.strictEqual(await minify(blocks(' \n '), { collapseWhitespace: true }), '<div>a</div><div>b</div>');
+  });
+
   test('Whitespace-collapse between consecutive `htmlmin:ignore` blocks', async () => {
     let input, output;
 

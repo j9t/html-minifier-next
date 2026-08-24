@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed whitespace at the end of an element surviving `collapseWhitespace` where more than one comment trailed behind it, which a second minification run then removed
 * Fixed `preserveLineBreaks` losing the line break it keeps wherever `removeOptionalTags` omitted a tag next to it, and losing it to a space where `conservativeCollapse` was on as well
 * Fixed whitespace next to a tag `removeOptionalTags` omitted being trimmed inside `pre` and `textarea`, and wherever `canTrimWhitespace` asked for it to stay, where it is kept verbatim rather than collapsed
+* Fixed a no-break space separating two consecutive `htmlmin:ignore` blocks being dropped under `collapseWhitespace`
 
 ## [8.1.0] - 2026-08-19
 

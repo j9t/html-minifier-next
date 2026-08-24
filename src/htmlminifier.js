@@ -1451,7 +1451,15 @@ async function minifyHTML(value, options, partialMarkup) {
                       // Apply `collapseWhitespace` with appropriate context
                       if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
                         // Not in pre or other no-collapse context
-                        if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
+                        if (prevText.includes('\xA0')) {
+                          // A no-break space is content, so the run collapses to it—with the
+                          // line breaks around it kept where `preserveLineBreaks` asks for them
+                          const first = prevText.indexOf('\xA0');
+                          const last = prevText.lastIndexOf('\xA0');
+                          const breakBefore = options.preserveLineBreaks && /[\n\r]/.test(prevText.slice(0, first));
+                          const breakAfter = options.preserveLineBreaks && /[\n\r]/.test(prevText.slice(last + 1));
+                          collapsedText = (breakBefore ? '\n' : '') + '\xA0' + (breakAfter ? '\n' : '');
+                        } else if (options.preserveLineBreaks && /[\n\r]/.test(prevText)) {
                           // Preserve line break as single newline
                           collapsedText = '\n';
                         } else if (options.conservativeCollapse) {
