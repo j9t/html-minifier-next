@@ -96,18 +96,13 @@ const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
 // Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
 const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'col', 'colgroup', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'menuitem', 'meta', 'ol', 'optgroup', 'option', 'param', 'rp', 'rt', 'source', 'style', 'summary', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul']);
 
-const reCache = {};
-
-// Pre-compiled regexes for common special elements (`script`, `style`, `noscript`, `textarea`, `title`).
-// Used frequently, and pre-compiling them avoids regex creation overhead.
-// Only a complete tag name ends the element, so `</scriptx>` is content rather than a match.
-const preCompiledStackedTags = {
-  'script': /([\s\S]*?)<\/script(?=[\s/>])[^>]*>/i,
-  'style': /([\s\S]*?)<\/style(?=[\s/>])[^>]*>/i,
-  'noscript': /([\s\S]*?)<\/noscript(?=[\s/>])[^>]*>/i,
-  'textarea': /([\s\S]*?)<\/textarea(?=[\s/>])[^>]*>/i,
-  'title': /([\s\S]*?)<\/title(?=[\s/>])[^>]*>/i
-};
+// One regex per element whose content is text, compiled once—`holdsRawText` admits exactly
+// these, so the lookup finds one whenever it is reached. Only a complete tag name ends the
+// element, so `</scriptx>` is content rather than a match.
+const rawTextEndTags = /** @type {Record<string, RegExp>} */ (Object.create(null));
+for (const tag of [...special, ...escapableRawTextElements]) {
+  rawTextEndTags[tag] = new RegExp('([\\s\\S]*?)\\x3c/' + tag + '(?=[\\s/>])[^>]*>', 'i');
+}
 
 // Cache for compiled attribute regexes per handler configuration
 const attrRegexCache = new WeakMap();
@@ -455,11 +450,9 @@ export class HTMLParser {
       } else {
         const stackedTag = lastTagLower;
         const isRawText = escapableRawTextElements.has(stackedTag);
-        // Use pre-compiled regex for common tags (`script`, `style`, `noscript`, `textarea`, `title`) to avoid regex creation overhead
-        const reStackedTag = /** @type {Record<string, RegExp>} */ (preCompiledStackedTags)[stackedTag] || /** @type {Record<string, RegExp>} */ (reCache)[stackedTag] || (/** @type {Record<string, RegExp>} */ (reCache)[stackedTag] = new RegExp('([\\s\\S]*?)\\x3c/' + stackedTag + '(?=[\\s/>])[^>]*>', 'i'));
 
         const remaining = sliceFromPos(pos);
-        const m = reStackedTag.exec(remaining);
+        const m = rawTextEndTags[stackedTag]?.exec(remaining);
         if (m && m.index === 0) {
           const text = m[1] ?? '';
           if (handler.chars) {
