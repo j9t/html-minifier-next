@@ -6331,6 +6331,18 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<title>a'), '<title>a');
   });
 
+  test('End tags that are never complete stay cheap', async () => {
+    // Scanning for the end tag with a regex lazy enough to skip the content rescans the rest
+    // of the input at every near match, which costs minutes at this size
+    for (const tag of ['textarea', 'script']) {
+      const input = `<${tag}>` + `</${tag} `.repeat(50000);
+      const start = Date.now();
+      assert.strictEqual(await minify(input), input, tag);
+      const elapsed = Date.now() - start;
+      assert.ok(elapsed < 5000, `Expected a linear scan for \`${tag}\`, took ${elapsed}ms`);
+    }
+  });
+
   test('`iframe` and `xmp` hold text, not markup', async () => {
     // The parser reads these as raw text as well, so a `<` inside them never starts a tag
     // https://html.spec.whatwg.org/multipage/parsing.html#generic-raw-text-element-parsing-algorithm

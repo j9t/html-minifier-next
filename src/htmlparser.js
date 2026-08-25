@@ -96,12 +96,29 @@ const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
 // Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
 const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'col', 'colgroup', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'menuitem', 'meta', 'ol', 'optgroup', 'option', 'param', 'rp', 'rt', 'source', 'style', 'summary', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul']);
 
-// One regex per element whose content is text, compiled once—`holdsRawText` admits exactly
-// these, so the lookup finds one whenever it is reached. Only a complete tag name ends the
-// element, so `</scriptx>` is content rather than a match.
-const rawTextEndTags = /** @type {Record<string, RegExp>} */ (Object.create(null));
-for (const tag of [...special, ...genericRawTextElements, ...escapableRawTextElements]) {
-  rawTextEndTags[tag] = new RegExp('([\\s\\S]*?)\\x3c/' + tag + '(?=[\\s/>])[^>]*>', 'i');
+// A tag name ends at whitespace, a slash, or the closing bracket, so `</scriptx>` names a
+// different element and does not end this one
+const endsTagName = (/** @type {string} */ character) =>
+  character === '' || character === '/' || character === '>' || /\s/.test(character);
+
+/**
+ * @param {string} text - The input from the start of the content on
+ * @param {string} tag - Lowercase element name
+ * @returns {{content: string, length: number} | null} What the element holds and how far it
+ *   reaches, or `null` where no end tag of its own follows
+ */
+function findRawTextEnd(text, tag) {
+  const nameEnd = tag.length + 2;
+  for (let candidate = text.indexOf('</'); candidate !== -1; candidate = text.indexOf('</', candidate + 2)) {
+    if (text.slice(candidate + 2, candidate + nameEnd).toLowerCase() !== tag || !endsTagName(text.charAt(candidate + nameEnd))) {
+      continue;
+    }
+    // What follows the name is not part of it, and the tag ends at the next bracket—
+    // where none follows, no later end tag can be complete, either
+    const end = text.indexOf('>', candidate + nameEnd);
+    return end === -1 ? null : { content: text.slice(0, candidate), length: end + 1 };
+  }
+  return null;
 }
 
 // Cache for compiled attribute regexes per handler configuration
@@ -186,7 +203,7 @@ export class HTMLParser {
     const fullHtml = this.html;
     const fullLength = fullHtml.length;
 
-    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[]}>} */
+    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[], namespace: string}>} */
     const stack = [];
     /** @type {string} */
     let lastTag = '';
@@ -273,26 +290,23 @@ export class HTMLParser {
     // in. Walking down from the root resolves that: `<svg>`/`<math>` lead out of HTML, an
     // integration point leads back in, and a name counts only in the namespace it belongs to
     // (`title` is one in SVG but not in MathML, `annotation-xml` one in MathML but not in SVG)
-    const inForeignContent = () => {
-      let namespace = '';
-      // The element itself never decides this: `<svg><title>` is SVG, what it holds is HTML
-      for (let i = 0; i < stack.length - 1; i++) {
-        const entry = stack[i];
-        const lower = entry?.lowerTag ?? '';
-        if (!namespace) {
-          if (lower === 'svg' || lower === 'math') {
-            namespace = lower;
-          }
-        } else if (namespace === 'svg') {
-          if (svgIntegrationPoints.has(lower)) {
-            namespace = '';
-          }
-        } else if (mathIntegrationPoints.has(lower) || (lower === 'annotation-xml' && entry && annotationHoldsHTML(entry))) {
-          namespace = '';
-        }
+    /** @param {{lowerTag: string, namespace: string, attrs?: HTMLAttribute[]} | undefined} entry */
+    const namespaceInside = (entry) => {
+      if (!entry) {
+        return '';
       }
-      return Boolean(namespace);
+      const { namespace, lowerTag } = entry;
+      if (!namespace) {
+        return lowerTag === 'svg' || lowerTag === 'math' ? lowerTag : '';
+      }
+      if (namespace === 'svg') {
+        return svgIntegrationPoints.has(lowerTag) ? '' : namespace;
+      }
+      return mathIntegrationPoints.has(lowerTag) || (lowerTag === 'annotation-xml' && annotationHoldsHTML(entry)) ? '' : namespace;
     };
+
+    // The element itself never decides this: `<svg><title>` is SVG, what it holds is HTML
+    const inForeignContent = () => Boolean(stack[stack.length - 1]?.namespace);
 
     // Whether the content of the element being parsed is read as text rather than markup
     // (`script` and `style` hold text in every namespace; the rest do so as HTML elements only)
@@ -454,9 +468,9 @@ export class HTMLParser {
         const isRawText = escapableRawTextElements.has(stackedTag);
 
         const remaining = sliceFromPos(pos);
-        const m = rawTextEndTags[stackedTag]?.exec(remaining);
-        if (m && m.index === 0) {
-          const text = m[1] ?? '';
+        const rawText = findRawTextEnd(remaining, stackedTag);
+        if (rawText) {
+          const text = rawText.content;
           if (handler.chars) {
             // Escapable raw text is a text node like any other, so the handler gets the tags
             // around it—it collapses and trims whitespace by what stands next to the text
@@ -466,7 +480,7 @@ export class HTMLParser {
             if (isThenable(result)) await result;
           }
           // Advance HTML past the matched special tag content and its closing tag
-          advance(m[0].length);
+          advance(rawText.length);
           await parseEndTag('</' + stackedTag + '>', stackedTag);
         } else {
           // Without an end tag of its own, the element holds the rest of the input as text
@@ -756,7 +770,7 @@ export class HTMLParser {
       if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
         lastTag = 'colgroup';
         lastTagLower = 'colgroup';
-        stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
+        stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [], namespace: namespaceInside(stack[stack.length - 1]) });
         if (handler.start) {
           await handler.start(lastTag, [], false, '', true);
         }
@@ -832,7 +846,7 @@ export class HTMLParser {
       }));
 
       if (!unary) {
-        stack.push({ tag: tagName, lowerTag: lowerTagName, attrs });
+        stack.push({ tag: tagName, lowerTag: lowerTagName, attrs, namespace: namespaceInside(stack[stack.length - 1]) });
         lastTag = tagName;
         lastTagLower = lowerTagName;
         unarySlash = '';

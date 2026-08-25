@@ -685,6 +685,16 @@ describe('SVG and MathML', () => {
     }
   });
 
+  test('The namespace an element sits in stays cheap to read', async () => {
+    // Reading it off the stack costs as much as the stack is deep, for every element whose
+    // content is text—which a deep document turns quadratic, minutes at this size
+    const input = '<div>'.repeat(80000) + '<textarea>a</textarea>'.repeat(8000);
+    const start = Date.now();
+    await minify(input);
+    const elapsed = Date.now() - start;
+    assert.ok(elapsed < 5000, `Expected the namespace to be kept, not walked, took ${elapsed}ms`);
+  });
+
   test('Preset normalization: `minifySVG` override', async () => {
     // Regression: `minifySVG: true` from a preset was not normalized to a function
     // Verify that the option is actually applied (SVGO converts `rect` to `path`) and
