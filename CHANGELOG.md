@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Fixed an attribute value that the source left unquoted—valid HTML, invalid XML—reaching SVGO that way
   - Fixed `removeOptionalTags` omitting end tags in that same block, which is as invalid there—the option now stops at an SVG handed to SVGO, and applies as before everywhere else, MathML included
   - Fixed `collapseBooleanAttributes` writing valueless attributes into the block, which is held back the same way
+  - Fixed an end tag that HTML lets the source leave out—the first `</p>` in `<p>a<p>b`, and likewise for `<li>`, `<td>`, and the rest—reaching SVGO missing, which cost the graphic its optimization; such end tags are written back wherever SVGO reads them
 
 ### Changed
 

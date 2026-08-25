@@ -158,6 +158,13 @@ describe('SVG and MathML', () => {
     );
     assert.deepStrictEqual(parseErrors(), []);
 
+    // What the block is holds through nested MathML, whose own HTML SVGO reads all the same
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><math><annotation-xml encoding="text/html"><br>x</annotation-xml></math></foreignObject></svg>', { minifySVG: true, log }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><math><annotation-xml encoding="text/html"><br/>x</annotation-xml></math></foreignObject></svg>'
+    );
+    assert.deepStrictEqual(parseErrors(), []);
+
     // The slash is there for SVGO, so it is written where SVGO reads and nowhere else
     assert.strictEqual(
       await minify('<svg><foreignObject><br>x</foreignObject></svg>'),
@@ -195,6 +202,22 @@ describe('SVG and MathML', () => {
       '<math><annotation-xml encoding="text/html"><input type="checkbox" checked><p>a<p>b</p></annotation-xml></math>'
     );
 
+    // An end tag HTML lets the source leave out is written back wherever SVGO reads it
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><p>a<p>b</foreignObject></svg>', { minifySVG: true }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><p>a</p><p>b</p></foreignObject></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><ul><li>a<li>b</ul></foreignObject></svg>', { minifySVG: true }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><ul><li>a</li><li>b</li></ul></foreignObject></svg>'
+    );
+
+    // Outside the block the option stands as it is, and writes no tag the source left out
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/></svg><div><p>a<p>b</div>', { minifySVG: true }),
+      '<svg><path d="M0 0h10v10H0z"/></svg><div><p>a<p>b</div>'
+    );
+
     // A unary element written without a slash anywhere in the block, not only in `foreignObject`
     assert.strictEqual(
       await minify('<svg><rect width="10" height="10"/><foreignObject><math><mspace/></math></foreignObject></svg>', { minifySVG: true }),
@@ -207,6 +230,12 @@ describe('SVG and MathML', () => {
     assert.strictEqual(
       await minify('<svg><rect width="10" height="10"/><foreignObject><p class=a>x</p></foreignObject></svg>', { minifySVG: true }),
       '<svg><path d="M0 0h10v10H0z"/><foreignObject><p class="a">x</p></foreignObject></svg>'
+    );
+
+    // Nested MathML does not lead out of the block SVGO reads
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><math><annotation-xml encoding="text/html"><p class=a>x</p></annotation-xml></math></foreignObject></svg>', { minifySVG: true }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><math><annotation-xml encoding="text/html"><p class="a">x</p></annotation-xml></math></foreignObject></svg>'
     );
 
     // Outside an SVG, and inside one no SVGO reads, the source’s own style stands
@@ -316,14 +345,14 @@ describe('SVG and MathML', () => {
   });
 
   test('Error recovery', async () => {
-    // SVGO fails on the unclosed `g` the input never closes; `continueOnMinifyError` keeps the unoptimized SVG
+    // SVGO fails on the bare `&` the text carries; `continueOnMinifyError` keeps the unoptimized SVG
     assert.strictEqual(
-      await minify('<svg><g><rect width="10" height="10"/></svg>', {
+      await minify('<svg><text>a & b</text><rect width="10" height="10"/></svg>', {
         minifySVG: true,
         collapseWhitespace: true,
         continueOnMinifyError: true
       }),
-      '<svg><g><rect width="10" height="10"/></svg>'
+      '<svg><text>a & b</text><rect width="10" height="10"/></svg>'
     );
   });
 
@@ -551,14 +580,14 @@ describe('SVG and MathML', () => {
 
   test('`continueOnMinifyError: false` throws on SVGO error', async () => {
     // When `continueOnMinifyError` is false and SVGO encounters invalid XML
-    // (here an unclosed `g`), it should throw
+    // (here a bare `&`), it should throw
     await assert.rejects(
-      () => minify('<svg><g><rect width="10" height="10"/></svg>', {
+      () => minify('<svg><text>a & b</text><rect width="10" height="10"/></svg>', {
         minifySVG: true,
         collapseWhitespace: true,
         continueOnMinifyError: false
       }),
-      /Unexpected close tag/
+      /Invalid character in entity name/
     );
 
     // Valid SVG should not throw even with `continueOnMinifyError: false`
