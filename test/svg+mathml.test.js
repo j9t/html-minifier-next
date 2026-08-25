@@ -84,6 +84,37 @@ describe('SVG and MathML', () => {
     );
   });
 
+  test('A unary foreign element leaves the context it opened', async () => {
+    // `<svg/>` has no end tag to fall back to HTML on, so the start tag has to do it
+    assert.strictEqual(await minify('<svg/><br/>x'), '<svg/><br>x');
+    assert.strictEqual(await minify('<math/><br/>x'), '<math/><br>x');
+    assert.strictEqual(await minify('<svg/><IMG SRC="a.PNG">'), '<svg/><img src="a.PNG">');
+    assert.strictEqual(await minify('<div><svg/></div><br/>x'), '<div><svg/></div><br>x');
+
+    // What follows is read as HTML raw text again, whitespace and all
+    assert.strictEqual(
+      await minify('<svg/><textarea> a </textarea>', { collapseWhitespace: true }),
+      '<svg/><textarea> a </textarea>'
+    );
+
+    // A self-closed `<svg>` holds nothing for SVGO, and ends no block for it either
+    assert.strictEqual(await minify('<svg/><br/>x', { minifySVG: true }), '<svg/><br>x');
+    assert.strictEqual(await minify('<svg><svg/></svg><br/>x', { minifySVG: true }), '<svg><svg/></svg><br>x');
+  });
+
+  test('A self-closed integration point keeps the slash of the namespace it sits in', async () => {
+    // `foreignObject` is an SVG element, however HTML what it holds is
+    assert.strictEqual(
+      await minify('<svg><foreignObject/><rect width="10" height="10"/></svg>'),
+      '<svg><foreignObject/><rect width="10" height="10"/></svg>'
+    );
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"/></math><br/>x'),
+      '<math><annotation-xml encoding="text/html"/></math><br>x'
+    );
+    assert.strictEqual(await minify('<svg><foreignObject/></svg><br/>x'), '<svg><foreignObject/></svg><br>x');
+  });
+
   test('Preserve `viewBox`', async () => {
     // SVGO v4 preserves `viewBox` by default
     const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, collapseWhitespace: true });
