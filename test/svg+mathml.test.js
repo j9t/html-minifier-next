@@ -62,6 +62,28 @@ describe('SVG and MathML', () => {
     assert.ok(mixed.includes('<br>'), 'HTML `br` should not have self-closing slash');
   });
 
+  test('A slash on a start tag closes the element in foreign content', async () => {
+    assert.strictEqual(await minify('<svg><rect/><circle/></svg>'), '<svg><rect/><circle/></svg>');
+    assert.strictEqual(await minify('<math><mspace/>a</math>'), '<math><mspace/>a</math>');
+
+    // `svg` and `math` lead out of HTML themselves, so their own slash counts
+    assert.strictEqual(await minify('<svg/>a'), '<svg/>a');
+    assert.strictEqual(await minify('<math/>a'), '<math/>a');
+
+    // `title` is SVG here, and holds markup rather than text
+    assert.strictEqual(await minify('<svg><title/>a</title>b</svg>'), '<svg><title/>ab</svg>');
+
+    // Integration points lead back into HTML, where the slash is ignored again
+    assert.strictEqual(
+      await minify('<svg><foreignObject><div/>a</div>b</foreignObject></svg>'),
+      '<svg><foreignObject><div>a</div>b</foreignObject></svg>'
+    );
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><div/>a</div>b</annotation-xml></math>'),
+      '<math><annotation-xml encoding="text/html"><div>a</div>b</annotation-xml></math>'
+    );
+  });
+
   test('Preserve `viewBox`', async () => {
     // SVGO v4 preserves `viewBox` by default
     const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, collapseWhitespace: true });
