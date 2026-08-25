@@ -6342,11 +6342,18 @@ describe('HTML', () => {
     // Scanning for the end tag with a regex lazy enough to skip the content rescans the rest
     // of the input at every near match, which costs minutes at this size
     for (const tag of ['textarea', 'script']) {
+      const benign = `<${tag}>a</${tag}>`.repeat(50000);
       const input = `<${tag}>` + `</${tag} `.repeat(50000);
+
+      const startBaseline = Date.now();
+      await minify(benign);
+      const baseline = Date.now() - startBaseline;
+
       const start = Date.now();
       assert.strictEqual(await minify(input), input, tag);
       const elapsed = Date.now() - start;
-      assert.ok(elapsed < 5000, `Expected a linear scan for \`${tag}\`, took ${elapsed}ms`);
+
+      assert.ok(elapsed < Math.max(baseline * 20, 2000), `Expected a linear scan for \`${tag}\`, took ${elapsed}ms (${baseline}ms baseline)`);
     }
   });
 
@@ -6354,12 +6361,22 @@ describe('HTML', () => {
     // Searching for the end of a comment that has none rescans the rest of the input, at
     // every opener. Only `continueOnParseError` reaches the second one—without it the first
     // ends the run—so that is where this costs minutes at this size.
-    for (const opener of ['<!--', '<![']) {
+    for (const [opener, closed] of [['<!--', '<!---->'], ['<![', '<![ ]>']]) {
+      // The baseline says how fast this machine is only where it does about as much work as
+      // the run it stands against, and an opener that closes is read faster than one that
+      // never does—so it takes more of them to weigh the same
+      const benign = closed.repeat(150000);
       const input = opener.repeat(50000);
+
+      const startBaseline = Date.now();
+      await minify(benign, { continueOnParseError: true });
+      const baseline = Date.now() - startBaseline;
+
       const start = Date.now();
       assert.strictEqual(await minify(input, { continueOnParseError: true }), input, opener);
       const elapsed = Date.now() - start;
-      assert.ok(elapsed < 5000, `Expected a linear scan for \`${opener}\`, took ${elapsed}ms`);
+
+      assert.ok(elapsed < Math.max(baseline * 20, 2000), `Expected a linear scan for \`${opener}\`, took ${elapsed}ms (${baseline}ms baseline)`);
     }
   });
 
