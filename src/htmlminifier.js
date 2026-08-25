@@ -1551,8 +1551,7 @@ async function minifyHTML(value, options, partialMarkup) {
           if (lowerTag === 'svg' && options.minifySVG) {
             options.removeAttributeQuotes = false;
             // @@ Encode a bare `&` for SVGO as well—it costs the block its optimization
-            // (HTML’s no-semicolon references make a naive encode rewrite `?a=1&copy=2`;
-            // fix could consider encoding `&` only where it’s unambiguous)
+            // (though not its validity; early fix could encode `&` where it’s unambiguous)
             options.decodeEntities = false;
             // Omitting a start and end tag both would keep the block well-formed, which this misses
             options.removeOptionalTags = false;
