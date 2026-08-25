@@ -473,22 +473,15 @@ export class HTMLParser {
           // Advance HTML past the matched special tag content and its closing tag
           advance(m[0].length);
           await parseEndTag('</' + stackedTag + '>', stackedTag);
-        } else if (isRawText) {
-          // Without an end tag, the element holds the rest of the input as text
+        } else {
+          // Without an end tag of its own, the element holds the rest of the input as text
           if (handler.chars && remaining) {
-            const result = handler.chars(remaining, stackedTag, '', prevAttrs, []);
+            const result = isRawText
+              ? handler.chars(remaining, stackedTag, '', prevAttrs, [])
+              : handler.chars(remaining);
             if (isThenable(result)) await result;
           }
           advance(remaining.length);
-        } else {
-          // No closing tag found; break to avoid an infinite loop
-          if (handler.continueOnParseError && handler.chars && pos < fullLength) {
-            const result = handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
-            if (isThenable(result)) await result;
-            advance(1);
-          } else {
-            break;
-          }
         }
       }
 

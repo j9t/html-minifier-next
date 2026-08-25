@@ -6275,6 +6275,15 @@ describe('HTML', () => {
     // What follows the name is not part of it
     assert.strictEqual(await minify('<textarea>a</textarea >b'), '<textarea>a</textarea>b');
 
+    // Where no end tag of its own follows at all, the element holds the rest of the input:
+    // Nothing that only looks like one may take the content down with it
+    for (const unclosed of ['<script>a</scriptx>b', '<style>a{}</stylex>b', '<textarea>a</textareax>b']) {
+      assert.strictEqual(await minify(unclosed), unclosed, unclosed);
+    }
+    for (const unclosed of ['<script>foo', '<style>a{}', '<textarea>foo', '<title>a']) {
+      assert.strictEqual(await minify(unclosed), unclosed, unclosed);
+    }
+
     // Minifying the output again leaves it alone
     input = '<textarea><p>a</p></textarea><title><p>b</p></title>';
     const options = { removeOptionalTags: true, removeComments: true, collapseWhitespace: true };

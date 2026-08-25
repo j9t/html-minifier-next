@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Fixed the content of `title` and `textarea` being read as markup
 * Fixed an end tag whose name merely starts with that of the element being parsed (as `</scriptx>` does for `<script>`), ending it and dropping everything up to the tag that really ends it
+* Fixed the content of an unclosed `script` or `style` element being dropped, rather than held to the end of the input
 * Fixed `decodeEntities` escaping every `<` in `textarea` and `title`, where only the element’s own end tag needs it
 
 ## [8.1.1] - 2026-08-24
