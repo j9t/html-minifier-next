@@ -95,7 +95,7 @@ const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
 
 // HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
 // Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
-const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'col', 'colgroup', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'menuitem', 'meta', 'ol', 'optgroup', 'option', 'param', 'rp', 'rt', 'source', 'style', 'summary', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul']);
+const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'center', 'col', 'colgroup', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'listing', 'main', 'menu', 'menuitem', 'meta', 'nav', 'ol', 'optgroup', 'option', 'param', 'plaintext', 'pre', 'rp', 'rt', 'search', 'section', 'source', 'style', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul', 'xmp']);
 
 // A tag name ends at whitespace, a slash, or the closing bracket, so `</scriptx>` names a
 // different element and does not end this one
@@ -278,6 +278,13 @@ export class HTMLParser {
       return nextGtPos !== -1;
     };
 
+    // A `-->` that the opener at `pos` does not find is not there for any later one, either,
+    // and the same holds for the `]>` of a downlevel-revealed conditional comment. `pos`
+    // only advances, so remembering the search that came up empty keeps the aggregate work
+    // O(n), where searching again at every opener rescans the rest of the input each time.
+    let commentEndAhead = true;
+    let conditionalEndAhead = true;
+
     // Helper to advance position
     const advance = (/** @type {number} */ n) => { pos += n; };
 
@@ -376,7 +383,8 @@ export class HTMLParser {
           // Comment
           commentTestY.lastIndex = pos;
           if (commentTestY.test(fullHtml)) {
-            const commentEnd = fullHtml.indexOf('-->', pos + 4);
+            const commentEnd = commentEndAhead ? fullHtml.indexOf('-->', pos + 4) : -1;
+            if (commentEnd === -1) commentEndAhead = false;
 
             if (commentEnd >= 0) {
               if (handler.comment) {
@@ -393,7 +401,8 @@ export class HTMLParser {
           // https://web.archive.org/web/20241201212701/https://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
           conditionalTestY.lastIndex = pos;
           if (conditionalTestY.test(fullHtml)) {
-            const conditionalEnd = fullHtml.indexOf(']>', pos + 3);
+            const conditionalEnd = conditionalEndAhead ? fullHtml.indexOf(']>', pos + 3) : -1;
+            if (conditionalEnd === -1) conditionalEndAhead = false;
 
             if (conditionalEnd >= 0) {
               if (handler.comment) {
@@ -506,6 +515,10 @@ export class HTMLParser {
           // Advance HTML past the matched special tag content and its closing tag
           advance(rawText.length);
           await parseEndTag('</' + stackedTag + '>', stackedTag);
+          // What follows stands after that end tag, not after the start tag still named here—
+          // whitespace next to `textarea` stays verbatim only while the element is open
+          prevTag = '/' + stackedTag;
+          prevAttrs = [];
         } else {
           // Without an end tag of its own, the element holds the rest of the input as text
           if (handler.chars && remaining) {
