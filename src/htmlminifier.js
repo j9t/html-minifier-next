@@ -1543,10 +1543,11 @@ async function minifyHTML(value, options, partialMarkup) {
           options.removeTagWhitespace = false;
         }
         // `foreignObject` in SVG and `annotation-xml` in MathML contain HTML content
-        // Note: The element itself is in SVG/MathML namespace, only its children are HTML
+        // (the element itself is in SVG/MathML namespace, only its children are HTML);
+        // a repeated attribute is dropped after the first, so the first `encoding` decides
         if (options.insideForeignContent && (lowerTag === 'foreignobject' ||
-            (lowerTag === 'annotation-xml' && attrs.some((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding' &&
-              RE_HTML_ENCODING.test(a.value ?? ''))))) {
+            (lowerTag === 'annotation-xml' && RE_HTML_ENCODING.test(
+              attrs.find((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding')?.value ?? '')))) {
           const nameParent = options.name;
           options = Object.create(options);
           options.caseSensitive = false;

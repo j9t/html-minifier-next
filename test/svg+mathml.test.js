@@ -568,6 +568,12 @@ describe('SVG and MathML', () => {
       '<math><annotation-xml encoding="application/mathml+xml"><mi></mi></annotation-xml></math>'
     );
 
+    // A repeated attribute is dropped after the first, so the first `encoding` decides
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/plain" encoding="text/html"><DIV>x</DIV></annotation-xml></math>', {}),
+      '<math><annotation-xml encoding="text/plain"><DIV>x</DIV></annotation-xml></math>'
+    );
+
     // `annotation-xml` without encoding attribute—content preserved as foreign
     assert.strictEqual(
       await minify('<math><annotation-xml><mi></mi></annotation-xml></math>', { removeEmptyElements: true }),
@@ -706,6 +712,18 @@ describe('SVG and MathML', () => {
     // alone—in foreign content it is an element like any other, whose text resolves them
     assert.strictEqual(await minify('<iframe>a&amp;b</iframe>', options), '<iframe>a&amp;b</iframe>');
     assert.strictEqual(await minify('<svg><iframe>a&amp;b</iframe></svg>', options), '<svg><iframe>a&b</iframe></svg>');
+
+
+    // `annotation-xml` holds HTML only where its `encoding` says so, and a repeated attribute
+    // is dropped after the first—so the first one decides it, whatever stands behind it
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><title>&lt;b&gt;</title></annotation-xml></math>', options),
+      '<math><annotation-xml encoding="text/html"><title><b></title></annotation-xml></math>'
+    );
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/plain" encoding="text/html"><title>&lt;b&gt;</title></annotation-xml></math>', options),
+      '<math><annotation-xml encoding="text/plain"><title>&lt;b></title></annotation-xml></math>'
+    );
 
     // `script` and `style` hold text wherever they sit, so theirs are kept in either place
     assert.strictEqual(await minify('<script>a&amp;b</script>', options), '<script>a&amp;b</script>');
