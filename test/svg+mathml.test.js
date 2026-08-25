@@ -597,6 +597,51 @@ describe('SVG and MathML', () => {
     );
   });
 
+  test('Escapable raw text in SVG and MathML', async () => {
+    // `textarea` and `title` hold text rather than markup, but that is an HTML rule: In SVG
+    // and MathML they are ordinary elements, until an integration point leads back into HTML
+    // https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
+    const options = { removeOptionalTags: true };
+    let input;
+
+    // Ordinary elements here, so an optional end tag inside them is one
+    assert.strictEqual(await minify('<svg><title><p>a</p></title></svg>', options), '<svg><title><p>a</title></svg>');
+    assert.strictEqual(await minify('<svg><desc><p>a</p></desc></svg>', options), '<svg><desc><p>a</desc></svg>');
+    assert.strictEqual(await minify('<math><title><p>a</p></title></math>', options), '<math><title><p>a</title></math>');
+
+    // An element that is no integration point keeps its content foreign
+    assert.strictEqual(await minify('<svg><g><textarea><p>a</p></textarea></g></svg>', options), '<svg><g><textarea><p>a</textarea></g></svg>');
+
+    // What an integration point holds is HTML again, so raw text inside one is raw text—note
+    // that the element itself does not decide this: `<svg><title>` is SVG, its content is not
+    for (const [open, close] of [
+      ['<svg><foreignObject>', '</foreignObject></svg>'],
+      ['<svg><desc>', '</desc></svg>'],
+      ['<svg><title>', '</title></svg>'],
+      ['<math><mtext>', '</mtext></math>'],
+      ['<math><mi>', '</mi></math>']
+    ]) {
+      input = `${open}<textarea><p>a</p></textarea>${close}`;
+      assert.strictEqual(await minify(input, options), input, open);
+    }
+
+    // `annotation-xml` is one only where its `encoding` says it holds HTML
+    for (const encoding of ['text/html', 'application/xhtml+xml', 'TEXT/HTML']) {
+      input = `<math><annotation-xml encoding="${encoding}"><title><p>a</p></title></annotation-xml></math>`;
+      assert.strictEqual(await minify(input, options), input, encoding);
+    }
+
+    // With any other encoding, and with none, its content stays MathML, where `title` holds markup
+    assert.strictEqual(
+      await minify('<math><annotation-xml><title><p>a</p></title></annotation-xml></math>', options),
+      '<math><annotation-xml><title><p>a</title></annotation-xml></math>'
+    );
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/plain"><title><p>a</p></title></annotation-xml></math>', options),
+      '<math><annotation-xml encoding="text/plain"><title><p>a</title></annotation-xml></math>'
+    );
+  });
+
   test('Preset normalization: `minifySVG` override', async () => {
     // Regression: `minifySVG: true` from a preset was not normalized to a function
     // Verify that the option is actually applied (SVGO converts `rect` to `path`) and

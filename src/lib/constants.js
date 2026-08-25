@@ -17,10 +17,12 @@ const RE_LEGACY_ENTITIES = /&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrav
 const RE_ESCAPE_LT = /</g;
 // In escapable raw text only the element’s own end tag ends the element, so nothing else
 // that `decodeEntities` decoded to a `<` needs escaping there
-const RE_ESCAPE_LT_RAW_TEXT = /** @type {Record<string, RegExp>} */ ({
+// (the record has no prototype, so a tag named after an inherited property—`constructor`,
+// `__proto__`—finds nothing here and falls back to escaping every `<`)
+const RE_ESCAPE_LT_RAW_TEXT = /** @type {Record<string, RegExp>} */ (Object.assign(Object.create(null), {
   textarea: /<(?=\/textarea[\s/>])/gi,
   title: /<(?=\/title[\s/>])/gi
-});
+}));
 // Encodings that make an `annotation-xml` element hold HTML rather than MathML
 // https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
 const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;

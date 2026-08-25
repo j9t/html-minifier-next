@@ -6275,30 +6275,6 @@ describe('HTML', () => {
     // What follows the name is not part of it
     assert.strictEqual(await minify('<textarea>a</textarea >b'), '<textarea>a</textarea>b');
 
-    // The rule is an HTML one: In SVG and MathML, `title` is an ordinary element
-    assert.strictEqual(await minify('<svg><title><p>a</p></title></svg>', { removeOptionalTags: true }), '<svg><title><p>a</title></svg>');
-    assert.strictEqual(await minify('<math><title><p>a</p></title></math>', { removeOptionalTags: true }), '<math><title><p>a</title></math>');
-
-    // `foreignObject` leads back into HTML, where it holds text again
-    input = '<svg><foreignObject><title><p>a</p></title></foreignObject></svg>';
-    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
-
-    // `annotation-xml` does so only where its `encoding` says it holds HTML
-    for (const encoding of ['text/html', 'application/xhtml+xml', 'TEXT/HTML']) {
-      input = `<math><annotation-xml encoding="${encoding}"><title><p>a</p></title></annotation-xml></math>`;
-      assert.strictEqual(await minify(input, { removeOptionalTags: true }), input, encoding);
-    }
-
-    // With any other encoding, and with none, its content stays MathML, where `title` holds markup
-    assert.strictEqual(
-      await minify('<math><annotation-xml><title><p>a</p></title></annotation-xml></math>', { removeOptionalTags: true }),
-      '<math><annotation-xml><title><p>a</title></annotation-xml></math>'
-    );
-    assert.strictEqual(
-      await minify('<math><annotation-xml encoding="text/plain"><title><p>a</p></title></annotation-xml></math>', { removeOptionalTags: true }),
-      '<math><annotation-xml encoding="text/plain"><title><p>a</title></annotation-xml></math>'
-    );
-
     // Minifying the output again leaves it alone
     input = '<textarea><p>a</p></textarea><title><p>b</p></title>';
     const options = { removeOptionalTags: true, removeComments: true, collapseWhitespace: true };
@@ -6321,6 +6297,16 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<textarea>&amp;</textarea>', { decodeEntities: true }), '<textarea>&</textarea>');
     assert.strictEqual(await minify('<title>&amp;</title>', { decodeEntities: true }), '<title>&</title>');
     assert.strictEqual(await minify('<textarea>a &lt; b</textarea>', { decodeEntities: true }), '<textarea>a < b</textarea>');
+
+    // A tag named after an inherited property picks no raw-text rule, so its `<` is escaped
+    // like that of any other element—leaving it would turn escaped markup into real markup
+    for (const tag of ['constructor', '__proto__', 'div']) {
+      assert.strictEqual(
+        await minify(`<${tag}>&lt;b&gt;x&lt;/b&gt;</${tag}>`, { decodeEntities: true }),
+        `<${tag}>&lt;b>x&lt;/b></${tag}>`,
+        tag
+      );
+    }
 
     // Only the element’s own end tag ends it, so `decodeEntities` escapes that one and
     // leaves every other `<` alone, rather than growing the output for nothing

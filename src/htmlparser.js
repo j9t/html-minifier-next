@@ -85,6 +85,12 @@ const fillAttrs = new Set(['checked', 'compact', 'declare', 'defer', 'disabled',
 // Special elements (can contain anything)
 const special = new Set(['script', 'style']);
 
+// Elements whose children are HTML rather than foreign content: In SVG `foreignObject`,
+// `desc`, and `title`, and the MathML text integration points—`annotation-xml` is one, too,
+// but only for some `encoding` values, so it is checked separately
+// https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
+const htmlIntegrationPoints = new Set(['foreignobject', 'desc', 'title', 'mi', 'mo', 'mn', 'ms', 'mtext']);
+
 // HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
 // Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
 const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'col', 'colgroup', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'menuitem', 'meta', 'ol', 'optgroup', 'option', 'param', 'rp', 'rt', 'source', 'style', 'summary', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul']);
@@ -268,15 +274,16 @@ export class HTMLParser {
     };
 
     // Escapable raw text is an HTML rule: In SVG and MathML, `title` is an ordinary element
-    // that holds markup, and only `foreignObject`/`annotation-xml` lead back into HTML
+    // that holds markup. The scan starts at the parent, as the element itself never decides
+    // this—`<svg><title>` is SVG, while what that same `title` holds is HTML again
     const inForeignContent = () => {
-      for (let i = stack.length - 1; i >= 0; i--) {
+      for (let i = stack.length - 2; i >= 0; i--) {
         const entry = stack[i];
-        const lower = entry?.lowerTag;
+        const lower = entry?.lowerTag ?? '';
         if (lower === 'svg' || lower === 'math') {
           return true;
         }
-        if (lower === 'foreignobject') {
+        if (htmlIntegrationPoints.has(lower)) {
           return false;
         }
         // Anything else this `annotation-xml` holds is foreign content, so keep looking outward
