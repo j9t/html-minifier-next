@@ -1124,6 +1124,14 @@ async function minifyHTML(value, options, partialMarkup) {
     buffer.length = Math.max(0, index);
   }
 
+  // Whether the element being parsed holds text rather than markup. The namespace decides
+  // this, not the name alone: `script` and `style` hold text wherever they stand, the rest
+  // only as HTML elements—an SVG or MathML `title` holds markup like any foreign element
+  function holdsRawText() {
+    return specialContentElements.has(currentTag) ||
+      (rawTextElements.has(currentTag) && !options.insideForeignContent);
+  }
+
   // Whether whitespace-only text between tags survives minification
   function keepsWhitespace() {
     return !options.collapseWhitespace || Boolean(options.conservativeCollapse) || Boolean(options.preserveLineBreaks);
@@ -1349,7 +1357,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
     }
     charsPrevTag = /^\s*$/.test(text) ? textPrevTag : 'comment';
-    if (options.decodeEntities && text && !rawTextElements.has(currentTag)) {
+    if (options.decodeEntities && text && !holdsRawText()) {
       // Escape any `&` symbols that start either:
       // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
       // 2. or any other character reference (i.e., one that does end with `;`)
@@ -1359,8 +1367,10 @@ async function minifyHTML(value, options, partialMarkup) {
         text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
       }
       if (text.indexOf('<') !== -1) {
-        // Escapable raw text ends at its own end tag alone, so only that one needs escaping
-        text = text.replace(RE_ESCAPE_LT_RAW_TEXT[currentTag] ?? RE_ESCAPE_LT, '&lt;');
+        // Escapable raw text ends at its own end tag alone, so only that one needs escaping;
+        // in foreign content the same element holds markup, where every `<` does
+        const escapeLt = (options.insideForeignContent ? undefined : RE_ESCAPE_LT_RAW_TEXT[currentTag]) ?? RE_ESCAPE_LT;
+        text = text.replace(escapeLt, '&lt;');
       }
     }
     if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
@@ -1780,7 +1790,7 @@ async function minifyHTML(value, options, partialMarkup) {
       textNextAttrs = nextAttrs || [];
 
       // Detect whether any async work is actually needed for this text node
-      const needsDecode = options.decodeEntities && text && !rawTextElements.has(currentTag) && text.indexOf('&') !== -1;
+      const needsDecode = options.decodeEntities && text && !holdsRawText() && text.indexOf('&') !== -1;
       const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
       const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(

@@ -498,7 +498,7 @@ export class HTMLParser {
         prevAttrs = [];
       } else {
         const stackedTag = lastTagLower;
-        const isRawText = escapableRawTextElements.has(stackedTag);
+        const isEscapableRawText = escapableRawTextElements.has(stackedTag);
 
         const remaining = sliceFromPos(pos);
         const rawText = findRawTextEnd(remaining, stackedTag);
@@ -507,7 +507,7 @@ export class HTMLParser {
           if (handler.chars) {
             // Escapable raw text is a text node like any other, so the handler gets the tags
             // around it—it collapses and trims whitespace by what stands next to the text
-            const result = isRawText
+            const result = isEscapableRawText
               ? handler.chars(text, stackedTag, '/' + stackedTag, prevAttrs, [])
               : handler.chars(text);
             if (isThenable(result)) await result;
@@ -522,7 +522,7 @@ export class HTMLParser {
         } else {
           // Without an end tag of its own, the element holds the rest of the input as text
           if (handler.chars && remaining) {
-            const result = isRawText
+            const result = isEscapableRawText
               ? handler.chars(remaining, stackedTag, '', prevAttrs, [])
               : handler.chars(remaining);
             if (isThenable(result)) await result;

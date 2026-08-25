@@ -685,6 +685,34 @@ describe('SVG and MathML', () => {
     }
   });
 
+  test('`decodeEntities` reads raw text by namespace, not by name', async () => {
+    // As an HTML element, `title` and `textarea` hold text that ends at their own end tag,
+    // so only that one `<` needs escaping. In foreign content the same element holds markup,
+    // and leaving the rest unescaped would turn text into elements
+    const options = { decodeEntities: true };
+    for (const tag of ['title', 'textarea']) {
+      assert.strictEqual(await minify(`<svg><${tag}>&lt;b&gt;</${tag}></svg>`, options), `<svg><${tag}>&lt;b></${tag}></svg>`, tag);
+      assert.strictEqual(await minify(`<math><${tag}>&lt;b&gt;</${tag}></math>`, options), `<math><${tag}>&lt;b></${tag}></math>`, tag);
+
+      // What an integration point holds is HTML again, where the element holds text once more
+      assert.strictEqual(
+        await minify(`<svg><foreignObject><${tag}>&lt;b&gt;</${tag}></foreignObject></svg>`, options),
+        `<svg><foreignObject><${tag}><b></${tag}></foreignObject></svg>`,
+        tag
+      );
+    }
+
+    // Raw text keeps its character references, and `iframe` holds raw text as an HTML element
+    // alone—in foreign content it is an element like any other, whose text resolves them
+    assert.strictEqual(await minify('<iframe>a&amp;b</iframe>', options), '<iframe>a&amp;b</iframe>');
+    assert.strictEqual(await minify('<svg><iframe>a&amp;b</iframe></svg>', options), '<svg><iframe>a&b</iframe></svg>');
+
+    // `script` and `style` hold text wherever they sit, so theirs are kept in either place
+    assert.strictEqual(await minify('<script>a&amp;b</script>', options), '<script>a&amp;b</script>');
+    assert.strictEqual(await minify('<svg><script>a&amp;b</script></svg>', options), '<svg><script>a&amp;b</script></svg>');
+    assert.strictEqual(await minify('<svg><style>a&amp;b</style></svg>', options), '<svg><style>a&amp;b</style></svg>');
+  });
+
   test('The namespace an element sits in stays cheap to read', async () => {
     // Reading it off the stack costs as much as the stack is deep, for every element whose
     // content is text—which a deep document turns quadratic, minutes at this size
