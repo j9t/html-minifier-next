@@ -1532,13 +1532,16 @@ async function minifyHTML(value, options, partialMarkup) {
         lowerTag = tag.toLowerCase();
         if (lowerTag === 'svg' || lowerTag === 'math') {
           // Preserve the surrounding HTML context’s name function (e.g., `identity`
-          // under `caseSensitive`) so `foreignObject`/`annotation-xml` can restore it
+          // under `caseSensitive`) and slash handling so `foreignObject`/`annotation-xml`
+          // can restore them
           const nameHTML = options.name;
+          const keepClosingSlashHTML = Boolean(options.keepClosingSlash);
           options = Object.create(options);
           options.caseSensitive = true;
           options.keepClosingSlash = true;
           options.name = identity;
           options.nameHTML = nameHTML;
+          options.keepClosingSlashHTML = keepClosingSlashHTML;
           options.insideSVG = lowerTag === 'svg';
           options.insideForeignContent = true;
           // Disable HTML-specific options that produce invalid XML:
@@ -1547,6 +1550,9 @@ async function minifyHTML(value, options, partialMarkup) {
           if (lowerTag === 'svg' && options.minifySVG) {
             options.removeAttributeQuotes = false;
             options.decodeEntities = false;
+            // Omitting a start and end tag both would keep the block well-formed, which this misses
+            options.removeOptionalTags = false;
+            options.collapseBooleanAttributes = false;
           }
           options.removeTagWhitespace = false;
           pushedContext = true;
@@ -1560,7 +1566,8 @@ async function minifyHTML(value, options, partialMarkup) {
           const nameParent = options.name;
           options = Object.create(options);
           options.caseSensitive = false;
-          options.keepClosingSlash = false;
+          // What the parser read the slash as, so that the two agree here as they do in HTML
+          options.keepClosingSlash = options.keepClosingSlashHTML ?? false;
           options.nameParent = nameParent; // Preserve for the element tag itself
           options.name = options.nameHTML ?? lowercase;
           options.insideForeignContent = false;
@@ -1631,7 +1638,10 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       const openTag = '<' + tag;
-      const hasUnarySlash = unarySlash && (useNameParentForTag ? optionsParent : options).keepClosingSlash;
+      // SVGO reads the whole SVG block as XML, where an element closes itself or not, so
+      // every unary element in there is written with a slash
+      const needsXMLSlash = unary && Boolean(options.insideSVG) && Boolean(options.minifySVG);
+      const hasUnarySlash = needsXMLSlash || (unarySlash && (useNameParentForTag ? optionsParent : options).keepClosingSlash);
 
       buffer.push(openTag);
 

@@ -47,6 +47,7 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   cssContext?: CSSContext,
  *   nameParent?: (name: string) => string,
  *   nameHTML?: (name: string) => string,
+ *   keepClosingSlashHTML?: boolean,
  *   insideSVG?: boolean,
  *   insideForeignContent?: boolean
  * }} ProcessedOptions

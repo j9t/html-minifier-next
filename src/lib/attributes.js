@@ -781,6 +781,8 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     (options.removeAttributeQuotes && ((uidAttr ? attrValue.indexOf(uidAttr) !== -1 : false) || !canRemoveAttributeQuotes(attrValue))) ||
     // If `removeAttributeQuotes` is not enabled, preserve original quote style or add quotes if value requires them
     (!options.removeAttributeQuotes && (attrQuote !== '' || !canRemoveAttributeQuotes(attrValue) ||
+      // SVGO reads the whole SVG block as XML, where every attribute value carries quotes
+      (Boolean(options.insideSVG) && Boolean(options.minifySVG)) ||
       // Special case: With `removeTagWhitespace`, unquoted values that aren’t last will have space added,
       // which can create ambiguous/invalid HTML—add quotes to be safe
       (options.removeTagWhitespace && attrQuote === '' && !isLast)))

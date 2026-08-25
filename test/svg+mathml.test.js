@@ -115,6 +115,108 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify('<svg><foreignObject/></svg><br/>x'), '<svg><foreignObject/></svg><br>x');
   });
 
+  test('`keepClosingSlash` reaches the HTML an integration point holds', async () => {
+    // The parser reads the slash as closing the element wherever the option is on, so the
+    // output has to keep it there too—otherwise `a` and `b` end up inside the `div`
+    assert.strictEqual(
+      await minify('<svg><foreignObject><div/>a</div>b</foreignObject></svg>', { keepClosingSlash: true }),
+      '<svg><foreignObject><div/>ab</foreignObject></svg>'
+    );
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><div/>a</div>b</annotation-xml></math>', { keepClosingSlash: true }),
+      '<math><annotation-xml encoding="text/html"><div/>ab</annotation-xml></math>'
+    );
+    assert.strictEqual(
+      await minify('<svg><foreignObject><br/>x</foreignObject></svg>', { keepClosingSlash: true }),
+      '<svg><foreignObject><br/>x</foreignObject></svg>'
+    );
+
+    // With the option off, the HTML in there is written as HTML
+    assert.strictEqual(
+      await minify('<svg><foreignObject><div/>a</div>b<br/></foreignObject></svg>'),
+      '<svg><foreignObject><div>a</div>b<br></foreignObject></svg>'
+    );
+  });
+
+  test('HTML inside `foreignObject` is written as XML wherever SVGO reads it', async () => {
+    /** @type {string[]} */
+    const messages = [];
+    const log = (/** @type {unknown} */ message) => messages.push(String(/** @type {Error} */ (message)?.message ?? message));
+    const parseErrors = () => messages.filter((message) => message.includes('Unexpected close tag'));
+
+    // A void element that closes nothing leaves the block invalid XML, which SVGO rejects—
+    // and one rejected block costs the whole graphic its optimization
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><br>x</foreignObject></svg>', { minifySVG: true, log }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><br/>x</foreignObject></svg>'
+    );
+    assert.deepStrictEqual(parseErrors(), [], 'SVGO should never see markup it cannot parse');
+
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><img src="a"></foreignObject></svg>', { minifySVG: true, log }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><img src="a"/></foreignObject></svg>'
+    );
+    assert.deepStrictEqual(parseErrors(), []);
+
+    // The slash is there for SVGO, so it is written where SVGO reads and nowhere else
+    assert.strictEqual(
+      await minify('<svg><foreignObject><br>x</foreignObject></svg>'),
+      '<svg><foreignObject><br>x</foreignObject></svg>'
+    );
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><br>x</annotation-xml></math>', { minifySVG: true }),
+      '<math><annotation-xml encoding="text/html"><br>x</annotation-xml></math>'
+    );
+    assert.strictEqual(
+      await minify('<div><br></div><svg><foreignObject><br></foreignObject></svg><br>', { minifySVG: true }),
+      '<div><br></div><svg><foreignObject><br/></foreignObject></svg><br>'
+    );
+  });
+
+  test('Options that write markup no XML parser accepts stop at an SVG SVGO reads', async () => {
+    // A valueless attribute is invalid XML, and costs the graphic its optimization
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><input type="checkbox" checked="checked"></foreignObject></svg>',
+        { minifySVG: true, collapseBooleanAttributes: true }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><input checked="checked" type="checkbox"/></foreignObject></svg>'
+    );
+
+    // Without `minifySVG` nothing reads the block as XML, and the option applies as always
+    assert.strictEqual(
+      await minify('<svg><foreignObject><input type="checkbox" checked="checked"></foreignObject></svg>',
+        { collapseBooleanAttributes: true }),
+      '<svg><foreignObject><input type="checkbox" checked></foreignObject></svg>'
+    );
+
+    // MathML never reaches SVGO, so nothing is held back there
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><input type="checkbox" checked="checked"><p>a</p><p>b</p></annotation-xml></math>',
+        { minifySVG: true, collapseBooleanAttributes: true, removeOptionalTags: true }),
+      '<math><annotation-xml encoding="text/html"><input type="checkbox" checked><p>a<p>b</p></annotation-xml></math>'
+    );
+
+    // A unary element written without a slash anywhere in the block, not only in `foreignObject`
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><math><mspace/></math></foreignObject></svg>', { minifySVG: true }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><math><mspace/></math></foreignObject></svg>'
+    );
+  });
+
+  test('Attribute values keep their quotes wherever SVGO reads them', async () => {
+    // An unquoted value is valid HTML the source may well be written in, and invalid XML
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><p class=a>x</p></foreignObject></svg>', { minifySVG: true }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><p class="a">x</p></foreignObject></svg>'
+    );
+
+    // Outside an SVG, and inside one no SVGO reads, the source’s own style stands
+    assert.strictEqual(await minify('<p class=a>x</p>', { minifySVG: true }), '<p class=a>x</p>');
+    assert.strictEqual(
+      await minify('<svg><foreignObject><p class=a>x</p></foreignObject></svg>'),
+      '<svg><foreignObject><p class=a>x</p></foreignObject></svg>'
+    );
+  });
+
   test('Preserve `viewBox`', async () => {
     // SVGO v4 preserves `viewBox` by default
     const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, collapseWhitespace: true });
@@ -214,15 +316,14 @@ describe('SVG and MathML', () => {
   });
 
   test('Error recovery', async () => {
-    // SVGO fails on the invalid XML `removeOptionalTags` produces here; `continueOnMinifyError` keeps the unoptimized SVG
+    // SVGO fails on the unclosed `g` the input never closes; `continueOnMinifyError` keeps the unoptimized SVG
     assert.strictEqual(
-      await minify('<svg><foreignObject width="100" height="100"><p>A</p><p>B</p></foreignObject></svg>', {
+      await minify('<svg><g><rect width="10" height="10"/></svg>', {
         minifySVG: true,
-        removeOptionalTags: true,
         collapseWhitespace: true,
         continueOnMinifyError: true
       }),
-      '<svg><foreignObject width="100" height="100"><p>A<p>B</foreignObject></svg>'
+      '<svg><g><rect width="10" height="10"/></svg>'
     );
   });
 
@@ -338,25 +439,39 @@ describe('SVG and MathML', () => {
       '<svg><foreignObject width="100" height="100"><p>Text</p></foreignObject></svg>'
     );
 
-    // Redundant attribute removal inside `foreignObject`
+    // Redundant attribute removal inside `foreignObject` (the `input` closes itself for SVGO)
     assert.strictEqual(
       await minify('<svg><foreignObject width="100" height="100"><form method="get"><input type="text"></form></foreignObject></svg>', { minifySVG: true, removeRedundantAttributes: true, collapseWhitespace: true }),
-      '<svg><foreignObject width="100" height="100"><form><input></form></foreignObject></svg>'
+      '<svg><foreignObject width="100" height="100"><form><input/></form></foreignObject></svg>'
     );
   });
 
   test('SVG with `foreignObject` and `removeOptionalTags`', async () => {
-    // When `removeOptionalTags` strips `</p>`, the SVG becomes invalid XML
-    // SVGO falls back gracefully with `continueOnMinifyError` (default: true),
-    // returning the unoptimized SVG—still valid HTML
-    const result = await minify('<svg><foreignObject width="100" height="100"><p>Text</p><p>More</p></foreignObject></svg>', {
-      minifySVG: true,
-      removeOptionalTags: true,
-      collapseWhitespace: true
-    });
-    assert.ok(result.includes('foreignObject'), '`foreignObject` should be preserved');
-    assert.ok(result.includes('Text'), 'Content should be preserved');
-    assert.ok(result.includes('More'), 'All paragraphs should be preserved');
+    // An omitted `</p>` would leave the block invalid XML, which costs the whole graphic its
+    // optimization, so the end tags stay wherever SVGO reads them
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject width="100" height="100"><p>Text</p><p>More</p></foreignObject></svg>', {
+        minifySVG: true,
+        removeOptionalTags: true,
+        collapseWhitespace: true
+      }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject width="100" height="100"><p>Text</p><p>More</p></foreignObject></svg>'
+    );
+
+    // Outside the SVG the option applies as it always does
+    assert.strictEqual(
+      await minify('<ul><li>a</li></ul><svg><rect width="10" height="10"/></svg><p>b</p>', { minifySVG: true, removeOptionalTags: true }),
+      '<ul><li>a</ul><svg><path d="M0 0h10v10H0z"/></svg><p>b'
+    );
+
+    // Without `minifySVG` nothing reads the block as XML, and the option applies throughout
+    assert.strictEqual(
+      await minify('<svg><foreignObject width="100" height="100"><p>Text</p><p>More</p></foreignObject></svg>', {
+        removeOptionalTags: true,
+        collapseWhitespace: true
+      }),
+      '<svg><foreignObject width="100" height="100"><p>Text<p>More</foreignObject></svg>'
+    );
   });
 
   test('HTML-only options are disabled inside SVG for XML compatibility', async () => {
@@ -436,11 +551,10 @@ describe('SVG and MathML', () => {
 
   test('`continueOnMinifyError: false` throws on SVGO error', async () => {
     // When `continueOnMinifyError` is false and SVGO encounters invalid XML
-    // (e.g., from `removeOptionalTags` stripping `</p>` in `foreignObject`), it should throw
+    // (here an unclosed `g`), it should throw
     await assert.rejects(
-      () => minify('<svg><foreignObject width="100" height="100"><p>A</p><p>B</p></foreignObject></svg>', {
+      () => minify('<svg><g><rect width="10" height="10"/></svg>', {
         minifySVG: true,
-        removeOptionalTags: true,
         collapseWhitespace: true,
         continueOnMinifyError: false
       }),
