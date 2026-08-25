@@ -6233,6 +6233,241 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div><p>a </p>  <p>b</p></div>', aggressive), '<div><p>a<p>b</div>');
   });
 
+  test('`textarea` and `title` hold text, not markup', async () => {
+    // Both are escapable raw text elements: A `<` inside them never starts a tag, so no
+    // option may treat their content as elements
+    // https://html.spec.whatwg.org/multipage/syntax.html#raw-text-elements
+
+    let input;
+
+    // Optional end tags are text here, and stay
+    input = '<textarea><p>a</p></textarea>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+    input = '<title><p>a</p></title>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+
+    // So is anything that only looks like a comment
+    input = '<textarea>a<!-- c --></textarea>';
+    assert.strictEqual(await minify(input, { removeComments: true }), input);
+    input = '<title>a<!-- c --></title>';
+    assert.strictEqual(await minify(input, { removeComments: true }), input);
+
+    // Attributes are text, too, and keep their whitespace and their quotes
+    input = '<textarea><b class="  y  ">x</b></textarea>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), input);
+
+    // An empty element is what it looks like, not what its text says
+    input = '<textarea><b></b></textarea>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
+
+    // Only the element’s own end tag ends it, whatever its case
+    assert.strictEqual(await minify('<textarea>x</TEXTAREA>'), '<textarea>x</textarea>');
+    assert.strictEqual(await minify('<textarea>a</p>b</textarea>'), '<textarea>a</p>b</textarea>');
+
+    // A longer name is a different element, so it does not end this one
+    input = '<textarea>a</textareax>b</textarea>';
+    assert.strictEqual(await minify(input), input);
+    input = '<script>a</scriptx>b</script>';
+    assert.strictEqual(await minify(input), input);
+    input = '<style>a{}</stylex>b</style>';
+    assert.strictEqual(await minify(input), input);
+    // What follows the name is not part of it
+    assert.strictEqual(await minify('<textarea>a</textarea >b'), '<textarea>a</textarea>b');
+
+    // Where no end tag of its own follows at all, the element holds the rest of the input:
+    // Nothing that only looks like one may take the content down with it
+    for (const unclosed of ['<script>a</scriptx>b', '<style>a{}</stylex>b', '<textarea>a</textareax>b']) {
+      assert.strictEqual(await minify(unclosed), unclosed, unclosed);
+    }
+    for (const unclosed of ['<script>foo', '<style>a{}', '<textarea>foo', '<title>a']) {
+      assert.strictEqual(await minify(unclosed), unclosed, unclosed);
+    }
+
+    // Minifying the output again leaves it alone
+    input = '<textarea><p>a</p></textarea><title><p>b</p></title>';
+    const options = { removeOptionalTags: true, removeComments: true, collapseWhitespace: true };
+    assert.strictEqual(await minify(input, options), input);
+    assert.strictEqual(await minify(await minify(input, options), options), input);
+  });
+
+  test('Whitespace and entities in `textarea` and `title`', async () => {
+    // Reading the content as text changes nothing about how it is otherwise handled
+
+    // Whitespace in `textarea` stays verbatim, whitespace in `title` collapses
+    assert.strictEqual(await minify('<textarea>  a  b  </textarea>', { collapseWhitespace: true }), '<textarea>  a  b  </textarea>');
+    assert.strictEqual(await minify('<title>  a  b  </title>', { collapseWhitespace: true }), '<title>a b</title>');
+
+    // A single trailing newline is still trimmed, as the template artifact it usually is
+    assert.strictEqual(await minify('<textarea>foo\n</textarea>', { collapseWhitespace: true }), '<textarea>foo</textarea>');
+    assert.strictEqual(await minify('<textarea>foo\n\n</textarea>', { collapseWhitespace: true }), '<textarea>foo\n\n</textarea>');
+
+    // Character references are decoded in both, as they are anywhere else
+    assert.strictEqual(await minify('<textarea>&amp;</textarea>', { decodeEntities: true }), '<textarea>&</textarea>');
+    assert.strictEqual(await minify('<title>&amp;</title>', { decodeEntities: true }), '<title>&</title>');
+    assert.strictEqual(await minify('<textarea>a &lt; b</textarea>', { decodeEntities: true }), '<textarea>a < b</textarea>');
+
+    // A tag named after an inherited property picks no raw-text rule, so its `<` is escaped
+    // like that of any other element—leaving it would turn escaped markup into real markup
+    for (const tag of ['constructor', '__proto__', 'div']) {
+      assert.strictEqual(
+        await minify(`<${tag}>&lt;b&gt;x&lt;/b&gt;</${tag}>`, { decodeEntities: true }),
+        `<${tag}>&lt;b>x&lt;/b></${tag}>`,
+        tag
+      );
+    }
+
+    // Only the element’s own end tag ends it, so `decodeEntities` escapes that one and
+    // leaves every other `<` alone, rather than growing the output for nothing
+    assert.strictEqual(await minify('<textarea><p>a</p></textarea>', { decodeEntities: true }), '<textarea><p>a</p></textarea>');
+    assert.strictEqual(await minify('<title>a<b>b</b>c</title>', { decodeEntities: true }), '<title>a<b>b</b>c</title>');
+    for (const input of ['<textarea>&lt;/textarea>x</textarea>', '<textarea>&lt;/TEXTAREA >x</textarea>', '<title>&lt;/title>x</title>']) {
+      assert.strictEqual(await minify(input, { decodeEntities: true }), input, input);
+      assert.strictEqual(await minify(await minify(input, { decodeEntities: true }), { decodeEntities: true }), input, input);
+    }
+
+
+    // What the element keeps verbatim ends with its end tag: Whitespace behind it stands
+    // outside and collapses like any other, whether or not a comment stood in between
+    const optionsComments = { collapseWhitespace: true, removeComments: true };
+    assert.strictEqual(await minify('<textarea> t </textarea><!-- c -->  b  ', optionsComments), '<textarea> t </textarea> b');
+    assert.strictEqual(await minify('<textarea> t </textarea>  b  ', optionsComments), '<textarea> t </textarea> b');
+
+    // An element left unclosed keeps the text it holds
+    assert.strictEqual(await minify('<textarea>foo'), '<textarea>foo');
+    assert.strictEqual(await minify('<title>a'), '<title>a');
+  });
+
+  test('End tags that are never complete stay cheap', async () => {
+    // Scanning for the end tag with a regex lazy enough to skip the content rescans the rest
+    // of the input at every near match, which costs minutes at this size
+    for (const tag of ['textarea', 'script']) {
+      const benign = `<${tag}>a</${tag}>`.repeat(50000);
+      const input = `<${tag}>` + `</${tag} `.repeat(50000);
+
+      const startBaseline = Date.now();
+      await minify(benign);
+      const baseline = Date.now() - startBaseline;
+
+      const start = Date.now();
+      assert.strictEqual(await minify(input), input, tag);
+      const elapsed = Date.now() - start;
+
+      assert.ok(elapsed < Math.max(baseline * 20, 2000), `Expected a linear scan for \`${tag}\`, took ${elapsed}ms (${baseline}ms baseline)`);
+    }
+  });
+
+  test('Comments that are never terminated stay cheap', async () => {
+    // Searching for the end of a comment that has none rescans the rest of the input, at
+    // every opener. Only `continueOnParseError` reaches the second one—without it the first
+    // ends the run—so that is where this costs minutes at this size.
+    for (const [opener, closed] of [['<!--', '<!---->'], ['<![', '<![ ]>']]) {
+      // The baseline says how fast this machine is only where it does about as much work as
+      // the run it stands against, and an opener that closes is read faster than one that
+      // never does—so it takes more of them to weigh the same
+      const benign = closed.repeat(150000);
+      const input = opener.repeat(50000);
+
+      const startBaseline = Date.now();
+      await minify(benign, { continueOnParseError: true });
+      const baseline = Date.now() - startBaseline;
+
+      const start = Date.now();
+      assert.strictEqual(await minify(input, { continueOnParseError: true }), input, opener);
+      const elapsed = Date.now() - start;
+
+      assert.ok(elapsed < Math.max(baseline * 20, 2000), `Expected a linear scan for \`${opener}\`, took ${elapsed}ms (${baseline}ms baseline)`);
+    }
+  });
+
+  test('An end tag ends at the `>` outside its attribute values', async () => {
+    // An end tag could carry attributes, and a quoted value there can hold `>`, which does
+    // not end the tag it stands in
+    // https://html.spec.whatwg.org/multipage/parsing.html#attribute-value-(double-quoted)-state
+    assert.strictEqual(await minify('<div>a</div foo="x>y">b'), '<div>a</div>b');
+    assert.strictEqual(await minify('<div>a</div foo=\'x>y\'>b'), '<div>a</div>b');
+
+    // Elements whose content is text scan for their own end tag separately
+    for (const tag of ['textarea', 'title', 'script', 'style', 'iframe', 'xmp']) {
+      assert.strictEqual(await minify(`<${tag}>a</${tag} foo="x>y">b`), `<${tag}>a</${tag}>b`, tag);
+    }
+
+    // Without a closing quote the tag has no end of its own, and ends at the first `>`
+    assert.strictEqual(await minify('<div>a</div foo="x>y'), '<div>a</div>y');
+    assert.strictEqual(await minify('<textarea>a</textarea foo="x>y'), '<textarea>a</textarea>y');
+
+    // The search for that bracket stops at the next `<`, which bounds what one tag costs
+    // and keeps the scans of consecutive tags from overlapping, so a `<` inside a value
+    // leaves the first bracket as the end
+    assert.strictEqual(await minify('<div>a</div foo="a<b>c">d'), '<div>a</div>c">d');
+    assert.strictEqual(await minify('<textarea>a</textarea foo="a<b>c">d'), '<textarea>a</textarea>c">d');
+  });
+
+  test('A start tag that ends a paragraph ends it, whatever the element', async () => {
+    // The spec names these alongside `div` and `ul`, and each closes an open `p` the same
+    // way; leaving one out kept the paragraph open across it, which put the end tag
+    // `includeAutoGeneratedTags` writes behind the element that had long closed it
+    // https://html.spec.whatwg.org/multipage/syntax.html#element-restrictions
+    for (const tag of ['center', 'dir', 'div', 'listing', 'main', 'menu', 'nav', 'pre', 'search', 'section', 'table', 'ul', 'xmp']) {
+      assert.strictEqual(
+        await minify(`<p>a<${tag}>b</${tag}>`, { includeAutoGeneratedTags: true }),
+        `<p>a</p><${tag}>b</${tag}>`,
+        tag
+      );
+    }
+  });
+
+  test('`iframe` and `xmp` hold text, not markup', async () => {
+    // The parser reads these as raw text as well, so a `<` inside them never starts a tag
+    // https://html.spec.whatwg.org/multipage/parsing.html#generic-raw-text-element-parsing-algorithm
+
+    let input;
+
+    // What looks like markup is text, and stays as it is written
+    const options = { removeOptionalTags: true, removeComments: true, removeAttributeQuotes: true };
+    for (const tag of ['iframe', 'xmp']) {
+      input = `<${tag}><b class="  y  ">a</b><!-- c --></${tag}>`;
+      assert.strictEqual(await minify(input, options), input, tag);
+      // Minifying the output again leaves it alone
+      assert.strictEqual(await minify(await minify(input, options), options), input, tag);
+
+      // Only the element’s own end tag ends it, whatever its case, and a longer name is a
+      // different element
+      assert.strictEqual(await minify(`<${tag}>a</${tag.toUpperCase()} >b`), `<${tag}>a</${tag}>b`, tag);
+      input = `<${tag}>a</${tag}x>b</${tag}>`;
+      assert.strictEqual(await minify(input), input, tag);
+
+      // Where no end tag of its own follows, the element holds the rest of the input
+      assert.strictEqual(await minify(`<${tag}>foo`), `<${tag}>foo`, tag);
+
+      // Raw text is read without resolving character references, so they stay as they are—
+      // unlike in `textarea` and `title`, resolving them here would change what is displayed
+      input = `<${tag}>a&amp;b&lt;c</${tag}>`;
+      assert.strictEqual(await minify(input, { decodeEntities: true }), input, tag);
+    }
+
+    // `xmp`, `listing`, and `plaintext` render preformatted, as `pre` does, so their
+    // whitespace stays
+    assert.strictEqual(await minify('<xmp>  a   b  </xmp>', { collapseWhitespace: true }), '<xmp>  a   b  </xmp>');
+    assert.strictEqual(await minify('<listing>  a   b  </listing>', { collapseWhitespace: true }), '<listing>  a   b  </listing>');
+    // `plaintext` has no end tag, so its content runs to the end of the document, where a
+    // trailing run of whitespace is trimmed as it is anywhere else
+    assert.strictEqual(await minify('<plaintext>  a   b  ', { collapseWhitespace: true }), '<plaintext>  a   b');
+
+    // Whitespace in the elements that are not preformatted still collapses, as it does in
+    // any other text
+    assert.strictEqual(await minify('<div> a  <iframe> x  y </iframe>  b </div>', { collapseWhitespace: true }), '<div>a<iframe>x y</iframe>b</div>');
+
+    // `noscript`, `noframes`, and `noembed` are raw text as well, and stay markup all the
+    // same: What they hold is markup to the UA that displays it, so it is minified as markup
+    const optionsCollapsing = { ...options, collapseWhitespace: true };
+    assert.strictEqual(await minify('<noscript><p class="y"> a </p><!-- c --></noscript>', optionsCollapsing), '<noscript><p class=y>a</p></noscript>');
+    assert.strictEqual(await minify('<noframes><p class="y"> a </p><!-- c --></noframes>', optionsCollapsing), '<noframes><p class=y>a</noframes>');
+    assert.strictEqual(await minify('<noembed><p class="y"> a </p><!-- c --></noembed>', optionsCollapsing), '<noembed><p class=y>a</noembed>');
+    // Which is why their character references are resolved, as they are in any other markup
+    assert.strictEqual(await minify('<noframes>a&amp;b</noframes>', { decodeEntities: true }), '<noframes>a&b</noframes>');
+  });
+
   test('Trim trailing newline in `pre`/`textarea` with `collapseWhitespace`', async () => {
     let input, output;
 
@@ -6369,6 +6604,40 @@ describe('HTML', () => {
         const once = await minify(html, options);
         const twice = await minify(once, options);
         assert.strictEqual(twice, once, `Failed for: ${documentName} / ${optionsName}`);
+      }
+    }
+  });
+
+  test('Minifying twice changes nothing, in generated combinations, too', async () => {
+    // The documents above are written by hand, so they reach the adjacencies someone thought
+    // of. Building the input from fragments instead reaches the ones no one writes down—two
+    // fixed points that were none turned up that way, a paragraph left open across a `<pre>`
+    // and whitespace behind a `textarea` that only the second run removed.
+    const fragments = [
+      '<p>a</p>', '<li>x<li>y', '<pre> p </pre>', '<textarea> t </textarea>', '<title> t </title>',
+      '<table><tr><td>t</table>', '<div a="b"> d </div>', '<span> s </span>',
+      '<!-- c -->', '  b  ', '\n', '<br>'
+    ];
+
+    const optionSets = {
+      'removeOptionalTags': { removeOptionalTags: true },
+      'and collapseWhitespace': { removeOptionalTags: true, collapseWhitespace: true },
+      'and includeAutoGeneratedTags': { removeOptionalTags: true, includeAutoGeneratedTags: true },
+      'collapseWhitespace with removeComments': { collapseWhitespace: true, removeComments: true },
+      'conservativeCollapse': { collapseWhitespace: true, conservativeCollapse: true },
+      'preserveLineBreaks': { collapseWhitespace: true, preserveLineBreaks: true }
+    };
+
+    for (const first of fragments) {
+      for (const second of fragments) {
+        for (const third of fragments) {
+          const html = first + second + third;
+          for (const [optionsName, options] of Object.entries(optionSets)) {
+            const once = await minify(html, options);
+            const twice = await minify(once, options);
+            assert.strictEqual(twice, once, `Failed for: ${JSON.stringify(html)} / ${optionsName}`);
+          }
+        }
       }
     }
   });

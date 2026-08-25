@@ -814,17 +814,18 @@ function describeQuantifierRisk(pattern) {
  * over quoted attribute values (which may contain `>`).
  * @param {string} html
  * @param {number} pos - Start position (just after the tag name)
+ * @param {number} [limit] - Position to stop the search at (exclusive)
  * @returns {number} Index of the closing `>`, or -1 if not found
  */
-function findTagEnd(html, pos) {
+function findTagEnd(html, pos, limit = html.length) {
   let i = pos;
-  while (i < html.length) {
+  while (i < limit) {
     const ch = html[i];
     if (ch === '>') return i;
     if (ch === '"' || ch === "'") {
       const q = ch;
       i++;
-      while (i < html.length && html[i] !== q) i++;
+      while (i < limit && html[i] !== q) i++;
     }
     i++;
   }

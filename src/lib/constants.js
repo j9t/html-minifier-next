@@ -15,6 +15,17 @@ const RE_TRAILING_SEMICOLON = /;$/;
 const RE_AMP_ENTITY = /&(#?[0-9a-zA-Z]+;)/g;
 const RE_LEGACY_ENTITIES = /&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt)(?!;)|(?:#?[0-9a-zA-Z]+;))/g;
 const RE_ESCAPE_LT = /</g;
+// In escapable raw text only the element’s own end tag ends the element, so nothing else
+// that `decodeEntities` decoded to a `<` needs escaping there
+// (the record has no prototype, so a tag named after an inherited property—`constructor`,
+// `__proto__`—finds nothing here and falls back to escaping every `<`)
+const RE_ESCAPE_LT_RAW_TEXT = /** @type {Record<string, RegExp>} */ (Object.assign(Object.create(null), {
+  textarea: /<(?=\/textarea[\s/>])/gi,
+  title: /<(?=\/title[\s/>])/gi
+}));
+// Encodings that make an `annotation-xml` element hold HTML rather than MathML
+// https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
+const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 const RE_ATTR_WS_CHECK = /[ \n\r\t\f]/;
 const RE_ATTR_WS_COLLAPSE = /[ \n\r\t\f]+/g;
 const RE_ATTR_WS_TRIM = /^[ \n\r\t\f]+|[ \n\r\t\f]+$/g;
@@ -172,6 +183,23 @@ const htmlElements = new Set(['a', 'abbr', 'acronym', 'address', 'applet', 'area
 
 const specialContentElements = new Set(['script', 'style']);
 
+// Elements the parser reads as raw text as well, though only `script` and `style` are raw text
+// elements by name—these are HTML’s alone, where `script` and `style` hold text in SVG, too
+// https://html.spec.whatwg.org/multipage/parsing.html#generic-raw-text-element-parsing-algorithm
+//
+// (`noscript`, `noframes`, and `noembed` are raw text, too, but stay markup here: What they
+// hold is markup to the UA that displays it—one without scripting or frames—so minifying it
+// as markup keeps what that UA sees)
+const genericRawTextElements = new Set(['iframe', 'xmp']);
+
+// Escapable raw text elements, whose content is text rather than markup
+// https://html.spec.whatwg.org/multipage/syntax.html#elements-2
+const escapableRawTextElements = new Set(['textarea', 'title']);
+
+// Raw text is read without resolving character references, so its text keeps them—unlike that
+// of `textarea` and `title`, where they are resolved as they are anywhere else
+const rawTextElements = new Set([...specialContentElements, ...genericRawTextElements]);
+
 // Exports
 
 export {
@@ -191,6 +219,8 @@ export {
   RE_AMP_ENTITY,
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
+  RE_ESCAPE_LT_RAW_TEXT,
+  RE_HTML_ENCODING,
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
   RE_ATTR_WS_TRIM,
@@ -240,5 +270,8 @@ export {
   htmlElements,
 
   // Special content elements
-  specialContentElements
+  specialContentElements,
+  genericRawTextElements,
+  escapableRawTextElements,
+  rawTextElements
 };

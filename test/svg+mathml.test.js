@@ -568,6 +568,12 @@ describe('SVG and MathML', () => {
       '<math><annotation-xml encoding="application/mathml+xml"><mi></mi></annotation-xml></math>'
     );
 
+    // A repeated attribute is dropped after the first, so the first `encoding` decides
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/plain" encoding="text/html"><DIV>x</DIV></annotation-xml></math>', {}),
+      '<math><annotation-xml encoding="text/plain"><DIV>x</DIV></annotation-xml></math>'
+    );
+
     // `annotation-xml` without encoding attribute—content preserved as foreign
     assert.strictEqual(
       await minify('<math><annotation-xml><mi></mi></annotation-xml></math>', { removeEmptyElements: true }),
@@ -595,6 +601,151 @@ describe('SVG and MathML', () => {
       await minify('<math><annotation-xml encoding="text/html"><div></div><svg><rect x="0" y="0"></rect></svg></annotation-xml></math>', { removeEmptyElements: true }),
       '<math><annotation-xml encoding="text/html"><svg><rect x="0" y="0"></rect></svg></annotation-xml></math>'
     );
+  });
+
+  test('Escapable raw text in SVG and MathML', async () => {
+    // `textarea` and `title` hold text rather than markup, but that is an HTML rule: In SVG
+    // and MathML they are ordinary elements, until an integration point leads back into HTML
+    // https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
+    const options = { removeOptionalTags: true };
+    let input;
+
+    // Ordinary elements here, so an optional end tag inside them is one
+    assert.strictEqual(await minify('<svg><title><p>a</p></title></svg>', options), '<svg><title><p>a</title></svg>');
+    assert.strictEqual(await minify('<svg><desc><p>a</p></desc></svg>', options), '<svg><desc><p>a</desc></svg>');
+    assert.strictEqual(await minify('<math><title><p>a</p></title></math>', options), '<math><title><p>a</title></math>');
+
+    // An element that is no integration point keeps its content foreign
+    assert.strictEqual(await minify('<svg><g><textarea><p>a</p></textarea></g></svg>', options), '<svg><g><textarea><p>a</textarea></g></svg>');
+
+    // What an integration point holds is HTML again, so raw text inside one is raw text—note
+    // that the element itself does not decide this: `<svg><title>` is SVG, its content is not
+    for (const [open, close] of [
+      ['<svg><foreignObject>', '</foreignObject></svg>'],
+      ['<svg><desc>', '</desc></svg>'],
+      ['<svg><title>', '</title></svg>'],
+      ['<math><mtext>', '</mtext></math>'],
+      ['<math><mi>', '</mi></math>']
+    ]) {
+      input = `${open}<textarea><p>a</p></textarea>${close}`;
+      assert.strictEqual(await minify(input, options), input, open);
+    }
+
+    // `annotation-xml` is one only where its `encoding` says it holds HTML
+    for (const encoding of ['text/html', 'application/xhtml+xml', 'TEXT/HTML']) {
+      input = `<math><annotation-xml encoding="${encoding}"><title><p>a</p></title></annotation-xml></math>`;
+      assert.strictEqual(await minify(input, options), input, encoding);
+    }
+
+    // A name counts only in the namespace it belongs to, so neither set reaches into the other
+    for (const [open, close] of [
+      ['<math><title>', '</title></math>'],
+      ['<math><desc>', '</desc></math>'],
+      ['<math><foreignObject>', '</foreignObject></math>'],
+      ['<svg><mtext>', '</mtext></svg>'],
+      ['<svg><mi>', '</mi></svg>'],
+      ['<svg><annotation-xml encoding="text/html">', '</annotation-xml></svg>']
+    ]) {
+      assert.strictEqual(
+        await minify(`${open}<textarea><p>a</p></textarea>${close}`, options),
+        `${open}<textarea><p>a</textarea>${close}`,
+        open
+      );
+    }
+
+    // Leaving an integration point enters the namespace around it again
+    input = '<svg><foreignObject><math><title><textarea><p>a</p></textarea></title></math></foreignObject></svg>';
+    assert.strictEqual(await minify(input, options), '<svg><foreignObject><math><title><textarea><p>a</textarea></title></math></foreignObject></svg>');
+    input = '<svg><foreignObject><svg><title><p>a</p></title></svg></foreignObject></svg>';
+    assert.strictEqual(await minify(input, options), '<svg><foreignObject><svg><title><p>a</title></svg></foreignObject></svg>');
+
+    // With any other encoding, and with none, its content stays MathML, where `title` holds markup
+    assert.strictEqual(
+      await minify('<math><annotation-xml><title><p>a</p></title></annotation-xml></math>', options),
+      '<math><annotation-xml><title><p>a</title></annotation-xml></math>'
+    );
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/plain"><title><p>a</p></title></annotation-xml></math>', options),
+      '<math><annotation-xml encoding="text/plain"><title><p>a</title></annotation-xml></math>'
+    );
+  });
+
+  test('Raw text in SVG and MathML', async () => {
+    // `iframe` and `xmp` hold text as HTML elements, and are ordinary elements anywhere else
+    const options = { removeOptionalTags: true };
+    let input;
+
+    for (const tag of ['iframe', 'xmp']) {
+      // Foreign content here, so an optional end tag inside them is one
+      assert.strictEqual(await minify(`<svg><${tag}><p>a</p></${tag}></svg>`, options), `<svg><${tag}><p>a</${tag}></svg>`, tag);
+      assert.strictEqual(await minify(`<math><${tag}><p>a</p></${tag}></math>`, options), `<math><${tag}><p>a</${tag}></math>`, tag);
+
+      // What an integration point holds is HTML again, so the same element holds text there
+      input = `<svg><foreignObject><${tag}><p>a</p></${tag}></foreignObject></svg>`;
+      assert.strictEqual(await minify(input, options), input, tag);
+    }
+
+    // `script` and `style` are the exception: They hold text wherever they sit
+    for (const held of ['<svg><script><p>a</p></script></svg>', '<svg><style><p>a</p></style></svg>', '<math><script><p>a</p></script></math>']) {
+      assert.strictEqual(await minify(held, options), held, held);
+    }
+  });
+
+  test('`decodeEntities` reads raw text by namespace, not by name', async () => {
+    // As an HTML element, `title` and `textarea` hold text that ends at their own end tag,
+    // so only that one `<` needs escaping. In foreign content the same element holds markup,
+    // and leaving the rest unescaped would turn text into elements
+    const options = { decodeEntities: true };
+    for (const tag of ['title', 'textarea']) {
+      assert.strictEqual(await minify(`<svg><${tag}>&lt;b&gt;</${tag}></svg>`, options), `<svg><${tag}>&lt;b></${tag}></svg>`, tag);
+      assert.strictEqual(await minify(`<math><${tag}>&lt;b&gt;</${tag}></math>`, options), `<math><${tag}>&lt;b></${tag}></math>`, tag);
+
+      // What an integration point holds is HTML again, where the element holds text once more
+      assert.strictEqual(
+        await minify(`<svg><foreignObject><${tag}>&lt;b&gt;</${tag}></foreignObject></svg>`, options),
+        `<svg><foreignObject><${tag}><b></${tag}></foreignObject></svg>`,
+        tag
+      );
+    }
+
+    // Raw text keeps its character references, and `iframe` holds raw text as an HTML element
+    // alone—in foreign content it is an element like any other, whose text resolves them
+    assert.strictEqual(await minify('<iframe>a&amp;b</iframe>', options), '<iframe>a&amp;b</iframe>');
+    assert.strictEqual(await minify('<svg><iframe>a&amp;b</iframe></svg>', options), '<svg><iframe>a&b</iframe></svg>');
+
+
+    // `annotation-xml` holds HTML only where its `encoding` says so, and a repeated attribute
+    // is dropped after the first—so the first one decides it, whatever stands behind it
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/html"><title>&lt;b&gt;</title></annotation-xml></math>', options),
+      '<math><annotation-xml encoding="text/html"><title><b></title></annotation-xml></math>'
+    );
+    assert.strictEqual(
+      await minify('<math><annotation-xml encoding="text/plain" encoding="text/html"><title>&lt;b&gt;</title></annotation-xml></math>', options),
+      '<math><annotation-xml encoding="text/plain"><title>&lt;b></title></annotation-xml></math>'
+    );
+
+    // `script` and `style` hold text wherever they sit, so theirs are kept in either place
+    assert.strictEqual(await minify('<script>a&amp;b</script>', options), '<script>a&amp;b</script>');
+    assert.strictEqual(await minify('<svg><script>a&amp;b</script></svg>', options), '<svg><script>a&amp;b</script></svg>');
+    assert.strictEqual(await minify('<svg><style>a&amp;b</style></svg>', options), '<svg><style>a&amp;b</style></svg>');
+  });
+
+  test('The namespace an element sits in stays cheap to read', async () => {
+    // Reading it off the stack costs as much as the stack is deep, for every element whose
+    // content is text—which a deep document turns quadratic, minutes at this size
+    const benign = '<div>a</div>'.repeat(46000);
+    const input = '<div>'.repeat(80000) + '<textarea>a</textarea>'.repeat(8000);
+
+    const startBaseline = Date.now();
+    await minify(benign);
+    const baseline = Date.now() - startBaseline;
+
+    const start = Date.now();
+    await minify(input);
+    const elapsed = Date.now() - start;
+
+    assert.ok(elapsed < Math.max(baseline * 20, 2000), `Expected the namespace to be kept, not walked, took ${elapsed}ms (${baseline}ms baseline)`);
   });
 
   test('Preset normalization: `minifySVG` override', async () => {

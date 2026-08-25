@@ -8,6 +8,8 @@ import { collectUsedSymbols } from './lib/unused-css.js';
 import {
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
+  RE_ESCAPE_LT_RAW_TEXT,
+  RE_HTML_ENCODING,
   RE_WS_START,
   RE_WS_END,
   RE_WS_ONLY,
@@ -16,6 +18,7 @@ import {
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
   specialContentElements,
+  rawTextElements,
   htmlElements,
   optionalStartTags,
   optionalEndTags,
@@ -586,8 +589,6 @@ const RE_HTML_COMMENT_START = /^\s*<!--/;
 const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
 const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
 
-// HTML encoding types for annotation-xml (MathML)
-const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 
 // Probe for SVG/MathML elements—when the input has none (the common case),
 // the per-tag foreign-content machinery can be skipped entirely
@@ -1123,6 +1124,14 @@ async function minifyHTML(value, options, partialMarkup) {
     buffer.length = Math.max(0, index);
   }
 
+  // Whether the element being parsed holds text rather than markup. The namespace decides
+  // this, not the name alone: `script` and `style` hold text wherever they stand, the rest
+  // only as HTML elements—an SVG or MathML `title` holds markup like any foreign element
+  function holdsRawText() {
+    return specialContentElements.has(currentTag) ||
+      (rawTextElements.has(currentTag) && !options.insideForeignContent);
+  }
+
   // Whether whitespace-only text between tags survives minification
   function keepsWhitespace() {
     return !options.collapseWhitespace || Boolean(options.conservativeCollapse) || Boolean(options.preserveLineBreaks);
@@ -1348,7 +1357,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
     }
     charsPrevTag = /^\s*$/.test(text) ? textPrevTag : 'comment';
-    if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
+    if (options.decodeEntities && text && !holdsRawText()) {
       // Escape any `&` symbols that start either:
       // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
       // 2. or any other character reference (i.e., one that does end with `;`)
@@ -1358,7 +1367,10 @@ async function minifyHTML(value, options, partialMarkup) {
         text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
       }
       if (text.indexOf('<') !== -1) {
-        text = text.replace(RE_ESCAPE_LT, '&lt;');
+        // Escapable raw text ends at its own end tag alone, so only that one needs escaping;
+        // in foreign content the same element holds markup, where every `<` does
+        const escapeLt = (options.insideForeignContent ? undefined : RE_ESCAPE_LT_RAW_TEXT[currentTag]) ?? RE_ESCAPE_LT;
+        text = text.replace(escapeLt, '&lt;');
       }
     }
     if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
@@ -1531,10 +1543,11 @@ async function minifyHTML(value, options, partialMarkup) {
           options.removeTagWhitespace = false;
         }
         // `foreignObject` in SVG and `annotation-xml` in MathML contain HTML content
-        // Note: The element itself is in SVG/MathML namespace, only its children are HTML
+        // (the element itself is in SVG/MathML namespace, only its children are HTML);
+        // a repeated attribute is dropped after the first, so the first `encoding` decides
         if (options.insideForeignContent && (lowerTag === 'foreignobject' ||
-            (lowerTag === 'annotation-xml' && attrs.some((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding' &&
-              RE_HTML_ENCODING.test(a.value ?? ''))))) {
+            (lowerTag === 'annotation-xml' && RE_HTML_ENCODING.test(
+              attrs.find((/** @type {HTMLAttribute} */ a) => a.name.toLowerCase() === 'encoding')?.value ?? '')))) {
           const nameParent = options.name;
           options = Object.create(options);
           options.caseSensitive = false;
@@ -1778,7 +1791,7 @@ async function minifyHTML(value, options, partialMarkup) {
       textNextAttrs = nextAttrs || [];
 
       // Detect whether any async work is actually needed for this text node
-      const needsDecode = options.decodeEntities && text && !specialContentElements.has(currentTag) && text.indexOf('&') !== -1;
+      const needsDecode = options.decodeEntities && text && !holdsRawText() && text.indexOf('&') !== -1;
       const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
       const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(

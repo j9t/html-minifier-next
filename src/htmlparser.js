@@ -5,7 +5,8 @@
  * http://erik.eae.net/simplehtmlparser/simplehtmlparser.js
  */
 
-import { isThenable, embedSource } from './lib/utils.js';
+import { isThenable, embedSource, findTagEnd } from './lib/utils.js';
+import { escapableRawTextElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -64,6 +65,7 @@ const qnameCapture = (function () {
   return '((?:' + ncname + '\\:)?' + ncname + ')';
 })();
 const startTagOpen = new RegExp('^<' + qnameCapture);
+const endTagOpen = new RegExp('^</' + qnameCapture);
 export const endTag = new RegExp('^</' + qnameCapture + '[^>]*>');
 
 let IS_REGEX_CAPTURING_BROKEN = false;
@@ -84,44 +86,69 @@ const fillAttrs = new Set(['checked', 'compact', 'declare', 'defer', 'disabled',
 // Special elements (can contain anything)
 const special = new Set(['script', 'style']);
 
+// Elements whose children are HTML rather than foreign content, each only in
+// the namespace it belongs to (`annotation-xml` is one, too, but only for some
+// `encoding` values, so it is checked separately)
+// https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
+const svgIntegrationPoints = new Set(['foreignobject', 'desc', 'title']);
+const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
+
 // HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
 // Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
-const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'col', 'colgroup', 'dd', 'details', 'dialog', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'menuitem', 'meta', 'ol', 'optgroup', 'option', 'param', 'rp', 'rt', 'source', 'style', 'summary', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul']);
+const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'center', 'col', 'colgroup', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'listing', 'main', 'menu', 'menuitem', 'meta', 'nav', 'ol', 'optgroup', 'option', 'param', 'plaintext', 'pre', 'rp', 'rt', 'search', 'section', 'source', 'style', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul', 'xmp']);
 
-const reCache = {};
+// A tag name ends at whitespace, a slash, or the closing bracket, so `</scriptx>` names a
+// different element and does not end this one
+const endsTagName = (/** @type {string} */ character) =>
+  character === '' || character === '/' || character === '>' || /\s/.test(character);
 
-// Pre-compiled regexes for common special elements (`script`, `style`, `noscript`)
-// These are used frequently, and pre-compiling them avoids regex creation overhead
-const preCompiledStackedTags = {
-  'script': /([\s\S]*?)<\/script[^>]*>/i,
-  'style': /([\s\S]*?)<\/style[^>]*>/i,
-  'noscript': /([\s\S]*?)<\/noscript[^>]*>/i
-};
+/**
+ * @param {string} text - The input the tag stands in
+ * @param {number} nameEnd - Position right after the tag name
+ * @returns {number} Position of the `>` that ends the tag, or -1 where none follows
+ */
+function findEndTagClose(text, nameEnd) {
+  const close = text.indexOf('>', nameEnd);
+  if (close === -1) {
+    return -1;
+  }
+  // A quoted attribute value can hold a `>` that does not end the tag it stands in, so a
+  // quote ahead of that bracket calls for a scan that knows about quoting. It stops at the
+  // next `<`, which no tag reaches past: The scans of consecutive tags then never overlap,
+  // and an unquoted value that spans one leaves the first bracket as the end, as before.
+  for (let index = nameEnd; index < close; index++) {
+    const character = text[index];
+    if (character === '"' || character === "'") {
+      const nextOpen = text.indexOf('<', nameEnd);
+      const quoted = findTagEnd(text, nameEnd, nextOpen === -1 ? text.length : nextOpen);
+      return quoted === -1 ? close : quoted;
+    }
+  }
+  return close;
+}
+
+/**
+ * @param {string} text - The input from the start of the content on
+ * @param {string} tag - Lowercase element name
+ * @returns {{content: string, length: number} | null} What the element holds and how far it
+ *   reaches, or `null` where no end tag of its own follows
+ */
+function findRawTextEnd(text, tag) {
+  const nameEnd = tag.length + 2;
+  for (let candidate = text.indexOf('</'); candidate !== -1; candidate = text.indexOf('</', candidate + 2)) {
+    if (text.slice(candidate + 2, candidate + nameEnd).toLowerCase() !== tag || !endsTagName(text.charAt(candidate + nameEnd))) {
+      continue;
+    }
+    // What follows the name is not part of it, and the tag ends at the next bracket outside
+    // its attribute values—where none follows, no later end tag can be complete, either
+    const end = findEndTagClose(text, candidate + nameEnd);
+    return end === -1 ? null : { content: text.slice(0, candidate), length: end + 1 };
+  }
+  return null;
+}
 
 // Cache for compiled attribute regexes per handler configuration
 const attrRegexCache = new WeakMap();
-
-// O(n) helper: Strip all occurrences of `open…close` delimiters, keeping inner content
-// Used instead of a regex replace to avoid O(n²) behavior on adversarial inputs
-/**
- * @param {string} str
- * @param {string} open
- * @param {string} close
- */
-function stripDelimited(str, open, close) {
-  let result = '';
-  let i = 0;
-  while (i < str.length) {
-    const start = str.indexOf(open, i);
-    if (start === -1) { result += str.slice(i); break; }
-    result += str.slice(i, start);
-    const end = str.indexOf(close, start + open.length);
-    if (end === -1) { result += str.slice(start); break; }
-    result += str.slice(start + open.length, end);
-    i = end + close.length;
-  }
-  return result;
-}
 
 /** @param {HTMLParserHandler} handler */
 function buildAttrRegex(handler) {
@@ -202,7 +229,7 @@ export class HTMLParser {
     const fullHtml = this.html;
     const fullLength = fullHtml.length;
 
-    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[]}>} */
+    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[], namespace: string}>} */
     const stack = [];
     /** @type {string} */
     let lastTag = '';
@@ -225,7 +252,7 @@ export class HTMLParser {
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
     // `\s*` with sticky flag is O(n) at worst—no retry from different positions possible
     const startTagCloseY = /\s*(\/?)>/y;
-    const endTagY = new RegExp(endTag.source.slice(1), 'y');
+    const endTagOpenY = new RegExp(endTagOpen.source.slice(1), 'y');
     const doctypeY = /<!DOCTYPE[^<>]+>/iy;
     const commentTestY = /<!--/y;
     const conditionalTestY = /<!\[/y;
@@ -238,11 +265,11 @@ export class HTMLParser {
     let pos = 0;
     let lastPos;
 
-    // An end tag always ends at a `>`; without one, the `endTag` regex’s name run
-    // and its `[^>]*` tail overlap and backtrack O(n²) on a long unclosed name
-    // (e.g., `</aaaa…` with no `>`). Track the next `>` monotonically—`pos` only
-    // advances, so the aggregate scan work stays O(n)—and skip the regex when none
-    // lies ahead, where it could not match anyway.
+    // An end tag always ends at a `>`; without one ahead, matching the name only to find
+    // no bracket behind it repeats the name run at every position, which costs O(n²) on a
+    // long unclosed name (e.g., `</aaaa…` with no `>`). Track the next `>` monotonically—
+    // `pos` only advances, so the aggregate scan work stays O(n)—and skip the match when
+    // none lies ahead, where the tag could not be complete anyway.
     let nextGtPos = fullHtml.indexOf('>');
     const hasCloseAtOrAfter = (/** @type {number} */ p) => {
       if (nextGtPos !== -1 && nextGtPos < p) {
@@ -250,6 +277,13 @@ export class HTMLParser {
       }
       return nextGtPos !== -1;
     };
+
+    // A `-->` that the opener at `pos` does not find is not there for any later one, either,
+    // and the same holds for the `]>` of a downlevel-revealed conditional comment. `pos`
+    // only advances, so remembering the search that came up empty keeps the aggregate work
+    // O(n), where searching again at every opener rescans the rest of the input each time.
+    let commentEndAhead = true;
+    let conditionalEndAhead = true;
 
     // Helper to advance position
     const advance = (/** @type {number} */ n) => { pos += n; };
@@ -274,11 +308,50 @@ export class HTMLParser {
       return fullHtml.slice(startPos);
     };
 
+    // `annotation-xml` holds HTML only where its `encoding` says so; with any other value,
+    // and with none, its content stays MathML
+    const annotationHoldsHTML = (/** @type {{attrs?: HTMLAttribute[]}} */ entry) => {
+      for (const attr of entry.attrs ?? []) {
+        if (attr.name.toLowerCase() === 'encoding') {
+          return RE_HTML_ENCODING.test(attr.value ?? '');
+        }
+      }
+      return false;
+    };
+
+    // Escapable raw text is an HTML rule, so what decides it is the namespace the element sits
+    // in. Walking down from the root resolves that: `<svg>`/`<math>` lead out of HTML, an
+    // integration point leads back in, and a name counts only in the namespace it belongs to
+    // (`title` is one in SVG but not in MathML, `annotation-xml` one in MathML but not in SVG)
+    /** @param {{lowerTag: string, namespace: string, attrs?: HTMLAttribute[]} | undefined} entry */
+    const namespaceInside = (entry) => {
+      if (!entry) {
+        return '';
+      }
+      const { namespace, lowerTag } = entry;
+      if (!namespace) {
+        return lowerTag === 'svg' || lowerTag === 'math' ? lowerTag : '';
+      }
+      if (namespace === 'svg') {
+        return svgIntegrationPoints.has(lowerTag) ? '' : namespace;
+      }
+      return mathIntegrationPoints.has(lowerTag) || (lowerTag === 'annotation-xml' && annotationHoldsHTML(entry)) ? '' : namespace;
+    };
+
+    // The element itself never decides this: `<svg><title>` is SVG, what it holds is HTML
+    const inForeignContent = () => Boolean(stack[stack.length - 1]?.namespace);
+
+    // Whether the content of the element being parsed is read as text rather than markup
+    // (`script` and `style` hold text in every namespace; the rest do so as HTML elements only)
+    const holdsRawText = (/** @type {string} */ tag) =>
+      special.has(tag) ||
+      ((genericRawTextElements.has(tag) || escapableRawTextElements.has(tag)) && !inForeignContent());
+
     while (pos < fullLength) {
       lastPos = pos;
 
-      // Make sure not to be in a `script` or `style` element
-      if (!lastTagLower || !special.has(lastTagLower)) {
+      // Make sure not to be in an element whose content is text, not markup
+      if (!lastTagLower || !holdsRawText(lastTagLower)) {
         const textEnd = fullHtml.indexOf('<', pos);
 
         if (textEnd === pos) {
@@ -298,9 +371,9 @@ export class HTMLParser {
             const endTagMatch = cachedNextEndTag.match;
             cachedNextStartTag = null;
             cachedNextEndTag = null;
-            advance((endTagMatch[0] ?? '').length);
-            await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
-            prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
+            advance(endTagMatch.text.length);
+            await parseEndTag(endTagMatch.text, endTagMatch.name);
+            prevTag = '/' + endTagMatch.name.toLowerCase();
             prevAttrs = [];
             continue;
           }
@@ -310,7 +383,8 @@ export class HTMLParser {
           // Comment
           commentTestY.lastIndex = pos;
           if (commentTestY.test(fullHtml)) {
-            const commentEnd = fullHtml.indexOf('-->', pos + 4);
+            const commentEnd = commentEndAhead ? fullHtml.indexOf('-->', pos + 4) : -1;
+            if (commentEnd === -1) commentEndAhead = false;
 
             if (commentEnd >= 0) {
               if (handler.comment) {
@@ -327,7 +401,8 @@ export class HTMLParser {
           // https://web.archive.org/web/20241201212701/https://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
           conditionalTestY.lastIndex = pos;
           if (conditionalTestY.test(fullHtml)) {
-            const conditionalEnd = fullHtml.indexOf(']>', pos + 3);
+            const conditionalEnd = conditionalEndAhead ? fullHtml.indexOf(']>', pos + 3) : -1;
+            if (conditionalEnd === -1) conditionalEndAhead = false;
 
             if (conditionalEnd >= 0) {
               if (handler.comment) {
@@ -354,15 +429,14 @@ export class HTMLParser {
             continue;
           }
 
-          // End tag—skip when no `>` lies ahead: The regex cannot match, and would
-          // otherwise backtrack quadratically on a long unclosed name
+          // End tag—skip when no `>` lies ahead: The tag cannot be complete, and matching
+          // its name at every position would cost O(n²) on a long unclosed name
           if (hasCloseAtOrAfter(pos)) {
-            endTagY.lastIndex = pos;
-            const endTagMatch = endTagY.exec(fullHtml);
+            const endTagMatch = matchEndTag(pos);
             if (endTagMatch) {
-              advance((endTagMatch[0] ?? '').length);
-              await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
-              prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
+              advance(endTagMatch.text.length);
+              await parseEndTag(endTagMatch.text, endTagMatch.name);
+              prevTag = '/' + endTagMatch.name.toLowerCase();
               prevAttrs = [];
               continue;
             }
@@ -401,10 +475,9 @@ export class HTMLParser {
             nextAttrs = extractAttrInfo(nextStartTagMatch.attrs);
             cachedNextStartTag = { match: nextStartTagMatch, pos };
           } else if (hasCloseAtOrAfter(pos)) {
-            endTagY.lastIndex = pos;
-            const nextEndTagMatch = endTagY.exec(fullHtml);
+            const nextEndTagMatch = matchEndTag(pos);
             if (nextEndTagMatch) {
-              nextTag = '/' + nextEndTagMatch[1];
+              nextTag = '/' + nextEndTagMatch.name;
               nextAttrs = [];
               cachedNextEndTag = { match: nextEndTagMatch, pos };
             } else {
@@ -425,32 +498,36 @@ export class HTMLParser {
         prevAttrs = [];
       } else {
         const stackedTag = lastTagLower;
-        // Use pre-compiled regex for common tags (`script`, `style`, `noscript`) to avoid regex creation overhead
-        const reStackedTag = /** @type {Record<string, RegExp>} */ (preCompiledStackedTags)[stackedTag] || /** @type {Record<string, RegExp>} */ (reCache)[stackedTag] || (/** @type {Record<string, RegExp>} */ (reCache)[stackedTag] = new RegExp('([\\s\\S]*?)\\x3c/' + stackedTag + '[^>]*>', 'i'));
+        const isEscapableRawText = escapableRawTextElements.has(stackedTag);
 
         const remaining = sliceFromPos(pos);
-        const m = reStackedTag.exec(remaining);
-        if (m && m.index === 0) {
-          let text = m[1] ?? '';
-          if (stackedTag !== 'script' && stackedTag !== 'style' && stackedTag !== 'noscript') {
-            text = stripDelimited(stripDelimited(text, '<!--', '-->'), '<![CDATA[', ']]>');
-          }
+        const rawText = findRawTextEnd(remaining, stackedTag);
+        if (rawText) {
+          const text = rawText.content;
           if (handler.chars) {
-            const result = handler.chars(text);
+            // Escapable raw text is a text node like any other, so the handler gets the tags
+            // around it—it collapses and trims whitespace by what stands next to the text
+            const result = isEscapableRawText
+              ? handler.chars(text, stackedTag, '/' + stackedTag, prevAttrs, [])
+              : handler.chars(text);
             if (isThenable(result)) await result;
           }
           // Advance HTML past the matched special tag content and its closing tag
-          advance(m[0].length);
+          advance(rawText.length);
           await parseEndTag('</' + stackedTag + '>', stackedTag);
+          // What follows stands after that end tag, not after the start tag still named here—
+          // whitespace next to `textarea` stays verbatim only while the element is open
+          prevTag = '/' + stackedTag;
+          prevAttrs = [];
         } else {
-          // No closing tag found; break to avoid an infinite loop
-          if (handler.continueOnParseError && handler.chars && pos < fullLength) {
-            const result = handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
+          // Without an end tag of its own, the element holds the rest of the input as text
+          if (handler.chars && remaining) {
+            const result = isEscapableRawText
+              ? handler.chars(remaining, stackedTag, '', prevAttrs, [])
+              : handler.chars(remaining);
             if (isThenable(result)) await result;
-            advance(1);
-          } else {
-            break;
           }
+          advance(remaining.length);
         }
       }
 
@@ -495,6 +572,21 @@ export class HTMLParser {
         const value = args[baseIndex + 2] ?? args[baseIndex + 3] ?? args[baseIndex + 4];
         return { name: name?.toLowerCase() ?? '', value };
       }).filter(attr => attr.name)); // Filter out invalid entries
+    }
+
+    /**
+     * @param {number} startPos
+     * @returns {{text: string, name: string} | null} The end tag standing there, or `null`
+     *   where none is complete
+     */
+    function matchEndTag(startPos) {
+      endTagOpenY.lastIndex = startPos;
+      const open = endTagOpenY.exec(fullHtml);
+      if (!open) {
+        return null;
+      }
+      const close = findEndTagClose(fullHtml, startPos + open[0].length);
+      return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name: open[1] ?? '' };
     }
 
     function parseStartTag(/** @type {number} */ startPos) {
@@ -730,7 +822,7 @@ export class HTMLParser {
       if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
         lastTag = 'colgroup';
         lastTagLower = 'colgroup';
-        stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [] });
+        stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [], namespace: namespaceInside(stack[stack.length - 1]) });
         if (handler.start) {
           await handler.start(lastTag, [], false, '', true);
         }
@@ -806,7 +898,7 @@ export class HTMLParser {
       }));
 
       if (!unary) {
-        stack.push({ tag: tagName, lowerTag: lowerTagName, attrs });
+        stack.push({ tag: tagName, lowerTag: lowerTagName, attrs, namespace: namespaceInside(stack[stack.length - 1]) });
         lastTag = tagName;
         lastTagLower = lowerTagName;
         unarySlash = '';

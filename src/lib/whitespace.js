@@ -237,8 +237,10 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
 
 // Collapse/trim whitespace for given tag
 
-const noCollapseWhitespaceTags = new Set(['script', 'style', 'pre', 'textarea']);
-const noTrimWhitespaceTags = new Set(['pre', 'textarea']);
+// `xmp`, `listing`, and `plaintext` render preformatted, as `pre` does
+// https://html.spec.whatwg.org/multipage/rendering.html#the-page
+const noCollapseWhitespaceTags = new Set(['script', 'style', 'pre', 'textarea', 'xmp', 'listing', 'plaintext']);
+const noTrimWhitespaceTags = new Set(['pre', 'textarea', 'xmp', 'listing', 'plaintext']);
 
 /** @param {string} tag */
 function canCollapseWhitespace(tag) {
