@@ -6343,6 +6343,23 @@ describe('HTML', () => {
     }
   });
 
+  test('An end tag ends at the `>` outside its attribute values', async () => {
+    // An end tag could carry attributes, and a quoted value there can hold `>`, which does
+    // not end the tag it stands in
+    // https://html.spec.whatwg.org/multipage/parsing.html#attribute-value-(double-quoted)-state
+    assert.strictEqual(await minify('<div>a</div foo="x>y">b'), '<div>a</div>b');
+    assert.strictEqual(await minify('<div>a</div foo=\'x>y\'>b'), '<div>a</div>b');
+
+    // Elements whose content is text scan for their own end tag separately
+    for (const tag of ['textarea', 'title', 'script', 'style', 'iframe', 'xmp']) {
+      assert.strictEqual(await minify(`<${tag}>a</${tag} foo="x>y">b`), `<${tag}>a</${tag}>b`, tag);
+    }
+
+    // Without a closing quote the tag has no end of its own, and ends at the first `>`
+    assert.strictEqual(await minify('<div>a</div foo="x>y'), '<div>a</div>y');
+    assert.strictEqual(await minify('<textarea>a</textarea foo="x>y'), '<textarea>a</textarea>y');
+  });
+
   test('`iframe` and `xmp` hold text, not markup', async () => {
     // The parser reads these as raw text as well, so a `<` inside them never starts a tag
     // https://html.spec.whatwg.org/multipage/parsing.html#generic-raw-text-element-parsing-algorithm

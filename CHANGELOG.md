@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed the content of an unclosed `script` or `style` element being dropped—an element whose content is text (`script`, `style`, `textarea`, `title`) now holds the rest of the input
 * Fixed `decodeEntities` escaping every `<` in `textarea` and `title`, where only the element’s own end tag needs it
 * Fixed the scan for an element’s own end tag rescanning the rest of the input at every near match (where a fragment such as `</script ` repeated cost minutes rather than milliseconds)
+* Fixed an end tag ending at the first `>`, even where that bracket stood inside one of its attribute values (as in `</textarea foo="x>y">`), which left the rest of the tag in the document as text
 
 ## [8.1.1] - 2026-08-24
 

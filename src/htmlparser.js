@@ -5,7 +5,7 @@
  * http://erik.eae.net/simplehtmlparser/simplehtmlparser.js
  */
 
-import { isThenable, embedSource } from './lib/utils.js';
+import { isThenable, embedSource, findTagEnd } from './lib/utils.js';
 import { escapableRawTextElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
@@ -65,6 +65,7 @@ const qnameCapture = (function () {
   return '((?:' + ncname + '\\:)?' + ncname + ')';
 })();
 const startTagOpen = new RegExp('^<' + qnameCapture);
+const endTagOpen = new RegExp('^</' + qnameCapture);
 export const endTag = new RegExp('^</' + qnameCapture + '[^>]*>');
 
 let IS_REGEX_CAPTURING_BROKEN = false;
@@ -102,6 +103,31 @@ const endsTagName = (/** @type {string} */ character) =>
   character === '' || character === '/' || character === '>' || /\s/.test(character);
 
 /**
+ * @param {string} text - The input the tag stands in
+ * @param {number} nameEnd - Position right after the tag name
+ * @returns {number} Position of the `>` that ends the tag, or -1 where none follows
+ */
+function findEndTagClose(text, nameEnd) {
+  const close = text.indexOf('>', nameEnd);
+  if (close === -1) {
+    return -1;
+  }
+  // A quoted attribute value can hold a `>` that does not end the tag it stands in, so a
+  // quote ahead of that bracket calls for a scan that knows about quoting. It stops at the
+  // next `<`, which no tag reaches past: The scans of consecutive tags then never overlap,
+  // and an unquoted value that spans one leaves the first bracket as the end, as before.
+  for (let index = nameEnd; index < close; index++) {
+    const character = text[index];
+    if (character === '"' || character === "'") {
+      const nextOpen = text.indexOf('<', nameEnd);
+      const quoted = findTagEnd(text, nameEnd, nextOpen === -1 ? text.length : nextOpen);
+      return quoted === -1 ? close : quoted;
+    }
+  }
+  return close;
+}
+
+/**
  * @param {string} text - The input from the start of the content on
  * @param {string} tag - Lowercase element name
  * @returns {{content: string, length: number} | null} What the element holds and how far it
@@ -113,9 +139,9 @@ function findRawTextEnd(text, tag) {
     if (text.slice(candidate + 2, candidate + nameEnd).toLowerCase() !== tag || !endsTagName(text.charAt(candidate + nameEnd))) {
       continue;
     }
-    // What follows the name is not part of it, and the tag ends at the next bracket—
-    // where none follows, no later end tag can be complete, either
-    const end = text.indexOf('>', candidate + nameEnd);
+    // What follows the name is not part of it, and the tag ends at the next bracket outside
+    // its attribute values—where none follows, no later end tag can be complete, either
+    const end = findEndTagClose(text, candidate + nameEnd);
     return end === -1 ? null : { content: text.slice(0, candidate), length: end + 1 };
   }
   return null;
@@ -226,7 +252,7 @@ export class HTMLParser {
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
     // `\s*` with sticky flag is O(n) at worst—no retry from different positions possible
     const startTagCloseY = /\s*(\/?)>/y;
-    const endTagY = new RegExp(endTag.source.slice(1), 'y');
+    const endTagOpenY = new RegExp(endTagOpen.source.slice(1), 'y');
     const doctypeY = /<!DOCTYPE[^<>]+>/iy;
     const commentTestY = /<!--/y;
     const conditionalTestY = /<!\[/y;
@@ -239,11 +265,11 @@ export class HTMLParser {
     let pos = 0;
     let lastPos;
 
-    // An end tag always ends at a `>`; without one, the `endTag` regex’s name run
-    // and its `[^>]*` tail overlap and backtrack O(n²) on a long unclosed name
-    // (e.g., `</aaaa…` with no `>`). Track the next `>` monotonically—`pos` only
-    // advances, so the aggregate scan work stays O(n)—and skip the regex when none
-    // lies ahead, where it could not match anyway.
+    // An end tag always ends at a `>`; without one ahead, matching the name only to find
+    // no bracket behind it repeats the name run at every position, which costs O(n²) on a
+    // long unclosed name (e.g., `</aaaa…` with no `>`). Track the next `>` monotonically—
+    // `pos` only advances, so the aggregate scan work stays O(n)—and skip the match when
+    // none lies ahead, where the tag could not be complete anyway.
     let nextGtPos = fullHtml.indexOf('>');
     const hasCloseAtOrAfter = (/** @type {number} */ p) => {
       if (nextGtPos !== -1 && nextGtPos < p) {
@@ -338,9 +364,9 @@ export class HTMLParser {
             const endTagMatch = cachedNextEndTag.match;
             cachedNextStartTag = null;
             cachedNextEndTag = null;
-            advance((endTagMatch[0] ?? '').length);
-            await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
-            prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
+            advance(endTagMatch.text.length);
+            await parseEndTag(endTagMatch.text, endTagMatch.name);
+            prevTag = '/' + endTagMatch.name.toLowerCase();
             prevAttrs = [];
             continue;
           }
@@ -394,15 +420,14 @@ export class HTMLParser {
             continue;
           }
 
-          // End tag—skip when no `>` lies ahead: The regex cannot match, and would
-          // otherwise backtrack quadratically on a long unclosed name
+          // End tag—skip when no `>` lies ahead: The tag cannot be complete, and matching
+          // its name at every position would cost O(n²) on a long unclosed name
           if (hasCloseAtOrAfter(pos)) {
-            endTagY.lastIndex = pos;
-            const endTagMatch = endTagY.exec(fullHtml);
+            const endTagMatch = matchEndTag(pos);
             if (endTagMatch) {
-              advance((endTagMatch[0] ?? '').length);
-              await parseEndTag(endTagMatch[0] ?? '', endTagMatch[1] ?? '');
-              prevTag = '/' + (endTagMatch[1] ?? '').toLowerCase();
+              advance(endTagMatch.text.length);
+              await parseEndTag(endTagMatch.text, endTagMatch.name);
+              prevTag = '/' + endTagMatch.name.toLowerCase();
               prevAttrs = [];
               continue;
             }
@@ -441,10 +466,9 @@ export class HTMLParser {
             nextAttrs = extractAttrInfo(nextStartTagMatch.attrs);
             cachedNextStartTag = { match: nextStartTagMatch, pos };
           } else if (hasCloseAtOrAfter(pos)) {
-            endTagY.lastIndex = pos;
-            const nextEndTagMatch = endTagY.exec(fullHtml);
+            const nextEndTagMatch = matchEndTag(pos);
             if (nextEndTagMatch) {
-              nextTag = '/' + nextEndTagMatch[1];
+              nextTag = '/' + nextEndTagMatch.name;
               nextAttrs = [];
               cachedNextEndTag = { match: nextEndTagMatch, pos };
             } else {
@@ -535,6 +559,21 @@ export class HTMLParser {
         const value = args[baseIndex + 2] ?? args[baseIndex + 3] ?? args[baseIndex + 4];
         return { name: name?.toLowerCase() ?? '', value };
       }).filter(attr => attr.name)); // Filter out invalid entries
+    }
+
+    /**
+     * @param {number} startPos
+     * @returns {{text: string, name: string} | null} The end tag standing there, or `null`
+     *   where none is complete
+     */
+    function matchEndTag(startPos) {
+      endTagOpenY.lastIndex = startPos;
+      const open = endTagOpenY.exec(fullHtml);
+      if (!open) {
+        return null;
+      }
+      const close = findEndTagClose(fullHtml, startPos + open[0].length);
+      return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name: open[1] ?? '' };
     }
 
     function parseStartTag(/** @type {number} */ startPos) {
