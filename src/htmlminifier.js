@@ -8,6 +8,7 @@ import { collectUsedSymbols } from './lib/unused-css.js';
 import {
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
+  RE_ESCAPE_LT_RAW_TEXT,
   RE_WS_START,
   RE_WS_END,
   RE_WS_ONLY,
@@ -1358,7 +1359,8 @@ async function minifyHTML(value, options, partialMarkup) {
         text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
       }
       if (text.indexOf('<') !== -1) {
-        text = text.replace(RE_ESCAPE_LT, '&lt;');
+        // Escapable raw text ends at its own end tag alone, so only that one needs escaping
+        text = text.replace(RE_ESCAPE_LT_RAW_TEXT[currentTag] ?? RE_ESCAPE_LT, '&lt;');
       }
     }
     if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {

@@ -6233,6 +6233,95 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div><p>a </p>  <p>b</p></div>', aggressive), '<div><p>a<p>b</div>');
   });
 
+  test('`textarea` and `title` hold text, not markup', async () => {
+    // Both are escapable raw text elements: A `<` inside them never starts a tag, so no
+    // option may treat their content as elements
+    // https://html.spec.whatwg.org/multipage/syntax.html#raw-text-elements
+
+    let input;
+
+    // Optional end tags are text here, and stay
+    input = '<textarea><p>a</p></textarea>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+    input = '<title><p>a</p></title>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+
+    // So is anything that only looks like a comment
+    input = '<textarea>a<!-- c --></textarea>';
+    assert.strictEqual(await minify(input, { removeComments: true }), input);
+    input = '<title>a<!-- c --></title>';
+    assert.strictEqual(await minify(input, { removeComments: true }), input);
+
+    // Attributes are text, too, and keep their whitespace and their quotes
+    input = '<textarea><b class="  y  ">x</b></textarea>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true }), input);
+
+    // An empty element is what it looks like, not what its text says
+    input = '<textarea><b></b></textarea>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
+
+    // Only the element’s own end tag ends it, whatever its case
+    assert.strictEqual(await minify('<textarea>x</TEXTAREA>'), '<textarea>x</textarea>');
+    assert.strictEqual(await minify('<textarea>a</p>b</textarea>'), '<textarea>a</p>b</textarea>');
+
+    // A longer name is a different element, so it does not end this one
+    input = '<textarea>a</textareax>b</textarea>';
+    assert.strictEqual(await minify(input), input);
+    input = '<script>a</scriptx>b</script>';
+    assert.strictEqual(await minify(input), input);
+    input = '<style>a{}</stylex>b</style>';
+    assert.strictEqual(await minify(input), input);
+    // What follows the name is not part of it
+    assert.strictEqual(await minify('<textarea>a</textarea >b'), '<textarea>a</textarea>b');
+
+    // The rule is an HTML one: In SVG and MathML, `title` is an ordinary element
+    assert.strictEqual(await minify('<svg><title><p>a</p></title></svg>', { removeOptionalTags: true }), '<svg><title><p>a</title></svg>');
+    assert.strictEqual(await minify('<math><title><p>a</p></title></math>', { removeOptionalTags: true }), '<math><title><p>a</title></math>');
+
+    // `foreignObject` and `annotation-xml` lead back into HTML, where it holds text again
+    input = '<svg><foreignObject><title><p>a</p></title></foreignObject></svg>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+    input = '<math><annotation-xml><title><p>a</p></title></annotation-xml></math>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
+
+    // Minifying the output again leaves it alone
+    input = '<textarea><p>a</p></textarea><title><p>b</p></title>';
+    const options = { removeOptionalTags: true, removeComments: true, collapseWhitespace: true };
+    assert.strictEqual(await minify(input, options), input);
+    assert.strictEqual(await minify(await minify(input, options), options), input);
+  });
+
+  test('Whitespace and entities in `textarea` and `title`', async () => {
+    // Reading the content as text changes nothing about how it is otherwise handled
+
+    // Whitespace in `textarea` stays verbatim, whitespace in `title` collapses
+    assert.strictEqual(await minify('<textarea>  a  b  </textarea>', { collapseWhitespace: true }), '<textarea>  a  b  </textarea>');
+    assert.strictEqual(await minify('<title>  a  b  </title>', { collapseWhitespace: true }), '<title>a b</title>');
+
+    // A single trailing newline is still trimmed, as the template artifact it usually is
+    assert.strictEqual(await minify('<textarea>foo\n</textarea>', { collapseWhitespace: true }), '<textarea>foo</textarea>');
+    assert.strictEqual(await minify('<textarea>foo\n\n</textarea>', { collapseWhitespace: true }), '<textarea>foo\n\n</textarea>');
+
+    // Character references are decoded in both, as they are anywhere else
+    assert.strictEqual(await minify('<textarea>&amp;</textarea>', { decodeEntities: true }), '<textarea>&</textarea>');
+    assert.strictEqual(await minify('<title>&amp;</title>', { decodeEntities: true }), '<title>&</title>');
+    assert.strictEqual(await minify('<textarea>a &lt; b</textarea>', { decodeEntities: true }), '<textarea>a < b</textarea>');
+
+    // Only the element’s own end tag ends it, so `decodeEntities` escapes that one and
+    // leaves every other `<` alone, rather than growing the output for nothing
+    assert.strictEqual(await minify('<textarea><p>a</p></textarea>', { decodeEntities: true }), '<textarea><p>a</p></textarea>');
+    assert.strictEqual(await minify('<title>a<b>b</b>c</title>', { decodeEntities: true }), '<title>a<b>b</b>c</title>');
+    for (const input of ['<textarea>&lt;/textarea>x</textarea>', '<textarea>&lt;/TEXTAREA >x</textarea>', '<title>&lt;/title>x</title>']) {
+      assert.strictEqual(await minify(input, { decodeEntities: true }), input, input);
+      assert.strictEqual(await minify(await minify(input, { decodeEntities: true }), { decodeEntities: true }), input, input);
+    }
+
+    // An element left unclosed keeps the text it holds
+    assert.strictEqual(await minify('<textarea>foo'), '<textarea>foo');
+    assert.strictEqual(await minify('<title>a'), '<title>a');
+  });
+
   test('Trim trailing newline in `pre`/`textarea` with `collapseWhitespace`', async () => {
     let input, output;
 

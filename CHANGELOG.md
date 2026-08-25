@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.1.2] - 2026-08-25
+
+### Fixed
+
+* Fixed the content of `title` and `textarea` being read as markup
+* Fixed an end tag whose name merely starts with that of the element being parsed (as `</scriptx>` does for `<script>`), ending it and dropping everything up to the tag that really ends it
+* Fixed `decodeEntities` escaping every `<` in `textarea` and `title`, where only the element’s own end tag needs it
+
 ## [8.1.1] - 2026-08-24
 
 ### Fixed

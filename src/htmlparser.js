@@ -6,6 +6,7 @@
  */
 
 import { isThenable, embedSource } from './lib/utils.js';
+import { escapableRawTextElements } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -90,38 +91,19 @@ const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote'
 
 const reCache = {};
 
-// Pre-compiled regexes for common special elements (`script`, `style`, `noscript`)
-// These are used frequently, and pre-compiling them avoids regex creation overhead
+// Pre-compiled regexes for common special elements (`script`, `style`, `noscript`, `textarea`, `title`).
+// Used frequently, and pre-compiling them avoids regex creation overhead.
+// Only a complete tag name ends the element, so `</scriptx>` is content rather than a match.
 const preCompiledStackedTags = {
-  'script': /([\s\S]*?)<\/script[^>]*>/i,
-  'style': /([\s\S]*?)<\/style[^>]*>/i,
-  'noscript': /([\s\S]*?)<\/noscript[^>]*>/i
+  'script': /([\s\S]*?)<\/script(?=[\s/>])[^>]*>/i,
+  'style': /([\s\S]*?)<\/style(?=[\s/>])[^>]*>/i,
+  'noscript': /([\s\S]*?)<\/noscript(?=[\s/>])[^>]*>/i,
+  'textarea': /([\s\S]*?)<\/textarea(?=[\s/>])[^>]*>/i,
+  'title': /([\s\S]*?)<\/title(?=[\s/>])[^>]*>/i
 };
 
 // Cache for compiled attribute regexes per handler configuration
 const attrRegexCache = new WeakMap();
-
-// O(n) helper: Strip all occurrences of `open…close` delimiters, keeping inner content
-// Used instead of a regex replace to avoid O(n²) behavior on adversarial inputs
-/**
- * @param {string} str
- * @param {string} open
- * @param {string} close
- */
-function stripDelimited(str, open, close) {
-  let result = '';
-  let i = 0;
-  while (i < str.length) {
-    const start = str.indexOf(open, i);
-    if (start === -1) { result += str.slice(i); break; }
-    result += str.slice(i, start);
-    const end = str.indexOf(close, start + open.length);
-    if (end === -1) { result += str.slice(start); break; }
-    result += str.slice(start + open.length, end);
-    i = end + close.length;
-  }
-  return result;
-}
 
 /** @param {HTMLParserHandler} handler */
 function buildAttrRegex(handler) {
@@ -274,11 +256,30 @@ export class HTMLParser {
       return fullHtml.slice(startPos);
     };
 
+    // Escapable raw text is an HTML rule: In SVG and MathML, `title` is an ordinary element
+    // that holds markup, and only `foreignObject`/`annotation-xml` lead back into HTML
+    const inForeignContent = () => {
+      for (let i = stack.length - 1; i >= 0; i--) {
+        const lower = stack[i]?.lowerTag;
+        if (lower === 'svg' || lower === 'math') {
+          return true;
+        }
+        if (lower === 'foreignobject' || lower === 'annotation-xml') {
+          return false;
+        }
+      }
+      return false;
+    };
+
+    // Whether the content of the element being parsed is read as text rather than markup
+    const holdsRawText = (/** @type {string} */ tag) =>
+      special.has(tag) || (escapableRawTextElements.has(tag) && !inForeignContent());
+
     while (pos < fullLength) {
       lastPos = pos;
 
-      // Make sure not to be in a `script` or `style` element
-      if (!lastTagLower || !special.has(lastTagLower)) {
+      // Make sure not to be in an element whose content is text, not markup
+      if (!lastTagLower || !holdsRawText(lastTagLower)) {
         const textEnd = fullHtml.indexOf('<', pos);
 
         if (textEnd === pos) {
@@ -425,23 +426,32 @@ export class HTMLParser {
         prevAttrs = [];
       } else {
         const stackedTag = lastTagLower;
-        // Use pre-compiled regex for common tags (`script`, `style`, `noscript`) to avoid regex creation overhead
-        const reStackedTag = /** @type {Record<string, RegExp>} */ (preCompiledStackedTags)[stackedTag] || /** @type {Record<string, RegExp>} */ (reCache)[stackedTag] || (/** @type {Record<string, RegExp>} */ (reCache)[stackedTag] = new RegExp('([\\s\\S]*?)\\x3c/' + stackedTag + '[^>]*>', 'i'));
+        const isRawText = escapableRawTextElements.has(stackedTag);
+        // Use pre-compiled regex for common tags (`script`, `style`, `noscript`, `textarea`, `title`) to avoid regex creation overhead
+        const reStackedTag = /** @type {Record<string, RegExp>} */ (preCompiledStackedTags)[stackedTag] || /** @type {Record<string, RegExp>} */ (reCache)[stackedTag] || (/** @type {Record<string, RegExp>} */ (reCache)[stackedTag] = new RegExp('([\\s\\S]*?)\\x3c/' + stackedTag + '(?=[\\s/>])[^>]*>', 'i'));
 
         const remaining = sliceFromPos(pos);
         const m = reStackedTag.exec(remaining);
         if (m && m.index === 0) {
-          let text = m[1] ?? '';
-          if (stackedTag !== 'script' && stackedTag !== 'style' && stackedTag !== 'noscript') {
-            text = stripDelimited(stripDelimited(text, '<!--', '-->'), '<![CDATA[', ']]>');
-          }
+          const text = m[1] ?? '';
           if (handler.chars) {
-            const result = handler.chars(text);
+            // Escapable raw text is a text node like any other, so the handler gets the tags
+            // around it—it collapses and trims whitespace by what stands next to the text
+            const result = isRawText
+              ? handler.chars(text, stackedTag, '/' + stackedTag, prevAttrs, [])
+              : handler.chars(text);
             if (isThenable(result)) await result;
           }
           // Advance HTML past the matched special tag content and its closing tag
           advance(m[0].length);
           await parseEndTag('</' + stackedTag + '>', stackedTag);
+        } else if (isRawText) {
+          // Without an end tag, the element holds the rest of the input as text
+          if (handler.chars && remaining) {
+            const result = handler.chars(remaining, stackedTag, '', prevAttrs, []);
+            if (isThenable(result)) await result;
+          }
+          advance(remaining.length);
         } else {
           // No closing tag found; break to avoid an infinite loop
           if (handler.continueOnParseError && handler.chars && pos < fullLength) {
