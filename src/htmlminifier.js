@@ -9,6 +9,7 @@ import {
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
   RE_ESCAPE_LT_RAW_TEXT,
+  RE_HTML_ENCODING,
   RE_WS_START,
   RE_WS_END,
   RE_WS_ONLY,
@@ -587,8 +588,6 @@ const RE_HTML_COMMENT_START = /^\s*<!--/;
 const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
 const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
 
-// HTML encoding types for annotation-xml (MathML)
-const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
 
 // Probe for SVG/MathML elements—when the input has none (the common case),
 // the per-tag foreign-content machinery can be skipped entirely

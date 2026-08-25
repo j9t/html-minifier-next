@@ -6,7 +6,7 @@
  */
 
 import { isThenable, embedSource } from './lib/utils.js';
-import { escapableRawTextElements } from './lib/constants.js';
+import { escapableRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -256,15 +256,31 @@ export class HTMLParser {
       return fullHtml.slice(startPos);
     };
 
+    // `annotation-xml` holds HTML only where its `encoding` says so; with any other value,
+    // and with none, its content stays MathML
+    const isHTMLIntegrationPoint = (/** @type {{attrs?: HTMLAttribute[]}} */ entry) => {
+      for (const attr of entry.attrs ?? []) {
+        if (attr.name.toLowerCase() === 'encoding') {
+          return RE_HTML_ENCODING.test(attr.value ?? '');
+        }
+      }
+      return false;
+    };
+
     // Escapable raw text is an HTML rule: In SVG and MathML, `title` is an ordinary element
     // that holds markup, and only `foreignObject`/`annotation-xml` lead back into HTML
     const inForeignContent = () => {
       for (let i = stack.length - 1; i >= 0; i--) {
-        const lower = stack[i]?.lowerTag;
+        const entry = stack[i];
+        const lower = entry?.lowerTag;
         if (lower === 'svg' || lower === 'math') {
           return true;
         }
-        if (lower === 'foreignobject' || lower === 'annotation-xml') {
+        if (lower === 'foreignobject') {
+          return false;
+        }
+        // Anything else this `annotation-xml` holds is foreign content, so keep looking outward
+        if (lower === 'annotation-xml' && entry && isHTMLIntegrationPoint(entry)) {
           return false;
         }
       }
