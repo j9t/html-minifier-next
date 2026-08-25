@@ -631,6 +631,28 @@ describe('SVG and MathML', () => {
       assert.strictEqual(await minify(input, options), input, encoding);
     }
 
+    // A name counts only in the namespace it belongs to, so neither set reaches into the other
+    for (const [open, close] of [
+      ['<math><title>', '</title></math>'],
+      ['<math><desc>', '</desc></math>'],
+      ['<math><foreignObject>', '</foreignObject></math>'],
+      ['<svg><mtext>', '</mtext></svg>'],
+      ['<svg><mi>', '</mi></svg>'],
+      ['<svg><annotation-xml encoding="text/html">', '</annotation-xml></svg>']
+    ]) {
+      assert.strictEqual(
+        await minify(`${open}<textarea><p>a</p></textarea>${close}`, options),
+        `${open}<textarea><p>a</textarea>${close}`,
+        open
+      );
+    }
+
+    // Leaving an integration point enters the namespace around it again
+    input = '<svg><foreignObject><math><title><textarea><p>a</p></textarea></title></math></foreignObject></svg>';
+    assert.strictEqual(await minify(input, options), '<svg><foreignObject><math><title><textarea><p>a</textarea></title></math></foreignObject></svg>');
+    input = '<svg><foreignObject><svg><title><p>a</p></title></svg></foreignObject></svg>';
+    assert.strictEqual(await minify(input, options), '<svg><foreignObject><svg><title><p>a</title></svg></foreignObject></svg>');
+
     // With any other encoding, and with none, its content stays MathML, where `title` holds markup
     assert.strictEqual(
       await minify('<math><annotation-xml><title><p>a</p></title></annotation-xml></math>', options),

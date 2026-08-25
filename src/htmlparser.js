@@ -85,11 +85,12 @@ const fillAttrs = new Set(['checked', 'compact', 'declare', 'defer', 'disabled',
 // Special elements (can contain anything)
 const special = new Set(['script', 'style']);
 
-// Elements whose children are HTML rather than foreign content: In SVG `foreignObject`,
-// `desc`, and `title`, and the MathML text integration points—`annotation-xml` is one, too,
-// but only for some `encoding` values, so it is checked separately
+// Elements whose children are HTML rather than foreign content, each only in
+// the namespace it belongs to (`annotation-xml` is one, too, but only for some
+// `encoding` values, so it is checked separately)
 // https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
-const htmlIntegrationPoints = new Set(['foreignobject', 'desc', 'title', 'mi', 'mo', 'mn', 'ms', 'mtext']);
+const svgIntegrationPoints = new Set(['foreignobject', 'desc', 'title']);
+const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
 
 // HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
 // Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
@@ -264,7 +265,7 @@ export class HTMLParser {
 
     // `annotation-xml` holds HTML only where its `encoding` says so; with any other value,
     // and with none, its content stays MathML
-    const isHTMLIntegrationPoint = (/** @type {{attrs?: HTMLAttribute[]}} */ entry) => {
+    const annotationHoldsHTML = (/** @type {{attrs?: HTMLAttribute[]}} */ entry) => {
       for (const attr of entry.attrs ?? []) {
         if (attr.name.toLowerCase() === 'encoding') {
           return RE_HTML_ENCODING.test(attr.value ?? '');
@@ -273,25 +274,29 @@ export class HTMLParser {
       return false;
     };
 
-    // Escapable raw text is an HTML rule: In SVG and MathML, `title` is an ordinary element
-    // that holds markup. The scan starts at the parent, as the element itself never decides
-    // this—`<svg><title>` is SVG, while what that same `title` holds is HTML again
+    // Escapable raw text is an HTML rule, so what decides it is the namespace the element sits
+    // in. Walking down from the root resolves that: `<svg>`/`<math>` lead out of HTML, an
+    // integration point leads back in, and a name counts only in the namespace it belongs to
+    // (`title` is one in SVG but not in MathML, `annotation-xml` one in MathML but not in SVG)
     const inForeignContent = () => {
-      for (let i = stack.length - 2; i >= 0; i--) {
+      let namespace = '';
+      // The element itself never decides this: `<svg><title>` is SVG, what it holds is HTML
+      for (let i = 0; i < stack.length - 1; i++) {
         const entry = stack[i];
         const lower = entry?.lowerTag ?? '';
-        if (lower === 'svg' || lower === 'math') {
-          return true;
-        }
-        if (htmlIntegrationPoints.has(lower)) {
-          return false;
-        }
-        // Anything else this `annotation-xml` holds is foreign content, so keep looking outward
-        if (lower === 'annotation-xml' && entry && isHTMLIntegrationPoint(entry)) {
-          return false;
+        if (!namespace) {
+          if (lower === 'svg' || lower === 'math') {
+            namespace = lower;
+          }
+        } else if (namespace === 'svg') {
+          if (svgIntegrationPoints.has(lower)) {
+            namespace = '';
+          }
+        } else if (mathIntegrationPoints.has(lower) || (lower === 'annotation-xml' && entry && annotationHoldsHTML(entry))) {
+          namespace = '';
         }
       }
-      return false;
+      return Boolean(namespace);
     };
 
     // Whether the content of the element being parsed is read as text rather than markup
