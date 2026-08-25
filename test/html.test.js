@@ -2126,6 +2126,20 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<Foo/><Bar/>', { keepClosingSlash: true, caseSensitive: true }), '<Foo/><Bar/>');
   });
 
+  test('A unary element holds no text for the options that read element content', async () => {
+    // Under `keepClosingSlash` the element closes at the slash, so what follows belongs to the document
+    assert.strictEqual(await minify('<script/>var a = 1;', { keepClosingSlash: true, minifyJS: true }), '<script/>var a = 1;');
+    assert.strictEqual(await minify('<style/>a { color : red }', { keepClosingSlash: true, minifyCSS: true }), '<style/>a { color : red }');
+
+    // Where the element does hold the text, it is minified as before
+    assert.strictEqual(await minify('<script>var a = 1;</script>', { minifyJS: true }), '<script>var a=1</script>');
+    assert.strictEqual(await minify('<script/>var a = 1;', { minifyJS: true }), '<script>var a=1');
+
+    // What a void element leaves behind is untouched—it is content of its parent, not of the element
+    assert.strictEqual(await minify('<div><br></div>', { removeEmptyElements: true }), '<div><br></div>');
+    assert.strictEqual(await minify('<p>a <br> b</p>', { collapseWhitespace: true }), '<p>a<br>b</p>');
+  });
+
   test('Remove optional tags', async () => {
     let input, output;
 

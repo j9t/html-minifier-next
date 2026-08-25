@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed a trailing slash on a start tag closing the element, which HTML ignores outside SVG and MathML—`<div/>x</div>y` was read as `<div>xy`, moving content that stood outside the element into it and dropping the end tag that really closed it
 * Fixed a self-closed `<svg/>` or `<math/>` leaving the rest of the document to be read as SVG or MathML, which kept element names in the case they were written in, kept trailing slashes on HTML elements, and left `minifySVG` holding a block that no end tag ever closed
 * Fixed a self-closed `<foreignObject/>` or `<annotation-xml/>` losing the slash that closes it, which the HTML context those elements open for their content decided rather than the SVG or MathML context they sit in
+* Fixed the text after a self-closed `<script/>` or `<style/>` being minified as if the element held it, which `minifyJS` and `minifyCSS` did wherever the slash closed the element
 
 ### Changed
 
