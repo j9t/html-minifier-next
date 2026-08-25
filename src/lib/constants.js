@@ -183,9 +183,22 @@ const htmlElements = new Set(['a', 'abbr', 'acronym', 'address', 'applet', 'area
 
 const specialContentElements = new Set(['script', 'style']);
 
+// Elements the parser reads as raw text as well, though only `script` and `style` are raw text
+// elements by name—these are HTML’s alone, where `script` and `style` hold text in SVG, too
+// https://html.spec.whatwg.org/multipage/parsing.html#generic-raw-text-element-parsing-algorithm
+//
+// (`noscript`, `noframes`, and `noembed` are raw text, too, but stay markup here: What they
+// hold is markup to the UA that displays it—one without scripting or frames—so minifying it
+// as markup keeps what that UA sees)
+const genericRawTextElements = new Set(['iframe', 'xmp']);
+
 // Escapable raw text elements, whose content is text rather than markup
 // https://html.spec.whatwg.org/multipage/syntax.html#elements-2
 const escapableRawTextElements = new Set(['textarea', 'title']);
+
+// Raw text is read without resolving character references, so its text keeps them—unlike that
+// of `textarea` and `title`, where they are resolved as they are anywhere else
+const rawTextElements = new Set([...specialContentElements, ...genericRawTextElements]);
 
 // Exports
 
@@ -258,5 +271,7 @@ export {
 
   // Special content elements
   specialContentElements,
-  escapableRawTextElements
+  genericRawTextElements,
+  escapableRawTextElements,
+  rawTextElements
 };

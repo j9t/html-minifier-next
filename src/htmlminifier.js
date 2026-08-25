@@ -18,6 +18,7 @@ import {
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
   specialContentElements,
+  rawTextElements,
   htmlElements,
   optionalStartTags,
   optionalEndTags,
@@ -1348,7 +1349,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
     }
     charsPrevTag = /^\s*$/.test(text) ? textPrevTag : 'comment';
-    if (options.decodeEntities && text && !specialContentElements.has(currentTag)) {
+    if (options.decodeEntities && text && !rawTextElements.has(currentTag)) {
       // Escape any `&` symbols that start either:
       // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
       // 2. or any other character reference (i.e., one that does end with `;`)
@@ -1779,7 +1780,7 @@ async function minifyHTML(value, options, partialMarkup) {
       textNextAttrs = nextAttrs || [];
 
       // Detect whether any async work is actually needed for this text node
-      const needsDecode = options.decodeEntities && text && !specialContentElements.has(currentTag) && text.indexOf('&') !== -1;
+      const needsDecode = options.decodeEntities && text && !rawTextElements.has(currentTag) && text.indexOf('&') !== -1;
       const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
       const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(

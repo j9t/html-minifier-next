@@ -6331,6 +6331,57 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<title>a'), '<title>a');
   });
 
+  test('`iframe` and `xmp` hold text, not markup', async () => {
+    // The parser reads these as raw text as well, so a `<` inside them never starts a tag
+    // https://html.spec.whatwg.org/multipage/parsing.html#generic-raw-text-element-parsing-algorithm
+
+    let input;
+
+    // What looks like markup is text, and stays as it is written
+    const options = { removeOptionalTags: true, removeComments: true, removeAttributeQuotes: true };
+    for (const tag of ['iframe', 'xmp']) {
+      input = `<${tag}><b class="  y  ">a</b><!-- c --></${tag}>`;
+      assert.strictEqual(await minify(input, options), input, tag);
+      // Minifying the output again leaves it alone
+      assert.strictEqual(await minify(await minify(input, options), options), input, tag);
+
+      // Only the element’s own end tag ends it, whatever its case, and a longer name is a
+      // different element
+      assert.strictEqual(await minify(`<${tag}>a</${tag.toUpperCase()} >b`), `<${tag}>a</${tag}>b`, tag);
+      input = `<${tag}>a</${tag}x>b</${tag}>`;
+      assert.strictEqual(await minify(input), input, tag);
+
+      // Where no end tag of its own follows, the element holds the rest of the input
+      assert.strictEqual(await minify(`<${tag}>foo`), `<${tag}>foo`, tag);
+
+      // Raw text is read without resolving character references, so they stay as they are—
+      // unlike in `textarea` and `title`, resolving them here would change what is displayed
+      input = `<${tag}>a&amp;b&lt;c</${tag}>`;
+      assert.strictEqual(await minify(input, { decodeEntities: true }), input, tag);
+    }
+
+    // `xmp`, `listing`, and `plaintext` render preformatted, as `pre` does, so their
+    // whitespace stays
+    assert.strictEqual(await minify('<xmp>  a   b  </xmp>', { collapseWhitespace: true }), '<xmp>  a   b  </xmp>');
+    assert.strictEqual(await minify('<listing>  a   b  </listing>', { collapseWhitespace: true }), '<listing>  a   b  </listing>');
+    // `plaintext` has no end tag, so its content runs to the end of the document, where a
+    // trailing run of whitespace is trimmed as it is anywhere else
+    assert.strictEqual(await minify('<plaintext>  a   b  ', { collapseWhitespace: true }), '<plaintext>  a   b');
+
+    // Whitespace in the elements that are not preformatted still collapses, as it does in
+    // any other text
+    assert.strictEqual(await minify('<div> a  <iframe> x  y </iframe>  b </div>', { collapseWhitespace: true }), '<div>a<iframe>x y</iframe>b</div>');
+
+    // `noscript`, `noframes`, and `noembed` are raw text as well, and stay markup all the
+    // same: What they hold is markup to the UA that displays it, so it is minified as markup
+    const optionsCollapsing = { ...options, collapseWhitespace: true };
+    assert.strictEqual(await minify('<noscript><p class="y"> a </p><!-- c --></noscript>', optionsCollapsing), '<noscript><p class=y>a</p></noscript>');
+    assert.strictEqual(await minify('<noframes><p class="y"> a </p><!-- c --></noframes>', optionsCollapsing), '<noframes><p class=y>a</noframes>');
+    assert.strictEqual(await minify('<noembed><p class="y"> a </p><!-- c --></noembed>', optionsCollapsing), '<noembed><p class=y>a</noembed>');
+    // Which is why their character references are resolved, as they are in any other markup
+    assert.strictEqual(await minify('<noframes>a&amp;b</noframes>', { decodeEntities: true }), '<noframes>a&b</noframes>');
+  });
+
   test('Trim trailing newline in `pre`/`textarea` with `collapseWhitespace`', async () => {
     let input, output;
 

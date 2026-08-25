@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 
 * Fixed the content of `title` and `textarea` being read as markup
+* Fixed the content of `iframe` and `xmp` being read as markup, and `decodeEntities` resolving character references in it, which raw text keeps
+* Fixed `collapseWhitespace` collapsing whitespace in `xmp`, `listing`, and `plaintext`, which render preformatted, as `pre` does
 * Fixed an end tag whose name merely starts with that of the element being parsed (as `</scriptx>` does for `<script>`), ending it and dropping everything up to the tag that really ends it
 * Fixed the content of an unclosed `script` or `style` element being dropped—an element whose content is text (`script`, `style`, `textarea`, `title`) now holds the rest of the input
 * Fixed `decodeEntities` escaping every `<` in `textarea` and `title`, where only the element’s own end tag needs it

@@ -6,7 +6,7 @@
  */
 
 import { isThenable, embedSource } from './lib/utils.js';
-import { escapableRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
+import { escapableRawTextElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -100,7 +100,7 @@ const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote'
 // these, so the lookup finds one whenever it is reached. Only a complete tag name ends the
 // element, so `</scriptx>` is content rather than a match.
 const rawTextEndTags = /** @type {Record<string, RegExp>} */ (Object.create(null));
-for (const tag of [...special, ...escapableRawTextElements]) {
+for (const tag of [...special, ...genericRawTextElements, ...escapableRawTextElements]) {
   rawTextEndTags[tag] = new RegExp('([\\s\\S]*?)\\x3c/' + tag + '(?=[\\s/>])[^>]*>', 'i');
 }
 
@@ -295,8 +295,10 @@ export class HTMLParser {
     };
 
     // Whether the content of the element being parsed is read as text rather than markup
+    // (`script` and `style` hold text in every namespace; the rest do so as HTML elements only)
     const holdsRawText = (/** @type {string} */ tag) =>
-      special.has(tag) || (escapableRawTextElements.has(tag) && !inForeignContent());
+      special.has(tag) ||
+      ((genericRawTextElements.has(tag) || escapableRawTextElements.has(tag)) && !inForeignContent());
 
     while (pos < fullLength) {
       lastPos = pos;

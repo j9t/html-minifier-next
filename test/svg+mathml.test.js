@@ -664,6 +664,27 @@ describe('SVG and MathML', () => {
     );
   });
 
+  test('Raw text in SVG and MathML', async () => {
+    // `iframe` and `xmp` hold text as HTML elements, and are ordinary elements anywhere else
+    const options = { removeOptionalTags: true };
+    let input;
+
+    for (const tag of ['iframe', 'xmp']) {
+      // Foreign content here, so an optional end tag inside them is one
+      assert.strictEqual(await minify(`<svg><${tag}><p>a</p></${tag}></svg>`, options), `<svg><${tag}><p>a</${tag}></svg>`, tag);
+      assert.strictEqual(await minify(`<math><${tag}><p>a</p></${tag}></math>`, options), `<math><${tag}><p>a</${tag}></math>`, tag);
+
+      // What an integration point holds is HTML again, so the same element holds text there
+      input = `<svg><foreignObject><${tag}><p>a</p></${tag}></foreignObject></svg>`;
+      assert.strictEqual(await minify(input, options), input, tag);
+    }
+
+    // `script` and `style` are the exception: They hold text wherever they sit
+    for (const held of ['<svg><script><p>a</p></script></svg>', '<svg><style><p>a</p></style></svg>', '<math><script><p>a</p></script></math>']) {
+      assert.strictEqual(await minify(held, options), held, held);
+    }
+  });
+
   test('Preset normalization: `minifySVG` override', async () => {
     // Regression: `minifySVG: true` from a preset was not normalized to a function
     // Verify that the option is actually applied (SVGO converts `rect` to `path`) and
