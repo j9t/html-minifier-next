@@ -103,6 +103,13 @@ const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote'
 const endsTagName = (/** @type {string} */ character) =>
   character === '' || character === '/' || character === '>' || /\s/.test(character);
 
+// The characters `\s` matches, by code: Tab through carriage return, space, and the
+// Unicode whitespace and line terminators
+const isWhitespaceCode = (/** @type {number} */ code) =>
+  (code >= 9 && code <= 13) || code === 32 || code === 0xA0 || code === 0x1680 ||
+  (code >= 0x2000 && code <= 0x200A) || code === 0x2028 || code === 0x2029 ||
+  code === 0x202F || code === 0x205F || code === 0x3000 || code === 0xFEFF;
+
 /**
  * @param {string} text - The input the tag stands in
  * @param {number} nameEnd - Position right after the tag name
@@ -251,8 +258,6 @@ export class HTMLParser {
 
     // Sticky regex versions for position-based matching (avoids string slicing)
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
-    // `\s*` with sticky flag is O(n) at worst—no retry from different positions possible
-    const startTagCloseY = /\s*(\/?)>/y;
     const endTagOpenY = new RegExp(endTagOpen.source.slice(1), 'y');
     const doctypeY = /<!DOCTYPE[^<>]+>/iy;
     const commentTestY = /<!--/y;
@@ -386,75 +391,82 @@ export class HTMLParser {
           cachedNextStartTag = null;
           cachedNextEndTag = null;
 
-          // Comment
-          commentTestY.lastIndex = pos;
-          if (commentTestY.test(fullHtml)) {
-            const commentEnd = commentEndAhead ? fullHtml.indexOf('-->', pos + 4) : -1;
-            if (commentEnd === -1) commentEndAhead = false;
+          // Dispatch on the character after `<`: Each branch below can only match
+          // with one leading character (`!` for markup declarations, `/` for end
+          // tags, a name character for start tags), so the matchers that require
+          // another one never run—a name lookup costs several regex executions
+          const nextCode = fullHtml.charCodeAt(pos + 1);
+          if (nextCode === 33) { // `!`
+            // Comment
+            commentTestY.lastIndex = pos;
+            if (commentTestY.test(fullHtml)) {
+              const commentEnd = commentEndAhead ? fullHtml.indexOf('-->', pos + 4) : -1;
+              if (commentEnd === -1) commentEndAhead = false;
 
-            if (commentEnd >= 0) {
-              if (handler.comment) {
-                const result = handler.comment(fullHtml.substring(pos + 4, commentEnd));
-                if (isThenable(result)) await result;
+              if (commentEnd >= 0) {
+                if (handler.comment) {
+                  const result = handler.comment(fullHtml.substring(pos + 4, commentEnd));
+                  if (isThenable(result)) await result;
+                }
+                advance(commentEnd + 3 - pos);
+                prevTag = '';
+                prevAttrs = [];
+                continue;
               }
-              advance(commentEnd + 3 - pos);
+            }
+
+            // https://web.archive.org/web/20241201212701/https://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
+            conditionalTestY.lastIndex = pos;
+            if (conditionalTestY.test(fullHtml)) {
+              const conditionalEnd = conditionalEndAhead ? fullHtml.indexOf(']>', pos + 3) : -1;
+              if (conditionalEnd === -1) conditionalEndAhead = false;
+
+              if (conditionalEnd >= 0) {
+                if (handler.comment) {
+                  const result = handler.comment(fullHtml.substring(pos + 2, conditionalEnd + 1), true /* Non-standard */);
+                  if (isThenable(result)) await result;
+                }
+                advance(conditionalEnd + 2 - pos);
+                prevTag = '';
+                prevAttrs = [];
+                continue;
+              }
+            }
+
+            // Doctype
+            doctypeY.lastIndex = pos;
+            const doctypeMatch = doctypeY.exec(fullHtml);
+            if (doctypeMatch) {
+              if (handler.doctype) {
+                handler.doctype(doctypeMatch[0]);
+              }
+              advance(doctypeMatch[0].length);
               prevTag = '';
               prevAttrs = [];
               continue;
             }
-          }
-
-          // https://web.archive.org/web/20241201212701/https://en.wikipedia.org/wiki/Conditional_comment#Downlevel-revealed_conditional_comment
-          conditionalTestY.lastIndex = pos;
-          if (conditionalTestY.test(fullHtml)) {
-            const conditionalEnd = conditionalEndAhead ? fullHtml.indexOf(']>', pos + 3) : -1;
-            if (conditionalEnd === -1) conditionalEndAhead = false;
-
-            if (conditionalEnd >= 0) {
-              if (handler.comment) {
-                const result = handler.comment(fullHtml.substring(pos + 2, conditionalEnd + 1), true /* Non-standard */);
-                if (isThenable(result)) await result;
+          } else if (nextCode === 47) { // `/`
+            // End tag—skip when no `>` lies ahead: The tag cannot be complete, and matching
+            // its name at every position would cost O(n²) on a long unclosed name
+            if (hasCloseAtOrAfter(pos)) {
+              const endTagMatch = matchEndTag(pos);
+              if (endTagMatch) {
+                advance(endTagMatch.text.length);
+                await parseEndTag(endTagMatch.text, endTagMatch.name);
+                prevTag = '/' + endTagMatch.name.toLowerCase();
+                prevAttrs = [];
+                continue;
               }
-              advance(conditionalEnd + 2 - pos);
-              prevTag = '';
-              prevAttrs = [];
+            }
+          } else {
+            // Start tag
+            const startTagMatch = parseStartTag(pos);
+            if (startTagMatch) {
+              advance(startTagMatch.advance);
+              await handleStartTag(startTagMatch);
+              prevTag = startTagMatch.tagName.toLowerCase();
               continue;
             }
-          }
-
-          // Doctype
-          doctypeY.lastIndex = pos;
-          const doctypeMatch = doctypeY.exec(fullHtml);
-          if (doctypeMatch) {
-            if (handler.doctype) {
-              handler.doctype(doctypeMatch[0]);
-            }
-            advance(doctypeMatch[0].length);
-            prevTag = '';
-            prevAttrs = [];
-            continue;
-          }
-
-          // End tag—skip when no `>` lies ahead: The tag cannot be complete, and matching
-          // its name at every position would cost O(n²) on a long unclosed name
-          if (hasCloseAtOrAfter(pos)) {
-            const endTagMatch = matchEndTag(pos);
-            if (endTagMatch) {
-              advance(endTagMatch.text.length);
-              await parseEndTag(endTagMatch.text, endTagMatch.name);
-              prevTag = '/' + endTagMatch.name.toLowerCase();
-              prevAttrs = [];
-              continue;
-            }
-          }
-
-          // Start tag
-          const startTagMatch = parseStartTag(pos);
-          if (startTagMatch) {
-            advance(startTagMatch.advance);
-            await handleStartTag(startTagMatch);
-            prevTag = startTagMatch.tagName.toLowerCase();
-            continue;
           }
 
           // Treat `<` as text
@@ -474,13 +486,21 @@ export class HTMLParser {
 
         // Next tag for whitespace processing context
         if (handler.wantsNextTag) {
-          const nextStartTagMatch = parseStartTag(pos);
-          if (nextStartTagMatch) {
-            nextTag = nextStartTagMatch.tagName;
-            // Extract minimal attribute info for whitespace logic (just name/value pairs)
-            nextAttrs = extractAttrInfo(nextStartTagMatch.attrs);
-            cachedNextStartTag = { match: nextStartTagMatch, pos };
-          } else if (hasCloseAtOrAfter(pos)) {
+          // Same dispatch as above: A start tag cannot follow `<` + `/` or `!`,
+          // an end tag requires `/`—the other matcher never runs
+          const nextCode = fullHtml.charCodeAt(pos + 1);
+          if (nextCode !== 47 && nextCode !== 33) {
+            const nextStartTagMatch = parseStartTag(pos);
+            if (nextStartTagMatch) {
+              nextTag = nextStartTagMatch.tagName;
+              // Extract minimal attribute info for whitespace logic (just name/value pairs)
+              nextAttrs = extractAttrInfo(nextStartTagMatch.attrs);
+              cachedNextStartTag = { match: nextStartTagMatch, pos };
+            } else {
+              nextTag = '';
+              nextAttrs = [];
+            }
+          } else if (nextCode === 47 && hasCloseAtOrAfter(pos)) {
             const nextEndTagMatch = matchEndTag(pos);
             if (nextEndTagMatch) {
               nextTag = '/' + nextEndTagMatch.name;
@@ -603,6 +623,23 @@ export class HTMLParser {
       return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name: open[1] ?? '' };
     }
 
+    // Where a tag ends: After optional whitespace, at `>` or `/>`. Scanned by hand in a
+    // single pass, where a regex did the same with one execution per attribute.
+    function matchTagClose(/** @type {number} */ currentPos) {
+      let scan = currentPos;
+      let code = fullHtml.charCodeAt(scan);
+      while (isWhitespaceCode(code)) {
+        code = fullHtml.charCodeAt(++scan);
+      }
+      if (code === 62) { // `>`
+        return { len: scan - currentPos + 1, slash: '' };
+      }
+      if (code === 47 && fullHtml.charCodeAt(scan + 1) === 62) { // `/>`
+        return { len: scan - currentPos + 2, slash: '/' };
+      }
+      return null;
+    }
+
     function parseStartTag(/** @type {number} */ startPos) {
       startTagOpenY.lastIndex = startPos;
       const start = startTagOpenY.exec(fullHtml);
@@ -615,17 +652,16 @@ export class HTMLParser {
         };
         let consumed = start[0].length;
         let currentPos = startPos + consumed;
-        let end, attr;
+        let close, attr;
 
         // Safety limit: Max length of input to check for attributes
         // Protects against catastrophic backtracking on massive attribute values
         const MAX_ATTR_PARSE_LENGTH = 20000; // 20 KB should be enough for any reasonable tag
 
         while (true) {
-          // Check for closing tag first (sticky regex—no slicing)
-          startTagCloseY.lastIndex = currentPos;
-          end = startTagCloseY.exec(fullHtml);
-          if (end) {
+          // Check for closing tag first (manual scan, regex only for the unusual)
+          close = matchTagClose(currentPos);
+          if (close) {
             break;
           }
 
@@ -748,12 +784,13 @@ export class HTMLParser {
           match.attrs.push(attr);
         }
 
-        // Check for closing tag (sticky regex—no slicing)
-        startTagCloseY.lastIndex = currentPos;
-        end = startTagCloseY.exec(fullHtml);
-        if (end) {
-          match.unarySlash = end[1] ?? '';
-          consumed += (end[0] ?? '').length;
+        // Check for closing tag (manual scan, regex only for the unusual)
+        if (!close) {
+          close = matchTagClose(currentPos);
+        }
+        if (close) {
+          match.unarySlash = close.slash;
+          consumed += close.len;
           match.advance = consumed;
           return match;
         }
