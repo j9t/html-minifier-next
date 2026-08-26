@@ -6,7 +6,7 @@
  */
 
 import { isThenable, embedSource, findTagEnd } from './lib/utils.js';
-import { escapableRawTextElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
+import { endlessRawTextElements, escapableRawTextElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -507,7 +507,8 @@ export class HTMLParser {
         const isEscapableRawText = escapableRawTextElements.has(stackedTag);
 
         const remaining = sliceFromPos(pos);
-        const rawText = findRawTextEnd(remaining, stackedTag);
+        // Where the raw text has no end, no end tag of its own ends the element either
+        const rawText = endlessRawTextElements.has(stackedTag) ? null : findRawTextEnd(remaining, stackedTag);
         if (rawText) {
           const text = rawText.content;
           if (handler.chars) {
@@ -534,6 +535,13 @@ export class HTMLParser {
             if (isThenable(result)) await result;
           }
           advance(remaining.length);
+          if (endlessRawTextElements.has(stackedTag)) {
+            // Nothing that stands behind the start tag is markup, so no end tag may be
+            // generated for the element, or for anything it stands in
+            stack.length = 0;
+            lastTag = '';
+            lastTagLower = '';
+          }
         }
       }
 
