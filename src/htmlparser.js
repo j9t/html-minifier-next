@@ -103,6 +103,13 @@ const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote'
 const endsTagName = (/** @type {string} */ character) =>
   character === '' || character === '/' || character === '>' || /\s/.test(character);
 
+// The characters `\s` matches, by code: Tab through carriage return, space, and the
+// Unicode whitespace and line terminators
+const isWhitespaceCode = (/** @type {number} */ code) =>
+  (code >= 9 && code <= 13) || code === 32 || code === 0xA0 || code === 0x1680 ||
+  (code >= 0x2000 && code <= 0x200A) || code === 0x2028 || code === 0x2029 ||
+  code === 0x202F || code === 0x205F || code === 0x3000 || code === 0xFEFF;
+
 /**
  * @param {string} text - The input the tag stands in
  * @param {number} nameEnd - Position right after the tag name
@@ -251,8 +258,6 @@ export class HTMLParser {
 
     // Sticky regex versions for position-based matching (avoids string slicing)
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
-    // `\s*` with sticky flag is O(n) at worst—no retry from different positions possible
-    const startTagCloseY = /\s*(\/?)>/y;
     const endTagOpenY = new RegExp(endTagOpen.source.slice(1), 'y');
     const doctypeY = /<!DOCTYPE[^<>]+>/iy;
     const commentTestY = /<!--/y;
@@ -618,13 +623,12 @@ export class HTMLParser {
       return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name: open[1] ?? '' };
     }
 
-    // Where a tag ends: After optional whitespace, at `>` or `/>`. The common case is
-    // ASCII whitespace, scanned by hand; the sticky regex remains for what the scan
-    // cannot settle (other whitespace, or no close at all), matching it either way
+    // Where a tag ends: After optional whitespace, at `>` or `/>`. Scanned by hand in a
+    // single pass, where a regex did the same with one execution per attribute.
     function matchTagClose(/** @type {number} */ currentPos) {
       let scan = currentPos;
       let code = fullHtml.charCodeAt(scan);
-      while (code === 32 || code === 9 || code === 10 || code === 12 || code === 13) {
+      while (isWhitespaceCode(code)) {
         code = fullHtml.charCodeAt(++scan);
       }
       if (code === 62) { // `>`
@@ -633,9 +637,7 @@ export class HTMLParser {
       if (code === 47 && fullHtml.charCodeAt(scan + 1) === 62) { // `/>`
         return { len: scan - currentPos + 2, slash: '/' };
       }
-      startTagCloseY.lastIndex = currentPos;
-      const end = startTagCloseY.exec(fullHtml);
-      return end ? { len: end[0].length, slash: end[1] ?? '' } : null;
+      return null;
     }
 
     function parseStartTag(/** @type {number} */ startPos) {
