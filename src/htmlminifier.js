@@ -767,7 +767,7 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     /** @type {string | undefined} */
     let currentType;
     const parser = new HTMLParser(input, {
-      start: function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
+      start: function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ unary) {
         if (attrChains) {
           if (!attrChains[tag]) {
             attrChains[tag] = new TokenChain();
@@ -783,6 +783,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
             currentTag = tag;
             currentType = attr.value;
           }
+        }
+        // As on the main path: What a unary tag holds ends with the tag, so no text can belong to it
+        if (unary) {
+          currentTag = '';
+          currentType = undefined;
         }
       },
       end: function () {

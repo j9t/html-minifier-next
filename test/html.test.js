@@ -4792,6 +4792,22 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { sortAttributes: true }), input);
   });
 
+  test('A self-closed `<script>` holds no text for the sorting scan', async () => {
+    // The scan pass reads what a `text/html` script holds as markup; a self-closed one holds
+    // nothing, so the raw text that follows must not be counted into the frequency chains
+    const options = { keepClosingSlash: true, processScripts: ['text/html'], sortClassNames: true, sortAttributes: true };
+    const rest = '<textarea><i class="zzz"></i><i class="zzz"></i><i class="zzz"></i></textarea><p class="aaa zzz">x</p><p class="aaa">y</p>';
+    assert.strictEqual(
+      await minify('<script type="text/html"/>' + rest, options),
+      '<script type="text/html"/>' + rest
+    );
+    // The same document with the script closed, which the end tag already kept clean
+    assert.strictEqual(
+      await minify('<script type="text/html"></script>' + rest, options),
+      '<script type="text/html"></script>' + rest
+    );
+  });
+
   test('Sort style classes', async () => {
     let input, output;
 
