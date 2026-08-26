@@ -4,6 +4,27 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.2.0] - 2026-08-26
+
+### Fixed
+
+* Improved handling of slashes on start tags:
+  - Fixed a trailing slash closing the element, which HTML ignores outside SVG and MathML—`<div/>x</div>y` was read as `<div>xy`, moving content that stood outside the element into it and dropping the end tag that really closed it
+  - Fixed a self-closed `<svg/>` or `<math/>` leaving the rest of the document to be read as SVG or MathML, which kept element names in the case they were written in, kept slashes on HTML elements, and left `minifySVG` holding a block that no end tag ever closed
+  - Fixed a self-closed `<foreignObject/>` or `<annotation-xml/>` losing its slash to the HTML context it opens for its content, where the element itself is SVG or MathML
+  - Fixed the text after a self-closed `<script/>` or `<style/>` being minified as if the element held it
+  - Fixed `keepClosingSlash` stopping at the HTML a `foreignObject` or `annotation-xml` holds, where the slash closed the element as the option asks but was then dropped, which moved the content behind it into that element
+* Improved what `minifySVG` hands to SVGO:
+  - Fixed an element that closes itself in HTML alone—a `<br>` or an `<img>`—reaching SVGO unclosed, which made SVGO reject the block and leave the whole graphic unoptimized; such elements are written self-closing wherever SVGO reads them
+  - Fixed an attribute value that the source left unquoted—valid HTML, invalid XML—reaching SVGO that way
+  - Fixed `removeOptionalTags` omitting end tags in that same block, which is as invalid there—the option now stops at an SVG handed to SVGO, and applies as before everywhere else, MathML included
+  - Fixed `collapseBooleanAttributes` writing valueless attributes into the block, which is held back the same way
+  - Fixed an end tag that HTML lets the source leave out—the first `</p>` in `<p>a<p>b`, and likewise for `<li>`, `<td>`, and the rest—reaching SVGO missing, which cost the graphic its optimization; such end tags are written back wherever SVGO reads them
+
+### Changed
+
+* Updated `keepClosingSlash` to say how the input is read as well as how it is written—the slash is kept, as before, and closes the element it sits on
+
 ## [8.1.2] - 2026-08-25
 
 ### Fixed

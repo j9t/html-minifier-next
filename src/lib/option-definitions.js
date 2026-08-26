@@ -91,7 +91,7 @@ const optionDefinitions = {
     type: 'jsonArray'
   },
   keepClosingSlash: {
-    description: 'Keep the trailing slash on void elements',
+    description: 'Keep the trailing slash on void elements and other start tags that carry one, and read it as closing the element',
     type: 'boolean'
   },
   maxInputLength: {

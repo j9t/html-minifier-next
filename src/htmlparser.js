@@ -22,6 +22,7 @@ import { escapableRawTextElements, genericRawTextElements, RE_HTML_ENCODING } fr
  *   continueOnParseError?: boolean | undefined,
  *   partialMarkup?: boolean | undefined,
  *   wantsNextTag?: boolean | undefined,
+ *   selfClosingSlash?: boolean | undefined,
  *   customAttrSurround?: RegExp[][] | undefined,
  *   customAttrAssign?: RegExp[] | undefined
  * }} HTMLParserHandler
@@ -340,6 +341,11 @@ export class HTMLParser {
 
     // The element itself never decides this: `<svg><title>` is SVG, what it holds is HTML
     const inForeignContent = () => Boolean(stack[stack.length - 1]?.namespace);
+
+    // The same question for a start tag, which is not on the stack yet: The element enters the
+    // namespace its parent holds, except that `svg` and `math` lead out of HTML themselves
+    const startsForeignContent = (/** @type {string} */ lowerTag) =>
+      Boolean(namespaceInside(stack[stack.length - 1])) || lowerTag === 'svg' || lowerTag === 'math';
 
     // Whether the content of the element being parsed is read as text rather than markup
     // (`script` and `style` hold text in every namespace; the rest do so as HTML elements only)
@@ -840,7 +846,10 @@ export class HTMLParser {
         await parseEndTag('', lastTag);
       }
 
-      const unary = empty.has(lowerTagName) || (lowerTagName === 'html' && lastTagLower === 'head') || !!unarySlash;
+      // HTML ignores the slash on a start tag—only in SVG and MathML does it close the
+      // element, which `selfClosingSlash` extends back to every element
+      const selfClosed = !!unarySlash && (handler.selfClosingSlash || startsForeignContent(lowerTagName));
+      const unary = empty.has(lowerTagName) || (lowerTagName === 'html' && lastTagLower === 'head') || selfClosed;
 
       const attrs = /** @type {HTMLAttribute[]} */ (match.attrs.map(function (/** @type {Array<string | undefined>} */ args) {
         /** @type {string | undefined} */
