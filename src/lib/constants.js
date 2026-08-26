@@ -190,7 +190,12 @@ const specialContentElements = new Set(['script', 'style']);
 // (`noscript`, `noframes`, and `noembed` are raw text, too, but stay markup here: What they
 // hold is markup to the UA that displays it—one without scripting or frames—so minifying it
 // as markup keeps what that UA sees)
-const genericRawTextElements = new Set(['iframe', 'xmp']);
+const genericRawTextElements = new Set(['iframe', 'plaintext', 'xmp']);
+
+// `plaintext` is the one element among these whose content has no end: The text runs to the
+// end of the document, `</plaintext>` and all, as nothing switches the parser back to markup
+// https://html.spec.whatwg.org/multipage/parsing.html#plaintext-state
+const endlessRawTextElements = new Set(['plaintext']);
 
 // Escapable raw text elements, whose content is text rather than markup
 // https://html.spec.whatwg.org/multipage/syntax.html#elements-2
@@ -272,6 +277,7 @@ export {
   // Special content elements
   specialContentElements,
   genericRawTextElements,
+  endlessRawTextElements,
   escapableRawTextElements,
   rawTextElements
 };
