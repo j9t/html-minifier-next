@@ -183,7 +183,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   removeUnusedCSS: {
-    description: 'Remove rules from `style` elements whose class or ID selectors the document never references (requires `--minify-css`); note that class names only applied by external scripts cannot be detected—use `{"safelist": […]}` for those',
+    description: 'Remove rules from `style` elements whose class or ID selectors the document never references—use with `--minify-css`; note that class names only applied by external scripts cannot be detected—use `{"safelist": […]}` for those',
     type: 'jsonObject'
   },
   sortAttributes: {

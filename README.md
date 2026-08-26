@@ -137,9 +137,9 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
-| `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Collapse whitespace more aggressively between inline elements—use with `collapseWhitespace: true` | `false` |
+| `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Collapse whitespace more aggressively between inline elements—use with `collapseWhitespace` | `false` |
 | `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace) | `false` |
-| `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with `collapseWhitespace: true` | `false` |
+| `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with `collapseWhitespace` | `false` |
 | `continueOnMinifyError`<br>`--continue-on-minify-error`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |
 | `continueOnParseError`<br>`--continue-on-parse-error` | [Handle parse errors](https://html.spec.whatwg.org/multipage/parsing.html#parse-errors) instead of aborting | `false` |
 | `customAttrAssign`<br>`--custom-attr-assign` | Array of regexes that allow to support custom attribute assign expressions (e.g., `<div flex?="{{mode != cover}}"></div>`) | `[]` |
@@ -161,7 +161,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
-| `preserveLineBreaks`<br>`--preserve-line-breaks` | Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with `collapseWhitespace: true` | `false` |
+| `preserveLineBreaks`<br>`--preserve-line-breaks` | Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with `collapseWhitespace` | `false` |
 | `preventAttributesEscaping`<br>`--prevent-attributes-escaping` | Prevents the escaping of the values of attributes | `false` |
 | `processScripts`<br>`--process-scripts` | Array of strings corresponding to types of `script` elements to process through minifier (e.g., `text/ng-template`, `text/x-handlebars-template`, etc.) | `[]` |
 | `quoteCharacter`<br>`--quote-character` | Type of quote to use for attribute values (`'` or `"`) | Auto-detected (uses the quote requiring less escaping; defaults to `"` when equal) |
@@ -174,7 +174,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
-| `removeUnusedCSS`<br>`--remove-unused-css` | [Remove unused CSS rules](#unused-css-removal) from `style` elements; requires `minifyCSS`; **note that this can change how a document renders** | `false` (could be `true`, `{ safelist, scripts }`) |
+| `removeUnusedCSS`<br>`--remove-unused-css` | [Remove unused CSS rules](#unused-css-removal) from `style` elements—use with `minifyCSS`; **note that this can change how a document renders** | `false` (could be `true`, `{ safelist, scripts }`) |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `strictCustomFragments`<br>`--strict-custom-fragments` | [Reject `ignoreCustomFragments` patterns that risk catastrophic backtracking](#redos-protection) (rather than warning about them) | `false` |
@@ -236,7 +236,7 @@ const result = await minify(html, {
 
 ### Unused CSS removal
 
-`removeUnusedCSS` removes rules from `style` elements whose class or ID selectors the document doesn’t reference. It requires `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
+`removeUnusedCSS` removes rules from `style` elements whose class or ID selectors the document doesn’t reference. It needs to be used with `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
 
 ```js
 const result = await minify(html, {
