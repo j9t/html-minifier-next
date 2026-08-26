@@ -94,6 +94,8 @@ const result = await minify('<p title="example" id="moo">foo</p>', {
 console.log(result); // `<p title=example id=moo>foo`
 ```
 
+(CommonJS consumers can still use dynamic import—`const { minify } = await import('html-minifier-next')`—as `minify()` is async.)
+
 See [the original blog post](https://perfectionkills.com/experimenting-with-html-minifier/) for details of [how it works](https://perfectionkills.com/experimenting-with-html-minifier/#how_it_works), [descriptions of most options](https://perfectionkills.com/experimenting-with-html-minifier/#options), [testing results](https://perfectionkills.com/experimenting-with-html-minifier/#field_testing), and [conclusions](https://perfectionkills.com/experimenting-with-html-minifier/#cost_and_benefits).
 
 ## Presets
