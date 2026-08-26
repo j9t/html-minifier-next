@@ -137,9 +137,9 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
-| `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Collapse whitespace more aggressively between inline elements—use with `collapseWhitespace` | `false` |
-| `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace) | `false` |
-| `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with `collapseWhitespace` | `false` |
+| `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Collapse whitespace more aggressively between inline elements—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
+| `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace); [enable other whitespace options](#combining-whitespace-options) | `false` |
+| `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
 | `continueOnMinifyError`<br>`--continue-on-minify-error`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |
 | `continueOnParseError`<br>`--continue-on-parse-error` | [Handle parse errors](https://html.spec.whatwg.org/multipage/parsing.html#parse-errors) instead of aborting | `false` |
 | `customAttrAssign`<br>`--custom-attr-assign` | Array of regexes that allow to support custom attribute assign expressions (e.g., `<div flex?="{{mode != cover}}"></div>`) | `[]` |
@@ -161,7 +161,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
-| `preserveLineBreaks`<br>`--preserve-line-breaks` | Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with `collapseWhitespace` | `false` |
+| `preserveLineBreaks`<br>`--preserve-line-breaks` | Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
 | `preventAttributesEscaping`<br>`--prevent-attributes-escaping` | Prevents the escaping of the values of attributes | `false` |
 | `processScripts`<br>`--process-scripts` | Array of strings corresponding to types of `script` elements to process through minifier (e.g., `text/ng-template`, `text/x-handlebars-template`, etc.) | `[]` |
 | `quoteCharacter`<br>`--quote-character` | Type of quote to use for attribute values (`'` or `"`) | Auto-detected (uses the quote requiring less escaping; defaults to `"` when equal) |
@@ -190,6 +190,31 @@ A few options take functions and are therefore only available programmatically, 
 | `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
 | `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
+
+### Combining whitespace options
+
+`collapseInlineTagWhitespace`, `conservativeCollapse`, and `preserveLineBreaks` are modifiers: They do nothing on their own, and only take effect when `collapseWhitespace` is enabled.
+
+Given input
+
+```html
+<nav>
+  <button>A</button> <button>B</button>
+</nav>
+```
+
+you get the following output (condensed, `\n` represents an actual line break):
+
+| Options | Output |
+| --- | --- |
+| `collapseInlineTagWhitespace` | `<nav>\n  <button>A</button> <button>B</button>\n</nav>` (unchanged) |
+| `collapseWhitespace` | `<nav><button>A</button> <button>B</button></nav>` |
+| `collapseWhitespace`, `collapseInlineTagWhitespace` | `<nav><button>A</button><button>B</button></nav>` |
+| `collapseWhitespace`, `conservativeCollapse` | `<nav> <button>A</button> <button>B</button> </nav>` |
+| `collapseWhitespace`, `preserveLineBreaks` | `<nav>\n<button>A</button> <button>B</button>\n</nav>` |
+| `collapseWhitespace`, `preserveLineBreaks`, `collapseInlineTagWhitespace` | `<nav>\n<button>A</button><button>B</button>\n</nav>` |
+
+Where the modifiers disagree, the preserving one wins—`conservativeCollapse` and `preserveLineBreaks` do not let `collapseInlineTagWhitespace` remove a space or line break entirely.
 
 ### Sorting attributes and style classes
 
