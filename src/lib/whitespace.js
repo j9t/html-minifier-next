@@ -169,6 +169,14 @@ function isHiddenInput(tagName, attrs) {
  * @param {Set<string>} inlineTextSet
  */
 function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet) {
+  if (!str) return str;
+
+  // Fast path: No whitespace at all—every decision below would leave `str`
+  // untouched (`collapseWhitespace` returns such strings unchanged)
+  if (!/[ \n\r\t\f\xA0]/.test(str)) {
+    return str;
+  }
+
   const prevTagName = prevTag && (prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag);
   const nextTagName = nextTag && (nextTag.charAt(0) === '/' ? nextTag.slice(1) : nextTag);
 
@@ -178,14 +186,17 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
 
   let trimLeft = prevTag && !inlineElementsToKeepWhitespace.has(prevTag);
 
+  // Whether the text is whitespace only—one scan, shared by the checks below
+  // (`str` is known non-empty here)
+  const isPureWhitespace = !/\S/.test(str);
+
   // Smart default behavior: Collapse space after non-rendering elements (`type="hidden"`)
   // This happens even in basic `collapseWhitespace` mode (safe optimization)
-  if (!trimLeft && prevIsHidden && str && !/\S/.test(str)) {
+  if (!trimLeft && prevIsHidden && isPureWhitespace) {
     trimLeft = true;
   }
 
   // Aggressive mode: Collapse between all form controls (pure whitespace only)
-  const isPureWhitespace = str && !/\S/.test(str);
   if (!trimLeft && prevTagName && nextTagName &&
       options.collapseInlineTagWhitespace &&
       isPureWhitespace &&
@@ -208,7 +219,7 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
   let trimRight = nextTag && !inlineElementsToKeepWhitespace.has(nextTag);
 
   // Smart default behavior: Collapse space before non-rendering elements (`type="hidden"`)
-  if (!trimRight && nextIsHidden && str && !/\S/.test(str)) {
+  if (!trimRight && nextIsHidden && isPureWhitespace) {
     trimRight = true;
   }
 
