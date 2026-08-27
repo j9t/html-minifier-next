@@ -607,6 +607,12 @@ describe('SVG and MathML', () => {
     assert.strictEqual(r1, r2, 'Cached result should match first result');
   });
 
+  test('Custom SVG cache size', async () => {
+    const input = '<svg><circle cx="10" cy="10" r="5" fill="red"/></svg>';
+    const result = await minify(input, { minifySVG: true, cacheSVG: 100 });
+    assert.strictEqual(result, await minify(input, { minifySVG: true }), 'SVG should minify the same with a custom cache size');
+  });
+
   test('Large SVG inputs with identical first/last 50 chars are not confused in cache', async () => {
     const first50 = '<svg xmlns="http://www.w3.org/2000/svg" width="10"'; // exactly 50 chars
     const last50 = '<!-- ' + 'z'.repeat(35) + ' --></svg>'; // exactly 50 chars
