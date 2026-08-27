@@ -1,5 +1,6 @@
 import HTMLMinifier, { getPreset } from '../src/htmlminifier.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
+import { paramCase } from '../src/lib/utils.js';
 import { getOptions } from './get-options.js';
 import pkg from '../package.json' with { type: 'json' };
 
@@ -9,11 +10,15 @@ const escapeHtml = (str) => str
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;');
 
+// Option names by CLI flag, so that a flag in a description is shown as the option it
+// names—recasing the flag would lose the case of acronyms (`minifyCSS`, `minifyJS`)
+const optionNamesByFlag = new Map(Object.keys(optionDefinitions).map(key => [paramCase(key), key]));
+
 // Convert CLI-style descriptions to demo-style HTML
 // - Backticks → `<code>` elements (with HTML escaping)
 // - `--kebab-case` → `camelCase` (for option cross-references)
 const toHtml = (desc = '') => String(desc)
-  .replace(/`--([a-z-]+)`/g, (_, kebab) => `<code>${kebab.replace(/-([a-z])/g, (__, c) => c.toUpperCase())}</code>`)
+  .replace(/`--([a-z-]+)`/g, (_, kebab) => `<code>${optionNamesByFlag.get(kebab) ?? kebab}</code>`)
   .replace(/`([^`]+)`/g, (_, content) => `<code>${escapeHtml(content)}</code>`);
 
 // Demo-specific UI configuration

@@ -35,9 +35,6 @@ import os from 'os';
 import readline from 'readline';
 import { Command, Option } from 'commander';
 
-// Simple case conversion for CLI option names (ASCII-only, no Unicode needed)
-/** @param {string} str */
-const paramCase = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 /** @param {string} str */
 const camelCase = (str) => paramCase(str).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
@@ -54,7 +51,7 @@ const commanderOptionKey = (key) => {
 
 // Lazy-load HMN to reduce CLI cold-start overhead
 import { getPreset, getPresetNames } from './src/presets.js';
-import { parseRegExp } from './src/lib/utils.js';
+import { paramCase, parseRegExp } from './src/lib/utils.js';
 import { optionDefinitions } from './src/lib/option-definitions.js';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));

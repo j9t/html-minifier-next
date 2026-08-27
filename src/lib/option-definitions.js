@@ -67,7 +67,7 @@ const optionDefinitions = {
     type: 'regexpArray'
   },
   customEventAttributes: {
-    description: 'Array of regexes that allow to support custom event attributes for minifyJS (e.g., `ng-click`)',
+    description: 'Array of regexes that allow to support custom event attributes (e.g., `ng-click`)—use with `--minify-js`',
     type: 'regexpArray'
   },
   decodeEntities: {
@@ -87,7 +87,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   inlineCustomElements: {
-    description: 'Array of names of custom elements which are inline, for whitespace handling',
+    description: 'Array of names of custom elements which are inline, for whitespace handling—use with `--collapse-whitespace`',
     type: 'jsonArray'
   },
   keepClosingSlash: {
@@ -123,7 +123,7 @@ const optionDefinitions = {
     type: 'json'
   },
   noNewlinesBeforeTagClose: {
-    description: 'Never add a newline before a tag that closes an element',
+    description: 'Never add a newline before a tag that closes an element—use with `--max-line-length`',
     type: 'boolean'
   },
   partialMarkup: {
@@ -167,7 +167,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   removeEmptyElementsExcept: {
-    description: 'Array of elements to preserve when `--remove-empty-elements` is enabled (e.g., `td`, `<span aria-hidden="true">`)',
+    description: 'Array of elements to preserve (e.g., `td`, `<span aria-hidden="true">`)—use with `--remove-empty-elements`',
     type: 'jsonArray'
   },
   removeOptionalTags: {
@@ -195,7 +195,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   trimCustomFragments: {
-    description: 'Trim whitespace around custom fragments (`--ignore-custom-fragments`)',
+    description: 'Trim whitespace around custom fragments (`--ignore-custom-fragments`)—use with `--collapse-whitespace`',
     type: 'boolean'
   },
   strictCustomFragments: {

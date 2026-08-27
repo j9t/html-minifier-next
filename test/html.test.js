@@ -4653,6 +4653,12 @@ describe('HTML', () => {
 
   test('Remove space between attributes', async () => {
     let input, output;
+
+    // `removeTagWhitespace` on its own
+    assert.strictEqual(await minify('<div class="a" id="b">x</div>', { removeTagWhitespace: true }), '<div class="a"id="b">x</div>');
+    assert.strictEqual(await minify('<img src="a.png" alt="a">', { removeTagWhitespace: true }), '<img src="a.png"alt="a">');
+    assert.strictEqual(await minify('<!DOCTYPE html>', { removeTagWhitespace: true }), '<!DOCTYPE html>');
+
     const options = {
       collapseBooleanAttributes: true,
       keepClosingSlash: true,
