@@ -195,7 +195,7 @@ A few options take functions and are therefore only available programmatically, 
 
 Some options modify what another option does, and do nothing when that other option is off. Setting one on its own is reported through [the `log` hook](#api-only-options) (and, in the CLI, on STDERR), once per message per run:
 
-```
+```text
 HTML Minifier Next: Ignoring `conservativeCollapse`—use with `collapseWhitespace` (`--collapse-whitespace`)
 ```
 
@@ -695,7 +695,7 @@ For CLI usage, using a config file is strongly recommended to avoid complex shel
 
 **[Web demo:](https://j9t.github.io/html-minifier-next/)**
 
-```
+```text
 \{%[\s\S]{0,1000}?%\} \{\{[\s\S]{0,500}?\}\}
 ```
 
