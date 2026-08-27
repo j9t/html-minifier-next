@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added warnings for options set that rely on another option, which used to pass silently
+* Added warnings for options that rely on another option, which used to pass silently
 
 ### Changed
 
