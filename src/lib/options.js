@@ -1,5 +1,5 @@
 import { createUrlMinifier } from './urls.js';
-import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
+import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -100,9 +100,52 @@ const optionKeysWarned = new Set();
 const presetNamesWarned = new Set();
 // Custom fragments whose shape risks ReDoS, warned about once per pattern per process
 const customFragmentsWarned = new Set();
+// Options set without the option they need, warned about once per message per process
+const dependenciesWarned = new Set();
+// Unused-CSS configuration that does not hold up, warned about once per message per process
 const unusedCSSWarned = new Set();
 // Object-valued options handed a string, warned about once per distinct value
 const stringValuesWarned = new Set();
+
+/**
+ * Options that do nothing on their own, and the option each one needs to take effect
+ *
+ * Cache sizes are deliberately absent: They never change output, so they are
+ * configuration for a subsystem rather than a transform that silently fails.
+ *
+ * @typedef {object} OptionDependency
+ * @property {string} option
+ * @property {string} requires
+ * @property {(input: Record<string, any>) => string | false} [unusable] Clause saying why the prerequisite does not count even though it is set
+ * @property {boolean} [clear] Whether to null the option out, where leaving it set would cost work downstream
+ *
+ * @type {OptionDependency[]}
+ */
+const optionDependencies = [
+  { option: 'collapseInlineTagWhitespace', requires: 'collapseWhitespace' },
+  { option: 'conservativeCollapse', requires: 'collapseWhitespace' },
+  { option: 'customEventAttributes', requires: 'minifyJS' },
+  { option: 'inlineCustomElements', requires: 'collapseWhitespace' },
+  { option: 'noNewlinesBeforeTagClose', requires: 'maxLineLength' },
+  { option: 'preserveLineBreaks', requires: 'collapseWhitespace' },
+  { option: 'removeEmptyElementsExcept', requires: 'removeEmptyElements' },
+  {
+    option: 'removeUnusedCSS',
+    requires: 'minifyCSS',
+    // Removal rides along with Lightning CSS, which a function of one’s own replaces
+    unusable: (/** @type {Record<string, any>} */ input) => typeof input.minifyCSS === 'function' && 'which a function of your own replaces',
+    clear: true
+  },
+  { option: 'trimCustomFragments', requires: 'collapseWhitespace' }
+];
+
+// An empty array is a value the user supplied but did not populate, and so asks for
+// nothing; `identity` is what a minifier that could not be loaded resolves to
+/** @param {unknown} value */
+function isRequested(value) {
+  if (value === identity) return false;
+  return Array.isArray(value) ? value.length > 0 : Boolean(value);
+}
 
 // Main options processor
 
@@ -642,19 +685,24 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   }
 
-  // Unused-CSS removal rides along with Lightning CSS, so it silently does nothing
-  // when `minifyCSS` is off or replaced by a function—say so rather than let it pass
-  if (options.removeUnusedCSS) {
-    const cssOption = /** @type {Record<string, any>} */ (effectiveInput).minifyCSS;
-    const reason = typeof cssOption === 'function'
-      ? 'it does not apply when `minifyCSS` is a function'
-      : (options.minifyCSS === identity ? 'it requires `minifyCSS` (`--minify-css`)' : '');
-    if (reason) {
-      if (!unusedCSSWarned.has(reason)) {
-        unusedCSSWarned.add(reason);
-        warn(`HTML Minifier Next: Ignoring \`removeUnusedCSS\`—${reason}`);
-      }
-      options.removeUnusedCSS = null;
+  // Options that silently do nothing without the option they build on say so rather
+  // than let them pass. The option is read from `effectiveInput` (user options
+  // over preset), so that a default filled in above doesn’t count as the user asking
+  // for it; the option it needs is read from the settled options, so that a minifier
+  // asked for but not loadable counts as absent rather than as present.
+  const requestedOptions = /** @type {Record<string, any>} */ (effectiveInput);
+  const settledOptions = /** @type {Record<string, any>} */ (options);
+  for (const { option, requires, unusable, clear } of optionDependencies) {
+    if (!isRequested(requestedOptions[option])) continue;
+    const aside = unusable && unusable(requestedOptions);
+    if (!aside && isRequested(settledOptions[requires])) continue;
+    const message = `HTML Minifier Next: Ignoring \`${option}\`—use with \`${requires}\` (\`--${paramCase(requires)}\`)${aside ? `, ${aside}` : ''}`;
+    if (!dependenciesWarned.has(message)) {
+      dependenciesWarned.add(message);
+      warn(message);
+    }
+    if (clear) {
+      settledOptions[option] = null;
     }
   }
 
@@ -664,6 +712,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 // Exports
 
 export {
+  optionDependencies,
   shouldMinifyInnerHTML,
   processOptions
 };

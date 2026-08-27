@@ -145,7 +145,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `customAttrAssign`<br>`--custom-attr-assign` | Array of regexes that allow to support custom attribute assign expressions (e.g., `<div flex?="{{mode != cover}}"></div>`) | `[]` |
 | `customAttrCollapse`<br>`--custom-attr-collapse` | Regex that specifies custom attribute to strip newlines from (e.g., `/ng-class/`) | `undefined` |
 | `customAttrSurround`<br>`--custom-attr-surround` | Array of regexes that allow to support custom attribute surround expressions (e.g., `<input {{#if value}}checked="checked"{{/if}}>`) | `[]` |
-| `customEventAttributes`<br>`--custom-event-attributes` | Array of regexes that allow to support custom event attributes for `minifyJS` (e.g., `ng-click`) | `[ /^on[a-z]{3,}$/ ]` |
+| `customEventAttributes`<br>`--custom-event-attributes` | Array of regexes that allow to support custom event attributes (e.g., `ng-click`)—use with `minifyJS` | `[ /^on[a-z]{3,}$/ ]` |
 | `decodeEntities`<br>`--decode-entities` | Use direct Unicode characters whenever possible | `false` |
 | `ignoreCustomComments`<br>`--ignore-custom-comments` | Array of regexes that allow to ignore matching comments | `[ /^!/, /^\s*#/ ]` |
 | `ignoreCustomFragments`<br>`--ignore-custom-fragments` | Array of regexes that allow to ignore certain fragments, when matched (e.g., `<?php … ?>`, `{{ … }}`, etc.) | `[ /<%[\s\S]*?%>/, /<\?[\s\S]*?\?>/ ]` |
@@ -170,7 +170,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeDefaultTypeAttributes`<br>`--remove-default-type-attributes` | Remove default `type` attributes from `style`/`link` (e.g., `type="text/css"`) and `script` (e.g., `type="text/javascript"`) elements; other `type` attribute values are left intact | `false` |
 | `removeEmptyAttributes`<br>`--remove-empty-attributes` | [Remove all attributes with whitespace-only values](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_or_blank_attributes) | `false` (could be `true`, `Function(attrName, tag)`) |
 | `removeEmptyElements`<br>`--remove-empty-elements` | [Remove all elements with empty contents](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_elements) | `false` |
-| `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve when `removeEmptyElements` is enabled; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<span aria-hidden='true'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
+| `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve—use with `removeEmptyElements`; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<span aria-hidden='true'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
@@ -190,6 +190,28 @@ A few options take functions and are therefore only available programmatically, 
 | `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
 | `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
+
+### Options that rely on another option
+
+Some options modify what another option does, and do nothing when that other option is off. Setting one on its own is reported through [the `log` hook](#api-only-options) (and, in the CLI, on STDERR), once per message per run:
+
+```
+HTML Minifier Next: Ignoring `conservativeCollapse`—use with `collapseWhitespace` (`--collapse-whitespace`)
+```
+
+| Option | Needs |
+| --- | --- |
+| `collapseInlineTagWhitespace` | `collapseWhitespace` |
+| `conservativeCollapse` | `collapseWhitespace` |
+| `customEventAttributes` | `minifyJS` |
+| `inlineCustomElements` | `collapseWhitespace` |
+| `noNewlinesBeforeTagClose` | `maxLineLength` |
+| `preserveLineBreaks` | `collapseWhitespace` |
+| `removeEmptyElementsExcept` | `removeEmptyElements` |
+| `removeUnusedCSS` | `minifyCSS`, and not [a function of your own](#unused-css-removal) |
+| `trimCustomFragments` | `collapseWhitespace` |
+
+Passing the option `false`, or an empty array, asks for nothing and is not reported. `cacheCSS`, `cacheJS`, and `cacheSVG` are not listed: They size a cache rather than transform markup, and don’t change output.
 
 ### Combining whitespace options
 

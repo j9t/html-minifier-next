@@ -1475,7 +1475,7 @@ describe('CLI', () => {
     assert.ok(stdout.toString().length > 0);
   });
 
-  test('Dry run prints cache stats', () => {
+  test('Should have dry run print cache stats', () => {
     const input = '<style>body{color:blue}</style>';
     const { stderr, status } = spawnSync('node', [cliPath, '--minify-css', '--dry'], {
       cwd: fixturesDir,
@@ -1489,7 +1489,7 @@ describe('CLI', () => {
     assert.ok(stderrText.includes('CSS cache: 0 hits, 1 miss, 1/500 entries'));
   });
 
-  test('Cache stats are omitted entirely when no cache was touched', () => {
+  test('Should omit cache stats when no cache was touched', () => {
     const input = '<p>Hello</p>';
     const { stderr, status } = spawnSync('node', [cliPath, '--verbose'], {
       cwd: fixturesDir,

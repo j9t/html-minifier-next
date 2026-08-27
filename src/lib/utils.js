@@ -106,6 +106,12 @@ function lowercase(value) {
   return value.toLowerCase();
 }
 
+// Option name to CLI flag name (ASCII-only, no Unicode needed)
+/** @param {string} value */
+function paramCase(value) {
+  return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
 // Replace async helper
 
 /**
@@ -844,6 +850,7 @@ export {
   identity,
   isThenable,
   lowercase,
+  paramCase,
   replaceAsync,
   parseRegExp,
   embedSource,

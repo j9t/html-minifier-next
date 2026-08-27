@@ -917,7 +917,7 @@ describe('CSS and JS', () => {
 
       assert.ok(styleOf(output).includes('.unused'), 'Without `minifyCSS` nothing should be removed');
       assert.ok(
-        logs.some(message => message.includes('removeUnusedCSS') && message.includes('requires')),
+        logs.some(message => message.includes('removeUnusedCSS') && message.includes('use with')),
         'Silently doing nothing would be the surprise, so it should warn'
       );
       assert.ok(
