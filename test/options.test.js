@@ -9,7 +9,8 @@ import { buildConfigSchema } from '../scripts/build-schema.js';
 const schemaOnDisk = JSON.parse(
   fs.readFileSync(new URL('../html-minifier-next.schema.json', import.meta.url), 'utf8')
 );
-const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+// Normalized since a Windows checkout carries CRLF and the parsing is line-anchored
+const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
 // Warnings are emitted once per message per process, so every case here uses a
 // distinct option pair and each pair is asserted exactly once
