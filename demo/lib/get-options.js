@@ -1,4 +1,4 @@
-import { describeQuantifierRisk, parseRegExp } from '../src/lib/utils.js';
+import { describeQuantifierRisk, parseRegExp } from '../../src/lib/utils.js';
 
 // Turn the demo’s option controls into the options object the minifier takes,
 // kept apart from the page so that it can be read without one

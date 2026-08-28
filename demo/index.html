@@ -10,13 +10,23 @@
 		<h1>HTML Minifier Next <span id="minifier-version"></span></h1>
 		<main x-data="minifier" x-cloak>
 			<div class="workspace">
-				<textarea rows="10" cols="40" id="input" x-model="input"></textarea>
+				<textarea rows="10" cols="40" id="input" x-model="input" aria-label="Markup to minify"></textarea>
 				<div class="alt">
 					<button type="button" @click="minify()">Minify</button>
 					<button type="button" @click="shareUrl()">Share</button>
 					<span x-show="share" x-text="share" class="share"></span>
 				</div>
-				<textarea rows="10" cols="40" id="output" readonly x-model="output"></textarea>
+				<div class="form-group">
+					<input type="checkbox" id="show-invisibles" x-model="showInvisibles">
+					<label for="show-invisibles">Show <i>invisibles</i></label>
+					<span class="quiet">Mark no-break spaces, soft hyphens, and other characters that the output does not show</span>
+				</div>
+				<textarea rows="10" cols="40" id="output" readonly x-model="output" x-show="!showInvisibles" aria-label="Minified markup"></textarea>
+				<pre id="output-view" role="region" aria-label="Minified markup, invisible characters marked" tabindex="0" x-show="showInvisibles" x-html="annotatedOutput"></pre>
+				<div class="alt">
+					<button type="button" @click="copyOutput()">Copy output</button>
+					<span x-show="copied" x-text="copied" class="share"></span>
+				</div>
 				<p x-text="stats.text" :class="stats.result"></p>
 			</div>
 			<div class="options">

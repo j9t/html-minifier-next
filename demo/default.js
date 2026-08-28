@@ -1,14 +1,11 @@
 import HTMLMinifier, { getPreset } from '../src/htmlminifier.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
 import { paramCase } from '../src/lib/utils.js';
-import { getOptions } from './get-options.js';
+import { getOptions } from './lib/get-options.js';
+import { annotateInvisibles } from './lib/show-invisibles.js';
+import { decodeState, encodeState } from './lib/url-state.js';
+import { escapeHtml } from './lib/utils.js';
 import pkg from '../package.json' with { type: 'json' };
-
-// Escape HTML entities for safe rendering inside `<code>` elements
-const escapeHtml = (str) => str
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;');
 
 // Option names by CLI flag, so that a flag in a description is shown as the option it
 // names—recasing the flag would lose the case of acronyms (`minifyCSS`, `minifyJS`)
@@ -215,82 +212,6 @@ const formatNumber = (num) => num.toLocaleString('en-US');
 // URL state management
 const MAX_URL_LENGTH = 2000; // Conservative limit for URL hash
 
-// Option migration map for backward compatibility;
-// when renaming options, add entries here to preserve old URLs
-//
-// Example: `{ 'oldOptionName': 'newOptionName' }`
-//
-// @@ Split the mapping out of `decodeState` (as `getOptions` was)
-// (so that an entry silently loading the wrong options is caught by a test)
-const OPTION_MIGRATIONS = {
-  customFragmentQuantifierLimit: null, // Removed in 8.0.0; discard from old URLs
-  html5: null, // Removed in 5.0.0; discard from old URLs
-  processConditionalComments: null, // Removed in 6.0.0; discard from old URLs
-  removeScriptTypeAttributes: 'removeDefaultTypeAttributes', // Merged in 7.0.0
-  removeStyleLinkTypeAttributes: 'removeDefaultTypeAttributes', // Merged in 7.0.0
-  sortClassName: 'sortClassNames'
-};
-
-const encodeState = (input, options) => {
-  const state = {
-    i: input || '',
-    o: {}
-  };
-
-  // Only store non-default options
-  options.forEach((option) => {
-    const defaultOption = defaultOptions.find(d => d.id === option.id);
-    if (!defaultOption) return;
-
-    if (option.type === 'checkbox') {
-      if (Boolean(option.checked) !== Boolean(defaultOption.checked)) {
-        state.o[option.id] = option.checked;
-      }
-    } else if (option.type === 'number') {
-      if (option.value !== defaultOption.value) {
-        state.o[option.id] = option.value;
-      }
-    } else if (option.type === 'text') {
-      if (option.value !== defaultOption.value) {
-        state.o[option.id] = option.value;
-      }
-    }
-  });
-
-  return LZString.compressToEncodedURIComponent(JSON.stringify(state));
-};
-
-const decodeState = (hash) => {
-  try {
-    const decompressed = LZString.decompressFromEncodedURIComponent(hash);
-    if (!decompressed) return null;
-    const state = JSON.parse(decompressed);
-
-    // Apply option migrations for backward compatibility
-    if (state.o) {
-      const migratedOptions = {};
-      for (const [key, value] of Object.entries(state.o)) {
-        if (key in OPTION_MIGRATIONS) {
-          // `null` means the option was removed; skip it
-          if (OPTION_MIGRATIONS[key]) {
-            const target = OPTION_MIGRATIONS[key];
-            migratedOptions[target] = migratedOptions[target] || value;
-          }
-        } else {
-          migratedOptions[key] = value;
-        }
-      }
-      state.o = migratedOptions;
-    }
-
-    return state;
-  } catch {
-    // Silently fail for invalid/corrupted URLs
-    // console.warn('Failed to decode URL state');
-    return null;
-  }
-};
-
 const loadStateFromUrl = () => {
   const hash = window.location.hash.slice(1);
   if (!hash) return null;
@@ -298,8 +219,8 @@ const loadStateFromUrl = () => {
   return decodeState(hash);
 };
 
-const updateUrlWithState = (input, options) => {
-  const encoded = encodeState(input, options);
+const updateUrlWithState = (input, options, showInvisibles) => {
+  const encoded = encodeState({ input, options, defaultOptions, showInvisibles });
   const url = `${window.location.origin}${window.location.pathname}#${encoded}`;
 
   return {
@@ -314,12 +235,20 @@ const minifierData = () => ({
   options: sillyClone(defaultOptions),
   input: '',
   output: '',
+  showInvisibles: false,
+  copied: '',
   stats: {
     result: '',
     text: ''
   },
   share: '',
   _shareTimeout: null,
+  _copiedTimeout: null,
+
+  // Output with every invisible character marked, for the “Show invisibles” view
+  get annotatedOutput() {
+    return annotateInvisibles(this.output);
+  },
 
   init() {
     // Load state from URL on page load
@@ -340,6 +269,8 @@ const minifierData = () => ({
           return option;
         });
       }
+
+      this.showInvisibles = Boolean(state.s);
 
       if (this.input) {
         this.minify();
@@ -402,7 +333,7 @@ const minifierData = () => ({
 
     this.share = '';
 
-    const result = updateUrlWithState(this.input, this.options);
+    const result = updateUrlWithState(this.input, this.options, this.showInvisibles);
 
     if (result.success) {
       // Update URL in browser
@@ -427,7 +358,7 @@ const minifierData = () => ({
       }, 5000);
     } else {
       // Try without input (options only)
-      const optionsOnly = updateUrlWithState('', this.options);
+      const optionsOnly = updateUrlWithState('', this.options, this.showInvisibles);
 
       if (optionsOnly.success) {
         window.history.pushState(null, '', optionsOnly.url);
@@ -453,6 +384,36 @@ const minifierData = () => ({
         this._shareTimeout = null;
       }, 8000);
     }
+  },
+
+  // Copy the minified markup itself, which the “Show invisibles” view marks up to show
+  async copyOutput() {
+    if (!this.output) return;
+
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      this.flashCopied('⚠ Clipboard not supported, copy from the output pane');
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(this.output);
+      this.flashCopied('✓ Minified markup copied to clipboard');
+    } catch {
+      this.flashCopied('⚠ Could not copy, copy from the output pane');
+    }
+  },
+
+  // Show a message beside the Copy button, and take it back after a while
+  flashCopied(message, ms = 5000) {
+    if (this._copiedTimeout) {
+      clearTimeout(this._copiedTimeout);
+    }
+
+    this.copied = message;
+    this._copiedTimeout = setTimeout(() => {
+      this.copied = '';
+      this._copiedTimeout = null;
+    }, ms);
   },
 
   selectAllOptions(yes = true) {
