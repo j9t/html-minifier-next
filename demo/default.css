@@ -67,8 +67,18 @@ button {
 	padding: .25rem .5rem;
 }
 
-textarea + p {
+textarea + p,
+#output-view {
 	margin-top: 0;
+}
+
+i,
+.invisible {
+	background: #ff0;
+}
+
+i {
+	font-style: normal;
 }
 
 code,
@@ -99,6 +109,17 @@ code,
 	color: #f00;
 }
 
+.invisible {
+	border-radius: 2px;
+}
+
+.invisible.zero-width::after {
+	content: attr(data-marker);
+	font-size: .7em;
+	padding: 0 1px;
+	vertical-align: middle;
+}
+
 .alt {
 	margin-bottom: 1rem;
 }
@@ -108,10 +129,27 @@ code,
 }
 
 #input,
-#output {
+#output,
+#output-view {
+	/* Set explicitly, as form controls take neither the page’s font nor its box model—
+	   the values match what browsers give a form control, so that the panes look and
+	   measure the same whether they are one or not */
+	background: #fff;
+	border: 1px solid #767676;
+	box-sizing: border-box;
+	display: block;
+	font-size: .8333rem;
 	height: 36vh;
+	line-height: normal;
 	margin-bottom: 5px;
 	min-height: 15rem;
+	padding: 2px;
 	resize: vertical;
 	width: 100%;
+}
+
+#output-view {
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
 }
