@@ -103,6 +103,31 @@ const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote'
 const endsTagName = (/** @type {string} */ character) =>
   character === '' || character === '/' || character === '>' || /\s/.test(character);
 
+// Fast path for tag names
+/**
+ * @param {string} html
+ * @param {number} start - Position of the first name character (after `<` or `</`)
+ * @returns {number} Name length from `start`, or -1 to fall back to the qname regex
+ */
+function scanAsciiTagName(html, start) {
+  const first = html.charCodeAt(start);
+  // First char: Letter or `_` (as for ncname)
+  if (!((first >= 65 && first <= 90) || (first >= 97 && first <= 122) || first === 95)) {
+    return -1;
+  }
+  let i = start + 1;
+  for (;;) {
+    const code = html.charCodeAt(i);
+    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 95 || code === 45 || code === 46) {
+      i++;
+    } else if (code === 58 || code >= 128) { // `:` or non-ASCII
+      return -1;
+    } else {
+      return i - start;
+    }
+  }
+}
+
 // The characters `\s` matches, by code: Tab through carriage return, space, and the
 // Unicode whitespace and line terminators
 const isWhitespaceCode = (/** @type {number} */ code) =>
@@ -374,8 +399,7 @@ export class HTMLParser {
             cachedNextStartTag = null;
             cachedNextEndTag = null;
             advance(startTagMatch.advance);
-            await handleStartTag(startTagMatch);
-            prevTag = startTagMatch.tagName.toLowerCase();
+            prevTag = await handleStartTag(startTagMatch);
             continue;
           }
           if (cachedNextEndTag && cachedNextEndTag.pos === pos) {
@@ -383,8 +407,7 @@ export class HTMLParser {
             cachedNextStartTag = null;
             cachedNextEndTag = null;
             advance(endTagMatch.text.length);
-            await parseEndTag(endTagMatch.text, endTagMatch.name);
-            prevTag = '/' + endTagMatch.name.toLowerCase();
+            prevTag = '/' + await parseEndTag(endTagMatch.text, endTagMatch.name);
             prevAttrs = [];
             continue;
           }
@@ -452,8 +475,7 @@ export class HTMLParser {
               const endTagMatch = matchEndTag(pos);
               if (endTagMatch) {
                 advance(endTagMatch.text.length);
-                await parseEndTag(endTagMatch.text, endTagMatch.name);
-                prevTag = '/' + endTagMatch.name.toLowerCase();
+                prevTag = '/' + await parseEndTag(endTagMatch.text, endTagMatch.name);
                 prevAttrs = [];
                 continue;
               }
@@ -463,8 +485,7 @@ export class HTMLParser {
             const startTagMatch = parseStartTag(pos);
             if (startTagMatch) {
               advance(startTagMatch.advance);
-              await handleStartTag(startTagMatch);
-              prevTag = startTagMatch.tagName.toLowerCase();
+              prevTag = await handleStartTag(startTagMatch);
               continue;
             }
           }
@@ -614,17 +635,29 @@ export class HTMLParser {
      *   where none is complete
      */
     function matchEndTag(startPos) {
-      endTagOpenY.lastIndex = startPos;
-      const open = endTagOpenY.exec(fullHtml);
-      if (!open) {
-        return null;
+      let name;
+      let nameEnd;
+      const scanned = scanAsciiTagName(fullHtml, startPos + 2);
+      if (scanned !== -1) {
+        nameEnd = startPos + 2 + scanned;
+        name = fullHtml.slice(startPos + 2, nameEnd);
+      } else {
+        endTagOpenY.lastIndex = startPos;
+        const open = endTagOpenY.exec(fullHtml);
+        if (!open) {
+          return null;
+        }
+        nameEnd = startPos + open[0].length;
+        name = open[1] ?? '';
       }
-      const close = findEndTagClose(fullHtml, startPos + open[0].length);
-      return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name: open[1] ?? '' };
+      const close = findEndTagClose(fullHtml, nameEnd);
+      return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name };
     }
 
     // Where a tag ends: After optional whitespace, at `>` or `/>`. Scanned by hand in a
-    // single pass, where a regex did the same with one execution per attribute.
+    // single pass, where a regex did the same with one execution per attribute. The
+    // result packs length and slash into one number (`length << 1 | hasSlash`, 0 for no
+    // match) so the per-attribute loop allocates nothing.
     function matchTagClose(/** @type {number} */ currentPos) {
       let scan = currentPos;
       let code = fullHtml.charCodeAt(scan);
@@ -632,25 +665,37 @@ export class HTMLParser {
         code = fullHtml.charCodeAt(++scan);
       }
       if (code === 62) { // `>`
-        return { len: scan - currentPos + 1, slash: '' };
+        return (scan - currentPos + 1) << 1;
       }
       if (code === 47 && fullHtml.charCodeAt(scan + 1) === 62) { // `/>`
-        return { len: scan - currentPos + 2, slash: '/' };
+        return ((scan - currentPos + 2) << 1) | 1;
       }
-      return null;
+      return 0;
     }
 
     function parseStartTag(/** @type {number} */ startPos) {
-      startTagOpenY.lastIndex = startPos;
-      const start = startTagOpenY.exec(fullHtml);
-      if (start) {
+      let tagName;
+      let consumed;
+      const scanned = scanAsciiTagName(fullHtml, startPos + 1);
+      if (scanned !== -1) {
+        tagName = fullHtml.slice(startPos + 1, startPos + 1 + scanned);
+        consumed = 1 + scanned;
+      } else {
+        startTagOpenY.lastIndex = startPos;
+        const start = startTagOpenY.exec(fullHtml);
+        if (!start) {
+          return undefined;
+        }
+        tagName = start[1] ?? '';
+        consumed = start[0].length;
+      }
+      {
         /** @type {{tagName: string, attrs: Array<Array<string|undefined>>, advance: number, unarySlash?: string}} */
         const match = {
-          tagName: start[1] ?? '',
+          tagName,
           attrs: [],
           advance: 0
         };
-        let consumed = start[0].length;
         let currentPos = startPos + consumed;
         let close, attr;
 
@@ -789,8 +834,8 @@ export class HTMLParser {
           close = matchTagClose(currentPos);
         }
         if (close) {
-          match.unarySlash = close.slash;
-          consumed += close.len;
+          match.unarySlash = (close & 1) ? '/' : '';
+          consumed += close >> 1;
           match.advance = consumed;
           return match;
         }
@@ -964,6 +1009,8 @@ export class HTMLParser {
       if (handler.start) {
         await handler.start(tagName, attrs, unary, unarySlash);
       }
+      // Returned so the parse loop can skip lowercasing the name again
+      return lowerTagName;
     }
 
     // `needle` must already be lowercase
@@ -1017,6 +1064,8 @@ export class HTMLParser {
           handler.end(tagName, []);
         }
       }
+      // Returned so the parse loop can skip lowercasing the name again
+      return lowerTagName;
     }
   }
 }

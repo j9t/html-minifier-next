@@ -1194,14 +1194,32 @@ async function minifyHTML(value, options, partialMarkup) {
     buffer.length = Math.max(0, index);
   }
 
+  // Match `/^<\/([\w:-]+)>$/` by hand—the regex engine’s per-call setup costs more
+  // than the scan on these short buffer entries
+  function matchPlainEndTag(/** @type {string} */ str) {
+    const end = str.length;
+    if (end < 4 || str.charCodeAt(0) !== 60 /* < */ || str.charCodeAt(1) !== 47 /* / */ || str.charCodeAt(end - 1) !== 62 /* > */) {
+      return null;
+    }
+    for (let i = 2; i < end - 1; i++) {
+      const code = str.charCodeAt(i);
+      // `[\w:-]`: Letters, digits, `_`, `:`, `-`
+      if (!((code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 95 || code === 58 || code === 45)) {
+        return null;
+      }
+    }
+    return str.slice(2, end - 1);
+  }
+
   // Look for trailing whitespaces, bypass any inline tags
   function trimTrailingWhitespace(/** @type {number} */ index, /** @type {string} */ nextTag) {
     for (let prevTag = ''; index >= 0 && canTrimWhitespace(prevTag, emptyAttrs); index--) {
       const str = buffer[index] ?? '';
-      const match = str.match(/^<\/([\w:-]+)>$/);
-      if (match) {
-        prevTag = match[1] ?? '';
-      } else if (/>$/.test(str) || (buffer[index] = collapseWhitespaceSmart(str, '', nextTag, emptyAttrs, emptyAttrs, options, inlineElements, inlineTextSet))) {
+      const endTagName = matchPlainEndTag(str);
+      if (endTagName !== null) {
+        prevTag = endTagName;
+      } else if (str.charCodeAt(str.length - 1) === 62 /* > */ ||
+          (buffer[index] = collapseWhitespaceSmart(str, '', nextTag, emptyAttrs, emptyAttrs, options, inlineElements, inlineTextSet))) {
         break;
       }
     }
