@@ -956,6 +956,27 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
 }
 
+// Match `/^<\/([\w:-]+)>$/` by hand—the regex engine’s per-call setup costs more
+// than the scan on these short buffer entries
+/**
+ * @param {string} str
+ * @returns {string | null} The tag name, or `null` where the string is not a plain end tag
+ */
+function matchPlainEndTag(str) {
+  const end = str.length;
+  if (end < 4 || str.charCodeAt(0) !== 60 /* < */ || str.charCodeAt(1) !== 47 /* / */ || str.charCodeAt(end - 1) !== 62 /* > */) {
+    return null;
+  }
+  for (let i = 2; i < end - 1; i++) {
+    const code = str.charCodeAt(i);
+    // `[\w:-]`: Letters, digits, `_`, `:`, `-`
+    if (!((code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 95 || code === 58 || code === 45)) {
+      return null;
+    }
+  }
+  return str.slice(2, end - 1);
+}
+
 /**
  * @param {string} value - HTML content to minify
  * @param {ProcessedOptions} options - Normalized minification options
@@ -1192,23 +1213,6 @@ async function minifyHTML(value, options, partialMarkup) {
       return;
     }
     buffer.length = Math.max(0, index);
-  }
-
-  // Match `/^<\/([\w:-]+)>$/` by hand—the regex engine’s per-call setup costs more
-  // than the scan on these short buffer entries
-  function matchPlainEndTag(/** @type {string} */ str) {
-    const end = str.length;
-    if (end < 4 || str.charCodeAt(0) !== 60 /* < */ || str.charCodeAt(1) !== 47 /* / */ || str.charCodeAt(end - 1) !== 62 /* > */) {
-      return null;
-    }
-    for (let i = 2; i < end - 1; i++) {
-      const code = str.charCodeAt(i);
-      // `[\w:-]`: Letters, digits, `_`, `:`, `-`
-      if (!((code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 95 || code === 58 || code === 45)) {
-        return null;
-      }
-    }
-    return str.slice(2, end - 1);
   }
 
   // Look for trailing whitespaces, bypass any inline tags
