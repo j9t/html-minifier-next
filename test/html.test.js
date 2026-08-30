@@ -60,6 +60,20 @@ describe('HTML', () => {
     input = '<h:ællæ></h:ællæ>';
     assert.strictEqual(await minify(input), input);
 
+    // A name that turns non-ASCII, with no colon to bail on earlier
+    input = '<hællæ></hællæ>';
+    assert.strictEqual(await minify(input), input);
+
+    input = '<ællæ></ællæ>';
+    assert.strictEqual(await minify(input), input);
+
+    input = '<hællæ.b-1></hællæ.b-1>';
+    assert.strictEqual(await minify(input), input);
+
+    assert.strictEqual(await minify('<div> <hællæ>x</hællæ> </div>', { collapseWhitespace: true }),
+      '<div><hællæ>x</hællæ></div>'
+    );
+
     input = '<$unicorn>';
     await assert.rejects(minify(input), { name: "Error" });
 

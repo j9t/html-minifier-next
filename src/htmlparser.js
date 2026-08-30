@@ -103,6 +103,31 @@ const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote'
 const endsTagName = (/** @type {string} */ character) =>
   character === '' || character === '/' || character === '>' || /\s/.test(character);
 
+// Fast path for tag names
+/**
+ * @param {string} html
+ * @param {number} start - Position of the first name character (after `<` or `</`)
+ * @returns {number} Name length from `start`, or -1 to fall back to the qname regex
+ */
+function scanAsciiTagName(html, start) {
+  const first = html.charCodeAt(start);
+  // First char: Letter or `_` (as for ncname)
+  if (!((first >= 65 && first <= 90) || (first >= 97 && first <= 122) || first === 95)) {
+    return -1;
+  }
+  let i = start + 1;
+  for (;;) {
+    const code = html.charCodeAt(i);
+    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122) || (code >= 48 && code <= 57) || code === 95 || code === 45 || code === 46) {
+      i++;
+    } else if (code === 58 || code >= 128) { // `:` or non-ASCII
+      return -1;
+    } else {
+      return i - start;
+    }
+  }
+}
+
 // The characters `\s` matches, by code: Tab through carriage return, space, and the
 // Unicode whitespace and line terminators
 const isWhitespaceCode = (/** @type {number} */ code) =>
@@ -374,8 +399,7 @@ export class HTMLParser {
             cachedNextStartTag = null;
             cachedNextEndTag = null;
             advance(startTagMatch.advance);
-            await handleStartTag(startTagMatch);
-            prevTag = startTagMatch.tagName.toLowerCase();
+            prevTag = await handleStartTag(startTagMatch);
             continue;
           }
           if (cachedNextEndTag && cachedNextEndTag.pos === pos) {
@@ -383,8 +407,7 @@ export class HTMLParser {
             cachedNextStartTag = null;
             cachedNextEndTag = null;
             advance(endTagMatch.text.length);
-            await parseEndTag(endTagMatch.text, endTagMatch.name);
-            prevTag = '/' + endTagMatch.name.toLowerCase();
+            prevTag = '/' + await parseEndTag(endTagMatch.text, endTagMatch.name);
             prevAttrs = [];
             continue;
           }
@@ -452,8 +475,7 @@ export class HTMLParser {
               const endTagMatch = matchEndTag(pos);
               if (endTagMatch) {
                 advance(endTagMatch.text.length);
-                await parseEndTag(endTagMatch.text, endTagMatch.name);
-                prevTag = '/' + endTagMatch.name.toLowerCase();
+                prevTag = '/' + await parseEndTag(endTagMatch.text, endTagMatch.name);
                 prevAttrs = [];
                 continue;
               }
@@ -463,8 +485,7 @@ export class HTMLParser {
             const startTagMatch = parseStartTag(pos);
             if (startTagMatch) {
               advance(startTagMatch.advance);
-              await handleStartTag(startTagMatch);
-              prevTag = startTagMatch.tagName.toLowerCase();
+              prevTag = await handleStartTag(startTagMatch);
               continue;
             }
           }
@@ -614,17 +635,29 @@ export class HTMLParser {
      *   where none is complete
      */
     function matchEndTag(startPos) {
-      endTagOpenY.lastIndex = startPos;
-      const open = endTagOpenY.exec(fullHtml);
-      if (!open) {
-        return null;
+      let name;
+      let nameEnd;
+      const scanned = scanAsciiTagName(fullHtml, startPos + 2);
+      if (scanned !== -1) {
+        nameEnd = startPos + 2 + scanned;
+        name = fullHtml.slice(startPos + 2, nameEnd);
+      } else {
+        endTagOpenY.lastIndex = startPos;
+        const open = endTagOpenY.exec(fullHtml);
+        if (!open) {
+          return null;
+        }
+        nameEnd = startPos + open[0].length;
+        name = open[1] ?? '';
       }
-      const close = findEndTagClose(fullHtml, startPos + open[0].length);
-      return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name: open[1] ?? '' };
+      const close = findEndTagClose(fullHtml, nameEnd);
+      return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name };
     }
 
     // Where a tag ends: After optional whitespace, at `>` or `/>`. Scanned by hand in a
-    // single pass, where a regex did the same with one execution per attribute.
+    // single pass, where a regex did the same with one execution per attribute. The
+    // result packs length and slash into one number (`length << 1 | hasSlash`, 0 for no
+    // match) so the per-attribute loop allocates nothing.
     function matchTagClose(/** @type {number} */ currentPos) {
       let scan = currentPos;
       let code = fullHtml.charCodeAt(scan);
@@ -632,132 +665,89 @@ export class HTMLParser {
         code = fullHtml.charCodeAt(++scan);
       }
       if (code === 62) { // `>`
-        return { len: scan - currentPos + 1, slash: '' };
+        return (scan - currentPos + 1) << 1;
       }
       if (code === 47 && fullHtml.charCodeAt(scan + 1) === 62) { // `/>`
-        return { len: scan - currentPos + 2, slash: '/' };
+        return ((scan - currentPos + 2) << 1) | 1;
       }
-      return null;
+      return 0;
     }
 
     function parseStartTag(/** @type {number} */ startPos) {
-      startTagOpenY.lastIndex = startPos;
-      const start = startTagOpenY.exec(fullHtml);
-      if (start) {
-        /** @type {{tagName: string, attrs: Array<Array<string|undefined>>, advance: number, unarySlash?: string}} */
-        const match = {
-          tagName: start[1] ?? '',
-          attrs: [],
-          advance: 0
-        };
-        let consumed = start[0].length;
-        let currentPos = startPos + consumed;
-        let close, attr;
+      let tagName;
+      let consumed;
+      const scanned = scanAsciiTagName(fullHtml, startPos + 1);
+      if (scanned !== -1) {
+        tagName = fullHtml.slice(startPos + 1, startPos + 1 + scanned);
+        consumed = 1 + scanned;
+      } else {
+        startTagOpenY.lastIndex = startPos;
+        const start = startTagOpenY.exec(fullHtml);
+        if (!start) {
+          return undefined;
+        }
+        tagName = start[1] ?? '';
+        consumed = start[0].length;
+      }
+      /** @type {{tagName: string, attrs: Array<Array<string|undefined>>, advance: number, unarySlash?: string}} */
+      const match = {
+        tagName,
+        attrs: [],
+        advance: 0
+      };
+      let currentPos = startPos + consumed;
+      let close, attr;
 
-        // Safety limit: Max length of input to check for attributes
-        // Protects against catastrophic backtracking on massive attribute values
-        const MAX_ATTR_PARSE_LENGTH = 20000; // 20 KB should be enough for any reasonable tag
+      // Safety limit: Max length of input to check for attributes
+      // Protects against catastrophic backtracking on massive attribute values
+      const MAX_ATTR_PARSE_LENGTH = 20000; // 20 KB should be enough for any reasonable tag
 
-        while (true) {
-          // Check for closing tag first (manual scan, regex only for the unusual)
-          close = matchTagClose(currentPos);
-          if (close) {
-            break;
-          }
+      while (true) {
+        // Check for closing tag first (manual scan, regex only for the unusual)
+        close = matchTagClose(currentPos);
+        if (close) {
+          break;
+        }
 
-          // Limit the input length to pass to the regex to prevent catastrophic backtracking
-          const remainingLen = fullLength - currentPos;
-          const isLimited = remainingLen > MAX_ATTR_PARSE_LENGTH;
+        // Limit the input length to pass to the regex to prevent catastrophic backtracking
+        const remainingLen = fullLength - currentPos;
+        const isLimited = remainingLen > MAX_ATTR_PARSE_LENGTH;
 
-          if (!isLimited) {
-            // Common case: Use sticky regex directly on full string (no slicing)
-            attributeY.lastIndex = currentPos;
-            attr = attributeY.exec(fullHtml);
-          } else {
-            const extractEndPos = currentPos + MAX_ATTR_PARSE_LENGTH;
+        if (!isLimited) {
+          // Common case: Use sticky regex directly on full string (no slicing)
+          attributeY.lastIndex = currentPos;
+          attr = attributeY.exec(fullHtml);
+        } else {
+          const extractEndPos = currentPos + MAX_ATTR_PARSE_LENGTH;
 
-            // Create a temporary substring only for attribute parsing (limited for safety)
-            const searchStr = fullHtml.substring(currentPos, extractEndPos);
-            attr = searchStr.match(attribute);
+          // Create a temporary substring only for attribute parsing (limited for safety)
+          const searchStr = fullHtml.substring(currentPos, extractEndPos);
+          attr = searchStr.match(attribute);
 
-            // If input was limited and there’s a match, check if the value might be truncated
-            if (attr) {
-              // Check if the attribute value extends beyond our search window
-              const attrEnd = attr[0].length;
-              // If the match ends near the limit, the value might be truncated
-              if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
-                // Manually extract this attribute to handle potentially huge value
-                const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
-                if (manualMatch) {
-                  const quoteChar = searchStr[manualMatch[0].length];
-                  if (quoteChar === '"' || quoteChar === "'") {
-                    const closeQuote = searchStr.indexOf(quoteChar, manualMatch[0].length + 1);
-                    if (closeQuote !== -1) {
-                      const fullAttrLen = closeQuote + 1;
-                      const numCustomParts = handler.customAttrSurround
-                        ? handler.customAttrSurround.length * NCP
-                        : 0;
-                      const baseIndex = 1 + numCustomParts;
-
-                      attr = [];
-                      attr[0] = searchStr.substring(0, fullAttrLen);
-                      attr[baseIndex] = manualMatch[1]; // Attribute name
-                      attr[baseIndex + 1] = '='; // `customAssign` (falls back to "=" for huge attributes)
-                      const value = searchStr.substring(manualMatch[0].length + 1, closeQuote);
-                      // Place value at correct index based on quote type
-                      if (quoteChar === '"') {
-                        attr[baseIndex + 2] = value; // Double-quoted value
-                      } else {
-                        attr[baseIndex + 3] = value; // Single-quoted value
-                      }
-                      currentPos += fullAttrLen;
-                      consumed += fullAttrLen;
-                      match.attrs.push(attr);
-                      continue;
-                    }
-                  }
-                  // Note: Unquoted attribute values are intentionally not handled here
-                  // Per HTML spec, unquoted values cannot contain spaces or special chars,
-                  // making a 20 KB+ unquoted value practically impossible; if encountered,
-                  // it’s malformed HTML and using the truncated regex match is acceptable
-                }
-              } else {
-                // If attr has no value assign but `=` follows in `fullHtml`,
-                // the value would be cut off—reset to trigger manual extraction below
-                const numCustomParts = handler.customAttrSurround
-                  ? handler.customAttrSurround.length * NCP
-                  : 0;
-                const baseIndex = 1 + numCustomParts;
-                if (attr[baseIndex + 1] === undefined) {
-                  const posAfterName = currentPos + attrEnd;
-                  if (/^\s*=/.test(fullHtml.slice(posAfterName, posAfterName + 50))) {
-                    attr = null;
-                  }
-                }
-              }
-            }
-
-            if (!attr) {
-              // If input was limited and there’s no match, try manual extraction
-              // This handles cases where quoted attributes exceed `MAX_ATTR_PARSE_LENGTH`
+          // If input was limited and there’s a match, check if the value might be truncated
+          if (attr) {
+            // Check if the attribute value extends beyond our search window
+            const attrEnd = attr[0].length;
+            // If the match ends near the limit, the value might be truncated
+            if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
+              // Manually extract this attribute to handle potentially huge value
               const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
               if (manualMatch) {
                 const quoteChar = searchStr[manualMatch[0].length];
                 if (quoteChar === '"' || quoteChar === "'") {
-                  // Search in the full HTML (not limited substring) for closing quote
-                  const closeQuote = fullHtml.indexOf(quoteChar, currentPos + manualMatch[0].length + 1);
+                  const closeQuote = searchStr.indexOf(quoteChar, manualMatch[0].length + 1);
                   if (closeQuote !== -1) {
-                    const fullAttrLen = closeQuote - currentPos + 1;
+                    const fullAttrLen = closeQuote + 1;
                     const numCustomParts = handler.customAttrSurround
                       ? handler.customAttrSurround.length * NCP
                       : 0;
                     const baseIndex = 1 + numCustomParts;
 
                     attr = [];
-                    attr[0] = fullHtml.substring(currentPos, closeQuote + 1);
+                    attr[0] = searchStr.substring(0, fullAttrLen);
                     attr[baseIndex] = manualMatch[1]; // Attribute name
-                    attr[baseIndex + 1] = '='; // customAssign
-                    const value = fullHtml.substring(currentPos + manualMatch[0].length + 1, closeQuote);
+                    attr[baseIndex + 1] = '='; // `customAssign` (falls back to "=" for huge attributes)
+                    const value = searchStr.substring(manualMatch[0].length + 1, closeQuote);
                     // Place value at correct index based on quote type
                     if (quoteChar === '"') {
                       attr[baseIndex + 2] = value; // Double-quoted value
@@ -770,30 +760,83 @@ export class HTMLParser {
                     continue;
                   }
                 }
+                // Note: Unquoted attribute values are intentionally not handled here
+                // Per HTML spec, unquoted values cannot contain spaces or special chars,
+                // making a 20 KB+ unquoted value practically impossible; if encountered,
+                // it’s malformed HTML and using the truncated regex match is acceptable
+              }
+            } else {
+              // If attr has no value assign but `=` follows in `fullHtml`,
+              // the value would be cut off—reset to trigger manual extraction below
+              const numCustomParts = handler.customAttrSurround
+                ? handler.customAttrSurround.length * NCP
+                : 0;
+              const baseIndex = 1 + numCustomParts;
+              if (attr[baseIndex + 1] === undefined) {
+                const posAfterName = currentPos + attrEnd;
+                if (/^\s*=/.test(fullHtml.slice(posAfterName, posAfterName + 50))) {
+                  attr = null;
+                }
               }
             }
           }
 
           if (!attr) {
-            break;
+            // If input was limited and there’s no match, try manual extraction
+            // This handles cases where quoted attributes exceed `MAX_ATTR_PARSE_LENGTH`
+            const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
+            if (manualMatch) {
+              const quoteChar = searchStr[manualMatch[0].length];
+              if (quoteChar === '"' || quoteChar === "'") {
+                // Search in the full HTML (not limited substring) for closing quote
+                const closeQuote = fullHtml.indexOf(quoteChar, currentPos + manualMatch[0].length + 1);
+                if (closeQuote !== -1) {
+                  const fullAttrLen = closeQuote - currentPos + 1;
+                  const numCustomParts = handler.customAttrSurround
+                    ? handler.customAttrSurround.length * NCP
+                    : 0;
+                  const baseIndex = 1 + numCustomParts;
+
+                  attr = [];
+                  attr[0] = fullHtml.substring(currentPos, closeQuote + 1);
+                  attr[baseIndex] = manualMatch[1]; // Attribute name
+                  attr[baseIndex + 1] = '='; // customAssign
+                  const value = fullHtml.substring(currentPos + manualMatch[0].length + 1, closeQuote);
+                  // Place value at correct index based on quote type
+                  if (quoteChar === '"') {
+                    attr[baseIndex + 2] = value; // Double-quoted value
+                  } else {
+                    attr[baseIndex + 3] = value; // Single-quoted value
+                  }
+                  currentPos += fullAttrLen;
+                  consumed += fullAttrLen;
+                  match.attrs.push(attr);
+                  continue;
+                }
+              }
+            }
           }
-
-          const attrLen = attr[0].length;
-          currentPos += attrLen;
-          consumed += attrLen;
-          match.attrs.push(attr);
         }
 
-        // Check for closing tag (manual scan, regex only for the unusual)
-        if (!close) {
-          close = matchTagClose(currentPos);
+        if (!attr) {
+          break;
         }
-        if (close) {
-          match.unarySlash = close.slash;
-          consumed += close.len;
-          match.advance = consumed;
-          return match;
-        }
+
+        const attrLen = attr[0].length;
+        currentPos += attrLen;
+        consumed += attrLen;
+        match.attrs.push(attr);
+      }
+
+      // Check for closing tag (manual scan, regex only for the unusual)
+      if (!close) {
+        close = matchTagClose(currentPos);
+      }
+      if (close) {
+        match.unarySlash = (close & 1) ? '/' : '';
+        consumed += close >> 1;
+        match.advance = consumed;
+        return match;
       }
       return undefined;
     }
@@ -964,6 +1007,8 @@ export class HTMLParser {
       if (handler.start) {
         await handler.start(tagName, attrs, unary, unarySlash);
       }
+      // Returned so the parse loop can skip lowercasing the name again
+      return lowerTagName;
     }
 
     // `needle` must already be lowercase
@@ -1017,6 +1062,8 @@ export class HTMLParser {
           handler.end(tagName, []);
         }
       }
+      // Returned so the parse loop can skip lowercasing the name again
+      return lowerTagName;
     }
   }
 }

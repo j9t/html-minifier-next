@@ -31,7 +31,7 @@
   },
   "minifySVG": true,
   "minifyURLs": true,
-  "noNewlinesBeforeTagClose": true,
+  "noNewlinesBeforeTagClose": false,
   "partialMarkup": false,
   "preserveLineBreaks": false,
   "preventAttributesEscaping": true,
