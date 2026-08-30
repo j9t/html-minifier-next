@@ -25,9 +25,9 @@ p {
 }
 
 main {
-	column-gap: 20px;
+	column-gap: 10px;
 	display: grid;
-	grid-template-columns: 5fr 2fr;
+	grid-template-columns: 4fr 2fr;
 }
 
 h1 {
@@ -53,6 +53,10 @@ input[type='number'] {
 
 input[type='text'] {
 	width: 70%;
+}
+
+input[type='number'] {
+	max-width: 70%;
 }
 
 input[type='checkbox'] {
@@ -86,6 +90,10 @@ code,
 	font-size: smaller;
 }
 
+code {
+	word-break: break-all;
+}
+
 .form-group {
 	margin-bottom: .75rem;
 }
@@ -96,6 +104,7 @@ code,
 
 .options {
 	background: #f9f9f9;
+	overflow: auto;
 	padding: 10px;
 }
 
@@ -131,9 +140,7 @@ code,
 #input,
 #output,
 #output-view {
-	/* Set explicitly, as form controls take neither the page’s font nor its box model—
-	   the values match what browsers give a form control, so that the panes look and
-	   measure the same whether they are one or not */
+	/* Set explicitly, as form controls take neither the page’s font nor its box model */
 	background: #fff;
 	border: 1px solid #767676;
 	box-sizing: border-box;
@@ -152,4 +159,20 @@ code,
 	overflow: auto;
 	overflow-wrap: anywhere;
 	white-space: pre-wrap;
+}
+
+@media screen and (max-width: 600px) {
+
+	main {
+		grid-template-columns: 3fr 2fr;
+	}
+
+}
+
+@media screen and (max-width: 400px) {
+
+	main {
+		grid-template-columns: 2fr 2fr;
+	}
+
 }
