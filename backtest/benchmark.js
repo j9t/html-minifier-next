@@ -42,6 +42,18 @@ const NOISE_WARN_PCT = 15;
 
 const PATH_BASELINE = path.join(__dirname, 'benchmark-baseline.json');
 
+// Which iteration a saved `time` stands for; a baseline naming another one is not comparable
+const METRIC = 'fastest';
+
+/** @param {{metric?: string, files?: Record<string, {spread?: number}>}} baseline */
+function baselineMetric(baseline) {
+  if (baseline.metric) {
+    return baseline.metric;
+  }
+  const files = Object.values(baseline.files ?? {});
+  return files.length && files.every(file => file.spread !== undefined) ? METRIC : 'median';
+}
+
 function parseArgs(argv) {
   const args = { save: false, core: false, cold: false, iterations: DEFAULT_ITERATIONS, config: 'html-minifier-next.config.json' };
   for (const arg of argv) {
@@ -180,6 +192,14 @@ async function main() {
   if (!args.save) {
     try {
       baseline = JSON.parse(await fs.readFile(PATH_BASELINE, 'utf8'));
+      // `time` held the median before it held the fastest iteration, and a median never
+      // reads faster—comparing across the two would show an improvement that is not there.
+      // A baseline predating the marker names its metric by whether it carries the
+      // per-file fields introduced alongside it.
+      if (baseline && baselineMetric(baseline) !== METRIC) {
+        console.log(`Warning: Ignoring baseline saved with an older timing metric—re-run with \`--save\` to compare against ${METRIC}-iteration times`);
+        baseline = null;
+      }
     } catch (err) {
       // A missing baseline is normal (first run reports absolute numbers only);
       // anything else (corrupt JSON, permissions) is worth surfacing
@@ -220,7 +240,7 @@ async function main() {
   const results = {};
   const noises = [];
   let sizeTotal = 0, timeTotal = 0;
-  let sizeTotalBase = 0, timeTotalBase = 0;
+  let sizeTotalBase = 0, timeTotalBase = 0, noiseWeightedBase = 0;
   let processed = 0, matched = 0;
 
   for (const fileName of fileNames) {
@@ -271,6 +291,7 @@ async function main() {
     if (prev) {
       sizeTotalBase += prev.size;
       timeTotalBase += prev.time;
+      noiseWeightedBase += (prev.spread != null ? prev.spread : 0) * prev.time;
       matched++;
     }
     // A delta has to clear both runs’ noise, so widen the band by the baseline’s own spread
@@ -295,7 +316,9 @@ async function main() {
   // letting a 3 ms file with a wide spread set the bar for the whole run
   const timeWeighted = noises.reduce((sum, n) => sum + n.noise * n.time, 0);
   const noiseTotal = timeTotal > 0 ? timeWeighted / timeTotal : noiseTypical;
-  const timeStrTotal = `${timeTotal.toFixed(1)} ms${compareTotals ? formatTimeDelta(timeTotal, timeTotalBase, noiseTotal) : ''}`;
+  // As for a single file, a delta has to clear both runs’ noise
+  const noiseTotalBase = timeTotalBase > 0 ? noiseWeightedBase / timeTotalBase : 0;
+  const timeStrTotal = `${timeTotal.toFixed(1)} ms${compareTotals ? formatTimeDelta(timeTotal, timeTotalBase, noiseTotal + noiseTotalBase) : ''}`;
   console.log(`\n${'Total'.padEnd(24)} ${sizeStrTotal.padEnd(24)} @ ${timeStrTotal}`);
   if (baseline && matched !== processed) {
     console.log(`Note: Total deltas omitted—only ${matched} of ${processed} processed file(s) have a baseline entry`);
@@ -312,6 +335,7 @@ async function main() {
     const payload = {
       created: new Date().toISOString(),
       git: getGitInfo(),
+      metric: METRIC,
       core: args.core,
       cold: args.cold,
       iterations: args.iterations,
