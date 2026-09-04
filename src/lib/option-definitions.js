@@ -1,4 +1,6 @@
-// Single source of truth for minifier option names, descriptions, types, and shared defaults
+/**
+ * Single source of truth for minifier option names, descriptions, types, and shared defaults
+ */
 
 /**
  * @typedef {object} OptionDefinition

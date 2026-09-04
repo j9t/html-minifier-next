@@ -1,3 +1,7 @@
+/**
+ * HTML element tag omission rules
+ */
+
 import {
   headerElements,
   descriptionElements,

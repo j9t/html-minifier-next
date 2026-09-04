@@ -1,4 +1,6 @@
-// Regex patterns (to avoid repeated allocations in hot paths)
+/**
+ * Regex patterns, element sets, and default configuration
+ */
 
 const RE_WS_START = /^[ \n\r\t\f]+/;
 const RE_WS_END = /[ \n\r\t\f]+$/;

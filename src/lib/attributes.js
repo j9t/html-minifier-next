@@ -1,3 +1,7 @@
+/**
+ * HTML attribute parsing, decoding, and minification
+ */
+
 import {
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,

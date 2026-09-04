@@ -1,4 +1,6 @@
-// Unused-CSS removal
+/**
+ * Unused-CSS removal
+ */
 
 import { findTagEnd } from './utils.js';
 

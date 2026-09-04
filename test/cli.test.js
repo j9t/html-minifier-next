@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
-import { describe, test, beforeEach } from 'node:test';
+import { describe, test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 
@@ -1912,5 +1912,167 @@ describe('CLI', () => {
 
     assert.strictEqual(status, 0);
     assert.strictEqual(stdout.toString().trim(), expected);
+  });
+});
+
+describe('Parallel multi-file processing', () => {
+  // Input and output directories are named per test but reused across runs, so a stale
+  // tree would leave files behind that the counts below then trip over
+  before(async () => await removeFixture('tmp'));
+  after(async () => await removeFixture('tmp'));
+
+  const execCliCapture = (/** @type {string[]} */ args) => {
+    const { stdout, stderr, status } = spawnSync('node', [cliPath, ...args], { cwd: fixturesDir });
+    return { stdout: stdout.toString(), stderr: stderr.toString(), exitCode: status };
+  };
+
+  // A page per file, varied enough that whitespace, CSS, JS, and SVG all take part,
+  // and repeated enough across files to exercise the shared minification caches
+  const buildInputDir = (/** @type {string} */ name, /** @type {number} */ count) => {
+    const dir = path.resolve(fixturesDir, 'tmp', name);
+    fs.mkdirSync(dir, { recursive: true });
+    for (let i = 0; i < count; i++) {
+      fs.writeFileSync(path.join(dir, `page-${i}.html`),
+        '<!doctype html>\n<html>\n  <head>\n    <title>Page ' + i + '</title>\n' +
+        '    <style>  .shared { color : red ; }  </style>\n' +
+        '    <style>  .p' + i + ' { color : blue ; }  </style>\n' +
+        '  </head>\n  <body>\n    <p>   Page ' + i + '   </p>\n' +
+        '    <svg viewBox="0 0 10 10"><rect x="0" y="0" width="10" height="10"/></svg>\n' +
+        '    <script>  var shared = 1 ;  console.log( shared ) ;  </script>\n' +
+        '    <script>  var local' + i + ' = ' + i + ' ;  </script>\n' +
+        '  </body>\n</html>\n');
+    }
+    return dir;
+  };
+
+  const readOutputs = (/** @type {string} */ dir) =>
+    fs.readdirSync(dir).sort().map(f => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
+
+  const OPTIONS_MINIFY = ['--collapse-whitespace', '--remove-comments', '--minify-css', '--minify-js', '--minify-svg'];
+
+  test('A worker names the step it failed at', async () => {
+    const { createFilePool } = await import('../src/lib/file-pool.js');
+    const dir = path.resolve(fixturesDir, 'tmp', 'par-stage');
+    fs.mkdirSync(dir, { recursive: true });
+    const pool = createFilePool({ options: { minifyJS: true, continueOnMinifyError: false }, size: 1 });
+
+    try {
+      const missing = path.join(dir, 'absent.html');
+      await assert.rejects(
+        pool.run({ inputFile: missing, outputFile: path.join(dir, 'out.html'), dryRun: false }),
+        (/** @type {any} */ err) => err.stage === 'read'
+      );
+
+      await assert.rejects(
+        pool.run({ inputFile: path.resolve(fixturesDir, 'invalid-css-js.html'), outputFile: path.join(dir, 'out.html'), dryRun: false }),
+        (/** @type {any} */ err) => err.stage === 'minify'
+      );
+
+      await assert.rejects(
+        pool.run({ inputFile: path.resolve(fixturesDir, 'default.html'), outputFile: path.join(dir, 'absent-dir', 'out.html'), dryRun: false }),
+        (/** @type {any} */ err) => err.stage === 'write'
+      );
+    } finally {
+      await pool.close();
+    }
+  });
+
+  test('Parallel output is byte-identical to sequential output', () => {
+    buildInputDir('par-in', 40);
+
+    execCli(['--input-dir=./tmp/par-in', '--output-dir=./tmp/par-seq', '--workers=1', ...OPTIONS_MINIFY]);
+    execCli(['--input-dir=./tmp/par-in', '--output-dir=./tmp/par-par', '--workers=4', ...OPTIONS_MINIFY]);
+
+    const sequential = readOutputs(path.resolve(fixturesDir, 'tmp/par-seq'));
+    const parallel = readOutputs(path.resolve(fixturesDir, 'tmp/par-par'));
+
+    assert.strictEqual(parallel.length, 40, 'Every input file is written');
+    assert.deepStrictEqual(parallel, sequential);
+  });
+
+  test('A run too small to repay a worker still produces the same output', () => {
+    buildInputDir('par-small-in', 2);
+
+    execCli(['--input-dir=./tmp/par-small-in', '--output-dir=./tmp/par-small-a', '--workers=1', ...OPTIONS_MINIFY]);
+    execCli(['--input-dir=./tmp/par-small-in', '--output-dir=./tmp/par-small-b', '--workers=4', ...OPTIONS_MINIFY]);
+
+    assert.deepStrictEqual(
+      readOutputs(path.resolve(fixturesDir, 'tmp/par-small-b')),
+      readOutputs(path.resolve(fixturesDir, 'tmp/par-small-a'))
+    );
+  });
+
+  test('`--workers=0` is read as “no workers” rather than as no work', () => {
+    buildInputDir('par-zero-in', 6);
+    execCli(['--input-dir=./tmp/par-zero-in', '--output-dir=./tmp/par-zero-out', '--workers=0', ...OPTIONS_MINIFY]);
+
+    assert.strictEqual(fs.readdirSync(path.resolve(fixturesDir, 'tmp/par-zero-out')).length, 6);
+  });
+
+  test('A file the minifier rejects is named, and the run does not hang', () => {
+    const dir = buildInputDir('par-bad-in', 8);
+    fs.writeFileSync(path.join(dir, 'broken.html'), '<script>var = = =;</script>');
+
+    const result = execCliCapture([
+      '--input-dir=./tmp/par-bad-in', '--output-dir=./tmp/par-bad-out',
+      '--workers=4', '--minify-js', '--no-continue-on-minify-error'
+    ]);
+
+    assert.notStrictEqual(result.exitCode, 0, 'The run fails rather than reporting success');
+    assert.match(result.stderr, /broken\.html/);
+  });
+
+  test('Workers and this process agree on whether a run failed', () => {
+    const dir = buildInputDir('par-parity-in', 8);
+    fs.writeFileSync(path.join(dir, 'broken.html'), '<script>var = = =;</script>');
+
+    const argsFor = (/** @type {string} */ workers, /** @type {string} */ out) => [
+      '--input-dir=./tmp/par-parity-in', `--output-dir=./tmp/${out}`, `--workers=${workers}`, '--minify-js'
+    ];
+
+    // Tolerated by default, so both paths finish and leave the offending script as it is
+    const lenientSequential = execCliCapture(argsFor('1', 'par-parity-a'));
+    const lenientParallel = execCliCapture(argsFor('4', 'par-parity-b'));
+    assert.strictEqual(lenientParallel.exitCode, lenientSequential.exitCode);
+    assert.deepStrictEqual(
+      readOutputs(path.resolve(fixturesDir, 'tmp/par-parity-b')),
+      readOutputs(path.resolve(fixturesDir, 'tmp/par-parity-a'))
+    );
+
+    // And both stop where the option says to stop
+    const strictSequential = execCliCapture([...argsFor('1', 'par-parity-c'), '--no-continue-on-minify-error']);
+    const strictParallel = execCliCapture([...argsFor('4', 'par-parity-d'), '--no-continue-on-minify-error']);
+    assert.notStrictEqual(strictSequential.exitCode, 0);
+    assert.strictEqual(strictParallel.exitCode, strictSequential.exitCode);
+  });
+
+  test('A warning from a worker is worded as it is in this process', () => {
+    const dir = buildInputDir('par-warn-in', 8);
+    fs.writeFileSync(path.join(dir, 'broken.html'), '<p>x</p><script>var = = =;</script>');
+
+    const warningsFrom = (/** @type {string} */ workers, /** @type {string} */ out) =>
+      execCliCapture([
+        '--input-dir=./tmp/par-warn-in', `--output-dir=./tmp/${out}`,
+        `--workers=${workers}`, '--minify-js', '--verbose'
+      ]).stderr.split('\n').filter(line => line.includes('Minification failed')).map(line => line.trim());
+
+    const sequential = warningsFrom('1', 'par-warn-a');
+    const parallel = warningsFrom('4', 'par-warn-b');
+
+    // An `Error` the minifier logs is worded differently from a plain message, and that
+    // wording has to survive the trip back from a worker
+    assert.deepStrictEqual(parallel, sequential);
+    assert.match(parallel[0] ?? '', /Warning: Minification failed, content left as-is:/);
+
+    // Lines from several files interleave, so each has to say which file it belongs to
+    assert.strictEqual(parallel.length, 1, 'Only the one broken file warns');
+    assert.match(parallel[0] ?? '', /\(.*broken\.html\)$/);
+  });
+
+  test('An invalid worker count is rejected', () => {
+    assert.throws(
+      () => execCli(['--input-dir=./tmp', '--output-dir=./tmp/par-invalid', '--workers=abc']),
+      /Invalid number for `--workers: "abc"`/
+    );
   });
 });

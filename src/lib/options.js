@@ -1,3 +1,7 @@
+/**
+ * Options processing and per-document minification state
+ */
+
 import { createUrlMinifier } from './urls.js';
 import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';
@@ -45,6 +49,7 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   minifySVG: ((svgContent: string) => string | Promise<string>) | null,
  *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
  *   cssContext?: CSSContext,
+ *   parallelJS?: boolean,
  *   nameParent?: (name: string) => string,
  *   nameHTML?: (name: string) => string,
  *   keepClosingSlashHTML?: boolean,
@@ -532,6 +537,13 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return text;
         }
       };
+
+      // Whether dispatching script bodies ahead of the parse pays off. It needs a minifier
+      // that leaves the main thread—SWC hands work to its own threadpool, where overlapping
+      // calls genuinely run at once, while Terser would only compete with the parse for the
+      // one thread both share. A user-supplied `minifyJS` is excluded either way—only this
+      // wrapper is content-keyed and free of side effects.
+      options.parallelJS = engine === 'swc';
     } else if (key === 'minifyURLs' && typeof option !== 'function') {
       if (!option) {
         return;

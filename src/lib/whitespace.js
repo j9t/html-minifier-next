@@ -1,3 +1,7 @@
+/**
+ * Whitespace trimming and collapsing
+ */
+
 import {
   RE_WS_START,
   RE_WS_END,

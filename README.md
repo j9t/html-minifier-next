@@ -36,6 +36,7 @@ Use `npx html-minifier-next --help` to check all available options:
 | `--input-dir <dir>`, `-I <dir>` | Specify an input directory | `--input-dir=src` |
 | `--ignore-dir <patterns>`, `-X <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>`, `-O <dir>` | Specify an output directory | `--output-dir=dist` |
+| `--workers <n>`, `-w <n>` | Number of worker threads for multi-file runs; defaults to half the available cores, at most 6, for runs of 128 files or more (below that threads cost more than they save) | `--workers=4` |
 | `--input <file>`, `-i <file>` | Specify input file (alternative to positional argument; pair with `--output` for file output) | `npx html-minifier-next -i input.html -o output.html` |
 | `--output <file>`, `-o <file>` | Specify output file (reads from `--input` file argument or STDIN; outputs to STDOUT if not specified) | File to file: `npx html-minifier-next input.html -o output.html`<br>File to file (explicit): `npx html-minifier-next -i input.html -o output.html`<br>Pipe to file: `cat input.html \| npx html-minifier-next -o output.html`<br>File to STDOUT: `npx html-minifier-next input.html` |
 | `--file-ext <extensions>`, `-f <extensions>` | Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files | `--file-ext=html,php`, `--file-ext='*'` |
@@ -337,7 +338,9 @@ const result = await minify(html, {
 **Available engines:**
 
 * `terser` (default): The standard JavaScript minifier with excellent compression
-* [`swc`](https://swc.rs/): Rust-based minifier that’s significantly faster than Terser (requires separate installation)
+* [`swc`](https://swc.rs/): Rust-based minifier multiple times faster than Terser (requires separate installation)
+
+The engine also decides how work is scheduled: SWC minifies a document’s script bodies as one batch dispatched ahead of the parse, while Terser shares the thread the parse runs on.
 
 **To use SWC**, install it as a development dependency:
 
@@ -466,7 +469,7 @@ npx html-minifier-next --minify-css --minify-js --minify-svg input.html
 **Important:**
 
 * Cache locking: Caches are created on the first `minify()` call and persist for the process lifetime. Cache sizes are locked after first initialization—subsequent calls reuse the same caches even if different `cacheCSS`, `cacheJS`, or `cacheSVG` options are provided. The first call’s options determine the cache sizes.
-* Zero values: Explicit `0` values are coerced to `1` (minimum functional cache size) to avoid immediate eviction. To keep the cache footprint as small as possible, use a small number like `10` or `50` instead of `0`.
+* Values: `0` switches the cache off; negative and non-finite values fall back to the default size.
 * Entry size cap: Individual CSS, JavaScript, or SVG blocks larger than 1 MB are minified normally but not stored in the cache—this bounds worst-case cache memory without affecting realistically sized inline content. (This cutoff is fixed and not configurable.)
 
 The caches persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
@@ -735,17 +738,20 @@ npm i;
 npm run benchmark
 ```
 
-It reuses the backtest corpus (run `npm run backtest` once to download it) and reports per-file output size and median processing time.
+It reuses the backtest corpus (run `npm run backtest` once to download it) and reports per-file output size and processing time.
 
 Parameters:
 
 * No argument: Runs and, if a baseline exists, shows size and time deltas
 * `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
 * `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s processing time
-* `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
-* `--config=PATH`: Uses an alternative options file (default html-minifier-next.config.json)
+* `--cold`: Switches the minification caches off so CSS, JS, and SVG work is redone on every iteration—without it, warm caches serve those results from memory after the warm-up run and the benchmark cannot see changes to those minifiers
+* `--iterations=N`: Sets the number of timed iterations (default: 5)
+* `--config=PATH`: Uses an alternative options file (default: html-minifier-next.config.json)
 
-To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers.
+To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers, or `--cold` when measuring changes to the CSS, JS, or SVG minification paths.
+
+Reported times are the *fastest* iteration, not the median: Interference can only make a run slower, so the minimum is the most stable estimate. Each run also reports its noise—how far the reported figure moves between the first and second half of the iterations—and any delta smaller than that is marked `within noise` rather than shown as a win or a regression. Raise `--iterations` until the noise sits below the change you are trying to measure.
 
 #### Profiling
 

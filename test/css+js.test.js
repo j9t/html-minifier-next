@@ -1,7 +1,9 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert';
+import { spawnSync } from 'node:child_process';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 import { collectUsedSymbols } from '../src/lib/unused-css.js';
+import { extractScriptBodies } from '../src/lib/content.js';
 
 describe('CSS and JS', () => {
   test('CSS minification', async () => {
@@ -1455,16 +1457,47 @@ describe('CSS and JS', () => {
       assert.ok(result.includes('function largeTest(){'), 'JS should minify with large cache');
     });
 
-    test('Zero cache size coerces to `1`', async () => {
+    test('Zero cache size still minifies', async () => {
       const input = '<style>.zero { margin: 0; }</style>';
 
-      // Should coerce `0` to `1` and still work
       const result = await minify(input, {
         minifyCSS: true,
-        cacheCSS: 0 // Should be coerced to `1`
+        cacheCSS: 0 // Switches the cache off
       });
 
       assert.ok(result.includes('.zero{margin:0}'), 'CSS should minify even with `cacheCSS: 0`');
+    });
+
+    // Sizes lock on the first `minify()` call for the life of the process, so any size but
+    // the default has to be observed in a process that sets it before anything else runs
+    const cssStatsForFirstCall = (/** @type {number} */ size) => {
+      const urlMinifier = new URL('../src/htmlminifier.js', import.meta.url).href;
+      const script = `
+        import { minify, getCacheStats } from ${JSON.stringify(urlMinifier)};
+        const input = '<style>.probe { color: red; }</style>';
+        await minify(input, { minifyCSS: true, cacheCSS: ${size} });
+        await minify(input, { minifyCSS: true, cacheCSS: ${size} });
+        console.log(JSON.stringify(getCacheStats().css));
+      `;
+      const { stdout, stderr, status } = spawnSync('node', ['--input-type=module', '--eval', script], { encoding: 'utf8' });
+      assert.strictEqual(status, 0, `Probe process failed: ${stderr}`);
+      return JSON.parse(stdout);
+    };
+
+    test('`cacheCSS: 0` switches the cache off', () => {
+      const stats = cssStatsForFirstCall(0);
+
+      assert.strictEqual(stats.limit, 0, 'Cache limit should be reported as zero');
+      assert.strictEqual(stats.gets, 2, 'Both calls should still perform a lookup');
+      assert.strictEqual(stats.hits, 0, 'The repeated call should miss rather than hit');
+      assert.strictEqual(stats.size, 0, 'Nothing should be stored');
+    });
+
+    test('A negative cache size falls back to the default', () => {
+      const stats = cssStatsForFirstCall(-5);
+
+      assert.strictEqual(stats.limit, 500, 'Default cache limit should be reported');
+      assert.strictEqual(stats.hits, 1, 'The repeated call should hit, as it does by default');
     });
 
     test('Negative env var returns undefined (uses default)', async () => {
@@ -1602,6 +1635,201 @@ describe('CSS and JS', () => {
       assert.ok(result1.includes('return 42'), 'JS should still be minified');
       assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
       assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
+    });
+  });
+
+
+  describe('Script body extraction', () => {
+    const codesOf = (html) => extractScriptBodies(html).map(body => body.code);
+
+    test('Executable scripts are collected in document order', () => {
+      assert.deepStrictEqual(
+        codesOf('<script>var a = 1;</script><p>x</p><script>var b = 2;</script>'),
+        ['var a = 1;', 'var b = 2;']
+      );
+    });
+
+    test('External and whitespace-only scripts are skipped', () => {
+      assert.deepStrictEqual(codesOf('<script src="a.js"></script><script>  \n </script>'), []);
+    });
+
+    test('Data blocks are skipped, executable types are kept', () => {
+      const input = '<script type="application/json">{"a":1}</script>' +
+        '<script type="application/ld+json">{"b":2}</script>' +
+        '<script type="text/template"><p>x</p></script>' +
+        '<script type="text/javascript">var a = 1;</script>';
+
+      assert.deepStrictEqual(codesOf(input), ['var a = 1;']);
+    });
+
+    test('A module is recorded as one', () => {
+      assert.deepStrictEqual(
+        extractScriptBodies('<script type="module">var a = 1;</script>'),
+        [{ code: 'var a = 1;', isModule: true }]
+      );
+    });
+
+    test('The same body in both script modes stays two entries', () => {
+      assert.deepStrictEqual(
+        extractScriptBodies('<script>var a = 1;</script><script type="module">var a = 1;</script>'),
+        [{ code: 'var a = 1;', isModule: false }, { code: 'var a = 1;', isModule: true }]
+      );
+    });
+
+    test('A repeated body is dispatched once', () => {
+      assert.deepStrictEqual(codesOf('<script>var a = 1;</script><script>var a = 1;</script>'), ['var a = 1;']);
+    });
+
+    test('A `>` inside an attribute value does not end the tag', () => {
+      assert.deepStrictEqual(codesOf('<script data-x="a>b">var a = 1;</script>'), ['var a = 1;']);
+    });
+
+    test('Markup that looks like script content is left alone', () => {
+      assert.deepStrictEqual(codesOf('<p>var a = 1;</p><pre>&lt;script&gt;x&lt;/script&gt;</pre>'), []);
+    });
+
+    test('Every collected body is what the minifier is asked to minify', async () => {
+      const input = '<script>var a = 1;</script><script type="module">var b = 2;</script>' +
+        '<script src="a.js"></script><script type="application/json">{"c":3}</script>';
+      const asked = [];
+
+      await minify(input, {
+        mergeScripts: false,
+        minifyJS: (code, inline) => {
+          if (!inline && code.trim()) asked.push(code);
+          return code;
+        }
+      });
+
+      assert.deepStrictEqual(codesOf(input), asked);
+    });
+
+    test('A closing tag carrying junk still ends the body', () => {
+      assert.deepStrictEqual(codesOf('<script>var a = 1;</script foo bar>'), ['var a = 1;']);
+    });
+
+    test('A tag whose name only starts with `script` does not end the body', () => {
+      const body = 'var a = 1; // </scriptx>\nvar b = 2;';
+      assert.deepStrictEqual(codesOf('<script>' + body + '</script>'), [body]);
+    });
+
+    test('An unclosed script is skipped', () => {
+      assert.deepStrictEqual(codesOf('<script>var a = 1;'), []);
+      assert.deepStrictEqual(codesOf('<script>var a = 1;</script'), []);
+    });
+
+    test('Repeated `</script` does not degrade to a quadratic scan', () => {
+      const input = '<script>var a = 1;' + '</script'.repeat(20000);
+      const start = performance.now();
+
+      assert.deepStrictEqual(codesOf(input), []);
+      assert.ok(performance.now() - start < 500, 'Extraction should stay linear in the input length');
+    });
+
+    test('Repeated `<script` does not degrade to a quadratic scan', () => {
+      const input = '<script '.repeat(20000);
+      const start = performance.now();
+
+      assert.deepStrictEqual(codesOf(input), []);
+      assert.ok(performance.now() - start < 500, 'Extraction should stay linear in the input length');
+    });
+  });
+
+  describe('Deferred JS minification', () => {
+    test('JS: Multiple scripts keep their results in document order', async () => {
+      const input = '<script>var a = 1; console.log(a);</script>' +
+        '<script>var b = 2; console.log(b);</script>' +
+        '<script>var c = 3; console.log(c);</script>';
+      const output = '<script>var a=1;console.log(a)</script>' +
+        '<script>var b=2;console.log(b)</script>' +
+        '<script>var c=3;console.log(c)</script>';
+
+      assert.strictEqual(await minify(input, { minifyJS: true, mergeScripts: false }), output);
+    });
+
+    test('JS: Scripts sharing content resolve independently', async () => {
+      const input = '<script>var a = 1; console.log(a);</script>' +
+        '<p>x</p>' +
+        '<script>var a = 1; console.log(a);</script>';
+      const output = '<script>var a=1;console.log(a)</script>' +
+        '<p>x</p>' +
+        '<script>var a=1;console.log(a)</script>';
+
+      assert.strictEqual(await minify(input, { minifyJS: true, mergeScripts: false }), output);
+    });
+
+    test('JS: Whitespace-only script is treated as empty', async () => {
+      assert.strictEqual(
+        await minify('<script>   </script>', { minifyJS: true, removeEmptyElements: true }),
+        ''
+      );
+    });
+
+    test('JS: Script that minifies away is still emitted', async () => {
+      // `removeEmptyElements` decides on the source text, so a comment-only script
+      // survives as an empty element rather than being dropped
+      assert.strictEqual(
+        await minify('<script>/* just a comment */</script>', { minifyJS: true }),
+        '<script></script>'
+      );
+    });
+
+    test('JS: Minification errors propagate by default', async () => {
+      await assert.rejects(
+        () => minify('<script>var = = =;</script>', { minifyJS: true, continueOnMinifyError: false })
+      );
+    });
+
+    test('JS: Minification errors are swallowed with `continueOnMinifyError`', async () => {
+      const logged = [];
+      const result = await minify(
+        '<script>var a = 1;</script><script>var = = =;</script>',
+        { minifyJS: true, mergeScripts: false, continueOnMinifyError: true, log: (err) => logged.push(err) }
+      );
+
+      assert.ok(result.includes('var a=1'), 'Valid script is still minified');
+      assert.ok(result.includes('var = = =;'), 'Invalid script is passed through unchanged');
+      assert.ok(logged.length > 0, 'Failure is reported through `log`');
+    });
+
+    test('JS: A user-supplied function sees each script exactly once', async () => {
+      const seen = [];
+      const input = '<script>var a = 1;</script><script>var b = 2;</script>';
+
+      await minify(input, {
+        mergeScripts: false,
+        minifyJS: (code) => {
+          seen.push(code);
+          return code;
+        }
+      });
+
+      assert.deepStrictEqual(seen, ['var a = 1;', 'var b = 2;']);
+    });
+
+    test('JS: `processScripts` and the batched engine work together', async () => {
+      const scripts = '<script>var b = 1 ;</script><script>var c = 2 ;</script>';
+      const options = { collapseWhitespace: true, minifyJS: { engine: 'swc' }, mergeScripts: false };
+
+      assert.strictEqual(
+        await minify('<script type="text/html"><div>  a  </div></script>' + scripts,
+          { ...options, processScripts: ['text/html'] }),
+        '<script type="text/html"><div>a</div></script><script>var b=1</script><script>var c=2</script>'
+      );
+
+      // An executable type is the case that reaches both the markup and the JS step
+      assert.strictEqual(
+        await minify('<script type="text/javascript"><div>  a  </div></script>' + scripts,
+          { ...options, processScripts: ['text/javascript'] }),
+        '<script type="text/javascript"><div>a</div></script><script>var b=1</script><script>var c=2</script>'
+      );
+    });
+
+    test('JS: Deferred results survive whitespace collapsing around scripts', async () => {
+      const input = '<div>\n  <script>var a = 1; console.log(a);</script>\n  <p>text</p>\n</div>';
+      const output = '<div><script>var a=1;console.log(a)</script><p>text</p></div>';
+
+      assert.strictEqual(await minify(input, { minifyJS: true, collapseWhitespace: true }), output);
     });
   });
 });
