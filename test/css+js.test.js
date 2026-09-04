@@ -1604,4 +1604,84 @@ describe('CSS and JS', () => {
       assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
     });
   });
+
+  describe('Deferred JS minification', () => {
+    test('JS: Multiple scripts keep their results in document order', async () => {
+      const input = '<script>var a = 1; console.log(a);</script>' +
+        '<script>var b = 2; console.log(b);</script>' +
+        '<script>var c = 3; console.log(c);</script>';
+      const output = '<script>var a=1;console.log(a)</script>' +
+        '<script>var b=2;console.log(b)</script>' +
+        '<script>var c=3;console.log(c)</script>';
+
+      assert.strictEqual(await minify(input, { minifyJS: true, mergeScripts: false }), output);
+    });
+
+    test('JS: Scripts sharing content resolve independently', async () => {
+      const input = '<script>var a = 1; console.log(a);</script>' +
+        '<p>x</p>' +
+        '<script>var a = 1; console.log(a);</script>';
+      const output = '<script>var a=1;console.log(a)</script>' +
+        '<p>x</p>' +
+        '<script>var a=1;console.log(a)</script>';
+
+      assert.strictEqual(await minify(input, { minifyJS: true, mergeScripts: false }), output);
+    });
+
+    test('JS: Whitespace-only script is treated as empty', async () => {
+      assert.strictEqual(
+        await minify('<script>   </script>', { minifyJS: true, removeEmptyElements: true }),
+        ''
+      );
+    });
+
+    test('JS: Script that minifies away is still emitted', async () => {
+      // `removeEmptyElements` decides on the source text, so a comment-only script
+      // survives as an empty element rather than being dropped
+      assert.strictEqual(
+        await minify('<script>/* just a comment */</script>', { minifyJS: true }),
+        '<script></script>'
+      );
+    });
+
+    test('JS: Minification errors propagate by default', async () => {
+      await assert.rejects(
+        () => minify('<script>var = = =;</script>', { minifyJS: true, continueOnMinifyError: false })
+      );
+    });
+
+    test('JS: Minification errors are swallowed with `continueOnMinifyError`', async () => {
+      const logged = [];
+      const result = await minify(
+        '<script>var a = 1;</script><script>var = = =;</script>',
+        { minifyJS: true, mergeScripts: false, continueOnMinifyError: true, log: (err) => logged.push(err) }
+      );
+
+      assert.ok(result.includes('var a=1'), 'Valid script is still minified');
+      assert.ok(result.includes('var = = =;'), 'Invalid script is passed through unchanged');
+      assert.ok(logged.length > 0, 'Failure is reported through `log`');
+    });
+
+    test('JS: A user-supplied function sees each script exactly once', async () => {
+      const seen = [];
+      const input = '<script>var a = 1;</script><script>var b = 2;</script>';
+
+      await minify(input, {
+        mergeScripts: false,
+        minifyJS: (code) => {
+          seen.push(code);
+          return code;
+        }
+      });
+
+      assert.deepStrictEqual(seen, ['var a = 1;', 'var b = 2;']);
+    });
+
+    test('JS: Deferred results survive whitespace collapsing around scripts', async () => {
+      const input = '<div>\n  <script>var a = 1; console.log(a);</script>\n  <p>text</p>\n</div>';
+      const output = '<div><script>var a=1;console.log(a)</script><p>text</p></div>';
+
+      assert.strictEqual(await minify(input, { minifyJS: true, collapseWhitespace: true }), output);
+    });
+  });
 });
