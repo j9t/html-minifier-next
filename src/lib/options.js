@@ -156,10 +156,10 @@ function isRequested(value) {
 
 /**
  * @param {MinifierOptions} inputOptions - User-provided options
- * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
+ * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, getOxvg?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
  * @returns {ProcessedOptions} Normalized options with defaults applied
  */
-const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
+const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, getOxvg, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
   /** @type {ProcessedOptions} */
   const options = {
     name: lowercase,
@@ -589,19 +589,35 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         }
       };
     } else if (key === 'minifySVG' && typeof option !== 'function') {
-      if (!option || !getSvgo || !svgMinifyCache) {
+      if (!option || !getSvgo || !getOxvg || !svgMinifyCache) {
         return;
       }
 
       // Capture to preserve TypeScript narrowing across the async closure boundary below
       const loadSvgo = getSvgo;
+      const loadOxvg = getOxvg;
       const svgCache = svgMinifyCache;
 
-      const svgoOptions = typeof option === 'object' ? option : {};
+      // Parse configuration
+      const svgConfig = typeof option === 'object' ? option : {};
+      const svgEngine = (svgConfig.engine || 'svgo').toLowerCase();
+
+      // Validate engine
+      const supportedSVGEngines = ['svgo', 'oxvg'];
+      if (!supportedSVGEngines.includes(svgEngine)) {
+        throw new Error(`Unsupported SVG minifier engine: \u201C${svgEngine}\u201D. Supported engines: ${supportedSVGEngines.join(', ')}`);
+      }
+      // Extract engine-specific options (excluding `engine` field itself)
+      const svgEngineOptions = { ...svgConfig };
+      delete svgEngineOptions.engine;
+
+      const svgoOptions = svgEngine === 'svgo' ? svgEngineOptions : {};
+      const oxvgOptions = svgEngine === 'oxvg' ? svgEngineOptions : {};
 
       // Pre-compute option signature for cache keys
       const svgSig = stableStringify({
-        ...svgoOptions,
+        engine: svgEngine,
+        ...svgEngineOptions,
         cont: !!options.continueOnMinifyError
       });
 
@@ -626,6 +642,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           }
 
           const inFlight = (async () => {
+            if (svgEngine === 'oxvg') {
+              const optimise = await loadOxvg();
+              return optimise(svgContent, Object.keys(oxvgOptions).length ? oxvgOptions : undefined);
+            }
             const optimize = await loadSvgo();
             const result = optimize(svgContent, svgoOptions);
             return result.data;

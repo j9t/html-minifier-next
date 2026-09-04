@@ -542,6 +542,22 @@ async function getSvgo() {
 }
 
 /** @type {Promise<Function> | undefined} */
+let oxvgPromise;
+async function getOxvg() {
+  if (!oxvgPromise) {
+    oxvgPromise = import('@oxvg/napi')
+      .then(m => (m.default || m).optimise)
+      .catch(() => {
+        throw new Error(
+          'The oxvg SVG minifier requires @oxvg/napi to be installed.\n' +
+          'Install it with: npm install @oxvg/napi'
+        );
+      });
+  }
+  return oxvgPromise;
+}
+
+/** @type {Promise<Function> | undefined} */
 let decodeHTMLPromise;
 async function getDecodeHTML() {
   if (!decodeHTMLPromise) {
@@ -2230,6 +2246,7 @@ export const minify = async function (value, options) {
       getTerser,
       getSwc,
       getSvgo,
+      getOxvg,
       cssMinifyCache: caches.cssMinifyCache ?? undefined,
       jsMinifyCache: caches.jsMinifyCache ?? undefined,
       svgMinifyCache: caches.svgMinifyCache ?? undefined
