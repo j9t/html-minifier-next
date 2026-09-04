@@ -1775,6 +1775,24 @@ describe('CSS and JS', () => {
       assert.deepStrictEqual(seen, ['var a = 1;', 'var b = 2;']);
     });
 
+    test('JS: `processScripts` and the batched engine work together', async () => {
+      const scripts = '<script>var b = 1 ;</script><script>var c = 2 ;</script>';
+      const options = { collapseWhitespace: true, minifyJS: { engine: 'swc' }, mergeScripts: false };
+
+      assert.strictEqual(
+        await minify('<script type="text/html"><div>  a  </div></script>' + scripts,
+          { ...options, processScripts: ['text/html'] }),
+        '<script type="text/html"><div>a</div></script><script>var b=1</script><script>var c=2</script>'
+      );
+
+      // An executable type is the case that reaches both the markup and the JS step
+      assert.strictEqual(
+        await minify('<script type="text/javascript"><div>  a  </div></script>' + scripts,
+          { ...options, processScripts: ['text/javascript'] }),
+        '<script type="text/javascript"><div>a</div></script><script>var b=1</script><script>var c=2</script>'
+      );
+    });
+
     test('JS: Deferred results survive whitespace collapsing around scripts', async () => {
       const input = '<div>\n  <script>var a = 1; console.log(a);</script>\n  <p>text</p>\n</div>';
       const output = '<div><script>var a=1;console.log(a)</script><p>text</p></div>';
