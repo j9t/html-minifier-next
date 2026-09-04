@@ -104,7 +104,7 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  improve performance for inputs with repeated CSS (e.g., batch processing).
  *  - Cache is created on first `minify()` call and persists for the process lifetime
  *  - Cache size is locked after first call—subsequent calls reuse the same cache
- *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
+ *  - `0` switches the cache off; negative and non-finite values fall back to the default size
  *
  *  Default: `500`
  *
@@ -113,7 +113,7 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  values improve performance for inputs with repeated JavaScript.
  *  - Cache is created on first `minify()` call and persists for the process lifetime
  *  - Cache size is locked after first call—subsequent calls reuse the same cache
- *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
+ *  - `0` switches the cache off; negative and non-finite values fall back to the default size
  *
  *  Default: `500`
  *
@@ -122,7 +122,7 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  values improve performance for inputs with repeated SVG content.
  *  - Cache is created on first `minify()` call and persists for the process lifetime
  *  - Cache size is locked after first call—subsequent calls reuse the same cache
- *  - Explicit `0` values are coerced to `1` (minimum functional cache size)
+ *  - `0` switches the cache off; negative and non-finite values fall back to the default size
  *
  *  Default: `500`
  *
@@ -2054,7 +2054,7 @@ function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
  * - Cache sizes are locked after first initialization—subsequent calls use the same caches
  *   even if different `cacheCSS`/`cacheJS`/`cacheSVG` options are provided
  * - The first call’s options determine the cache sizes for subsequent calls
- * - Invalid values (NaN, Infinity) fall back to the default size (500); values below `1` are clamped to `1`
+ * - Invalid values (NaN, Infinity, negative) fall back to the default size (500)
  */
 /** @param {MinifierOptions} options */
 function initCaches(options) {
@@ -2072,8 +2072,9 @@ function initCaches(options) {
       return parsed;
     };
 
-    // Sanitize a cache size: Non-finite/NaN falls back to `defaultSize`; otherwise clamped to min 1 and floored
-    const sanitizeSize = (/** @type {number} */ size) => Number.isFinite(size) ? Math.max(1, Math.floor(size)) : defaultSize;
+    // Non-finite and negative sizes fall back to `defaultSize`, as they do for the
+    // environment variables above
+    const sanitizeSize = (/** @type {number} */ size) => Number.isFinite(size) && size >= 0 ? Math.floor(size) : defaultSize;
 
     // Get cache sizes with precedence: Options > env > default
     const cssSize = options.cacheCSS !== undefined ? options.cacheCSS

@@ -1,5 +1,7 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 import { collectUsedSymbols } from '../src/lib/unused-css.js';
 import { extractScriptBodies } from '../src/lib/content.js';
@@ -1456,16 +1458,47 @@ describe('CSS and JS', () => {
       assert.ok(result.includes('function largeTest(){'), 'JS should minify with large cache');
     });
 
-    test('Zero cache size coerces to `1`', async () => {
+    test('Zero cache size still minifies', async () => {
       const input = '<style>.zero { margin: 0; }</style>';
 
-      // Should coerce `0` to `1` and still work
       const result = await minify(input, {
         minifyCSS: true,
-        cacheCSS: 0 // Should be coerced to `1`
+        cacheCSS: 0 // Switches the cache off
       });
 
       assert.ok(result.includes('.zero{margin:0}'), 'CSS should minify even with `cacheCSS: 0`');
+    });
+
+    // Sizes lock on the first `minify()` call for the life of the process, so any size but
+    // the default has to be observed in a process that sets it before anything else runs
+    const cssStatsForFirstCall = (/** @type {number} */ size) => {
+      const pathMinifier = fileURLToPath(new URL('../src/htmlminifier.js', import.meta.url));
+      const script = `
+        import { minify, getCacheStats } from ${JSON.stringify(pathMinifier)};
+        const input = '<style>.probe { color: red; }</style>';
+        await minify(input, { minifyCSS: true, cacheCSS: ${size} });
+        await minify(input, { minifyCSS: true, cacheCSS: ${size} });
+        console.log(JSON.stringify(getCacheStats().css));
+      `;
+      const { stdout, stderr, status } = spawnSync('node', ['--input-type=module', '--eval', script], { encoding: 'utf8' });
+      assert.strictEqual(status, 0, `Probe process failed: ${stderr}`);
+      return JSON.parse(stdout);
+    };
+
+    test('`cacheCSS: 0` switches the cache off', () => {
+      const stats = cssStatsForFirstCall(0);
+
+      assert.strictEqual(stats.limit, 0, 'Cache limit should be reported as zero');
+      assert.strictEqual(stats.gets, 2, 'Both calls should still perform a lookup');
+      assert.strictEqual(stats.hits, 0, 'The repeated call should miss rather than hit');
+      assert.strictEqual(stats.size, 0, 'Nothing should be stored');
+    });
+
+    test('A negative cache size falls back to the default', () => {
+      const stats = cssStatsForFirstCall(-5);
+
+      assert.strictEqual(stats.limit, 500, 'Default cache limit should be reported');
+      assert.strictEqual(stats.hits, 1, 'The repeated call should hit, as it does by default');
     });
 
     test('Negative env var returns undefined (uses default)', async () => {

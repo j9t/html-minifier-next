@@ -469,7 +469,7 @@ npx html-minifier-next --minify-css --minify-js --minify-svg input.html
 **Important:**
 
 * Cache locking: Caches are created on the first `minify()` call and persist for the process lifetime. Cache sizes are locked after first initialization—subsequent calls reuse the same caches even if different `cacheCSS`, `cacheJS`, or `cacheSVG` options are provided. The first call’s options determine the cache sizes.
-* Zero values: Explicit `0` values are coerced to `1` (minimum functional cache size) to avoid immediate eviction. To keep the cache footprint as small as possible, use a small number like `10` or `50` instead of `0`.
+* Values: `0` switches the cache off; negative and non-finite values fall back to the default size.
 * Entry size cap: Individual CSS, JavaScript, or SVG blocks larger than 1 MB are minified normally but not stored in the cache—this bounds worst-case cache memory without affecting realistically sized inline content. (This cutoff is fixed and not configurable.)
 
 The caches persist across multiple `minify()` calls, making them particularly effective when processing many files in a batch operation.
@@ -745,7 +745,7 @@ Parameters:
 * No argument: Runs and, if a baseline exists, shows size and time deltas
 * `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
 * `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s processing time
-* `--cold`: Shrinks the minification caches so most CSS, JS, and SVG work is redone on every iteration—without it, warm caches serve those results from memory after the warm-up run and the benchmark cannot see changes to those minifiers
+* `--cold`: Switches the minification caches off so CSS, JS, and SVG work is redone on every iteration—without it, warm caches serve those results from memory after the warm-up run and the benchmark cannot see changes to those minifiers
 * `--iterations=N`: Sets the number of timed iterations (default: 5)
 * `--config=PATH`: Uses an alternative options file (default: html-minifier-next.config.json)
 
