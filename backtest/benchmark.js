@@ -102,10 +102,12 @@ function fastest(values) {
 // what each half would have reported. This answers the question a delta actually
 // depends on—“how much would this number move if I ran it again?”—and, unlike the
 // spread between fastest and slowest, it tightens rather than inflates as iterations
-// are added, because it does not chase the single worst outlier.
+// are added, because it does not chase the single worst outlier. One iteration has no
+// halves to compare, and reports nothing rather than a zero that would read as a
+// perfectly reproducible run.
 function reproducibility(values) {
   if (values.length < 2) {
-    return 0;
+    return null;
   }
   const half = Math.floor(values.length / 2);
   const lowFirst = Math.min(...values.slice(0, half));
@@ -283,7 +285,7 @@ async function main() {
       size,
       time: Math.round(time * 100) / 100,
       median: Math.round(median(times) * 100) / 100,
-      spread: Math.round(noise * 10) / 10
+      spread: noise === null ? null : Math.round(noise * 10) / 10
     };
     sizeTotal += size;
     timeTotal += time;
@@ -297,9 +299,9 @@ async function main() {
       matched++;
     }
     // A delta has to clear both runs’ noise, so widen the band by the baseline’s own spread
-    const band = noise + (prev && prev.spread != null ? prev.spread : 0);
+    const band = (noise ?? 0) + (prev && prev.spread != null ? prev.spread : 0);
     const sizeStr = `${formatBytes(size)} B${prev ? formatDelta(size, prev.size) : ''}`;
-    const timeStr = `${time.toFixed(1)} ms${prev ? formatTimeDelta(time, prev.time, band) : ''} ±${noise.toFixed(0)}%`;
+    const timeStr = `${time.toFixed(1)} ms${prev ? formatTimeDelta(time, prev.time, band) : ''}${noise === null ? '' : ` ±${noise.toFixed(0)}%`}`;
     console.log(`${fileName.padEnd(24)} ${sizeStr.padEnd(24)} @ ${timeStr}`);
   }
 
@@ -312,25 +314,31 @@ async function main() {
   // current and baseline totals cover the same files (an apples-to-apples comparison)
   const compareTotals = baseline && matched === processed;
   const sizeStrTotal = `${formatBytes(sizeTotal)} B${compareTotals ? formatDelta(sizeTotal, sizeTotalBase) : ''}`;
-  const noiseTypical = noises.length ? median(noises.map(n => n.noise)) : 0;
+  // Every file ran the same number of iterations, so noise is either measured or not
+  const noiseMeasured = noises.every(n => n.noise !== null);
+  const noiseTypical = noiseMeasured ? median(noises.map(n => n.noise)) : null;
   // The total is dominated by the big files, which are also the precisely measured
   // ones, so weight its noise band by each file’s share of the time rather than
   // letting a 3 ms file with a wide spread set the bar for the whole run
-  const timeWeighted = noises.reduce((sum, n) => sum + n.noise * n.time, 0);
-  const noiseTotal = timeTotal > 0 ? timeWeighted / timeTotal : noiseTypical;
+  const timeWeighted = noiseMeasured ? noises.reduce((sum, n) => sum + n.noise * n.time, 0) : 0;
+  const noiseTotal = noiseMeasured ? (timeTotal > 0 ? timeWeighted / timeTotal : noiseTypical) : null;
   // As for a single file, a delta has to clear both runs’ noise
   const noiseTotalBase = timeTotalBase > 0 ? noiseWeightedBase / timeTotalBase : 0;
-  const timeStrTotal = `${timeTotal.toFixed(1)} ms${compareTotals ? formatTimeDelta(timeTotal, timeTotalBase, noiseTotal + noiseTotalBase) : ''}`;
+  const timeStrTotal = `${timeTotal.toFixed(1)} ms${compareTotals ? formatTimeDelta(timeTotal, timeTotalBase, (noiseTotal ?? 0) + noiseTotalBase) : ''}`;
   console.log(`\n${'Total'.padEnd(24)} ${sizeStrTotal.padEnd(24)} @ ${timeStrTotal}`);
   if (baseline && matched !== processed) {
     console.log(`Note: Total deltas omitted—only ${matched} of ${processed} processed file(s) have a baseline entry`);
   }
 
   // Deltas below the machine’s own noise floor mean nothing, so say what that floor is
-  const noiseWorst = noises.length ? Math.max(...noises.map(n => n.worst)) : 0;
-  console.log(`\nNoise: ${noiseTotal.toFixed(1)}% on the total, ${noiseTypical.toFixed(1)}% typical per file (how much the reported figure moves between iteration halves; worst fastest-to-slowest spread was ${noiseWorst.toFixed(0)}%)`);
-  if (noiseTotal > NOISE_WARN_PCT) {
-    console.log(`Warning: This machine is too noisy to resolve changes under ~${noiseTotal.toFixed(0)}% on the total. Close other applications, or raise --iterations.`);
+  if (!noiseMeasured) {
+    console.log('\nNoise: Unmeasured—a single iteration cannot say how much the times above would move on a re-run, so no delta is qualified as noise. Raise --iterations to get a band.');
+  } else {
+    const noiseWorst = noises.length ? Math.max(...noises.map(n => n.worst)) : 0;
+    console.log(`\nNoise: ${noiseTotal.toFixed(1)}% on the total, ${noiseTypical.toFixed(1)}% typical per file (how much the reported figure moves between iteration halves; worst fastest-to-slowest spread was ${noiseWorst.toFixed(0)}%)`);
+    if (noiseTotal > NOISE_WARN_PCT) {
+      console.log(`Warning: This machine is too noisy to resolve changes under ~${noiseTotal.toFixed(0)}% on the total. Close other applications, or raise --iterations.`);
+    }
   }
 
   if (args.save) {
