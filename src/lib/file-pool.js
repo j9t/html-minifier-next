@@ -1,21 +1,23 @@
-// Worker pool for whole files, as the CLI’s directory runs need them
-//
-// This pools one kind of work—read a file, minify it, write it—rather than arbitrary
-// tasks: The worker body, the message contract, and the result are all about files. The
-// spawning and queueing below would generalize, but nothing else asks for it yet.
-//
-// Minifying a document is CPU-bound work on one thread, so a run over a directory
-// serializes no matter how the files are awaited. Whole files are the unit handed to
-// workers, which is what makes threads pay here: A document takes long enough that the
-// thread it crosses costs a fraction of a percent, and files share no state, so nothing
-// travels but paths, options, and the resulting sizes.
-//
-// Scaling is bounded by what each thread has to re-learn rather than by the cores: Every
-// worker runs its own isolate and warms up its own JIT, so the useful worker count tops
-// out well short of the core count.
-//
-// Node-only: cli.js loads this module lazily and minifies in process wherever worker
-// threads are unavailable or the options can’t cross a structured clone.
+/**
+ * Worker pool for whole files, as the CLI’s directory runs need them
+ *
+ * This pools one kind of work—read a file, minify it, write it—rather than arbitrary
+ * tasks: The worker body, the message contract, and the result are all about files. The
+ * spawning and queueing below would generalize, but nothing else asks for it yet.
+ *
+ * Minifying a document is CPU-bound work on one thread, so a run over a directory
+ * serializes no matter how the files are awaited. Whole files are the unit handed to
+ * workers, which is what makes threads pay here: A document takes long enough that the
+ * thread it crosses costs a fraction of a percent, and files share no state, so nothing
+ * travels but paths, options, and the resulting sizes.
+ *
+ * Scaling is bounded by what each thread has to re-learn rather than by the cores: Every
+ * worker runs its own isolate and warms up its own JIT, so the useful worker count tops
+ * out well short of the core count.
+ *
+ * Node-only: cli.js loads this module lazily and minifies in process wherever worker
+ * threads are unavailable or the options can’t cross a structured clone.
+ */
 
 import fs from 'node:fs';
 import { isMainThread, parentPort, workerData, Worker } from 'node:worker_threads';

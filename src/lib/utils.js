@@ -1,4 +1,6 @@
-// Stringify for options signatures (sorted keys, shallow, nested objects)
+/**
+ * General utility functions
+ */
 
 /**
  * @param {unknown} obj

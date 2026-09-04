@@ -1,3 +1,7 @@
+/**
+ * Options processing and per-document minification state
+ */
+
 import { createUrlMinifier } from './urls.js';
 import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
 import { RE_TRAILING_SEMICOLON } from './constants.js';

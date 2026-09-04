@@ -1,3 +1,7 @@
+/**
+ * CSS and script content wrapping for minification
+ */
+
 import {
   jsonScriptTypes
 } from './constants.js';
