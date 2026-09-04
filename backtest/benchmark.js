@@ -3,7 +3,7 @@
 // Working-tree benchmark for HTML Minifier Next.
 //
 // Times the current working-tree minifier against the local corpus
-// (backtest/input) and reports per-file output size and median processing time.
+// (backtest/input) and reports per-file output size and processing time.
 // Unlike backtest.js (which walks Git history), this measures the code exactly as
 // it is right now—ideal for A/B testing a branch against a saved baseline.
 //
@@ -25,7 +25,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// One warm-up run (discarded) plus this many timed iterations; the median is reported
+// One warm-up run (discarded) plus this many timed iterations
 const BENCH_WARMUP = 1;
 const DEFAULT_ITERATIONS = 5;
 

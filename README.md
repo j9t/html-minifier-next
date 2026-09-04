@@ -738,16 +738,16 @@ npm i;
 npm run benchmark
 ```
 
-It reuses the backtest corpus (run `npm run backtest` once to download it) and reports per-file output size and median processing time.
+It reuses the backtest corpus (run `npm run backtest` once to download it) and reports per-file output size and processing time.
 
 Parameters:
 
 * No argument: Runs and, if a baseline exists, shows size and time deltas
 * `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
 * `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s processing time
-* `--cold`: Shrinks the minification caches so CSS, JS, and SVG work is redone on every iteration—without it, warm caches serve those results from memory after the warm-up run and the benchmark cannot see changes to those minifiers
-* `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
-* `--config=PATH`: Uses an alternative options file (default html-minifier-next.config.json)
+* `--cold`: Shrinks the minification caches so most CSS, JS, and SVG work is redone on every iteration—without it, warm caches serve those results from memory after the warm-up run and the benchmark cannot see changes to those minifiers
+* `--iterations=N`: Sets the number of timed iterations (default: 5)
+* `--config=PATH`: Uses an alternative options file (default: html-minifier-next.config.json)
 
 To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers, or `--cold` when measuring changes to the CSS, JS, or SVG minification paths.
 

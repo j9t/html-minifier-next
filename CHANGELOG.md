@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `--workers` flag to the CLI, spreading a multi-file run (`--input-dir`) across worker threads rather than minifying one file after another
+* Added `--workers` flag to the CLI, spreading a multi-file run (`--input-dir`) across worker threads rather than minifying one file after another; runs of 128 files or more use workers without the flag
 
 ### Changed
 
