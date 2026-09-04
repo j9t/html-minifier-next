@@ -68,6 +68,22 @@ function shouldMinifyInnerHTML(options) {
   );
 }
 
+// SVGO runs on worker threads once a batch is big enough to amortize their startup;
+// below that, optimizing in process is cheaper than spawning anything
+const SVG_POOL_THRESHOLD = 4;
+
+/** @type {Promise<typeof import('./svg-pool.js') | null> | undefined} */
+let svgPoolPromise;
+
+// Worker threads are Node-only, so a failure to load the pool is expected in the
+// browser and simply falls back to in-process SVGO
+function getSvgPool() {
+  if (!svgPoolPromise) {
+    svgPoolPromise = import(/* @vite-ignore */ './svg-pool.js').catch(() => null);
+  }
+  return svgPoolPromise;
+}
+
 // Persistent per-site URL minification caches—results depend only on the `site`
 // configuration, so entries can be shared across `minify()` calls; bounded so
 // batch runs with many distinct sites can’t grow memory without limit
@@ -593,6 +609,61 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         cont: !!options.continueOnMinifyError
       });
 
+      // Worker dispatch clones the options, so anything unclonable (a plugin
+      // function, say) has to stay in process
+      let poolUsable = true;
+      try {
+        structuredClone(svgoOptions);
+      } catch {
+        poolUsable = false;
+      }
+
+      /** @type {{svg: string, resolve: (value: string) => void, reject: (reason: unknown) => void}[]} */
+      let svgBatch = [];
+      let svgBatchScheduled = false;
+
+      // The post-pass in htmlminifier.js fires every SVG block in one turn, so
+      // collecting a tick’s worth of calls reveals how much work is actually available
+      async function flushSVGBatch() {
+        const batch = svgBatch;
+        svgBatch = [];
+        svgBatchScheduled = false;
+
+        const pool = (poolUsable && batch.length >= SVG_POOL_THRESHOLD) ? await getSvgPool() : null;
+        if (pool && !pool.isBroken()) {
+          for (const task of batch) {
+            pool.optimizeOnWorker(task.svg, svgoOptions).then(task.resolve, async () => {
+              // A worker failure must not cost the optimization—redo it in process
+              try {
+                const optimize = await loadSvgo();
+                task.resolve(optimize(task.svg, svgoOptions).data);
+              } catch (err) {
+                task.reject(err);
+              }
+            });
+          }
+          return;
+        }
+
+        const optimize = await loadSvgo();
+        for (const task of batch) {
+          try {
+            task.resolve(optimize(task.svg, svgoOptions).data);
+          } catch (err) {
+            task.reject(err);
+          }
+        }
+      }
+
+      /** @type {(svg: string) => Promise<string>} */
+      const optimizeSVG = (svg) => new Promise((resolve, reject) => {
+        svgBatch.push({ svg, resolve, reject });
+        if (!svgBatchScheduled) {
+          svgBatchScheduled = true;
+          queueMicrotask(flushSVGBatch);
+        }
+      });
+
       options.minifySVG = async function (/** @type {string} */ svgContent) {
         if (!svgContent || !svgContent.trim()) {
           return svgContent;
@@ -613,11 +684,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             }
           }
 
-          const inFlight = (async () => {
-            const optimize = await loadSvgo();
-            const result = optimize(svgContent, svgoOptions);
-            return result.data;
-          })();
+          const inFlight = optimizeSVG(svgContent);
 
           if (svgKey !== undefined) svgCache.set(svgKey, inFlight);
           const resolved = await inFlight;
