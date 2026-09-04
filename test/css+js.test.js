@@ -1671,6 +1671,31 @@ describe('CSS and JS', () => {
 
       assert.deepStrictEqual(codesOf(input), asked);
     });
+
+    test('A closing tag carrying junk still ends the body', () => {
+      assert.deepStrictEqual(codesOf('<script>var a = 1;</script foo bar>'), ['var a = 1;']);
+    });
+
+    test('An unclosed script is skipped', () => {
+      assert.deepStrictEqual(codesOf('<script>var a = 1;'), []);
+      assert.deepStrictEqual(codesOf('<script>var a = 1;</script'), []);
+    });
+
+    test('Repeated `</script` does not degrade to a quadratic scan', () => {
+      const input = '<script>var a = 1;' + '</script'.repeat(20000);
+      const start = performance.now();
+
+      assert.deepStrictEqual(codesOf(input), []);
+      assert.ok(performance.now() - start < 500, 'Extraction should stay linear in the input length');
+    });
+
+    test('Repeated `<script` does not degrade to a quadratic scan', () => {
+      const input = '<script '.repeat(20000);
+      const start = performance.now();
+
+      assert.deepStrictEqual(codesOf(input), []);
+      assert.ok(performance.now() - start < 500, 'Extraction should stay linear in the input length');
+    });
   });
 
   describe('Deferred JS minification', () => {

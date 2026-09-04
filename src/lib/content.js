@@ -100,10 +100,34 @@ async function processScript(text, options, currentAttrs, minifyHTML) {
   return text;
 }
 
-// Matches a `script` element and captures its attributes and raw body. Script content is
-// raw text, so the body runs to the first `</script`—no nesting to account for
-const RE_SCRIPT_ELEMENT = /<script\b((?:"[^"]*"|'[^']*'|[^>"'])*)>([\s\S]*?)<\/script[^>]*>/gi;
+// A `script` element is walked in three steps rather than matched by one pattern—
+// a pattern spanning the whole element rescans the same text for every candidate
+// tag, which turns markup repeating `<script` or `</script` into a quadratic scan
+const RE_SCRIPT_START = /<script\b/gi;
+const RE_SCRIPT_END = /<\/script/gi;
 const RE_TYPE_ATTRIBUTE = /(?:^|\s)type\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+
+// Index of the `>` closing a start tag, skipping quoted values so that a `>` inside one
+// doesn’t end the tag early; `-1` when the tag never closes
+/**
+ * @param {string} html
+ * @param {number} start
+ */
+function findTagEnd(html, start) {
+  for (let index = start; index < html.length; index++) {
+    const char = html[index];
+    if (char === '"' || char === '\'') {
+      const quoteEnd = html.indexOf(char, index + 1);
+      if (quoteEnd === -1) {
+        return -1;
+      }
+      index = quoteEnd;
+    } else if (char === '>') {
+      return index;
+    }
+  }
+  return -1;
+}
 
 /**
  * Collects the bodies of executable inline scripts, in document order, so they can be
@@ -117,14 +141,34 @@ function extractScriptBodies(html) {
   const bodies = [];
   const seen = new Set();
 
-  for (const match of html.matchAll(RE_SCRIPT_ELEMENT)) {
-    const code = match[2] ?? '';
+  RE_SCRIPT_START.lastIndex = 0;
+  let startTag;
+  while ((startTag = RE_SCRIPT_START.exec(html))) {
+    const tagEnd = findTagEnd(html, RE_SCRIPT_START.lastIndex);
+    if (tagEnd === -1) {
+      break;
+    }
+    // Script content is raw text, so the body runs to the first `</script`—
+    // no nesting to account for
+    RE_SCRIPT_END.lastIndex = tagEnd + 1;
+    const endTag = RE_SCRIPT_END.exec(html);
+    if (!endTag) {
+      break;
+    }
+    const closeEnd = html.indexOf('>', RE_SCRIPT_END.lastIndex);
+    if (closeEnd === -1) {
+      break;
+    }
+    // Resuming past the element is what keeps every character visited once
+    RE_SCRIPT_START.lastIndex = closeEnd + 1;
+
+    const code = html.slice(tagEnd + 1, endTag.index);
     // Whitespace-only and external scripts carry no work the minifier would do
     if (!code.trim()) {
       continue;
     }
 
-    const typeMatch = RE_TYPE_ATTRIBUTE.exec(match[1] ?? '');
+    const typeMatch = RE_TYPE_ATTRIBUTE.exec(html.slice(startTag.index + '<script'.length, tagEnd));
     /** @type {Array<{name: string, value: string}>} */
     const attrs = typeMatch
       ? [{ name: 'type', value: typeMatch[1] ?? typeMatch[2] ?? typeMatch[3] ?? '' }]
