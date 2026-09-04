@@ -742,10 +742,13 @@ Parameters:
 * No argument: Runs and, if a baseline exists, shows size and time deltas
 * `--save`: Saves the run as the baseline (e.g., on `main` before switching to a branch)
 * `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s processing time
+* `--cold`: Shrinks the minification caches so CSS, JS, and SVG work is redone on every iteration—without it, warm caches serve those results from memory after the warm-up run and the benchmark cannot see changes to those minifiers
 * `--iterations=N`: Sets the number of timed iterations (default 5; the median is reported)
 * `--config=PATH`: Uses an alternative options file (default html-minifier-next.config.json)
 
-To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers.
+To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers, or `--cold` when measuring changes to the CSS, JS, or SVG minification paths.
+
+Reported times are the *fastest* iteration, not the median: Interference can only make a run slower, so the minimum is the most stable estimate. Each run also reports its noise—how far the reported figure moves between the first and second half of the iterations—and any delta smaller than that is marked `within noise` rather than shown as a win or a regression. Raise `--iterations` until the noise sits below the change you are trying to measure.
 
 #### Profiling
 
