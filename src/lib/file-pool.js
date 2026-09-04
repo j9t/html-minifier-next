@@ -27,30 +27,38 @@ import { isMainThread, parentPort, workerData, Worker } from 'node:worker_thread
 if (!isMainThread && parentPort) {
   const port = parentPort;
   const { minify } = await import('../htmlminifier.js');
-  const { options } = workerData;
+  const { options, wantsLog } = workerData;
 
   // The pool hands a worker one file at a time, so the file a diagnostic belongs to is
   // simply the one in hand
   let fileCurrent = '';
 
-  // `log` cannot cross a structured clone, so it is rebuilt here and forwarded. Whether
-  // the minifier logged an `Error` travels with the message: The CLI words those
-  // differently, and an error that crossed as a plain string would lose that wording.
-  const taskOptions = {
-    ...options,
-    log: (/** @type {unknown} */ message) => port.postMessage({
-      log: message instanceof Error ? message.message : String(message),
-      logIsError: message instanceof Error,
-      logFile: fileCurrent
-    })
-  };
+  // `log` cannot cross a structured clone, so it is rebuilt here and forwarded, and only
+  // where the CLI has somewhere to put it. Whether the minifier logged an `Error` travels
+  // with the message: The CLI words those differently, and an error that crossed as a
+  // plain string would lose that wording.
+  const taskOptions = wantsLog
+    ? {
+        ...options,
+        log: (/** @type {unknown} */ message) => port.postMessage({
+          log: message instanceof Error ? message.message : String(message),
+          logIsError: message instanceof Error,
+          logFile: fileCurrent
+        })
+      }
+    : options;
 
   port.on('message', async (/** @type {{id: number, inputFile: string, outputFile: string, dryRun: boolean}} */ task) => {
+    // Which step failed decides how the CLI words the failure, and reading and writing
+    // name different files
+    let stage = 'read';
     try {
       fileCurrent = task.inputFile;
       const data = await fs.promises.readFile(task.inputFile, 'utf8');
+      stage = 'minify';
       const minified = await minify(data, taskOptions);
       if (!task.dryRun) {
+        stage = 'write';
         await fs.promises.writeFile(task.outputFile, minified, 'utf8');
       }
       port.postMessage({
@@ -59,7 +67,7 @@ if (!isMainThread && parentPort) {
         minifiedSize: Buffer.byteLength(minified, 'utf8')
       });
     } catch (err) {
-      port.postMessage({ id: task.id, error: err instanceof Error ? err.message : String(err) });
+      port.postMessage({ id: task.id, stage, error: err instanceof Error ? err.message : String(err) });
     }
   });
 }
@@ -84,6 +92,8 @@ export function createFilePool({ options, size, onLog }) {
   let idNext = 0;
   /** @type {Error | null} */
   let failure = null;
+  let closing = false;
+  const wantsLog = Boolean(onLog);
 
   // A worker that dies takes its task with it, and any task still queued would wait for a
   // turn that never comes; both are failed at once so the run ends rather than hangs
@@ -97,9 +107,9 @@ export function createFilePool({ options, size, onLog }) {
   for (let i = 0; i < size; i++) {
     // Workers inherit the parent’s `execArgv`, which can carry flags that are invalid for
     // a module worker and would kill it on startup
-    const worker = new Worker(urlWorker, { workerData: { options }, execArgv: [] });
+    const worker = new Worker(urlWorker, { workerData: { options, wantsLog }, execArgv: [] });
     worker.unref();
-    worker.on('message', (/** @type {{id?: number, log?: string, logIsError?: boolean, logFile?: string, error?: string, originalSize?: number, minifiedSize?: number}} */ message) => {
+    worker.on('message', (/** @type {{id?: number, log?: string, logIsError?: boolean, logFile?: string, error?: string, stage?: string, originalSize?: number, minifiedSize?: number}} */ message) => {
       if (message.log !== undefined) {
         onLog?.(message.log, Boolean(message.logIsError), message.logFile ?? '');
         return;
@@ -110,10 +120,25 @@ export function createFilePool({ options, size, onLog }) {
       if (!pending.size && !queue.length) worker.unref();
       drain();
       if (!entry) return;
-      if (message.error !== undefined) entry.reject(new Error(message.error));
-      else entry.resolve({ originalSize: message.originalSize ?? 0, minifiedSize: message.minifiedSize ?? 0 });
+      if (message.error !== undefined) {
+        const err = new Error(message.error);
+        // Which step failed rides along so the CLI can word the failure as it does for a
+        // file it minified itself
+        if (message.stage) /** @type {any} */ (err).stage = message.stage;
+        entry.reject(err);
+      } else {
+        entry.resolve({ originalSize: message.originalSize ?? 0, minifiedSize: message.minifiedSize ?? 0 });
+      }
     });
     worker.on('error', failAll);
+    // A worker can also go without an `error`—killed for memory, or exiting on its own.
+    // Its tasks would then wait forever, so an exit before `close()` ends the run, too
+    worker.on('exit', (/** @type {number} */ code) => {
+      if (closing || failure) return;
+      const index = idle.indexOf(worker);
+      if (index !== -1) idle.splice(index, 1);
+      failAll(new Error(`Worker stopped unexpectedly (exit code ${code})`));
+    });
     workers.push(worker);
     idle.push(worker);
   }
@@ -143,6 +168,7 @@ export function createFilePool({ options, size, onLog }) {
       });
     },
     async close() {
+      closing = true;
       await Promise.all(workers.map(worker => worker.terminate()));
     }
   };

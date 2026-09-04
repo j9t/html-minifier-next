@@ -1676,6 +1676,11 @@ describe('CSS and JS', () => {
       assert.deepStrictEqual(codesOf('<script>var a = 1;</script foo bar>'), ['var a = 1;']);
     });
 
+    test('A tag whose name only starts with `script` does not end the body', () => {
+      const body = 'var a = 1; // </scriptx>\nvar b = 2;';
+      assert.deepStrictEqual(codesOf('<script>' + body + '</script>'), [body]);
+    });
+
     test('An unclosed script is skipped', () => {
       assert.deepStrictEqual(codesOf('<script>var a = 1;'), []);
       assert.deepStrictEqual(codesOf('<script>var a = 1;</script'), []);

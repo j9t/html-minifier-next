@@ -897,7 +897,13 @@ program.helpOption('-h, --help', 'Display help for command');
         await Promise.all(list.map(async (inputFile, idx) => {
           const outFile = await prepareOutDir(inputFile);
           const sizes = await pool.run({ inputFile, outputFile: outFile, dryRun: isDryRun })
-            .catch(err => fatal('Minification error on ' + inputFile + '\n' + errorMessage(err)));
+            .catch(err => {
+              // A worker names the step it failed at, so the wording matches what this
+              // file would have got had it been minified in this process
+              if (err?.stage === 'read') fatal('Cannot read ' + inputFile + '\n' + errorMessage(err));
+              if (err?.stage === 'write') fatal('Cannot write ' + outFile + '\n' + errorMessage(err));
+              fatal('Minification error on ' + inputFile + '\n' + errorMessage(err));
+            });
           const stats = calculateSizeStats(sizes.originalSize, sizes.minifiedSize);
           if (isDryRun || isVerbose) {
             console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);

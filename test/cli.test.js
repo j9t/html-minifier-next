@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
-import { describe, test, beforeEach } from 'node:test';
+import { describe, test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 
@@ -1916,6 +1916,11 @@ describe('CLI', () => {
 });
 
 describe('Parallel multi-file processing', () => {
+  // Input and output directories are named per test but reused across runs, so a stale
+  // tree would leave files behind that the counts below then trip over
+  before(async () => await removeFixture('tmp'));
+  after(async () => await removeFixture('tmp'));
+
   const execCliCapture = (/** @type {string[]} */ args) => {
     const { stdout, stderr, status } = spawnSync('node', [cliPath, ...args], { cwd: fixturesDir });
     return { stdout: stdout.toString(), stderr: stderr.toString(), exitCode: status };
@@ -1944,6 +1949,33 @@ describe('Parallel multi-file processing', () => {
     fs.readdirSync(dir).sort().map(f => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
 
   const OPTIONS_MINIFY = ['--collapse-whitespace', '--remove-comments', '--minify-css', '--minify-js', '--minify-svg'];
+
+  test('A worker names the step it failed at', async () => {
+    const { createFilePool } = await import('../src/lib/file-pool.js');
+    const dir = path.resolve(fixturesDir, 'tmp', 'par-stage');
+    fs.mkdirSync(dir, { recursive: true });
+    const pool = createFilePool({ options: { minifyJS: true, continueOnMinifyError: false }, size: 1 });
+
+    try {
+      const missing = path.join(dir, 'absent.html');
+      await assert.rejects(
+        pool.run({ inputFile: missing, outputFile: path.join(dir, 'out.html'), dryRun: false }),
+        (/** @type {any} */ err) => err.stage === 'read'
+      );
+
+      await assert.rejects(
+        pool.run({ inputFile: path.resolve(fixturesDir, 'invalid-css-js.html'), outputFile: path.join(dir, 'out.html'), dryRun: false }),
+        (/** @type {any} */ err) => err.stage === 'minify'
+      );
+
+      await assert.rejects(
+        pool.run({ inputFile: path.resolve(fixturesDir, 'default.html'), outputFile: path.join(dir, 'absent-dir', 'out.html'), dryRun: false }),
+        (/** @type {any} */ err) => err.stage === 'write'
+      );
+    } finally {
+      await pool.close();
+    }
+  });
 
   test('Parallel output is byte-identical to sequential output', () => {
     buildInputDir('par-in', 40);

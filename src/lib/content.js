@@ -2,6 +2,7 @@ import {
   jsonScriptTypes
 } from './constants.js';
 import { isExecutableScript } from './attributes.js';
+import { findTagEnd } from './utils.js';
 import { trimWhitespace } from './whitespace.js';
 
 /** @import { ProcessedOptions } from './options.js' */
@@ -104,30 +105,10 @@ async function processScript(text, options, currentAttrs, minifyHTML) {
 // a pattern spanning the whole element rescans the same text for every candidate
 // tag, which turns markup repeating `<script` or `</script` into a quadratic scan
 const RE_SCRIPT_START = /<script\b/gi;
-const RE_SCRIPT_END = /<\/script/gi;
+// A tag name ends at whitespace, a slash, or the closing bracket, so `</scriptx>` names a
+// different element and leaves the body running, as it does for the parser
+const RE_SCRIPT_END = /<\/script(?=[\s/>])/gi;
 const RE_TYPE_ATTRIBUTE = /(?:^|\s)type\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
-
-// Index of the `>` closing a start tag, skipping quoted values so that a `>` inside one
-// doesn’t end the tag early; `-1` when the tag never closes
-/**
- * @param {string} html
- * @param {number} start
- */
-function findTagEnd(html, start) {
-  for (let index = start; index < html.length; index++) {
-    const char = html[index];
-    if (char === '"' || char === '\'') {
-      const quoteEnd = html.indexOf(char, index + 1);
-      if (quoteEnd === -1) {
-        return -1;
-      }
-      index = quoteEnd;
-    } else if (char === '>') {
-      return index;
-    }
-  }
-  return -1;
-}
 
 /**
  * Collects the bodies of executable inline scripts, in document order, so they can be

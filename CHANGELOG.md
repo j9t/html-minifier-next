@@ -14,7 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Improved `minifyJS` performance with the SWC engine: Inline script bodies are now minified as one batch ahead of the parse, rather than one at a time as the parse reaches them
 * Made minifier warnings under `--verbose` and `--dry` name the file they came from when a run covers a directory (where several files are minified at once and their lines interleave)
-* Improved the working-tree benchmark with a `--cold` mode, which surfaces external-minifier work that warm caches hide otherwise
+* Improved the working-tree benchmark with a `--cold` mode, which shrinks the caches so that most external-minifier work warm caches would hide is redone
 
 ## [8.3.1] - 2026-08-30
 

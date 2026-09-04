@@ -11,7 +11,7 @@
 //   npm run benchmark: Run; if a baseline exists, show deltas
 //   npm run benchmark -- --save: Run and save the result as the baseline
 //   npm run benchmark -- --core: Disable external minifiers (CSS/JS/SVG/URLs) to isolate HMN’s processing time
-//   npm run benchmark -- --cold: Shrink the minification caches so CSS/JS/SVG work is actually
+//   npm run benchmark -- --cold: Shrink the minification caches so most CSS/JS/SVG work is
 //     redone every iteration—without this, warm caches hide any change to those minifiers
 //   npm run benchmark -- --iterations=10
 //   npm run benchmark -- --config=path/to/config.json
@@ -29,9 +29,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BENCH_WARMUP = 1;
 const DEFAULT_ITERATIONS = 5;
 
-// Cache sizes applied by `--cold`. Warm caches serve CSS/JS/SVG results straight from
-// the LRU after the warm-up run, so a default benchmark cannot see changes to those
-// minifiers at all; shrinking the caches forces the work to happen on every iteration.
+// Cache sizes applied by `--cold`. (One entry is the smallest the options allow, so
+// back-to-back repeats still hit—about a third of CSS and SVG lookups on the corpus.)
 const COLD_CACHE_SIZES = { cacheCSS: 1, cacheJS: 1, cacheSVG: 1 };
 
 // External minifiers disabled by `--core` to surface HMN’s time
@@ -190,7 +189,7 @@ async function main() {
     }
   }
 
-  const modes = [args.core ? 'core: external minifiers disabled' : '', args.cold ? 'cold: caches shrunk so CSS/JS/SVG work is redone' : ''].filter(Boolean);
+  const modes = [args.core ? 'core: external minifiers disabled' : '', args.cold ? 'cold: caches shrunk to one entry, so most CSS/JS/SVG work is redone' : ''].filter(Boolean);
   console.log(`Benchmarking ${fileNames.length} file(s)${modes.length ? ' (' + modes.join('; ') + ')' : ''}, fastest of ${args.iterations} iteration(s)`);
 
   if (baseline) {
