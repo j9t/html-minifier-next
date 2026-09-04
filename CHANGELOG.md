@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Improved `minifyJS` performance with the SWC engine: Inline script bodies are now minified as one batch ahead of the parse, rather than one at a time as the parse reaches them
 * Made minifier warnings under `--verbose` and `--dry` name the file they came from when a run covers a directory (where several files are minified at once and their lines interleave)
 * Made `cacheCSS`, `cacheJS`, and `cacheSVG` accept `0` to switch a cache off (where they used to clamp it to `1`); negative values now fall back to the default size (they already did for `HMN_CACHE_*` environment variables)
-* Improved the working-tree benchmark with a `--cold` mode, which switches the caches off so that external-minifier work warm caches would hide is redone
+* Improved the working-tree benchmark with a `--cold` mode, which switches the caches off so that external-minifier work that warm caches would hide is redone
 
 ## [8.3.1] - 2026-08-30
 
