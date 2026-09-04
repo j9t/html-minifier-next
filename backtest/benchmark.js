@@ -201,8 +201,10 @@ async function main() {
         baseline = null;
       }
     } catch (err) {
+      // Whatever the baseline turned out to be, it’s not something to compare against
+      baseline = null;
       // A missing baseline is normal (first run reports absolute numbers only);
-      // anything else (corrupt JSON, permissions) is worth surfacing
+      // anything else (corrupt JSON, malformed entries, permissions) is worth surfacing
       if (err.code !== 'ENOENT') {
         console.error(`Warning: Ignoring unreadable baseline (${PATH_BASELINE}): ${err.message}`);
       }
