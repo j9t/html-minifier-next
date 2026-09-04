@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.3.2] - 2026-09-04
+
+### Changed
+
+* Improved `minifyJS` performance with the SWC engine: Inline script bodies are now minified as one batch ahead of the parse, rather than one at a time as the parse reaches them
+* Improved the working-tree benchmark with a `--cold` mode, which surfaces the external-minifier work that warm caches hide otherwise
+
 ## [8.3.1] - 2026-08-30
 
 ### Changed
