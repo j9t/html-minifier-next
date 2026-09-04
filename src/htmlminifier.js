@@ -58,6 +58,7 @@ import {
 
 import {
   hasJsonScriptType,
+  extractScriptBodies,
   processScript
 } from './lib/content.js';
 
@@ -1526,6 +1527,35 @@ async function minifyHTML(value, options, partialMarkup) {
     buffer.push(comment);
   }
 
+  // Inline scripts are minified one at a time as the parse reaches them, which serializes
+  // work the minifier could overlap. Dispatching them all up front turns that into a single
+  // wave the parse then reads results from. Bodies are matched by exact content, so one the
+  // parse asks for in another form simply misses and takes the original path.
+  /** @type {Map<string, Promise<string>> | null} */
+  let jsPrewarmed = null;
+  if (options.parallelJS && options.minifyJS !== identity && !options.processScripts?.length) {
+    const bodies = extractScriptBodies(value);
+    if (bodies.length > 1) {
+      jsPrewarmed = new Map();
+      // `collapseWhitespace` reaches script bodies through the whole-document pass above,
+      // so the parse sees them trimmed; other whitespace modes leave them as they are
+      const trims = Boolean(options.collapseWhitespace) &&
+        !options.conservativeCollapse && !options.preserveLineBreaks;
+      for (const { code, isModule } of bodies) {
+        const body = trims ? code.trim() : code;
+        const key = (isModule ? 'm|' : '|') + body;
+        if (jsPrewarmed.has(key)) {
+          continue;
+        }
+        const pending = Promise.resolve(options.minifyJS(body, false, isModule));
+        // The awaiting consumer reports the failure; a body the parse never asks for
+        // would not have been minified at all, so its failure is not ours to raise
+        pending.catch(() => {});
+        jsPrewarmed.set(key, pending);
+      }
+    }
+  }
+
   // SVG subtree capture: When SVGO is active, record buffer positions for post-processing
   /** @type {Array<{start: number, end: number}>} */
   const svgBlocks = []; // Array of { start, end } buffer indices
@@ -1876,7 +1906,8 @@ async function minifyHTML(value, options, partialMarkup) {
           text = await processScript(text, options, currentAttrs, minifyHTML);
         }
         if (needsMinifyJS) {
-          text = await options.minifyJS(text, false, isModuleScript);
+          const prewarmed = jsPrewarmed?.get((isModuleScript ? 'm|' : '|') + text);
+          text = prewarmed ? await prewarmed : await options.minifyJS(text, false, isModuleScript);
         }
         if (needsMinifyCSS) {
           text = await options.minifyCSS(text, undefined, options.cssContext);

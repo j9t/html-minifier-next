@@ -2,6 +2,7 @@ import {describe, test} from 'node:test';
 import assert from 'node:assert';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 import { collectUsedSymbols } from '../src/lib/unused-css.js';
+import { extractScriptBodies } from '../src/lib/content.js';
 
 describe('CSS and JS', () => {
   test('CSS minification', async () => {
@@ -1602,6 +1603,73 @@ describe('CSS and JS', () => {
       assert.ok(result1.includes('return 42'), 'JS should still be minified');
       assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
       assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
+    });
+  });
+
+
+  describe('Script body extraction', () => {
+    const codesOf = (html) => extractScriptBodies(html).map(body => body.code);
+
+    test('Executable scripts are collected in document order', () => {
+      assert.deepStrictEqual(
+        codesOf('<script>var a = 1;</script><p>x</p><script>var b = 2;</script>'),
+        ['var a = 1;', 'var b = 2;']
+      );
+    });
+
+    test('External and whitespace-only scripts are skipped', () => {
+      assert.deepStrictEqual(codesOf('<script src="a.js"></script><script>  \n </script>'), []);
+    });
+
+    test('Data blocks are skipped, executable types are kept', () => {
+      const input = '<script type="application/json">{"a":1}</script>' +
+        '<script type="application/ld+json">{"b":2}</script>' +
+        '<script type="text/template"><p>x</p></script>' +
+        '<script type="text/javascript">var a = 1;</script>';
+
+      assert.deepStrictEqual(codesOf(input), ['var a = 1;']);
+    });
+
+    test('A module is recorded as one', () => {
+      assert.deepStrictEqual(
+        extractScriptBodies('<script type="module">var a = 1;</script>'),
+        [{ code: 'var a = 1;', isModule: true }]
+      );
+    });
+
+    test('The same body in both script modes stays two entries', () => {
+      assert.deepStrictEqual(
+        extractScriptBodies('<script>var a = 1;</script><script type="module">var a = 1;</script>'),
+        [{ code: 'var a = 1;', isModule: false }, { code: 'var a = 1;', isModule: true }]
+      );
+    });
+
+    test('A repeated body is dispatched once', () => {
+      assert.deepStrictEqual(codesOf('<script>var a = 1;</script><script>var a = 1;</script>'), ['var a = 1;']);
+    });
+
+    test('A `>` inside an attribute value does not end the tag', () => {
+      assert.deepStrictEqual(codesOf('<script data-x="a>b">var a = 1;</script>'), ['var a = 1;']);
+    });
+
+    test('Markup that looks like script content is left alone', () => {
+      assert.deepStrictEqual(codesOf('<p>var a = 1;</p><pre>&lt;script&gt;x&lt;/script&gt;</pre>'), []);
+    });
+
+    test('Every collected body is what the minifier is asked to minify', async () => {
+      const input = '<script>var a = 1;</script><script type="module">var b = 2;</script>' +
+        '<script src="a.js"></script><script type="application/json">{"c":3}</script>';
+      const asked = [];
+
+      await minify(input, {
+        mergeScripts: false,
+        minifyJS: (code, inline) => {
+          if (!inline && code.trim()) asked.push(code);
+          return code;
+        }
+      });
+
+      assert.deepStrictEqual(codesOf(input), asked);
     });
   });
 

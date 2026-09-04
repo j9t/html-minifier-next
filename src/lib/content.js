@@ -1,6 +1,7 @@
 import {
   jsonScriptTypes
 } from './constants.js';
+import { isExecutableScript } from './attributes.js';
 import { trimWhitespace } from './whitespace.js';
 
 /** @import { ProcessedOptions } from './options.js' */
@@ -99,6 +100,52 @@ async function processScript(text, options, currentAttrs, minifyHTML) {
   return text;
 }
 
+// Matches a `script` element and captures its attributes and raw body. Script content is
+// raw text, so the body runs to the first `</script`—no nesting to account for
+const RE_SCRIPT_ELEMENT = /<script\b((?:"[^"]*"|'[^']*'|[^>"'])*)>([\s\S]*?)<\/script[^>]*>/gi;
+const RE_TYPE_ATTRIBUTE = /(?:^|\s)type\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+
+/**
+ * Collects the bodies of executable inline scripts, in document order, so they can be
+ * minified as one batch ahead of the parse. Duplicates are dropped: The minifier is
+ * content-keyed, so the same body only needs dispatching once.
+ * @param {string} html
+ * @returns {Array<{code: string, isModule: boolean}>}
+ */
+function extractScriptBodies(html) {
+  /** @type {Array<{code: string, isModule: boolean}>} */
+  const bodies = [];
+  const seen = new Set();
+
+  for (const match of html.matchAll(RE_SCRIPT_ELEMENT)) {
+    const code = match[2] ?? '';
+    // Whitespace-only and external scripts carry no work the minifier would do
+    if (!code.trim()) {
+      continue;
+    }
+
+    const typeMatch = RE_TYPE_ATTRIBUTE.exec(match[1] ?? '');
+    /** @type {Array<{name: string, value: string}>} */
+    const attrs = typeMatch
+      ? [{ name: 'type', value: typeMatch[1] ?? typeMatch[2] ?? typeMatch[3] ?? '' }]
+      : [];
+    if (!isExecutableScript('script', attrs) || hasJsonScriptType(attrs)) {
+      continue;
+    }
+
+    // Module and classic scripts minify differently, so identical bodies in the two
+    // modes stay separate entries
+    const isModule = trimWhitespace((attrs[0]?.value ?? '')).toLowerCase() === 'module';
+    const key = (isModule ? 'm|' : '|') + code;
+    if (!seen.has(key)) {
+      seen.add(key);
+      bodies.push({ code, isModule });
+    }
+  }
+
+  return bodies;
+}
+
 // Exports
 
 export {
@@ -109,5 +156,6 @@ export {
   // Scripts
   minifyJson,
   hasJsonScriptType,
+  extractScriptBodies,
   processScript
 };
