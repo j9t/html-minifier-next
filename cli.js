@@ -310,11 +310,12 @@ function normalizeConfig(config) {
 let config = {};
 program.option('-z, --zero', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options)');
 program.option('-I --input-dir <dir>', 'Specify an input directory');
-program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated), e.g., `libs` or `libs,vendor,node_modules`');
+program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting)');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
-program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated); defaults to `html,htm,shtml,shtm`; use `*` for all files');
+program.option('-w --workers <n>', 'Number of worker threads for multi-file runs; defaults to half the available cores, at most 6, for runs of 128 files or more (below that threads cost more than they save)', parseValidInt('workers'));
+program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files');
 program.option('-p --preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
-program.option('-c --config-file <file>', 'Use config file');
+program.option('-c --config-file <file>', 'Use a configuration file (defaults to html-minifier-next.config.json in the working directory, if present)');
 program.version(pkg.version, '-V, --version', 'Output the version number');
 program.helpOption('-h, --help', 'Display help for command');
 
@@ -478,25 +479,35 @@ program.helpOption('-h, --help', 'Display help for command');
 
     // 4. Surface minifier diagnostics when verbose
     if (programOptions.verbose || programOptions.dry) {
-      options.log = (/** @type {unknown} */ message) => {
-        // The hook carries the minifier’s per-call timing as well, which the run's own
-        // per-file statistics already cover
-        if (typeof message === 'string' && message.startsWith('minified in: ')) {
-          return;
-        }
-        // Only `continueOnMinifyError` passes `Error` objects, always after leaving the
-        // offending content unminified—so say that
-        if (message instanceof Error) {
-          console.error(`  ${MARK_WARNING}Warning: Minification failed, content left as-is: ${message.message || message}${MARK_RESET}`);
-        } else if (String(message).startsWith('Warning: ') || String(message).startsWith('HTML Minifier Next: ')) {
-          console.error(`  ${MARK_WARNING}${message}${MARK_RESET}`);
-        } else {
-          console.error(`  ${message}`);
-        }
-      };
+      options.log = createLog();
     }
 
     return options;
+  }
+
+  /**
+   * Diagnostics name no file of their own, so a run over a directory—where several are in
+   * flight at once and lines interleave—says which file each came from
+   * @param {string} [fileLabel]
+   */
+  function createLog(fileLabel) {
+    const where = fileLabel ? ` (${fileLabel})` : '';
+    return (/** @type {unknown} */ message) => {
+      // The hook carries the minifier’s per-call timing as well, which the run's own
+      // per-file statistics already cover
+      if (typeof message === 'string' && message.startsWith('minified in: ')) {
+        return;
+      }
+      // Only `continueOnMinifyError` passes `Error` objects, always after leaving the
+      // offending content unminified—so say that
+      if (message instanceof Error) {
+        console.error(`  ${MARK_WARNING}Warning: Minification failed, content left as-is: ${message.message || message}${where}${MARK_RESET}`);
+      } else if (String(message).startsWith('Warning: ') || String(message).startsWith('HTML Minifier Next: ')) {
+        console.error(`  ${MARK_WARNING}${message}${where}${MARK_RESET}`);
+      } else {
+        console.error(`  ${message}${where}`);
+      }
+    };
   }
 
   /** @param {Record<string, unknown>} minifierOptions */
@@ -518,12 +529,69 @@ program.helpOption('-h, --help', 'Display help for command');
    * @param {string} minified
    */
   function calculateStats(original, minified) {
-    const originalSize = Buffer.byteLength(original, 'utf8');
-    const minifiedSize = Buffer.byteLength(minified, 'utf8');
+    return calculateSizeStats(Buffer.byteLength(original, 'utf8'), Buffer.byteLength(minified, 'utf8'));
+  }
+
+  /**
+   * @param {number} originalSize
+   * @param {number} minifiedSize
+   */
+  function calculateSizeStats(originalSize, minifiedSize) {
     const saved = originalSize - minifiedSize;
     const sign = saved >= 0 ? '-' : '+';
     const percentage = originalSize ? ((Math.abs(saved) / originalSize) * 100).toFixed(1) : '0.0';
     return { originalSize, minifiedSize, saved, sign, percentage };
+  }
+
+  // Below this many files the threads spend more time warming up than they save: Each
+  // runs its own isolate and so warms its own JIT, which a short run never earns back
+  const FILES_PER_RUN_MIN = 128;
+  // Each worker warms up its own JIT, so the useful count tops out well short of the cores
+  const WORKERS_MAX = 6;
+
+  /**
+   * A pool for this run, or `null` where one wouldn’t pay or wouldn’t work—in which case
+   * the caller minifies in process exactly as before
+   * @param {number} fileCount
+   */
+  async function createPool(fileCount) {
+    const requested = programOptions.workers;
+    // `availableParallelism` reports what this process may actually use, which under a
+    // CPU affinity mask—a container, commonly—is less than the machine’s core count
+    const isDefault = requested === undefined;
+    const size = isDefault
+      ? Math.max(1, Math.min(Math.floor(os.availableParallelism() / 2), WORKERS_MAX))
+      : requested;
+
+    // The file count only decides the default; asking for workers outright is the
+    // caller’s judgment to make, whatever the run looks like
+    if (size <= 1 || (isDefault && fileCount < FILES_PER_RUN_MIN)) {
+      return null;
+    }
+
+    // `log` is a closure over this process’s console and is rebuilt inside the worker;
+    // anything else unclonable (which the CLI itself never produces) stays in process
+    const { log, ...options } = createOptions();
+    try {
+      structuredClone(options);
+    } catch {
+      return null;
+    }
+
+    try {
+      const { createFilePool } = await import('./src/lib/file-pool.js');
+      return createFilePool({
+        options,
+        size: Math.min(size, fileCount),
+        // `log` is only set when the run asks for diagnostics
+        onLog: log
+          ? (/** @type {string} */ message, /** @type {boolean} */ isError, /** @type {string} */ file) =>
+            createLog(path.relative(process.cwd(), file))(isError ? new Error(message) : message)
+          : undefined
+      });
+    } catch {
+      return null;
+    }
   }
 
   // Print a one-line-per-cache hits/misses/size summary to STDERR, skipping caches
@@ -561,7 +629,11 @@ program.helpOption('-h, --help', 'Display help for command');
     let minified;
     try {
       const minify = await getMinify();
-      minified = await minify(data, createOptions());
+      const fileOptions = createOptions();
+      if (fileOptions.log) {
+        fileOptions.log = createLog(path.relative(process.cwd(), inputFile));
+      }
+      minified = await minify(data, fileOptions);
     } catch (err) {
       fatal('Minification error on ' + inputFile + '\n' + errorMessage(err));
     }
@@ -801,22 +873,50 @@ program.helpOption('-h, --help', 'Display help for command');
     // Collect all files first for bounded parallel processing
     const list = await collectFiles(inputDir, extensions, skipRootAbs, ignorePatterns, baseDir);
     const allStats = new Array(list.length);
-    const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
-    await runWithConcurrency(list, concurrency, async (inputFile, idx) => {
-      const rel = path.relative(inputDir, inputFile);
-      const outFile = path.join(outputDir, rel);
-      const outDir = path.dirname(outFile);
+
+    const prepareOutDir = async (/** @type {string} */ inputFile) => {
+      const outFile = path.join(outputDir, path.relative(inputDir, inputFile));
       if (!isDryRun) {
-        await fs.promises.mkdir(outDir, { recursive: true }).catch(err => {
-          fatal('Cannot create directory ' + outDir + '\n' + errorMessage(err));
+        await fs.promises.mkdir(path.dirname(outFile), { recursive: true }).catch(err => {
+          fatal('Cannot create directory ' + path.dirname(outFile) + '\n' + errorMessage(err));
         });
       }
-      const stats = await processFile(inputFile, outFile, isDryRun, isVerbose);
-      allStats[idx] = stats;
+      return outFile;
+    };
+
+    const advanceProgress = () => {
       if (progress) {
         progress.current++;
         updateProgress(progress.current, progress.total);
       }
+    };
+
+    const pool = await createPool(list.length);
+    if (pool) {
+      try {
+        await Promise.all(list.map(async (inputFile, idx) => {
+          const outFile = await prepareOutDir(inputFile);
+          const sizes = await pool.run({ inputFile, outputFile: outFile, dryRun: isDryRun })
+            .catch(err => fatal('Minification error on ' + inputFile + '\n' + errorMessage(err)));
+          const stats = calculateSizeStats(sizes.originalSize, sizes.minifiedSize);
+          if (isDryRun || isVerbose) {
+            console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+          }
+          allStats[idx] = { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
+          advanceProgress();
+        }));
+      } finally {
+        await pool.close();
+      }
+      return allStats.filter(Boolean);
+    }
+
+    const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
+    await runWithConcurrency(list, concurrency, async (inputFile, idx) => {
+      const outFile = await prepareOutDir(inputFile);
+      const stats = await processFile(inputFile, outFile, isDryRun, isVerbose);
+      allStats[idx] = stats;
+      advanceProgress();
     });
     return allStats.filter(Boolean);
   }
