@@ -1,7 +1,6 @@
 import {describe, test} from 'node:test';
 import assert from 'node:assert';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 import { collectUsedSymbols } from '../src/lib/unused-css.js';
 import { extractScriptBodies } from '../src/lib/content.js';
@@ -1472,9 +1471,9 @@ describe('CSS and JS', () => {
     // Sizes lock on the first `minify()` call for the life of the process, so any size but
     // the default has to be observed in a process that sets it before anything else runs
     const cssStatsForFirstCall = (/** @type {number} */ size) => {
-      const pathMinifier = fileURLToPath(new URL('../src/htmlminifier.js', import.meta.url));
+      const urlMinifier = new URL('../src/htmlminifier.js', import.meta.url).href;
       const script = `
-        import { minify, getCacheStats } from ${JSON.stringify(pathMinifier)};
+        import { minify, getCacheStats } from ${JSON.stringify(urlMinifier)};
         const input = '<style>.probe { color: red; }</style>';
         await minify(input, { minifyCSS: true, cacheCSS: ${size} });
         await minify(input, { minifyCSS: true, cacheCSS: ${size} });
