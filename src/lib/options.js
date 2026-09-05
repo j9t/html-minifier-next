@@ -438,7 +438,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       // Validate engine
       const supportedEngines = ['terser', 'swc'];
       if (!supportedEngines.includes(engine)) {
-        throw new Error(`Unsupported JS minifier engine: “${engine}”. Supported engines: ${supportedEngines.join(', ')}`);
+        throw new Error(`Unsupported JS minifier engine: \`${engine}\`. Supported engines: ${supportedEngines.join(', ')}`);
       }
 
       // Extract engine-specific options (excluding `engine` field itself)
@@ -605,7 +605,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       // Validate engine
       const supportedSVGEngines = ['svgo', 'oxvg'];
       if (!supportedSVGEngines.includes(svgEngine)) {
-        throw new Error(`Unsupported SVG minifier engine: \u201C${svgEngine}\u201D. Supported engines: ${supportedSVGEngines.join(', ')}`);
+        throw new Error(`Unsupported SVG minifier engine: \`${svgEngine}\`. Supported engines: ${supportedSVGEngines.join(', ')}`);
       }
 
       // Extract engine-specific options (excluding `engine` field itself)
@@ -623,7 +623,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         const carried = svgoOnlyKeys.filter(k => k in svgEngineOptions);
         if (carried.length) {
           throw new Error(
-            `SVG minifier engine \`oxvg\` does not accept SVGO options: ${carried.map(k => `\u201C${k}\u201D`).join(', ')}. ` +
+            `SVG minifier engine \`oxvg\` does not accept SVGO options: ${carried.map(k => `“${k}”`).join(', ')}. ` +
             'OXVG takes a map of job names to parameters (for example `{removeComments: {}}`), and silently runs no jobs when given an SVGO configuration. ' +
             'Configure it in its own terms, or translate a plugin list with `convertSvgoConfig` from `@oxvg/napi`.'
           );
