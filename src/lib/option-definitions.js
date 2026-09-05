@@ -117,7 +117,7 @@ const optionDefinitions = {
     type: 'jsonObject'
   },
   minifySVG: {
-    description: 'Minify SVG elements (uses SVGO)',
+    description: 'Minify SVG elements (uses SVGO or OXVG; pass `{"engine": "oxvg"}` for OXVG)',
     type: 'jsonObject'
   },
   minifyURLs: {
