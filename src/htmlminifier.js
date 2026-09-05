@@ -312,10 +312,13 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  Default: `false`
  *
- * @prop {boolean | Object} [minifySVG]
+ * @prop {boolean | Object | {engine?: 'svgo' | 'oxvg', [key: string]: any}} [minifySVG]
  *  When true, enables SVG minification using [SVGO](https://github.com/svg/svgo).
  *  Complete SVG subtrees are extracted and optimized as a block.
- *  If an object is provided, it is passed to SVGO as configuration options.
+ *  If an object is provided, it configures minification:
+ *  - `engine`: The minifier to use (`svgo` or `oxvg`). Default: `svgo`.
+ *  - Any other properties are passed to the selected engine (SVGO options if
+ *    `engine: 'svgo'`, OXVG jobs if `engine: 'oxvg'`—the two are not interchangeable).
  *  If disabled, SVG content is minified using standard HTML rules only.
  *
  *  Default: `false`
@@ -539,6 +542,22 @@ async function getSvgo() {
     svgoPromise = import('svgo').then(m => m.optimize);
   }
   return svgoPromise;
+}
+
+/** @type {Promise<Function> | undefined} */
+let oxvgPromise;
+async function getOxvg() {
+  if (!oxvgPromise) {
+    oxvgPromise = import('@oxvg/napi')
+      .then(m => (m.default || m).optimise)
+      .catch(() => {
+        throw new Error(
+          'The OXVG SVG minifier requires @oxvg/napi to be installed.\n' +
+          'Install it with: npm install @oxvg/napi'
+        );
+      });
+  }
+  return oxvgPromise;
 }
 
 /** @type {Promise<Function> | undefined} */
@@ -2230,6 +2249,7 @@ export const minify = async function (value, options) {
       getTerser,
       getSwc,
       getSvgo,
+      getOxvg,
       cssMinifyCache: caches.cssMinifyCache ?? undefined,
       jsMinifyCache: caches.jsMinifyCache ?? undefined,
       svgMinifyCache: caches.svgMinifyCache ?? undefined
