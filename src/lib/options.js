@@ -607,9 +607,28 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       if (!supportedSVGEngines.includes(svgEngine)) {
         throw new Error(`Unsupported SVG minifier engine: \u201C${svgEngine}\u201D. Supported engines: ${supportedSVGEngines.join(', ')}`);
       }
+
       // Extract engine-specific options (excluding `engine` field itself)
       const svgEngineOptions = { ...svgConfig };
       delete svgEngineOptions.engine;
+
+      // The engines take unrelated configuration shapes: SVGO reads a plugin
+      // pipeline, OXVG a map of job names to parameters, and any object handed
+      // to OXVG replaces its defaults rather than merging into them. Unknown
+      // keys are dropped silently, so an SVGO config reaches OXVG as “run no
+      // jobs at all” and yields near-unminified output with nothing reported.
+      // Refusing the SVGO-only keys turns that silence into a message.
+      if (svgEngine === 'oxvg') {
+        const svgoOnlyKeys = ['datauri', 'floatPrecision', 'js2svg', 'multipass', 'path', 'plugins'];
+        const carried = svgoOnlyKeys.filter(k => k in svgEngineOptions);
+        if (carried.length) {
+          throw new Error(
+            `SVG minifier engine \`oxvg\` does not accept SVGO options: ${carried.map(k => `\u201C${k}\u201D`).join(', ')}. ` +
+            'OXVG takes a map of job names to parameters (for example `{removeComments: {}}`), and silently runs no jobs when given an SVGO configuration. ' +
+            'Configure it in its own terms, or translate a plugin list with `convertSvgoConfig` from `@oxvg/napi`.'
+          );
+        }
+      }
 
       const svgoOptions = svgEngine === 'svgo' ? svgEngineOptions : {};
       const oxvgOptions = svgEngine === 'oxvg' ? svgEngineOptions : {};

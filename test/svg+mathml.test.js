@@ -975,4 +975,78 @@ describe('SVG and MathML', () => {
     assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
     assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
   });
+
+  test('SVG: Invalid engine throws error', async () => {
+    const input = '<svg><rect width="10" height="10"/></svg>';
+
+    await assert.rejects(
+      async () => await minify(input, { minifySVG: { engine: 'invalid' } }),
+      /Unsupported SVG minifier engine/,
+      'Should throw error for invalid engine'
+    );
+  });
+
+  test('SVG: Explicit `svgo` engine matches the default', async () => {
+    const input = '<svg><rect width="10" height="10"/></svg>';
+
+    assert.strictEqual(
+      await minify(input, { minifySVG: { engine: 'svgo' } }),
+      await minify(input, { minifySVG: true }),
+      'Naming the default engine should change nothing'
+    );
+  });
+
+  test('SVG: OXVG engine minifies', async () => {
+    const input = '<svg><rect width="10" height="10"/></svg>';
+    const result = await minify(input, { minifySVG: { engine: 'oxvg' } });
+
+    assert.ok(result.includes('<path'), 'OXVG should convert `rect` to `path`');
+  });
+
+  test('SVG: Engine field is case-insensitive', async () => {
+    const input = '<svg><rect width="10" height="10"/></svg>';
+
+    const result1 = await minify(input, { minifySVG: { engine: 'oxvg' } });
+    const result2 = await minify(input, { minifySVG: { engine: 'OXVG' } });
+
+    assert.strictEqual(result1, result2, 'Case variations should produce same result');
+  });
+
+  test('SVG: Engine takes part in the cache key', async () => {
+    // Same input under both engines—one must not serve the other’s cached result
+    const input = '<svg><rect width="10" height="10"/></svg>';
+
+    const withSvgo = await minify(input, { minifySVG: { engine: 'svgo' } });
+    const withOxvg = await minify(input, { minifySVG: { engine: 'oxvg' } });
+
+    assert.notStrictEqual(withSvgo, withOxvg, 'Engines differ on path close (`z` vs `Z`)');
+    assert.strictEqual(
+      await minify(input, { minifySVG: { engine: 'svgo' } }),
+      withSvgo,
+      'SVGO result should survive an intervening OXVG run'
+    );
+  });
+
+  test('SVG: OXVG engine refuses SVGO options', async () => {
+    const input = '<svg><rect width="10" height="10"/></svg>';
+
+    for (const svgoOption of [{ plugins: ['removeComments'] }, { floatPrecision: 1 }, { multipass: true }]) {
+      await assert.rejects(
+        async () => await minify(input, { minifySVG: { engine: 'oxvg', ...svgoOption } }),
+        /does not accept SVGO options/,
+        `Should reject ${Object.keys(svgoOption)[0]}`
+      );
+    }
+  });
+
+  test('SVG: OXVG engine accepts its own jobs, and SVGO keeps its options', async () => {
+    const input = '<svg><!--c--><rect width="10" height="10"/></svg>';
+
+    const jobs = await minify(input, { minifySVG: { engine: 'oxvg', removeComments: {} } });
+    assert.ok(!jobs.includes('<!--c-->'), 'OXVG should run the job it was given');
+
+    // The guard is scoped to OXVG—SVGO’s own configuration must pass through
+    const svgo = await minify(input, { minifySVG: { engine: 'svgo', plugins: [{ name: 'preset-default' }] } });
+    assert.ok(svgo.includes('<path'), 'SVGO should still accept a plugin pipeline');
+  });
 });

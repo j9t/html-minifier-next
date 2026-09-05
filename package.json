@@ -57,6 +57,7 @@
     "minify",
     "optimize",
     "optimizer",
+    "oxvg",
     "pack",
     "packer",
     "svg",
@@ -69,9 +70,13 @@
   "license": "MIT",
   "name": "html-minifier-next",
   "peerDependencies": {
+    "@oxvg/napi": "^0.0.7",
     "@swc/core": "^1.15.7"
   },
   "peerDependenciesMeta": {
+    "@oxvg/napi": {
+      "optional": true
+    },
     "@swc/core": {
       "optional": true
     }

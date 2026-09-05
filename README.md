@@ -158,7 +158,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `mergeScripts`<br>`--merge-scripts` | Merge consecutive inline `script` elements into one (only merges compatible scripts with same `type`, matching `async`/`defer`/`nomodule`/`nonce`) | `false` |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://terser.org/) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
-| `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/)) | `false` (could be `true`, `Object`) |
+| `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/) or [OXVG](https://github.com/noahbald/oxvg)) | `false` (could be `true`, `Object`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element—use with `maxLineLength` | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
@@ -408,6 +408,48 @@ const result = await minify(html, {
   }
 });
 ```
+
+You can choose between different SVG minifiers using the `engine` field:
+
+```js
+const result = await minify(html, {
+  minifySVG: {
+    engine: 'oxvg' // Use OXVG instead of SVGO
+  }
+});
+```
+
+**Available engines:**
+
+* `svgo` (default): The standard SVG optimizer
+* [`oxvg`](https://github.com/noahbald/oxvg): Rust-based optimizer, several times faster than SVGO on SVG-heavy input (requires separate installation)
+
+**To use OXVG**, install it as a development dependency:
+
+```shell
+npm i -D @oxvg/napi
+```
+
+**Important:** the two engines do not share a configuration format. SVGO reads a
+plugin pipeline, OXVG a map of job names to parameters:
+
+```js
+const result = await minify(html, {
+  minifySVG: {
+    engine: 'oxvg',
+    removeComments: {} // An OXVG job, not an SVGO plugin
+  }
+});
+```
+
+<!-- @@ Check section before OXVG release: -->
+
+Passing SVGO options (`plugins`, `floatPrecision`, `multipass`, …) to OXVG is refused with an error. On its own OXVG would accept them silently and run no jobs at all, leaving SVG all but unminified—so the error is deliberate. Translate a plugin list with `convertSvgoConfig` from `@oxvg/napi`, or name the jobs directly.
+
+Two further differences to expect from OXVG:
+
+* Inline SVG containing named HTML character references (`&nbsp;`, `&copy;`, and similar) currently fails to parse ([oxvg#274](https://github.com/noahbald/oxvg/issues/274)). That SVG is left unminified, or raises an error under `continueOnMinifyError: false`.
+* Path data closes with `Z` rather than SVGO’s `z`—identical in meaning and length, but it will show up in golden-file comparisons.
 
 **Important:**
 
