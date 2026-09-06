@@ -188,14 +188,6 @@ const optionDefinitions = {
     description: 'Remove rules from `style` elements whose class or ID selectors the document never references—use with `--minify-css`; note that class names only applied by external scripts cannot be detected—use `{"safelist": […]}` for those',
     type: 'jsonObject'
   },
-  shouldMinifyCSS: {
-    description: 'Function to determine whether a given CSS code should be minified—use with `--minify-css`',
-    type: 'jsonObject'
-  },
-  shouldMinifyJS: {
-    description: 'Function to determine whether a given JS code should be minified—use with `--minify-js`',
-    type: 'jsonObject'
-  },
   sortAttributes: {
     description: 'Sort attributes by frequency',
     type: 'boolean'

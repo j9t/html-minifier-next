@@ -99,7 +99,7 @@ function getUrlMinifyCache(site) {
 }
 
 // User-facing option keys that are valid but not listed in `optionDefinitions`
-const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace']);
+const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace', 'shouldMinifyCSS', 'shouldMinifyJS']);
 
 // Unknown option keys and preset names already warned about—warn once per
 // key per process, so repeated `minify` calls (e.g., batch runs) don’t flood STDERR
@@ -761,6 +761,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
 export {
   optionDependencies,
+  optionKeysExtra,
   shouldMinifyInnerHTML,
   processOptions
 };

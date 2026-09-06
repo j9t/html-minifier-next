@@ -281,20 +281,6 @@
         "object"
       ]
     },
-    "shouldMinifyCSS": {
-      "description": "Function to determine whether a given CSS code should be minified—use with `--minify-css`",
-      "type": [
-        "boolean",
-        "object"
-      ]
-    },
-    "shouldMinifyJS": {
-      "description": "Function to determine whether a given JS code should be minified—use with `--minify-js`",
-      "type": [
-        "boolean",
-        "object"
-      ]
-    },
     "sortAttributes": {
       "description": "Sort attributes by frequency",
       "type": "boolean"
