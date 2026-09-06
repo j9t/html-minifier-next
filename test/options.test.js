@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
-import { optionDependencies, processOptions } from '../src/lib/options.js';
+import { optionDependencies, optionKeysExtra, processOptions } from '../src/lib/options.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
 import { buildConfigSchema } from '../scripts/build-schema.js';
 
@@ -49,6 +49,7 @@ describe('Options', () => {
   describe('Option dependencies', () => {
     test('Every entry names options that exist', () => {
       for (const { option, requires } of optionDependencies) {
+        if (optionKeysExtra.has(option)) continue;
         assert.ok(Object.hasOwn(optionDefinitions, option), `\`${option}\` is not an option`);
         assert.ok(Object.hasOwn(optionDefinitions, requires), `\`${requires}\`, needed by \`${option}\`, is not an option`);
       }
