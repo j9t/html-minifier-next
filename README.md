@@ -213,7 +213,7 @@ HTML Minifier Next: Ignoring `conservativeCollapse`—use with `collapseWhitespa
 | `removeEmptyElementsExcept` | `removeEmptyElements` |
 | `removeUnusedCSS` | `minifyCSS`, and not [a function of your own](#unused-css-removal) |
 | `shouldMinifyCSS` | `minifyCSS`, and not [a function of your own](#css-minification) |
-| `shouldMinifyJS` | `minifyJS`, and not [a function of your own](#js-minification) |
+| `shouldMinifyJS` | `minifyJS`, and not [a function of your own](#javascript-minification) |
 | `trimCustomFragments` | `collapseWhitespace` |
 
 Passing the option `false`, or an empty array, asks for nothing and is not reported. `cacheCSS`, `cacheJS`, and `cacheSVG` are not listed: They size a cache rather than transform markup, and don’t change output.
@@ -398,7 +398,7 @@ const result = await minify(html, {
 });
 ```
 
-You can also prevent minification for certain CSS blocks by using the `shouldMinifyJS` option, which takes a function that returns a boolean based on the JavaScript text and whether it's inline.
+You can also prevent minification for certain JavaScript blocks by using the `shouldMinifyJS` option, which takes a function that returns a boolean based on the JavaScript text and whether it's inline.
 
 ```js
 const result = await minify(html, {
