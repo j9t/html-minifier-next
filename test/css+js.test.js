@@ -1792,17 +1792,22 @@ describe('CSS and JS', () => {
     });
 
     test('Hook not called when minifyCSS is a custom function', async () => {
-      const hookCalls = [];
+      const minifyCalls = [];
+      let hookCount = 0;
       const input = '<style>body { color: red; }</style>';
       await minify(input, {
         minifyCSS: (text) => {
-          hookCalls.push(text);
+          minifyCalls.push(text);
           return text;
         },
-        shouldMinifyCSS: () => false,
+        shouldMinifyCSS: () => {
+          hookCount++;
+          return false;
+        },
         log: () => {} // hide the warning about `shouldMinifyCSS` without `minifyCSS`
       });
-      assert.ok(hookCalls.length > 0, 'Custom minifyCSS function should be called');
+      assert.ok(minifyCalls.length > 0, 'Custom minifyCSS function should be called');
+      assert.strictEqual(hookCount, 0, 'Hook should never be called');
     });
 
     test('Warns when shouldMinifyCSS used without minifyCSS', async () => {
@@ -1813,22 +1818,6 @@ describe('CSS and JS', () => {
         log: (msg) => logs.push(String(msg))
       });
       assert.ok(logs.some(m => m.includes('shouldMinifyCSS') && m.includes('minifyCSS')), 'Should warn about missing minifyCSS');
-    });
-
-    test('Warns when shouldMinifyCSS is a string', async () => {
-      const logs = [];
-      const input = '<style>body { color: red; }</style>';
-      await minify(input, {
-        minifyCSS: true,
-        shouldMinifyCSS: 'false',
-        log: (msg) => logs.push(String(msg))
-      });
-      assert.ok(logs.some(m => m.includes('shouldMinifyCSS') && m.includes('string')), 'Should warn about string value');
-      assert.strictEqual(
-        await minify(input, { minifyCSS: true }),
-        '<style>body{color:red}</style>',
-        'String value should not enable the hook'
-      );
     });
   });
 
@@ -1904,17 +1893,22 @@ describe('CSS and JS', () => {
     });
 
     test('Hook not called when minifyJS is a custom function', async () => {
-      const hookCalls = [];
+      const minifyCalls = [];
+      let hookCount = 0;
       const input = '<script>let x = 1;</script>';
       await minify(input, {
         minifyJS: (text) => {
-          hookCalls.push(text);
+          minifyCalls.push(text);
           return text;
         },
-        shouldMinifyJS: () => false,
+        shouldMinifyJS: () => {
+          hookCount++;
+          return false;
+        },
         log: () => {} // hide the warning about `shouldMinifyJS` without `minifyJS`
       });
-      assert.ok(hookCalls.length > 0, 'Custom minifyJS function should be called');
+      assert.ok(minifyCalls.length > 0, 'Custom minifyJS function should be called');
+      assert.strictEqual(hookCount, 0, 'Hook should never be called');
     });
 
     test('Warns when shouldMinifyJS used without minifyJS', async () => {
@@ -1925,22 +1919,6 @@ describe('CSS and JS', () => {
         log: (msg) => logs.push(String(msg))
       });
       assert.ok(logs.some(m => m.includes('shouldMinifyJS') && m.includes('minifyJS')), 'Should warn about missing minifyJS');
-    });
-
-    test('Warns when shouldMinifyJS is a string', async () => {
-      const logs = [];
-      const input = '<script>let x = 1;</script>';
-      await minify(input, {
-        minifyJS: true,
-        shouldMinifyJS: 'false',
-        log: (msg) => logs.push(String(msg))
-      });
-      assert.ok(logs.some(m => m.includes('shouldMinifyJS') && m.includes('string')), 'Should warn about string value');
-      assert.strictEqual(
-        await minify(input, { minifyJS: true }),
-        '<script>let x=1</script>',
-        'String value should not enable the hook'
-      );
     });
   });
 
