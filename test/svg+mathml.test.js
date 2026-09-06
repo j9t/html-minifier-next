@@ -1049,4 +1049,84 @@ describe('SVG and MathML', () => {
     const svgo = await minify(input, { minifySVG: { engine: 'svgo', plugins: [{ name: 'preset-default' }] } });
     assert.ok(svgo.includes('<path'), 'SVGO should still accept a plugin pipeline');
   });
+
+  test('SVG: Non-string engine is rejected with the engine error', async () => {
+    const input = '<svg><rect width="10" height="10"/></svg>';
+
+    for (const engine of [1, true, {}, ['oxvg']]) {
+      await assert.rejects(
+        async () => await minify(input, { minifySVG: { engine } }),
+        /Unsupported SVG minifier engine/,
+        `Should reject ${JSON.stringify(engine)} without a type error`
+      );
+    }
+
+    // An unset engine is not a wrong one
+    for (const engine of [undefined, null]) {
+      assert.strictEqual(
+        await minify(input, { minifySVG: { engine } }),
+        await minify(input, { minifySVG: true }),
+        `${engine} should fall back to the default engine`
+      );
+    }
+  });
+
+  test('SVG: OXVG engine handles named character references', async () => {
+    const input = '<svg><title>A&copy;B</title><rect width="10" height="10"/></svg>';
+
+    const oxvg = await minify(input, { minifySVG: { engine: 'oxvg' } });
+    assert.ok(oxvg.includes('<path'), 'SVG with named references should still be minified');
+    assert.ok(oxvg.includes('A\u00a9B'), 'Named references should be resolved as SVGO resolves them');
+
+    const svgo = await minify(input, { minifySVG: true });
+    assert.strictEqual(
+      oxvg.slice(oxvg.indexOf('<title>'), oxvg.indexOf('</title>')),
+      svgo.slice(svgo.indexOf('<title>'), svgo.indexOf('</title>')),
+      'Both engines should agree on the resolved text'
+    );
+  });
+
+  test('SVG: OXVG engine replaces space characters, whichever way they are written', async () => {
+    // Not something the reference resolution introduces—OXVG does this to a
+    // literal or numeric U+00A0 just the same
+    const input = '<svg><title>A&nbsp;B</title><rect width="10" height="10"/></svg>';
+
+    const oxvg = await minify(input, { minifySVG: { engine: 'oxvg' } });
+    assert.ok(oxvg.includes('A B'), 'OXVG should be seen to flatten the non-breaking space');
+    assert.ok(!oxvg.includes('A\u00a0B'), 'The non-breaking space should not survive OXVG');
+
+    const svgo = await minify(input, { minifySVG: true });
+    assert.ok(svgo.includes('A\u00a0B'), 'SVGO should keep it, which is why the engines differ here');
+  });
+
+  test('SVG: OXVG engine handles named references under `continueOnMinifyError: false`', async () => {
+    const input = '<svg><title>A&mdash;B</title><rect width="10" height="10"/></svg>';
+
+    const result = await minify(input, { minifySVG: { engine: 'oxvg' }, continueOnMinifyError: false });
+    assert.ok(result.includes('<path'), 'Named references should not abort strict minification');
+  });
+
+  test('SVG: OXVG engine leaves XML built-ins and numeric references alone', async () => {
+    const input = '<svg><title>&amp;lt; &#169; &#xA9;</title><rect width="10" height="10"/></svg>';
+
+    const result = await minify(input, { minifySVG: { engine: 'oxvg' } });
+    assert.ok(result.includes('&amp;lt;'), 'An escaped entity should not be decoded twice');
+    assert.ok(!result.includes('&#169;') && !result.includes('&#xA9;'), 'Numeric references should be resolved by OXVG');
+  });
+
+  test('SVG: OXVG engine treats unknown references as SVGO does', async () => {
+    const input = '<svg><title>&unknownthing;</title><rect width="10" height="10"/></svg>';
+
+    for (const engine of ['oxvg', 'svgo']) {
+      await assert.rejects(
+        async () => await minify(input, { minifySVG: { engine }, continueOnMinifyError: false }),
+        /entity|entities/i,
+        `${engine} should reject an unknown reference`
+      );
+      assert.ok(
+        (await minify(input, { minifySVG: { engine } })).includes('&unknownthing;'),
+        `${engine} should leave the SVG untouched by default`
+      );
+    }
+  });
 });

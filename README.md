@@ -422,13 +422,15 @@ const result = await minify(html, {
 **Available engines:**
 
 * `svgo` (default): The standard SVG optimizer
-* [`oxvg`](https://github.com/noahbald/oxvg): Rust-based optimizer, several times faster than SVGO on SVG-heavy input (requires separate installation)
+* [`oxvg`](https://github.com/noahbald/oxvg): Rust-based optimizer, several times faster than SVGO on SVG-heavy input (experimental, requires separate installation)
 
 **To use OXVG**, install it as a development dependency:
 
 ```shell
 npm i -D @oxvg/napi
 ```
+
+OXVG is pre-1.0, and its output differs from SVGO’s in the ways listed below—worth re-checking the result when switching an existing project over.
 
 **Important:** the two engines do not share a configuration format. SVGO reads a
 plugin pipeline, OXVG a map of job names to parameters:
@@ -442,13 +444,15 @@ const result = await minify(html, {
 });
 ```
 
-<!-- @@ Check section before OXVG release: -->
+Passing SVGO options (`plugins`, `floatPrecision`, `multipass`, …) to OXVG is refused with an error. On its own OXVG would accept them silently and run no jobs at all, leaving SVG all but unminified.
 
-Passing SVGO options (`plugins`, `floatPrecision`, `multipass`, …) to OXVG is refused with an error. On its own OXVG would accept them silently and run no jobs at all, leaving SVG all but unminified—so the error is deliberate. Translate a plugin list with `convertSvgoConfig` from `@oxvg/napi`, or name the jobs directly.
+Naming a job replaces OXVG’s default pipeline rather than adding to it, so build on the defaults: `{...convertSvgoConfig(), removeComments: {}}`, with `convertSvgoConfig` imported from `@oxvg/napi`. It takes a list of plugin names as well, though as of 0.0.7 it rejects `preset-default` and plugin parameters.
 
-Two further differences to expect from OXVG:
+Named character references (`&nbsp;`, `&copy;`, and similar) are resolved before the SVG reaches OXVG, which parses XML and [would otherwise reject them](https://github.com/noahbald/oxvg/issues/274). SVGO resolves them on its own, so both engines emit the same characters. Names neither engine knows are left alone, and both then refuse the SVG.
 
-* Inline SVG containing named HTML character references (`&nbsp;`, `&copy;`, and similar) currently fails to parse ([oxvg#274](https://github.com/noahbald/oxvg/issues/274)). That SVG is left unminified, or raises an error under `continueOnMinifyError: false`.
+Two differences to expect from OXVG:
+
+* Space characters other than the plain space—non-breaking spaces, thin spaces, and the like—come out as a plain space in text and attribute values, however they were written (`&nbsp;`, `&#160;`, or the character itself). `xml:space="preserve"` keeps them; SVGO keeps them either way.
 * Path data closes with `Z` rather than SVGO’s `z`—identical in meaning and length, but it will show up in golden-file comparisons.
 
 **Important:**

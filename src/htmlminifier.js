@@ -26,7 +26,8 @@ import {
   compactElements,
   looseElements,
   trailingElements,
-  pInlineElements
+  pInlineElements,
+  MISSING_DEPENDENCY
 } from './lib/constants.js';
 
 import {
@@ -519,6 +520,20 @@ async function getTerser() {
   return terserPromise;
 }
 
+/**
+ * @param {string} label - Minifier name as it should read in the message
+ * @param {string} specifier - Package to install
+ * @returns {Error} Error marked as a missing dependency
+ */
+function missingDependency(label, specifier) {
+  const err = new Error(
+    `The ${label} minifier requires ${specifier} to be installed.\n` +
+    `Install it with: npm install ${specifier}`
+  );
+  /** @type {any} */ (err).code = MISSING_DEPENDENCY;
+  return err;
+}
+
 /** @type {Promise<any> | undefined} */
 let swcPromise;
 async function getSwc() {
@@ -526,10 +541,7 @@ async function getSwc() {
     swcPromise = import('@swc/core')
       .then(m => m.default || m)
       .catch(() => {
-        throw new Error(
-          'The swc minifier requires @swc/core to be installed.\n' +
-          'Install it with: npm install @swc/core'
-        );
+        throw missingDependency('swc', '@swc/core');
       });
   }
   return swcPromise;
@@ -551,10 +563,7 @@ async function getOxvg() {
     oxvgPromise = import('@oxvg/napi')
       .then(m => (m.default || m).optimise)
       .catch(() => {
-        throw new Error(
-          'The OXVG SVG minifier requires @oxvg/napi to be installed.\n' +
-          'Install it with: npm install @oxvg/napi'
-        );
+        throw missingDependency('OXVG SVG', '@oxvg/napi');
       });
   }
   return oxvgPromise;
@@ -2250,6 +2259,7 @@ export const minify = async function (value, options) {
       getSwc,
       getSvgo,
       getOxvg,
+      getDecodeHTML,
       cssMinifyCache: caches.cssMinifyCache ?? undefined,
       jsMinifyCache: caches.jsMinifyCache ?? undefined,
       svgMinifyCache: caches.svgMinifyCache ?? undefined

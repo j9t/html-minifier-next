@@ -4,6 +4,7 @@ import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 import { optionDependencies, processOptions } from '../src/lib/options.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
+import { MISSING_DEPENDENCY } from '../src/lib/constants.js';
 import { buildConfigSchema } from '../scripts/build-schema.js';
 
 const schemaOnDisk = JSON.parse(
@@ -139,6 +140,62 @@ describe('Options', () => {
 
     test('Cache sizes never warn—they configure a cache rather than transform markup', async () => {
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { cacheCSS: 300, cacheJS: 300, cacheSVG: 300 }), []);
+    });
+  });
+
+  describe('Optional engines', () => {
+    const notInstalled = () => {
+      const err = new Error('The OXVG SVG minifier requires @oxvg/napi to be installed.');
+      err.code = MISSING_DEPENDENCY;
+      throw err;
+    };
+
+    test('An engine that is not installed is reported, however errors are handled', async () => {
+      for (const continueOnMinifyError of [true, false]) {
+        const options = processOptions(
+          { minifySVG: { engine: 'oxvg' }, continueOnMinifyError },
+          { getSvgo: async () => (svg => ({ data: svg })), getOxvg: async () => notInstalled(), getDecodeHTML: async () => (text => text), svgMinifyCache: new Map() }
+        );
+
+        await assert.rejects(
+          async () => await options.minifySVG('<svg><rect width="1" height="1"/></svg>'),
+          /requires @oxvg\/napi/,
+          `Asking for an engine that is missing is a configuration error (\`continueOnMinifyError: ${continueOnMinifyError}\`)`
+        );
+      }
+    });
+
+    test('The same is true of a JS engine that is not installed', async () => {
+      const swcNotInstalled = () => {
+        const err = new Error('The swc minifier requires @swc/core to be installed.');
+        err.code = MISSING_DEPENDENCY;
+        throw err;
+      };
+      const options = processOptions(
+        { minifyJS: { engine: 'swc' }, continueOnMinifyError: true },
+        { getTerser: async () => ({}), getSwc: async () => swcNotInstalled(), jsMinifyCache: new Map() }
+      );
+
+      await assert.rejects(
+        async () => await options.minifyJS('var a = 1;', false),
+        /requires @swc\/core/,
+        'A missing JS engine should not pass the script through unminified'
+      );
+    });
+
+    test('A minification error is still tolerated', async () => {
+      const svg = '<svg><rect width="1" height="1"/></svg>';
+      const options = processOptions(
+        { minifySVG: { engine: 'oxvg' }, continueOnMinifyError: true },
+        {
+          getSvgo: async () => (input => ({ data: input })),
+          getOxvg: async () => (() => { throw new Error('unknown entity reference'); }),
+          getDecodeHTML: async () => (text => text),
+          svgMinifyCache: new Map()
+        }
+      );
+
+      assert.strictEqual(await options.minifySVG(svg), svg, 'Content the engine chokes on should pass through as before');
     });
   });
 });

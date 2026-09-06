@@ -209,6 +209,10 @@ const rawTextElements = new Set([...specialContentElements, ...genericRawTextEle
 
 // Exports
 
+// Marks the error for a minifier that was asked for but is not installed—a
+// configuration error, and so not one that `continueOnMinifyError` waves through
+const MISSING_DEPENDENCY = 'HMN_MISSING_DEPENDENCY';
+
 export {
   // Regex patterns
   RE_WS_START,
@@ -256,6 +260,7 @@ export {
 
   // Misc
   srcsetElements,
+  MISSING_DEPENDENCY,
 
   // Tag omission rules
   optionalStartTags,
