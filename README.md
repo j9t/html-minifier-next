@@ -446,7 +446,7 @@ const result = await minify(html, {
 
 Passing SVGO options (`plugins`, `floatPrecision`, `multipass`, …) to OXVG is refused with an error. On its own OXVG would accept them silently and run no jobs at all, leaving SVG all but unminified.
 
-Naming a job replaces OXVG’s default pipeline rather than adding to it, so build on the defaults: `{...convertSvgoConfig(), removeComments: {}}`, with `convertSvgoConfig` imported from `@oxvg/napi`. It takes a list of plugin names as well, though as of 0.0.7 it rejects `preset-default` and plugin parameters.
+Naming a job replaces OXVG’s default pipeline rather than adding to it, so build on the defaults with its own `extend`: `{...extend({type: 'Default'}, {removeComments: {}})}`. `convertSvgoConfig` translates a list of plugin names, though as of 0.0.7 it rejects `preset-default` and plugin parameters.
 
 Named character references (`&nbsp;`, `&copy;`, and similar) are resolved before the SVG reaches OXVG, which parses XML and [would otherwise reject them](https://github.com/noahbald/oxvg/issues/274). SVGO resolves them on its own, so both engines emit the same characters. Names neither engine knows are left alone, and both then refuse the SVG.
 
