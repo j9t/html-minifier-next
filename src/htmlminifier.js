@@ -320,6 +320,26 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  Default: `false`
  *
+ * @prop {((text: string, type?: string) => boolean) | null} [shouldMinifyCSS]
+ *  When present, this function is called to determine whether a given CSS code
+ *  should be minified. This hook is called right before any CSS minification
+ *  is performed, and can be used to skip minification for certain CSS blocks,
+ *  based on your own criteria.
+ *  This hook is only used when `minifyCSS` is using the default minifier
+ *  (`true` or a configuration object)
+ *
+ *  Default: `null`
+ *
+ * @prop {((text: string, inline?: boolean) => boolean) | null} [shouldMinifyJS]
+ *  When present, this function is called to determine whether a given JS code
+ *  should be minified. This hook is called right before any JS minification
+ *  is performed, and can be used to skip minification for certain JS blocks,
+ *  based on your own criteria.
+ *  This hook is only used when `minifyJS` is using the default minifier
+ *  (`true` or a configuration object)
+ *
+ *  Default: `null`
+ *
  * @prop {boolean} [noNewlinesBeforeTagClose]
  *  When wrapping lines, prevent inserting a newline directly before a
  *  closing tag (useful to keep tags like `</a>` on the same line).
