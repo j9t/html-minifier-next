@@ -6,13 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [8.4.1] - 2026-09-08
 
-### Added
-
-* Added a `Worker threads:` line to verbose output, naming how many threads a run uses
-
 ### Changed
 
 * Updated the CLI to use worker threads automatically for a smaller batch that still carries enough input to share out across files
+* Updated verbose output to name how many worker threads a run uses
 
 ## [8.4.0] - 2026-09-04
 
