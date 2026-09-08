@@ -1949,7 +1949,7 @@ describe('Parallel multi-file processing', () => {
   const readOutputs = (/** @type {string} */ dir) =>
     fs.readdirSync(dir).sort().map(f => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
 
-  // Plain filler, since these runs turn on how many bytes a file holds rather than on
+  // Plain filler, since these runs depend on how many bytes a file holds rather than on
   // what minifying it involves
   const buildSizedDir = (/** @type {string} */ name, /** @type {number[]} */ byteSizes) => {
     const dir = path.resolve(fixturesDir, 'tmp', name);
