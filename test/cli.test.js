@@ -2056,6 +2056,19 @@ describe('Parallel multi-file processing', () => {
     assert.match(stderr, /Worker threads: none/);
   });
 
+  test('A single file stays in process even when workers are asked for', () => {
+    const dir = buildInputDir('par-single-in', 1);
+    assert.strictEqual(fs.readdirSync(dir).length, 1);
+
+    const { stderr, exitCode } = execCliCapture([
+      '--input-dir=./tmp/par-single-in', '--output-dir=./tmp/par-single-out', '--workers=4', '--verbose', '--remove-comments'
+    ]);
+
+    assert.strictEqual(exitCode, 0);
+    assert.match(stderr, /Worker threads: none/, 'One file gives a pool nothing to share out');
+    assert.strictEqual(fs.readdirSync(path.resolve(fixturesDir, 'tmp/par-single-out')).length, 1);
+  });
+
   test('`--workers=0` is read as “no workers” rather than as no work', () => {
     buildInputDir('par-zero-in', 6);
     execCli(['--input-dir=./tmp/par-zero-in', '--output-dir=./tmp/par-zero-out', '--workers=0', ...OPTIONS_MINIFY]);

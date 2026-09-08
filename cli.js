@@ -601,7 +601,13 @@ program.helpOption('-h, --help', 'Display help for command');
       return inProcess();
     }
 
+    // A pool this small has nothing to share out and still pays for its workers, so an
+    // explicit request for them lands in process as `--workers=1` does
     const poolSize = Math.min(size, fileCount);
+    if (poolSize <= 1) {
+      return inProcess();
+    }
+
     try {
       const { createFilePool } = await import('./src/lib/file-pool.js');
       const pool = createFilePool({
