@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawnSync } from 'child_process';
+import os from 'os';
 import { describe, test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
@@ -1948,6 +1949,21 @@ describe('Parallel multi-file processing', () => {
   const readOutputs = (/** @type {string} */ dir) =>
     fs.readdirSync(dir).sort().map(f => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
 
+  // Plain filler, since these runs depend on how many bytes a file holds rather than on
+  // what minifying it involves
+  const buildSizedDir = (/** @type {string} */ name, /** @type {number[]} */ byteSizes) => {
+    const dir = path.resolve(fixturesDir, 'tmp', name);
+    fs.mkdirSync(dir, { recursive: true });
+    const block = '<section class="card"><h2>Heading</h2><p>Lorem ipsum dolor sit amet.</p></section>\n';
+    byteSizes.forEach((bytes, i) => {
+      fs.writeFileSync(path.join(dir, `page-${i}.html`),
+        '<!doctype html>\n<html>\n  <body>\n' + block.repeat(Math.ceil(bytes / block.length)) + '  </body>\n</html>\n');
+    });
+    return dir;
+  };
+
+  const MB = 1024 * 1024;
+
   const OPTIONS_MINIFY = ['--collapse-whitespace', '--remove-comments', '--minify-css', '--minify-js', '--minify-svg'];
 
   test('A worker names the step it failed at', async () => {
@@ -2000,6 +2016,57 @@ describe('Parallel multi-file processing', () => {
       readOutputs(path.resolve(fixturesDir, 'tmp/par-small-b')),
       readOutputs(path.resolve(fixturesDir, 'tmp/par-small-a'))
     );
+  });
+
+  test('A small run carrying enough to share out goes wide', () => {
+    // Half the cores decides the default pool, so a machine this narrow has no pool
+    // to form and nothing for this test to observe
+    if (os.availableParallelism() < 4) return;
+    buildSizedDir('par-bytes-in', [1.2 * MB, 1.2 * MB, 1.2 * MB]);
+
+    const { stderr, exitCode } = execCliCapture([
+      '--input-dir=./tmp/par-bytes-in', '--output-dir=./tmp/par-bytes-out', '--verbose', '--remove-comments'
+    ]);
+
+    assert.strictEqual(exitCode, 0);
+    assert.match(stderr, /Worker threads: [2-9]/, 'Three sizeable files are worth sharing out');
+  });
+
+  test('A run whose bytes sit in one file stays in process', () => {
+    // The one large file cannot be split, so the pool would have only the crumbs
+    // around it to work on while paying for every worker it started
+    buildSizedDir('par-skew-in', [3 * MB, 1024, 1024, 1024]);
+
+    const { stderr, exitCode } = execCliCapture([
+      '--input-dir=./tmp/par-skew-in', '--output-dir=./tmp/par-skew-out', '--verbose', '--remove-comments'
+    ]);
+
+    assert.strictEqual(exitCode, 0);
+    assert.match(stderr, /Worker threads: none/);
+  });
+
+  test('A small run of small files stays in process', () => {
+    buildInputDir('par-light-in', 4);
+
+    const { stderr, exitCode } = execCliCapture([
+      '--input-dir=./tmp/par-light-in', '--output-dir=./tmp/par-light-out', '--verbose', '--remove-comments'
+    ]);
+
+    assert.strictEqual(exitCode, 0);
+    assert.match(stderr, /Worker threads: none/);
+  });
+
+  test('A single file stays in process even when workers are asked for', () => {
+    const dir = buildInputDir('par-single-in', 1);
+    assert.strictEqual(fs.readdirSync(dir).length, 1);
+
+    const { stderr, exitCode } = execCliCapture([
+      '--input-dir=./tmp/par-single-in', '--output-dir=./tmp/par-single-out', '--workers=4', '--verbose', '--remove-comments'
+    ]);
+
+    assert.strictEqual(exitCode, 0);
+    assert.match(stderr, /Worker threads: none/, 'One file gives a pool nothing to share out');
+    assert.strictEqual(fs.readdirSync(path.resolve(fixturesDir, 'tmp/par-single-out')).length, 1);
   });
 
   test('`--workers=0` is read as “no workers” rather than as no work', () => {

@@ -197,7 +197,7 @@ Object.entries(optionDefinitions).forEach(function ([key, { description, descrip
 });
 program.option('-i --input <file>', 'Specify input file (alternative to positional argument; pair with `--output` for output)');
 program.option('-o --output <file>', 'Specify output file (reads from `--input` file argument or STDIN; outputs to STDOUT if not specified)');
-program.option('-v --verbose', 'Show detailed processing information');
+program.option('-v --verbose', 'Show detailed processing information (active options, worker thread count, file statistics, and minifier warnings)');
 program.option('-d --dry', 'Dry run: Process and report statistics without writing output');
 program.addHelpText('after', '\nBoolean options support a `--no-<flag>` form to disable them, overriding a preset or config file (e.g., `--preset=comprehensive --no-collapse-whitespace`).');
 
@@ -312,7 +312,7 @@ program.option('-z, --zero', 'Minify all HTML files in the current folder and it
 program.option('-I --input-dir <dir>', 'Specify an input directory');
 program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting)');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
-program.option('-w --workers <n>', 'Number of worker threads for multi-file runs; defaults to half the available cores, at most 6, for runs of 128 files or more (below that threads cost more than they save)', parseValidInt('workers'));
+program.option('-w --workers <n>', 'Number of worker threads for multi-file runs; defaults to half the available cores (at most 6) for runs large enough to justify them', parseValidInt('workers'));
 program.option('-f --file-ext <extensions>', 'Specify file extension(s) to process (comma-separated, overrides config file setting); defaults to `html,htm,shtml,shtm`; use `*` for all files');
 program.option('-p --preset <name>', `Use a preset configuration (${getPresetNames().join(', ')})`);
 program.option('-c --config-file <file>', 'Use a configuration file (defaults to html-minifier-next.config.json in the working directory, if present)');
@@ -543,19 +543,29 @@ program.helpOption('-h, --help', 'Display help for command');
     return { originalSize, minifiedSize, saved, sign, percentage };
   }
 
-  // Below this many files the threads spend more time warming up than they save: Each
-  // runs its own isolate and so warms its own JIT, which a short run never earns back
+  // A run with many files earns back each worker’s isolate/JIT startup cost. A smaller
+  // run can do so too when it carries enough bytes to share out, which a file count
+  // alone cannot see.
   const FILES_PER_RUN_MIN = 128;
+  const PARALLEL_BYTES_MIN = 2 * 1024 * 1024;
   // Each worker warms up its own JIT, so the useful count tops out well short of the cores
   const WORKERS_MAX = 6;
 
   /**
    * A pool for this run, or `null` where one wouldn’t pay or wouldn’t work—in which case
    * the caller minifies in process exactly as before
-   * @param {number} fileCount
+   * @param {string[]} files
    */
-  async function createPool(fileCount) {
+  async function createPool(files) {
+    const fileCount = files.length;
     const requested = programOptions.workers;
+    const isVerbose = Boolean(programOptions.verbose || programOptions.dry);
+    // Whether the run went wide is worth saying, since the default weighs the file
+    // count and the bytes there are to share out, neither of which the caller sees
+    const inProcess = () => {
+      if (isVerbose) console.error('Worker threads: none (minifying in process)');
+      return null;
+    };
     // `availableParallelism` reports what this process may actually use, which under a
     // CPU affinity mask—a container, commonly—is less than the machine’s core count
     const isDefault = requested === undefined;
@@ -565,8 +575,21 @@ program.helpOption('-h, --help', 'Display help for command');
 
     // The file count only decides the default; asking for workers outright is the
     // caller’s judgment to make, whatever the run looks like
-    if (size <= 1 || (isDefault && fileCount < FILES_PER_RUN_MIN)) {
-      return null;
+    if (size <= 1) {
+      return inProcess();
+    }
+
+    if (isDefault && fileCount < FILES_PER_RUN_MIN) {
+      // `stat()` is cheaper than starting workers and is only needed for a run that
+      // would otherwise stay in-process. A failed stat leaves normal file processing
+      // to report the read error with its usual filename and wording.
+      const sizes = await Promise.all(files.map(file => fs.promises.stat(file).then(stat => stat.size, () => 0)));
+      // No single file is split across workers, so the largest one sets a floor no
+      // pool can beat; what the rest carry is the work there is to share out
+      const parallelBytes = sizes.reduce((sum, byteSize) => sum + byteSize, 0) - Math.max(0, ...sizes);
+      if (parallelBytes < PARALLEL_BYTES_MIN) {
+        return inProcess();
+      }
     }
 
     // `log` is a closure over this process’s console and is rebuilt inside the worker;
@@ -575,22 +598,31 @@ program.helpOption('-h, --help', 'Display help for command');
     try {
       structuredClone(options);
     } catch {
-      return null;
+      return inProcess();
+    }
+
+    // A pool this small has nothing to share out and still pays for its workers, so an
+    // explicit request for them lands in process as `--workers=1` does
+    const poolSize = Math.min(size, fileCount);
+    if (poolSize <= 1) {
+      return inProcess();
     }
 
     try {
       const { createFilePool } = await import('./src/lib/file-pool.js');
-      return createFilePool({
+      const pool = createFilePool({
         options,
-        size: Math.min(size, fileCount),
+        size: poolSize,
         // `log` is only set when the run asks for diagnostics
         onLog: log
           ? (/** @type {string} */ message, /** @type {boolean} */ isError, /** @type {string} */ file) =>
             createLog(path.relative(process.cwd(), file))(isError ? new Error(message) : message)
           : undefined
       });
+      if (isVerbose) console.error(`Worker threads: ${poolSize}`);
+      return pool;
     } catch {
-      return null;
+      return inProcess();
     }
   }
 
@@ -891,7 +923,7 @@ program.helpOption('-h, --help', 'Display help for command');
       }
     };
 
-    const pool = await createPool(list.length);
+    const pool = await createPool(list);
     if (pool) {
       try {
         await Promise.all(list.map(async (inputFile, idx) => {
