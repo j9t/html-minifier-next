@@ -238,11 +238,9 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
   let trimLeft = Boolean(prevTag) && !inlineElementsToKeepWhitespace.has(prevTag);
   let trimRight = Boolean(nextTag) && !inlineElementsToKeepWhitespace.has(nextTag);
 
-  // Every branch below that consults the text’s content also requires an adjacent
-  // `input`—the sole element both kept-whitespace and form-control—so the scan for
-  // a non-whitespace character is only worth making then
-  const nearInput = prevTag === 'input' || nextTag === 'input';
-  const isPureWhitespace = nearInput && !RE_NON_WS.test(str);
+  // Every branch below that consults the text’s content needs a side left untrimmed,
+  // so the scan for a non-whitespace character is only worth making then
+  const isPureWhitespace = (!trimLeft || !trimRight) && !RE_NON_WS.test(str);
 
   if (isPureWhitespace) {
     // Smart default behavior: Collapse space around non-rendering elements
