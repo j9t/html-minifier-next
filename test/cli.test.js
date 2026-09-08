@@ -2018,18 +2018,27 @@ describe('Parallel multi-file processing', () => {
     );
   });
 
-  test('A small run carrying enough to share out goes wide', () => {
-    // Half the cores decides the default pool, so a machine this narrow has no pool
-    // to form and nothing for this test to observe
-    if (os.availableParallelism() < 4) return;
-    buildSizedDir('par-bytes-in', [1.2 * MB, 1.2 * MB, 1.2 * MB]);
+  // Half the cores decides the default pool, so a machine this narrow has no pool to
+  // form and nothing for the test below to observe
+  const hasCoresForPool = os.availableParallelism() >= 4;
+
+  (hasCoresForPool ? test : test.skip)('A small run carrying enough to share out goes wide', () => {
+    const byteSizes = [1.2 * MB, 1.2 * MB, 1.2 * MB];
+    buildSizedDir('par-bytes-in', byteSizes);
 
     const { stderr, exitCode } = execCliCapture([
       '--input-dir=./tmp/par-bytes-in', '--output-dir=./tmp/par-bytes-out', '--verbose', '--remove-comments'
     ]);
 
     assert.strictEqual(exitCode, 0);
-    assert.match(stderr, /Worker threads: [2-9]/, 'Three sizeable files are worth sharing out');
+    const reported = stderr.match(/^Worker threads: (\d+)$/m);
+    assert.ok(reported, `Three sizeable files are worth sharing out, got: ${stderr}`);
+    const workers = Number(reported[1]);
+    // No file is split, so a pool never exceeds one worker per file
+    assert.ok(
+      workers >= 2 && workers <= byteSizes.length,
+      `Expected between 2 and ${byteSizes.length} workers, got ${workers}`
+    );
   });
 
   test('A run whose bytes sit in one file stays in process', () => {
