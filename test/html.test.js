@@ -4132,6 +4132,8 @@ describe('HTML', () => {
     // Preserved line breaks outrank the whitespace around them
     assert.strictEqual(collapseWhitespace(' \n a \n ', lineBreaks, true, true, false), '\na\n');
     assert.strictEqual(collapseWhitespace('  a  ', lineBreaks, true, true, false), 'a');
+    assert.strictEqual(collapseWhitespace(' \n a \n b \n ', lineBreaks, true, true, true), '\na b\n');
+    assert.strictEqual(collapseWhitespace('  a  b  ', lineBreaks, true, true, true), 'a b');
 
     // Collapsing all runs composes with trimming
     assert.strictEqual(collapseWhitespace('  a  \n  b  ', plain, true, true, true), 'a b');
