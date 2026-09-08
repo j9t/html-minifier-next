@@ -3,8 +3,6 @@
  */
 
 import {
-  RE_WS_START,
-  RE_WS_END,
   RE_ALL_WS_NBSP,
   RE_NBSP_LEADING_GROUP,
   RE_NBSP_LEAD_GROUP,
@@ -15,37 +13,64 @@ import {
   formControlElements
 } from './constants.js';
 
+const RE_ANY_WS_NBSP = /[ \n\r\t\f\xA0]/;
+const RE_TAB_NBSP = /[\t\xA0]/;
+const RE_ASCII_WS_RUN = /[ \n\r\f]+/g;
+const RE_NEEDS_COLLAPSE = /[\n\r\f]| {2}/;
+const RE_NON_WS = /\S/;
+
 // Trim whitespace
 
 /** @param {string} str */
 const trimWhitespace = str => {
   if (!str) return str;
-  // Fast path: If no whitespace at start or end, return early
-  if (!/^[ \n\r\t\f]/.test(str) && !/[ \n\r\t\f]$/.test(str)) {
-    return str;
-  }
-  return str.replace(RE_WS_START, '').replace(RE_WS_END, '');
+  let start = 0;
+  let end = str.length;
+  while (start < end && isAsciiWs(str.charCodeAt(start))) start++;
+  while (end > start && isAsciiWs(str.charCodeAt(end - 1))) end--;
+  return start === 0 && end === str.length ? str : str.slice(start, end);
 };
 
+/** @param {number} code */
+function isAsciiWs(code) {
+  return code === 32 || code === 10 || code === 13 || code === 9 || code === 12;
+}
+
+/** @param {number} code */
+function isWsOrNbsp(code) {
+  return code === 32 || code === 10 || code === 13 || code === 9 || code === 12 || code === 160;
+}
+
 // Collapse all whitespace
+
+// Module scope so the hot path doesn’t allocate a closure per call
+/** @param {string} spaces */
+function collapseRun(spaces) {
+  // Preserve standalone tabs
+  if (spaces === '\t') return '\t';
+  if (spaces.indexOf('\xA0') === -1) return ' ';
+  return spaces.replace(RE_NBSP_LEADING_GROUP, '$1 ');
+}
 
 /** @param {string} str */
 function collapseWhitespaceAll(str) {
   if (!str) return str;
   // Fast path: If there are no common whitespace characters, return early
-  if (!/[ \n\r\t\f\xA0]/.test(str)) {
+  if (!RE_ANY_WS_NBSP.test(str)) {
     return str;
   }
-  // No-break space is specifically handled inside the replacer function here:
-  return str.replace(RE_ALL_WS_NBSP, function (/** @param {string} spaces */ spaces) {
-    // Preserve standalone tabs
-    if (spaces === '\t') return '\t';
-    // Fast path: No no-break space, common case—just collapse to single space
-    // This avoids the nested regex for the majority of cases
-    if (spaces.indexOf('\xA0') === -1) return ' ';
-    // For no-break space handling, use the nested regex
-    return spaces.replace(RE_NBSP_LEADING_GROUP, '$1 ');
-  });
+  return collapseWhitespaceAllKnown(str);
+}
+
+// As `collapseWhitespaceAll`, for callers that already know `str` holds whitespace
+/** @param {string} str */
+function collapseWhitespaceAllKnown(str) {
+  // Only a tab or a no-break space makes the replacement depend on the run itself;
+  // without either, every run becomes one space and no per-match callback is needed
+  if (!RE_TAB_NBSP.test(str)) {
+    return RE_NEEDS_COLLAPSE.test(str) ? str.replace(RE_ASCII_WS_RUN, ' ') : str;
+  }
+  return str.replace(RE_ALL_WS_NBSP, collapseRun);
 }
 
 // Collapse whitespace with options
@@ -58,8 +83,6 @@ function collapseWhitespaceAll(str) {
  * @param {boolean} [collapseAll]
  */
 function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = false) {
-  let lineBreakBefore = ''; let lineBreakAfter = '';
-
   if (!str) return str;
 
   // Fast path: Nothing to do
@@ -68,16 +91,30 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
   }
 
   // Fast path: No whitespace at all
-  if (!/[ \n\r\t\f\xA0]/.test(str)) {
+  if (!RE_ANY_WS_NBSP.test(str)) {
     return str;
   }
+
+  return collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll);
+}
+
+// As `collapseWhitespace`, for callers that already know `str` is non-empty, holds
+// whitespace, and has something to do
+/**
+ * @param {string} str
+ * @param {{preserveLineBreaks?: boolean | undefined, conservativeCollapse?: boolean | undefined}} options
+ * @param {boolean} trimLeft
+ * @param {boolean} trimRight
+ * @param {boolean} collapseAll
+ */
+function collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll) {
+  let lineBreakBefore = ''; let lineBreakAfter = '';
 
   if (options.preserveLineBreaks) {
     // Find leading/trailing whitespace containing line breaks manually
     // (avoids polynomial backtracking with end-anchored lazy quantifiers)
-    const WS_CHARS = ' \n\r\t\f';
     let leadEnd = 0;
-    while (leadEnd < str.length && WS_CHARS.includes(str.charAt(leadEnd))) {
+    while (leadEnd < str.length && isAsciiWs(str.charCodeAt(leadEnd))) {
       leadEnd++;
     }
     if (leadEnd > 0) {
@@ -88,7 +125,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
       }
     }
     let trailStart = str.length;
-    while (trailStart > 0 && WS_CHARS.includes(str.charAt(trailStart - 1))) {
+    while (trailStart > 0 && isAsciiWs(str.charCodeAt(trailStart - 1))) {
       trailStart--;
     }
     if (trailStart < str.length) {
@@ -101,21 +138,34 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
   }
 
   if (trimLeft) {
-    // No-break space is specifically handled inside the replacer function
-    str = str.replace(/^[ \n\r\t\f\xA0]+/, function (/** @type {string} */ spaces) {
+    // Find the leading whitespace boundary with a loop, so the common case neither
+    // allocates a replacer closure nor runs the regex machinery
+    let start = 0;
+    while (start < str.length && isWsOrNbsp(str.charCodeAt(start))) {
+      start++;
+    }
+    if (start > 0) {
+      const spaces = str.slice(0, start);
       const conservative = !lineBreakBefore && options.conservativeCollapse;
+      let replacement;
       if (conservative && spaces === '\t') {
-        return '\t';
+        replacement = '\t';
+      } else if (spaces.indexOf('\xA0') === -1) {
+        // No no-break space: The whole run goes
+        replacement = conservative ? ' ' : '';
+      } else {
+        // No-break space is specifically handled via the nested regexes
+        replacement = spaces.replace(/^[^\xA0]+/, '').replace(RE_NBSP_LEAD_GROUP, '$1 ') || (conservative ? ' ' : '');
       }
-      return spaces.replace(/^[^\xA0]+/, '').replace(RE_NBSP_LEAD_GROUP, '$1 ') || (conservative ? ' ' : '');
-    });
+      str = replacement + str.slice(start);
+    }
   }
 
   if (trimRight) {
     // Find trailing whitespace boundary manually (avoids polynomial backtracking
     // with `/[ \n\r\t\f\xA0]+$/` on strings with long internal whitespace runs)
     let end = str.length;
-    while (end > 0 && ' \n\r\t\f\xA0'.includes(str.charAt(end - 1))) {
+    while (end > 0 && isWsOrNbsp(str.charCodeAt(end - 1))) {
       end--;
     }
     if (end < str.length) {
@@ -124,6 +174,9 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
       let replacement;
       if (conservative && spaces === '\t') {
         replacement = '\t';
+      } else if (spaces.indexOf('\xA0') === -1) {
+        // No no-break space: The whole run goes
+        replacement = conservative ? ' ' : '';
       } else {
         // No-break space is specifically handled via the nested regexes
         replacement = spaces.replace(RE_NBSP_TRAILING_GROUP, ' $1').replace(RE_NBSP_TRAILING_STRIP, '') || (conservative ? ' ' : '');
@@ -132,9 +185,9 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
     }
   }
 
-  if (collapseAll) {
+  if (collapseAll && str) {
     // Strip non-space whitespace then compress spaces to one
-    str = collapseWhitespaceAll(str);
+    str = collapseWhitespaceAllKnown(str);
   }
 
   // Avoid string concatenation when no line breaks (common case)
@@ -149,11 +202,10 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
 // Check if an input element has `type="hidden"`; module-scope so the hot path
 // doesn’t allocate a closure per text node
 /**
- * @param {string} tagName
  * @param {Array<{name: string, value?: string}>} attrs
  */
-function isHiddenInput(tagName, attrs) {
-  if (tagName !== 'input' || !attrs || !attrs.length) return false;
+function isHiddenInput(attrs) {
+  if (!attrs || !attrs.length) return false;
   for (const attr of attrs) {
     if (attr.name === 'type') {
       return attr.value === 'hidden';
@@ -177,77 +229,69 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
 
   // Fast path: No whitespace at all—every decision below would leave `str`
   // untouched (`collapseWhitespace` returns such strings unchanged)
-  if (!/[ \n\r\t\f\xA0]/.test(str)) {
+  if (!RE_ANY_WS_NBSP.test(str)) {
     return str;
   }
 
-  const prevTagName = prevTag && (prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag);
-  const nextTagName = nextTag && (nextTag.charAt(0) === '/' ? nextTag.slice(1) : nextTag);
+  const inlineOption = Boolean(options.collapseInlineTagWhitespace);
 
-  // Check if prev/next are non-rendering (hidden) elements
-  const prevIsHidden = isHiddenInput(prevTagName, prevAttrs);
-  const nextIsHidden = isHiddenInput(nextTagName, nextAttrs);
+  let trimLeft = Boolean(prevTag) && !inlineElementsToKeepWhitespace.has(prevTag);
+  let trimRight = Boolean(nextTag) && !inlineElementsToKeepWhitespace.has(nextTag);
 
-  let trimLeft = prevTag && !inlineElementsToKeepWhitespace.has(prevTag);
+  // Every branch below that consults the text’s content also requires an adjacent
+  // `input`—the sole element both kept-whitespace and form-control—so the scan for
+  // a non-whitespace character is only worth making then
+  const nearInput = prevTag === 'input' || nextTag === 'input';
+  const isPureWhitespace = nearInput && !RE_NON_WS.test(str);
 
-  // Whether the text is whitespace only—one scan, shared by the checks below
-  // (`str` is known non-empty here)
-  const isPureWhitespace = !/\S/.test(str);
-
-  // Smart default behavior: Collapse space after non-rendering elements (`type="hidden"`)
-  // This happens even in basic `collapseWhitespace` mode (safe optimization)
-  if (!trimLeft && prevIsHidden && isPureWhitespace) {
-    trimLeft = true;
-  }
-
-  // Aggressive mode: Collapse between all form controls (pure whitespace only)
-  if (!trimLeft && prevTagName && nextTagName &&
-      options.collapseInlineTagWhitespace &&
-      isPureWhitespace &&
-      formControlElements.has(prevTagName) && formControlElements.has(nextTagName)) {
-    trimLeft = true;
-  }
-
-  if (trimLeft && !options.collapseInlineTagWhitespace) {
-    trimLeft = prevTag.charAt(0) === '/' ? !inlineElements.has(prevTag.slice(1)) : !inlineTextSet.has(prevTag);
-  }
-
-  // When `collapseInlineTagWhitespace` is enabled, still preserve whitespace around inline text elements
-  if (trimLeft && options.collapseInlineTagWhitespace) {
-    const tagName = prevTag.charAt(0) === '/' ? prevTag.slice(1) : prevTag;
-    if (inlineElementsToKeepWhitespaceWithin.has(tagName)) {
-      trimLeft = false;
+  if (isPureWhitespace) {
+    // Smart default behavior: Collapse space around non-rendering elements
+    // (`type="hidden"`); this happens even in basic `collapseWhitespace` mode
+    if (!trimLeft && prevTag === 'input' && isHiddenInput(prevAttrs)) {
+      trimLeft = true;
+    }
+    if (!trimRight && nextTag === 'input' && isHiddenInput(nextAttrs)) {
+      trimRight = true;
+    }
+    // Aggressive mode: Collapse between all form controls
+    if (inlineOption && (!trimLeft || !trimRight) &&
+        formControlElements.has(stripSlash(prevTag)) && formControlElements.has(stripSlash(nextTag))) {
+      trimLeft = true;
+      trimRight = true;
     }
   }
 
-  let trimRight = nextTag && !inlineElementsToKeepWhitespace.has(nextTag);
-
-  // Smart default behavior: Collapse space before non-rendering elements (`type="hidden"`)
-  if (!trimRight && nextIsHidden && isPureWhitespace) {
-    trimRight = true;
-  }
-
-  // Aggressive mode: Same as `trimLeft`
-  if (!trimRight && prevTagName && nextTagName &&
-      options.collapseInlineTagWhitespace &&
-      isPureWhitespace &&
-      formControlElements.has(prevTagName) && formControlElements.has(nextTagName)) {
-    trimRight = true;
-  }
-
-  if (trimRight && !options.collapseInlineTagWhitespace) {
-    trimRight = nextTag.charAt(0) === '/' ? !inlineTextSet.has(nextTag.slice(1)) : !inlineElements.has(nextTag);
-  }
-
-  // When `collapseInlineTagWhitespace` is enabled, still preserve whitespace around inline text elements
-  if (trimRight && options.collapseInlineTagWhitespace) {
-    const tagName = nextTag.charAt(0) === '/' ? nextTag.slice(1) : nextTag;
-    if (inlineElementsToKeepWhitespaceWithin.has(tagName)) {
-      trimRight = false;
+  if (trimLeft) {
+    if (inlineOption) {
+      // Still preserve whitespace around inline text elements
+      if (inlineElementsToKeepWhitespaceWithin.has(stripSlash(prevTag))) {
+        trimLeft = false;
+      }
+    } else {
+      trimLeft = prevTag.charCodeAt(0) === 47 /* / */ ? !inlineElements.has(prevTag.slice(1)) : !inlineTextSet.has(prevTag);
     }
   }
 
-  return collapseWhitespace(str, options, Boolean(trimLeft), Boolean(trimRight), Boolean(prevTag && nextTag));
+  if (trimRight) {
+    if (inlineOption) {
+      if (inlineElementsToKeepWhitespaceWithin.has(stripSlash(nextTag))) {
+        trimRight = false;
+      }
+    } else {
+      trimRight = nextTag.charCodeAt(0) === 47 /* / */ ? !inlineTextSet.has(nextTag.slice(1)) : !inlineElements.has(nextTag);
+    }
+  }
+
+  const collapseAll = Boolean(prevTag && nextTag);
+  if (!trimLeft && !trimRight && !collapseAll && !options.preserveLineBreaks) {
+    return str;
+  }
+  return collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll);
+}
+
+/** @param {string} tag */
+function stripSlash(tag) {
+  return tag && tag.charCodeAt(0) === 47 /* / */ ? tag.slice(1) : tag;
 }
 
 // Collapse/trim whitespace for given tag
