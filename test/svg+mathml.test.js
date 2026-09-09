@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 import {describe, test} from 'node:test';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
+import { convertSvgoConfig, extend } from '@oxvg/napi';
 
 describe('SVG and MathML', () => {
   test('SVGO basic optimization', async () => {
@@ -1112,6 +1113,71 @@ describe('SVG and MathML', () => {
     const result = await minify(input, { minifySVG: { engine: 'oxvg' } });
     assert.ok(result.includes('&amp;lt;'), 'An escaped entity should not be decoded twice');
     assert.ok(!result.includes('&#169;') && !result.includes('&#xA9;'), 'Numeric references should be resolved by OXVG');
+  });
+
+  test('SVG: OXVG closes path data with `Z`, where SVGO uses `z`', async () => {
+    // A documented difference between the engines, and the one that shows up in
+    // golden-file comparisons—if it goes away, the README should say so
+    const input = '<svg><rect width="10" height="10"/></svg>';
+
+    const oxvg = await minify(input, { minifySVG: { engine: 'oxvg' } });
+    const svgo = await minify(input, { minifySVG: true });
+
+    assert.match(oxvg, /d="[^"]*Z"/, 'OXVG should close the path with `Z`');
+    assert.match(svgo, /d="[^"]*z"/, 'SVGO should close the path with `z`');
+  });
+
+  test('SVG: OXVG runs its default jobs, rather than passing the graphic through', async () => {
+    // The quiet failure to watch for: handed something it cannot read, OXVG runs
+    // no jobs at all and returns near enough what it was given
+    const input = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+      '<!-- note --><g><rect x="1.00000" y="1.00000" width="10.0000" height="10.0000"/></g></svg>';
+
+    const result = await minify(input, { minifySVG: { engine: 'oxvg' } });
+
+    assert.ok(!result.includes('<!--'), 'The comment should be gone');
+    assert.ok(!result.includes('<g>'), 'The group that carries nothing should be collapsed');
+    assert.ok(!result.includes('1.00000'), 'Redundant precision should be trimmed');
+    assert.ok(result.includes('<path'), '`rect` should have become a path');
+  });
+
+  test('SVG: Naming a job replaces OXVG’s defaults, and `extend` builds on them', async () => {
+    const input = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+      '<!-- note --><g><rect width="10" height="10"/></g></svg>';
+
+    const defaults = await minify(input, { minifySVG: { engine: 'oxvg' } });
+
+    // The README’s example, which merges the named job into the default pipeline
+    const extended = await minify(input, {
+      minifySVG: { engine: 'oxvg', ...extend({ type: 'Default' }, { removeComments: {} }) }
+    });
+    assert.strictEqual(extended, defaults, 'Extending the defaults with a job they already run should change nothing');
+
+    // The same job named on its own, which replaces the pipeline rather than adding to it
+    const alone = await minify(input, { minifySVG: { engine: 'oxvg', removeComments: {} } });
+    assert.ok(!alone.includes('<!--'), 'The named job should still run');
+    assert.ok(alone.includes('<rect'), 'The default jobs should not run alongside it');
+  });
+
+  test('SVG: `convertSvgoConfig` translates plugin names within the limits the README names', async () => {
+    assert.strictEqual(
+      Object.keys(convertSvgoConfig(['removeComments'])).length, 1,
+      'A plugin name should translate to the job of that name'
+    );
+    assert.ok(
+      Object.keys(convertSvgoConfig(['preset-default'])).length > 1,
+      '`preset-default` should translate as a bare string'
+    );
+    assert.throws(
+      () => convertSvgoConfig([{ name: 'preset-default', params: {} }]),
+      /unknown job/,
+      '`preset-default` should be refused in the object form'
+    );
+    assert.throws(
+      () => convertSvgoConfig([{ name: 'cleanupNumericValues', params: { floatPrecision: 2 } }]),
+      /Missing field/,
+      'Parameters should have to be given in full, unlike SVGO’s partial overrides'
+    );
   });
 
   test('SVG: OXVG engine treats unknown references as SVGO does', async () => {
