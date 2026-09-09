@@ -209,7 +209,7 @@ const rawTextElements = new Set([...specialContentElements, ...genericRawTextEle
 
 // Exports
 
-// Marks the error for a minifier that was asked for but is not installed—a
+// Marks the error for a minifier that was asked for but is not available—a
 // configuration error, and so not one that `continueOnMinifyError` waves through
 const MISSING_DEPENDENCY = 'HMN_MISSING_DEPENDENCY';
 

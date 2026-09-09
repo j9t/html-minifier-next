@@ -2,7 +2,7 @@ import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
+import { LRU, describeDependencyFailure, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
 import { collectUsedSymbols } from './lib/unused-css.js';
 
 import {
@@ -522,14 +522,12 @@ async function getTerser() {
 
 /**
  * @param {string} label - Minifier name as it should read in the message
- * @param {string} specifier - Package to install
- * @returns {Error} Error marked as a missing dependency
+ * @param {string} specifier - Package that failed to load
+ * @param {unknown} cause - Error the import rejected with
+ * @returns {Error} Error marked as an unavailable dependency
  */
-function missingDependency(label, specifier) {
-  const err = new Error(
-    `The ${label} minifier requires ${specifier} to be installed.\n` +
-    `Install it with: npm install ${specifier}`
-  );
+function unavailableDependency(label, specifier, cause) {
+  const err = new Error(describeDependencyFailure(label, specifier, cause), { cause });
   /** @type {any} */ (err).code = MISSING_DEPENDENCY;
   return err;
 }
@@ -540,8 +538,8 @@ async function getSwc() {
   if (!swcPromise) {
     swcPromise = import('@swc/core')
       .then(m => m.default || m)
-      .catch(() => {
-        throw missingDependency('swc', '@swc/core');
+      .catch(err => {
+        throw unavailableDependency('swc', '@swc/core', err);
       });
   }
   return swcPromise;
@@ -562,8 +560,8 @@ async function getOxvg() {
   if (!oxvgPromise) {
     oxvgPromise = import('@oxvg/napi')
       .then(m => (m.default || m).optimise)
-      .catch(() => {
-        throw missingDependency('OXVG SVG', '@oxvg/napi');
+      .catch(err => {
+        throw unavailableDependency('OXVG SVG', '@oxvg/napi', err);
       });
   }
   return oxvgPromise;
