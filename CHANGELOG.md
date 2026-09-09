@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.4.2] - 2026-09-09
+
+### Changed
+
+* Improved whitespace-collapse performance (~10% faster overall on reference corpus, output unchanged)
+
 ## [8.4.1] - 2026-09-08
 
 ### Changed
