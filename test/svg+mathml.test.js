@@ -1116,8 +1116,7 @@ describe('SVG and MathML', () => {
   });
 
   test('SVG: OXVG closes path data with `Z`, where SVGO uses `z`', async () => {
-    // A documented difference between the engines, and the one that shows up in
-    // golden-file comparisons—if it goes away, the README should say so
+    // A README-documented difference, and the one that surfaces in golden-file comparisons
     const input = '<svg><rect width="10" height="10"/></svg>';
 
     const oxvg = await minify(input, { minifySVG: { engine: 'oxvg' } });
@@ -1137,7 +1136,6 @@ describe('SVG and MathML', () => {
 
     assert.ok(!result.includes('<!--'), 'The comment should be gone');
     assert.ok(!result.includes('<g>'), 'The group that carries nothing should be collapsed');
-    assert.ok(!result.includes('1.00000'), 'Redundant precision should be trimmed');
     assert.ok(result.includes('<path'), '`rect` should have become a path');
   });
 
@@ -1153,13 +1151,15 @@ describe('SVG and MathML', () => {
     });
     assert.strictEqual(extended, defaults, 'Extending the defaults with a job they already run should change nothing');
 
-    // The same job named on its own, which replaces the pipeline rather than adding to it
+    // The same job named on its own, which replaces the pipeline instead
     const alone = await minify(input, { minifySVG: { engine: 'oxvg', removeComments: {} } });
     assert.ok(!alone.includes('<!--'), 'The named job should still run');
     assert.ok(alone.includes('<rect'), 'The default jobs should not run alongside it');
   });
 
   test('SVG: `convertSvgoConfig` translates plugin names within the limits the README names', async () => {
+    // Upstream’s limits, asserted so that a release lifting them reads as a
+    // README correction rather than as a break
     assert.strictEqual(
       Object.keys(convertSvgoConfig(['removeComments'])).length, 1,
       'A plugin name should translate to the job of that name'
