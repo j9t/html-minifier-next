@@ -47,6 +47,8 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   minifyJS: (text: string, inline?: boolean, isModule?: boolean) => string | Promise<string>,
  *   minifyURLs: (text: string) => string | Promise<string>,
  *   minifySVG: ((svgContent: string) => string | Promise<string>) | null,
+ *   shouldMinifyCSS: ((text: string, type?: string) => boolean) | null,
+ *   shouldMinifyJS: ((text: string, inline?: boolean) => boolean) | null,
  *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
  *   cssContext?: CSSContext,
  *   parallelJS?: boolean,
@@ -97,7 +99,7 @@ function getUrlMinifyCache(site) {
 }
 
 // User-facing option keys that are valid but not listed in `optionDefinitions`
-const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace']);
+const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace', 'shouldMinifyCSS', 'shouldMinifyJS']);
 
 // Unknown option keys and preset names already warned about—warn once per
 // key per process, so repeated `minify` calls (e.g., batch runs) don’t flood STDERR
@@ -141,7 +143,21 @@ const optionDependencies = [
     unusable: (/** @type {Record<string, any>} */ input) => typeof input.minifyCSS === 'function' && 'which a function of your own replaces',
     clear: true
   },
-  { option: 'trimCustomFragments', requires: 'collapseWhitespace' }
+  {
+    option: 'shouldMinifyCSS',
+    requires: 'minifyCSS',
+    // Removal rides along with Lightning CSS, which a function of one’s own replaces
+    unusable: (/** @type {Record<string, any>} */ input) => typeof input.minifyCSS === 'function' && 'which a function of your own replaces',
+    clear: true
+  },
+  {
+    option: 'shouldMinifyJS',
+    requires: 'minifyJS',
+    // Removal rides along with Terser/SWC, which a function of one’s own replaces
+    unusable: (/** @type {Record<string, any>} */ input) => typeof input.minifyJS === 'function' && 'which a function of your own replaces',
+    clear: true
+  },
+  { option: 'trimCustomFragments', requires: 'collapseWhitespace' },
 ];
 
 // An empty array is a value the user supplied but did not populate, and so asks for
@@ -171,6 +187,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     minifyJS: identity,
     minifyURLs: identity,
     minifySVG: null,
+    shouldMinifyCSS: null,
+    shouldMinifyJS: null,
     removeUnusedCSS: null
   };
 
@@ -264,6 +282,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       if (typeof option === 'function') {
         options.log = option;
       }
+    } else if (key === 'shouldMinifyCSS') {
+      if (typeof option === 'function') {
+        options.shouldMinifyCSS = option;
+      }
+    } else if (key === 'shouldMinifyJS') {
+      if (typeof option === 'function') {
+        options.shouldMinifyJS = option;
+      }
     } else if (key === 'minifyCSS' && typeof option !== 'function') {
       if (!option || !getLightningCSS || !cssMinifyCache) {
         return;
@@ -277,6 +303,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       options.minifyCSS = async function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {CSSContext | undefined} */ context) {
         // Fast path: Nothing to minify
         if (!text || !text.trim()) {
+          return text;
+        }
+
+        // Skip minification if the user-supplied hook says not to
+        if(options.shouldMinifyCSS && !options.shouldMinifyCSS(text, type)) {
           return text;
         }
 
@@ -472,6 +503,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         // Fast path: Avoid invoking minifier for empty/whitespace-only content
         if (!code || !code.trim()) {
           return '';
+        }
+
+        // Skip minification if the user-supplied hook says not to
+        if(options.shouldMinifyJS && !options.shouldMinifyJS(text, inline)) {
+          return text;
         }
 
         // Hybrid strategy: Always use Terser for inline JS (needs bare returns support)
@@ -725,6 +761,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
 export {
   optionDependencies,
+  optionKeysExtra,
   shouldMinifyInnerHTML,
   processOptions
 };

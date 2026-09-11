@@ -1735,6 +1735,227 @@ describe('CSS and JS', () => {
     });
   });
 
+  describe('shouldMinifyCSS hook', () => {
+    test('Skips CSS minification when hook returns false', async () => {
+      const input = '<style>body { color: red; font-size: 12px; }</style>';
+      const result = await minify(input, {
+        minifyCSS: true,
+        shouldMinifyCSS: () => false
+      });
+      assert.strictEqual(result, input, 'CSS should not be minified when hook returns false');
+    });
+
+    test('Minifies CSS when hook returns true', async () => {
+      const input = '<style>body { color: red; font-size: 12px; }</style>';
+      const result = await minify(input, {
+        minifyCSS: true,
+        shouldMinifyCSS: () => true
+      });
+      assert.strictEqual(result, '<style>body{color:red;font-size:12px}</style>', 'CSS should be minified when hook returns true');
+    });
+
+    test('Hook receives CSS text and type', async () => {
+      const received = [];
+      const input = '<style>body { color: red; }</style><p style="margin: 0;"></p>';
+      await minify(input, {
+        minifyCSS: true,
+        shouldMinifyCSS: (text, type) => {
+          received.push({ text, type });
+          return true;
+        }
+      });
+      assert.strictEqual(received.length, 2, 'Hook should be called for each style element');
+      assert.ok(received[0].text.includes('color: red'), 'First call should receive first CSS text');
+      assert.strictEqual(received[0].type, undefined, 'First call should receive type');
+      assert.ok(received[1].text.includes('margin: 0'), 'Second call should receive second CSS text');
+      assert.strictEqual(received[1].type, 'inline', 'Second call should receive type');
+    });
+
+    test('Can filter by CSS content', async () => {
+      const input = '<style>.keep { color: red; }</style><style>.skip { color: blue; }</style>';
+      const result = await minify(input, {
+        minifyCSS: true,
+        shouldMinifyCSS: (text) => text.includes('.keep')
+      });
+      assert.ok(result.includes('.keep{color:red}'), 'Matching CSS should be minified');
+      assert.ok(result.includes('.skip { color: blue; }'), 'Non-matching CSS should not be minified');
+    });
+
+    test('Works with style attributes', async () => {
+      const input = '<div style="color: red; font-size: 12px;"></div><style>body { color: blue; }</style>';
+      const result = await minify(input, {
+        minifyCSS: true,
+        shouldMinifyCSS: (_, type) => type === 'inline'
+      });
+      assert.ok(result.includes('style="color:red;font-size:12px"'), 'Style attributes should be minified when hook allows');
+      assert.ok(result.includes('color: blue;'), 'Other style elements should not be minified');
+    });
+
+    test('Hook not called when minifyCSS is a custom function', async () => {
+      const minifyCalls = [];
+      let hookCount = 0;
+      const input = '<style>body { color: red; }</style>';
+      await minify(input, {
+        minifyCSS: (text) => {
+          minifyCalls.push(text);
+          return text;
+        },
+        shouldMinifyCSS: () => {
+          hookCount++;
+          return false;
+        },
+        log: () => {} // hide the warning about `shouldMinifyCSS` without `minifyCSS`
+      });
+      assert.ok(minifyCalls.length > 0, 'Custom minifyCSS function should be called');
+      assert.strictEqual(hookCount, 0, 'Hook should never be called');
+    });
+
+    test('Warns when shouldMinifyCSS used without minifyCSS', async () => {
+      const logs = [];
+      const input = '<style>body { color: red; }</style>';
+      await minify(input, {
+        shouldMinifyCSS: () => true,
+        log: (msg) => logs.push(String(msg))
+      });
+      assert.ok(logs.some(m => m.includes('shouldMinifyCSS') && m.includes('minifyCSS')), 'Should warn about missing minifyCSS');
+    });
+  });
+
+  describe('shouldMinifyJS hook', () => {
+    test('Skips JS minification when hook returns false', async () => {
+      const input = '<script>function test() { let x = 1; return x; }</script>';
+      const result = await minify(input, {
+        minifyJS: true,
+        shouldMinifyJS: () => false
+      });
+      assert.strictEqual(result, input, 'JS should not be minified when hook returns false');
+    });
+
+    test('Minifies JS when hook returns true', async () => {
+      const input = '<script>function test() { let x = 1; return x; }</script>';
+      const result = await minify(input, {
+        minifyJS: true,
+        shouldMinifyJS: () => true
+      });
+      assert.strictEqual(result, '<script>function test(){return 1}</script>', 'JS should be minified when hook returns true');
+    });
+
+    test('Hook receives JS text and inline flag', async () => {
+      const received = [];
+      const input = '<script>let a = 1;</script><button onclick="let b = 2;">Click</button>';
+      await minify(input, {
+        minifyJS: true,
+        shouldMinifyJS: (text, inline) => {
+          received.push({ text, inline });
+          return true;
+        }
+      });
+      assert.strictEqual(received.length, 2, 'Hook should be called for each script');
+      assert.strictEqual(received[0].inline, false, 'Script block should have inline=false');
+      assert.strictEqual(received[1].inline, true, 'Event handler should have inline=true');
+      assert.ok(received[0].text.includes('let a = 1'), 'First call should receive script block content');
+      assert.ok(received[1].text.includes('let b = 2'), 'Second call should receive event handler content');
+    });
+
+    test('Can filter by JS content', async () => {
+      const input = '<script>function keep() { return 1; }</script><script>function skip() { return 2; }</script>';
+      const result = await minify(input, {
+        minifyJS: true,
+        shouldMinifyJS: (text) => text.includes('keep')
+      });
+      assert.ok(result.includes('function keep(){return 1}'), 'Matching JS should be minified');
+      assert.ok(result.includes('function skip() { return 2; }'), 'Non-matching JS should not be minified');
+    });
+
+    test('Can filter inline vs block scripts', async () => {
+      const input = '<script>let x = 1;</script><button onclick="let y = 2;">Click</button>';
+      const result = await minify(input, {
+        minifyJS: true,
+        shouldMinifyJS: (_, inline) => !inline
+      });
+      assert.ok(result.includes('let x=1'), 'Block scripts should be minified');
+      assert.ok(result.includes('onclick="let y = 2;"'), 'Inline scripts should not be minified');
+    });
+
+    test('Works with module scripts', async () => {
+      const received = [];
+      const input = '<script type="module">export const x = 1;</script><script>let y = 2;</script>';
+      await minify(input, {
+        minifyJS: true,
+        shouldMinifyJS: (text, inline) => {
+          received.push({ text, inline });
+          return true;
+        }
+      });
+      assert.strictEqual(received.length, 2, 'Hook should be called for both scripts');
+      assert.strictEqual(received[0].inline, false, 'Module script should have inline=false');
+      assert.strictEqual(received[1].inline, false, 'Classic script should have inline=false');
+    });
+
+    test('Hook not called when minifyJS is a custom function', async () => {
+      const minifyCalls = [];
+      let hookCount = 0;
+      const input = '<script>let x = 1;</script>';
+      await minify(input, {
+        minifyJS: (text) => {
+          minifyCalls.push(text);
+          return text;
+        },
+        shouldMinifyJS: () => {
+          hookCount++;
+          return false;
+        },
+        log: () => {} // hide the warning about `shouldMinifyJS` without `minifyJS`
+      });
+      assert.ok(minifyCalls.length > 0, 'Custom minifyJS function should be called');
+      assert.strictEqual(hookCount, 0, 'Hook should never be called');
+    });
+
+    test('Warns when shouldMinifyJS used without minifyJS', async () => {
+      const logs = [];
+      const input = '<script>let x = 1;</script>';
+      await minify(input, {
+        shouldMinifyJS: () => true,
+        log: (msg) => logs.push(String(msg))
+      });
+      assert.ok(logs.some(m => m.includes('shouldMinifyJS') && m.includes('minifyJS')), 'Should warn about missing minifyJS');
+    });
+  });
+
+  describe('Combined shouldMinifyCSS and shouldMinifyJS hooks', () => {
+    test('Both hooks work together', async () => {
+      const input = '<style>.a { color: red; }</style><script>let x = 1;</script>';
+      const result = await minify(input, {
+        minifyCSS: true,
+        minifyJS: true,
+        shouldMinifyCSS: (text) => text.includes('.a'),
+        shouldMinifyJS: (text) => text.includes('x = 1')
+      });
+      assert.ok(result.includes('.a{color:red}'), 'CSS hook should work');
+      assert.ok(result.includes('let x=1'), 'JS hook should work');
+    });
+
+    test('Hooks work with collapseWhitespace', async () => {
+      const input = `
+        <style>
+          body { color: red; }
+        </style>
+        <script>
+          function test() { return 1; }
+        </script>
+      `;
+      const result = await minify(input, {
+        minifyCSS: true,
+        minifyJS: true,
+        collapseWhitespace: true,
+        shouldMinifyCSS: () => true,
+        shouldMinifyJS: () => true
+      });
+      assert.ok(result.includes('body{color:red}'), 'CSS should be minified with collapseWhitespace');
+      assert.ok(result.includes('function test(){return 1}'), 'JS should be minified with collapseWhitespace');
+    });
+  });
+
   describe('Deferred JS minification', () => {
     test('JS: Multiple scripts keep their results in document order', async () => {
       const input = '<script>var a = 1; console.log(a);</script>' +
