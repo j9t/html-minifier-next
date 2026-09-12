@@ -432,6 +432,8 @@ npm i -D @oxvg/napi
 
 OXVG is pre-1.0, and its output differs from SVGO’s in the ways listed below—worth re-checking the result when switching an existing project over.
 
+**Important:** OXVG reserves panics for what it considers its own bugs, and a panic ends the Node process rather than raising an error. `continueOnMinifyError` does not apply—there is no JavaScript error to catch—and nothing else in the run completes: The panic message goes to STDERR, and the process exits with 134. SVGO throws an ordinary exception instead, which `continueOnMinifyError` can absorb. The behavior is [deliberate upstream](https://github.com/noahbald/oxvg/issues/281), and it’s the main reason to keep OXVG opt-in.
+
 **Important:** the two engines do not share a configuration format. SVGO reads a
 plugin pipeline, OXVG a map of job names to parameters:
 

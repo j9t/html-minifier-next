@@ -2152,3 +2152,59 @@ describe('Parallel multi-file processing', () => {
     );
   });
 });
+
+describe('Output file integrity', () => {
+  beforeEach(async () => {
+    await removeFixture('tmp-atomic');
+  });
+
+  after(async () => {
+    await removeFixture('tmp-atomic');
+  });
+
+  // An abrupt exit (a native crash, an OOM kill) gives no chance to clean up, so
+  // content has to land somewhere else first and be moved into place in one step
+  test('Output content is never written to the destination path directly', async () => {
+    const dirBase = path.resolve(fixturesDir, 'tmp-atomic');
+    const dirInput = path.resolve(dirBase, 'in');
+    const dirOutput = path.resolve(dirBase, 'out');
+    const fileLog = path.resolve(dirBase, 'written.log');
+    await fs.promises.mkdir(dirInput, { recursive: true });
+
+    for (const name of ['a.html', 'b.html', 'c.html']) {
+      await fs.promises.writeFile(path.resolve(dirInput, name), '<p   class="x"  >Text</p>');
+    }
+
+    // Record every path the CLI writes content to, before it is moved into place
+    const configPath = path.resolve(dirBase, 'record.config.mjs');
+    await fs.promises.writeFile(configPath, [
+      "import fs from 'fs';",
+      `const fileLog = ${JSON.stringify(fileLog)};`,
+      'const write = fs.promises.writeFile.bind(fs.promises);',
+      'fs.promises.writeFile = (file, ...rest) => {',
+      '  fs.appendFileSync(fileLog, String(file) + String.fromCharCode(10));',
+      '  return write(file, ...rest);',
+      '};',
+      'export default {collapseWhitespace: true};'
+    ].join(String.fromCharCode(10)));
+
+    execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--config-file', configPath]);
+
+    assert.deepStrictEqual((await fs.promises.readdir(dirOutput)).sort(), ['a.html', 'b.html', 'c.html']);
+
+    const written = (await fs.promises.readFile(fileLog, 'utf8')).split(String.fromCharCode(10)).filter(Boolean);
+    const direct = written.filter(file => ['a.html', 'b.html', 'c.html'].includes(path.basename(file)));
+    assert.deepStrictEqual(direct, [], `Written straight to the destination: ${direct.join(', ')}`);
+  });
+
+  test('No temporary files survive a successful run', async () => {
+    const dirInput = path.resolve(fixturesDir, 'tmp-atomic/in2');
+    const dirOutput = path.resolve(fixturesDir, 'tmp-atomic/out2');
+    await fs.promises.mkdir(dirInput, { recursive: true });
+    await fs.promises.writeFile(path.resolve(dirInput, 'a.html'), '<p   class="x"  >Text</p>');
+
+    execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--collapse-whitespace']);
+
+    assert.deepStrictEqual(await fs.promises.readdir(dirOutput), ['a.html']);
+  });
+});
