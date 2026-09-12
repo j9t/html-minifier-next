@@ -2214,10 +2214,15 @@ describe('Output file integrity', () => {
       await fs.promises.chmod(fileOutput, mode);
     }
 
-    execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--collapse-whitespace']);
+    const { exitCode, stderr } = execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--collapse-whitespace']);
+    assert.strictEqual(exitCode, 0, `The run is expected to succeed: ${stderr}`);
 
     for (const [name, mode] of Object.entries(modes)) {
-      const stats = await fs.promises.stat(path.resolve(dirOutput, name));
+      const fileOutput = path.resolve(dirOutput, name);
+      // Without this the modes below would hold for a file the run never touched
+      assert.notStrictEqual(await fs.promises.readFile(fileOutput, 'utf8'), 'Previous output', `${name} should have been rewritten`);
+
+      const stats = await fs.promises.stat(fileOutput);
       assert.strictEqual(stats.mode & 0o777, mode, `${name} should stay ${mode.toString(8)}`);
     }
   });
