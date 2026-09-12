@@ -231,8 +231,16 @@ let writeCounter = 0;
  */
 async function writeFileAtomic(outputFile, data) {
   const tempFile = path.join(path.dirname(outputFile), `.${path.basename(outputFile)}.${process.pid}.${writeCounter++}.tmp`);
+  // The rename replaces the output rather than writing through it, so a mode set on the output has to be carried over
+  const stats = await fs.promises.stat(outputFile).catch(() => undefined);
+  const mode = stats ? stats.mode & 0o7777 : undefined;
+
   try {
-    await fs.promises.writeFile(tempFile, data, { encoding: 'utf8' });
+    await fs.promises.writeFile(tempFile, data, { encoding: 'utf8', mode });
+    // `mode` on creation is subject to the umask, so the exact bits have to be set separately
+    if (mode !== undefined) {
+      await fs.promises.chmod(tempFile, mode);
+    }
     await fs.promises.rename(tempFile, outputFile);
   } catch (err) {
     await fs.promises.rm(tempFile, { force: true });

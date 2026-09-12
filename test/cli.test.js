@@ -2197,6 +2197,31 @@ describe('Output file integrity', () => {
     assert.deepStrictEqual(direct, [], `Written straight to the destination: ${direct.join(', ')}`);
   });
 
+  test('An existing output file keeps its permissions', { skip: process.platform === 'win32' && 'POSIX file modes' }, async () => {
+    const dirInput = path.resolve(fixturesDir, 'tmp-atomic/in3');
+    const dirOutput = path.resolve(fixturesDir, 'tmp-atomic/out3');
+    await fs.promises.mkdir(dirInput, { recursive: true });
+    await fs.promises.mkdir(dirOutput, { recursive: true });
+    await fs.promises.writeFile(path.resolve(dirInput, 'a.html'), '<p   class="x"  >Text</p>');
+
+    await fs.promises.writeFile(path.resolve(dirInput, 'b.html'), '<p   class="x"  >Text</p>');
+
+    // A mode the umask would clear as well as one it would not
+    const modes = { 'a.html': 0o600, 'b.html': 0o664 };
+    for (const [name, mode] of Object.entries(modes)) {
+      const fileOutput = path.resolve(dirOutput, name);
+      await fs.promises.writeFile(fileOutput, 'Previous output');
+      await fs.promises.chmod(fileOutput, mode);
+    }
+
+    execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--collapse-whitespace']);
+
+    for (const [name, mode] of Object.entries(modes)) {
+      const stats = await fs.promises.stat(path.resolve(dirOutput, name));
+      assert.strictEqual(stats.mode & 0o777, mode, `${name} should stay ${mode.toString(8)}`);
+    }
+  });
+
   test('No temporary files survive a successful run', async () => {
     const dirInput = path.resolve(fixturesDir, 'tmp-atomic/in2');
     const dirOutput = path.resolve(fixturesDir, 'tmp-atomic/out2');
