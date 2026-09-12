@@ -4,6 +4,19 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.5.0] - 2026-09-@@
+
+### Added
+
+* Enabled [OXVG](https://github.com/noahbald/oxvg) as an opt-in engine for SVG minification, allowing to choose `oxvg` instead of `svgo` (the default)
+  - **Important:** OXVG support is currently experimental, it’s installed separately (`npm i -D @oxvg/napi`), and it’s configured as a map of job names rather than in SVGO’s plugin format (an SVGO configuration handed to it is refused)
+  - **Important:** An internal error in OXVG ends the Node process rather than raising a catchable error, so `continueOnMinifyError` cannot absorb it and the rest of the run is lost
+
+### Changed
+
+* Ensured an external minifier that cannot be loaded throws a configuration error rather than something `continueOnMinifyError` waves through
+* Made the CLI write output by way of a temporary file, so that an exit leaving no chance to clean up—e.g., because of a native crash in a minifier, an OOM kill—can no longer leave a half-written file where the output belongs
+
 ## [8.4.2] - 2026-09-09
 
 ### Changed

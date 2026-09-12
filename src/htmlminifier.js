@@ -2,7 +2,7 @@ import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
+import { LRU, describeDependencyFailure, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
 import { collectUsedSymbols } from './lib/unused-css.js';
 
 import {
@@ -26,7 +26,8 @@ import {
   compactElements,
   looseElements,
   trailingElements,
-  pInlineElements
+  pInlineElements,
+  MISSING_DEPENDENCY
 } from './lib/constants.js';
 
 import {
@@ -312,10 +313,13 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  Default: `false`
  *
- * @prop {boolean | Object} [minifySVG]
+ * @prop {boolean | Object | {engine?: 'svgo' | 'oxvg', [key: string]: any}} [minifySVG]
  *  When true, enables SVG minification using [SVGO](https://github.com/svg/svgo).
  *  Complete SVG subtrees are extracted and optimized as a block.
- *  If an object is provided, it is passed to SVGO as configuration options.
+ *  If an object is provided, it configures minification:
+ *  - `engine`: The minifier to use (`svgo` or—experimental—`oxvg`). Default: `svgo`.
+ *  - Any other properties are passed to the selected engine (SVGO options if
+ *    `engine: 'svgo'`, OXVG jobs if `engine: 'oxvg'`—the two are not interchangeable).
  *  If disabled, SVG content is minified using standard HTML rules only.
  *
  *  Default: `false`
@@ -516,17 +520,26 @@ async function getTerser() {
   return terserPromise;
 }
 
+/**
+ * @param {string} label - Minifier name as it should read in the message
+ * @param {string} specifier - Package that failed to load
+ * @param {unknown} cause - Error the import rejected with
+ * @returns {Error} Error marked as an unavailable dependency
+ */
+function unavailableDependency(label, specifier, cause) {
+  const err = new Error(describeDependencyFailure(label, specifier, cause), { cause });
+  /** @type {any} */ (err).code = MISSING_DEPENDENCY;
+  return err;
+}
+
 /** @type {Promise<any> | undefined} */
 let swcPromise;
 async function getSwc() {
   if (!swcPromise) {
     swcPromise = import('@swc/core')
       .then(m => m.default || m)
-      .catch(() => {
-        throw new Error(
-          'The swc minifier requires @swc/core to be installed.\n' +
-          'Install it with: npm install @swc/core'
-        );
+      .catch(err => {
+        throw unavailableDependency('swc', '@swc/core', err);
       });
   }
   return swcPromise;
@@ -539,6 +552,19 @@ async function getSvgo() {
     svgoPromise = import('svgo').then(m => m.optimize);
   }
   return svgoPromise;
+}
+
+/** @type {Promise<Function> | undefined} */
+let oxvgPromise;
+async function getOxvg() {
+  if (!oxvgPromise) {
+    oxvgPromise = import('@oxvg/napi')
+      .then(m => (m.default || m).optimise)
+      .catch(err => {
+        throw unavailableDependency('OXVG SVG', '@oxvg/napi', err);
+      });
+  }
+  return oxvgPromise;
 }
 
 /** @type {Promise<Function> | undefined} */
@@ -2230,6 +2256,8 @@ export const minify = async function (value, options) {
       getTerser,
       getSwc,
       getSvgo,
+      getOxvg,
+      getDecodeHTML,
       cssMinifyCache: caches.cssMinifyCache ?? undefined,
       jsMinifyCache: caches.jsMinifyCache ?? undefined,
       svgMinifyCache: caches.svgMinifyCache ?? undefined

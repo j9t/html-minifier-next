@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { LRU, describeQuantifierRisk, embedSource } from '../src/lib/utils.js';
+import { LRU, describeDependencyFailure, describeQuantifierRisk, embedSource } from '../src/lib/utils.js';
 
 /** @param {string} source */
 const hasRiskyQuantifiers = source => describeQuantifierRisk(source) !== null;
@@ -352,6 +352,43 @@ describe('Utils', () => {
 
     test('Risk nested deeper in a group still surfaces', () => {
       assert.strictEqual(hasRiskyQuantifiers(/<%(?:x(a+)+y)?%>/.source), true);
+    });
+  });
+
+  describe('`describeDependencyFailure`', () => {
+    // What Node rejects with when the package is nowhere to be found
+    const notFound = specifier => Object.assign(
+      new Error(`Cannot find package '${specifier}' imported from /app/src/htmlminifier.js`),
+      { code: 'ERR_MODULE_NOT_FOUND' }
+    );
+
+    test('A package that is not installed is answered with the install command', () => {
+      const message = describeDependencyFailure('OXVG SVG', '@oxvg/napi', notFound('@oxvg/napi'));
+      assert.match(message, /requires @oxvg\/napi to be installed/);
+      assert.match(message, /npm install @oxvg\/napi/);
+    });
+
+    test('A package that is installed but fails to load names the failure instead', () => {
+      // OXVG throws this when npm skipped the platform binary, and no reinstall of
+      // `@oxvg/napi` itself would change it
+      const message = describeDependencyFailure(
+        'OXVG SVG', '@oxvg/napi', new Error('Cannot find native binding.')
+      );
+      assert.match(message, /could not load @oxvg\/napi: Cannot find native binding\./);
+      assert.doesNotMatch(message, /npm install/, 'Pointing at the install command would mislead');
+    });
+
+    test('A missing dependency of the package is not read as the package itself', () => {
+      const message = describeDependencyFailure('swc', '@swc/core', notFound('@swc/counter'));
+      assert.match(message, /could not load @swc\/core/);
+      assert.doesNotMatch(message, /npm install/);
+    });
+
+    test('A rejection that is not an error is still described', () => {
+      assert.match(
+        describeDependencyFailure('swc', '@swc/core', 'boom'),
+        /could not load @swc\/core: boom/
+      );
     });
   });
 });

@@ -220,6 +220,34 @@ function readFile(file) {
   }
 }
 
+let writeCounter = 0;
+
+/**
+ * Write a file by way of a temporary file in the same folder, so that an exit
+ * that leaves no chance to clean up—a native crash in a minifier, an OOM
+ * kill—cannot leave a half-written file where the output belongs
+ * @param {string} outputFile
+ * @param {string} data
+ */
+async function writeFileAtomic(outputFile, data) {
+  const tempFile = path.join(path.dirname(outputFile), `.${path.basename(outputFile)}.${process.pid}.${writeCounter++}.tmp`);
+  // The rename replaces the output rather than writing through it, so a mode set on the output has to be carried over
+  const stats = await fs.promises.stat(outputFile).catch(() => undefined);
+  const mode = stats ? stats.mode & 0o7777 : undefined;
+
+  try {
+    await fs.promises.writeFile(tempFile, data, { encoding: 'utf8', mode });
+    // `mode` on creation is subject to the umask, so the exact bits have to be set separately
+    if (mode !== undefined) {
+      await fs.promises.chmod(tempFile, mode);
+    }
+    await fs.promises.rename(tempFile, outputFile);
+  } catch (err) {
+    await fs.promises.rm(tempFile, { force: true });
+    throw err;
+  }
+}
+
 /**
  * Load config from a file path. Extensions .json, .js, and .mjs are handled
  * directly; for unknown extensions, JSON is tried first, then module import.
@@ -681,7 +709,7 @@ program.helpOption('-h, --help', 'Display help for command');
       return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
     }
 
-    await fs.promises.writeFile(outputFile, minified, { encoding: 'utf8' }).catch(err => {
+    await writeFileAtomic(outputFile, minified).catch(err => {
       fatal('Cannot write ' + outputFile + '\n' + err.message);
     });
 
@@ -1000,7 +1028,7 @@ program.helpOption('-h, --help', 'Display help for command');
     if (programOptions.output) {
       try {
         await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
-        await fs.promises.writeFile(programOptions.output, minified, { encoding: 'utf8' });
+        await writeFileAtomic(programOptions.output, minified);
       } catch (err) {
         fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
       }
@@ -1188,7 +1216,7 @@ program.helpOption('-h, --help', 'Display help for command');
     if (programOptions.output) {
       try {
         await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
-        await fs.promises.writeFile(programOptions.output, minifiedCombined, 'utf8');
+        await writeFileAtomic(programOptions.output, minifiedCombined);
       } catch (err) {
         fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
       }
