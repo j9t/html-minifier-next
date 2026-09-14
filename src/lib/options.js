@@ -171,7 +171,12 @@ function normalizeEngine(engine, fallback) {
 /** @param {unknown} engine - Engine name as it should read in an error message */
 function describeEngine(engine) {
   if (typeof engine === 'string') return engine;
-  return JSON.stringify(engine) ?? String(engine);
+  try {
+    return JSON.stringify(engine) ?? String(engine);
+  } catch {
+    // BigInt and cyclic values do not serialize
+    return String(engine);
+  }
 }
 
 // Main options processor

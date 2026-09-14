@@ -547,6 +547,20 @@ describe('CSS and JS', () => {
     }
   });
 
+  test('JS: Engine that cannot be serialized is still rejected with the engine error', async () => {
+    const input = '<script>function test() { return 42; }</script>';
+    const cyclic = {};
+    cyclic.self = cyclic;
+
+    for (const engine of [1n, cyclic]) {
+      await assert.rejects(
+        async () => await minify(input, { minifyJS: { engine } }),
+        /Unsupported JS minifier engine/,
+        `Should reject a ${typeof engine === 'bigint' ? 'BigInt' : 'cyclic object'} without a serialization error`
+      );
+    }
+  });
+
   test('JS: Unset engine falls back to Terser', async () => {
     const input = '<script>function test() { return 42; }</script>';
     const output = await minify(input, { minifyJS: { engine: 'terser' } });
