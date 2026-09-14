@@ -535,6 +535,31 @@ describe('CSS and JS', () => {
     assert.strictEqual(result2, result3, 'Case variations should produce same result');
   });
 
+  test('JS: Non-string engine is rejected with the engine error', async () => {
+    const input = '<script>function test() { return 42; }</script>';
+
+    for (const engine of [1, true, {}, ['swc']]) {
+      await assert.rejects(
+        async () => await minify(input, { minifyJS: { engine } }),
+        /Unsupported JS minifier engine/,
+        `Should reject ${JSON.stringify(engine)} without a type error`
+      );
+    }
+  });
+
+  test('JS: Unset engine falls back to Terser', async () => {
+    const input = '<script>function test() { return 42; }</script>';
+    const output = await minify(input, { minifyJS: { engine: 'terser' } });
+
+    for (const engine of [undefined, null, '']) {
+      assert.strictEqual(
+        await minify(input, { minifyJS: { engine } }),
+        output,
+        `${JSON.stringify(engine)} should fall back to Terser`
+      );
+    }
+  });
+
   test('JavaScript minification error handling', async () => {
     // Test invalid JavaScript syntax
     let input = '<script>function foo( { syntax error</script>';

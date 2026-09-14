@@ -4,7 +4,7 @@
 
 import { createUrlMinifier } from './urls.js';
 import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
-import { RE_TRAILING_SEMICOLON } from './constants.js';
+import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 import { findUnusedSymbols, normalizeUnusedCSSOptions } from './unused-css.js';
@@ -150,6 +150,28 @@ const optionDependencies = [
 function isRequested(value) {
   if (value === identity) return false;
   return Array.isArray(value) ? value.length > 0 : Boolean(value);
+}
+
+/** @param {unknown} err - Error raised while minifying */
+function isMissingDependency(err) {
+  return Boolean(err) && /** @type {any} */ (err).code === MISSING_DEPENDENCY;
+}
+
+// An unset (falsy) engine takes the fallback and names match lowercase; anything else
+// passes through untouched so that validation reports it instead of a type error
+/**
+ * @param {unknown} engine - Configured engine name
+ * @param {string} fallback - Engine to use when none is configured
+ */
+function normalizeEngine(engine, fallback) {
+  if (!engine) return fallback;
+  return typeof engine === 'string' ? engine.toLowerCase() : engine;
+}
+
+/** @param {unknown} engine - Engine name as it should read in an error message */
+function describeEngine(engine) {
+  if (typeof engine === 'string') return engine;
+  return JSON.stringify(engine) ?? String(engine);
 }
 
 // Main options processor
@@ -433,12 +455,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
       // Parse configuration
       const config = typeof option === 'object' ? option : {};
-      const engine = (config.engine || 'terser').toLowerCase();
+      const engine = normalizeEngine(config.engine, 'terser');
 
       // Validate engine
       const supportedEngines = ['terser', 'swc'];
-      if (!supportedEngines.includes(engine)) {
-        throw new Error(`Unsupported JS minifier engine: “${engine}”. Supported engines: ${supportedEngines.join(', ')}`);
+      if (!supportedEngines.includes(/** @type {string} */ (engine))) {
+        throw new Error(`Unsupported JS minifier engine: \`${describeEngine(engine)}\`. Supported engines: ${supportedEngines.join(', ')}`);
       }
 
       // Extract engine-specific options (excluding `engine` field itself)
@@ -530,7 +552,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return resolved;
         } catch (err) {
           if (jsKey !== undefined) jsCache.delete(jsKey);
-          if (!options.continueOnMinifyError) {
+          if (!options.continueOnMinifyError || isMissingDependency(err)) {
             throw err;
           }
           options.log && options.log(err);

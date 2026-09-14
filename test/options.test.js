@@ -4,6 +4,7 @@ import assert from 'node:assert';
 import { minify } from '../src/htmlminifier.js';
 import { optionDependencies, processOptions } from '../src/lib/options.js';
 import { optionDefinitions } from '../src/lib/option-definitions.js';
+import { MISSING_DEPENDENCY } from '../src/lib/constants.js';
 import { buildConfigSchema } from '../scripts/build-schema.js';
 
 const schemaOnDisk = JSON.parse(
@@ -139,6 +140,43 @@ describe('Options', () => {
 
     test('Cache sizes never warn—they configure a cache rather than transform markup', async () => {
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { cacheCSS: 300, cacheJS: 300, cacheSVG: 300 }), []);
+    });
+  });
+
+  describe('Optional engines', () => {
+    const swcNotInstalled = async () => {
+      const err = new Error('The swc minifier requires @swc/core to be installed.');
+      err.code = MISSING_DEPENDENCY;
+      throw err;
+    };
+
+    test('An engine that is not installed is reported, however errors are handled', async () => {
+      for (const continueOnMinifyError of [true, false]) {
+        const options = processOptions(
+          { minifyJS: { engine: 'swc' }, continueOnMinifyError },
+          { getTerser: async () => ({}), getSwc: swcNotInstalled, jsMinifyCache: new Map() }
+        );
+
+        await assert.rejects(
+          async () => await options.minifyJS('var a = 1;', false),
+          /requires @swc\/core/,
+          `Asking for an engine that is missing is a configuration error (\`continueOnMinifyError: ${continueOnMinifyError}\`)`
+        );
+      }
+    });
+
+    test('A minification error is still tolerated', async () => {
+      const script = 'var a = 1;';
+      const options = processOptions(
+        { minifyJS: { engine: 'swc' }, continueOnMinifyError: true },
+        {
+          getTerser: async () => ({}),
+          getSwc: async () => ({ minify: async () => { throw new Error('Unexpected token'); } }),
+          jsMinifyCache: new Map()
+        }
+      );
+
+      assert.strictEqual(await options.minifyJS(script, false), script, 'Content the engine chokes on should pass through as before');
     });
   });
 });

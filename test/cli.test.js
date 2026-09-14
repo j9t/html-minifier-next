@@ -2152,3 +2152,145 @@ describe('Parallel multi-file processing', () => {
     );
   });
 });
+
+describe('Output file integrity', () => {
+  beforeEach(async () => {
+    await removeFixture('tmp-atomic');
+  });
+
+  after(async () => {
+    await removeFixture('tmp-atomic');
+  });
+
+  // An abrupt exit (a native crash, an OOM kill) gives no chance to clean up, so
+  // content has to land somewhere else first and be moved into place in one step
+  test('Output content is never written to the destination path directly', async () => {
+    const dirBase = path.resolve(fixturesDir, 'tmp-atomic');
+    const dirInput = path.resolve(dirBase, 'in');
+    const dirOutput = path.resolve(dirBase, 'out');
+    const fileLog = path.resolve(dirBase, 'written.log');
+    await fs.promises.mkdir(dirInput, { recursive: true });
+
+    for (const name of ['a.html', 'b.html', 'c.html']) {
+      await fs.promises.writeFile(path.resolve(dirInput, name), '<p   class="x"  >Text</p>');
+    }
+
+    // Record every path the CLI writes content to, before it is moved into place
+    const configPath = path.resolve(dirBase, 'record.config.mjs');
+    await fs.promises.writeFile(configPath, [
+      "import fs from 'fs';",
+      `const fileLog = ${JSON.stringify(fileLog)};`,
+      'const write = fs.promises.writeFile.bind(fs.promises);',
+      'fs.promises.writeFile = (file, ...rest) => {',
+      '  fs.appendFileSync(fileLog, String(file) + String.fromCharCode(10));',
+      '  return write(file, ...rest);',
+      '};',
+      'export default {collapseWhitespace: true};'
+    ].join(String.fromCharCode(10)));
+
+    execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--config-file', configPath]);
+
+    assert.deepStrictEqual((await fs.promises.readdir(dirOutput)).sort(), ['a.html', 'b.html', 'c.html']);
+
+    const written = (await fs.promises.readFile(fileLog, 'utf8')).split(String.fromCharCode(10)).filter(Boolean);
+    const direct = written.filter(file => ['a.html', 'b.html', 'c.html'].includes(path.basename(file)));
+    assert.deepStrictEqual(direct, [], `Written straight to the destination: ${direct.join(', ')}`);
+  });
+
+  test('An existing output file keeps its permissions', { skip: process.platform === 'win32' && 'POSIX file modes' }, async () => {
+    const dirInput = path.resolve(fixturesDir, 'tmp-atomic/in3');
+    const dirOutput = path.resolve(fixturesDir, 'tmp-atomic/out3');
+    await fs.promises.mkdir(dirInput, { recursive: true });
+    await fs.promises.mkdir(dirOutput, { recursive: true });
+    await fs.promises.writeFile(path.resolve(dirInput, 'a.html'), '<p   class="x"  >Text</p>');
+
+    await fs.promises.writeFile(path.resolve(dirInput, 'b.html'), '<p   class="x"  >Text</p>');
+
+    // A mode the umask would clear as well as one it would not
+    const modes = { 'a.html': 0o600, 'b.html': 0o664 };
+    for (const [name, mode] of Object.entries(modes)) {
+      const fileOutput = path.resolve(dirOutput, name);
+      await fs.promises.writeFile(fileOutput, 'Previous output');
+      await fs.promises.chmod(fileOutput, mode);
+    }
+
+    const { exitCode, stderr } = execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--collapse-whitespace']);
+    assert.strictEqual(exitCode, 0, `The run is expected to succeed: ${stderr}`);
+
+    for (const [name, mode] of Object.entries(modes)) {
+      const fileOutput = path.resolve(dirOutput, name);
+      // Without this the modes below would hold for a file the run never touched
+      assert.notStrictEqual(await fs.promises.readFile(fileOutput, 'utf8'), 'Previous output', `${name} should have been rewritten`);
+
+      const stats = await fs.promises.stat(fileOutput);
+      assert.strictEqual(stats.mode & 0o777, mode, `${name} should stay ${mode.toString(8)}`);
+    }
+  });
+
+  test('No temporary files survive a successful run', async () => {
+    const dirInput = path.resolve(fixturesDir, 'tmp-atomic/in2');
+    const dirOutput = path.resolve(fixturesDir, 'tmp-atomic/out2');
+    await fs.promises.mkdir(dirInput, { recursive: true });
+    await fs.promises.writeFile(path.resolve(dirInput, 'a.html'), '<p   class="x"  >Text</p>');
+
+    execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--collapse-whitespace']);
+
+    assert.deepStrictEqual(await fs.promises.readdir(dirOutput), ['a.html']);
+  });
+
+  test('A symlinked output file is written through rather than replaced', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
+    const dirInput = path.resolve(fixturesDir, 'tmp-atomic/in4');
+    const dirOutput = path.resolve(fixturesDir, 'tmp-atomic/out4');
+    const dirTarget = path.resolve(fixturesDir, 'tmp-atomic/target4');
+    await fs.promises.mkdir(dirInput, { recursive: true });
+    await fs.promises.mkdir(dirOutput, { recursive: true });
+    await fs.promises.mkdir(dirTarget, { recursive: true });
+    await fs.promises.writeFile(path.resolve(dirInput, 'a.html'), '<p   class="x"  >Text</p>');
+
+    const fileTarget = path.resolve(dirTarget, 'a.html');
+    const fileLink = path.resolve(dirOutput, 'a.html');
+    await fs.promises.writeFile(fileTarget, 'Previous output');
+    await fs.promises.symlink(path.relative(dirOutput, fileTarget), fileLink);
+
+    const { exitCode, stderr } = execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--collapse-whitespace']);
+    assert.strictEqual(exitCode, 0, `The run is expected to succeed: ${stderr}`);
+
+    assert.ok((await fs.promises.lstat(fileLink)).isSymbolicLink(), 'The link should still be a link');
+    assert.strictEqual(await fs.promises.readFile(fileTarget, 'utf8'), '<p class="x">Text</p>', 'The file linked to should hold the output');
+    assert.deepStrictEqual(await fs.promises.readdir(dirTarget), ['a.html'], 'No temporary file should be left next to the file linked to');
+  });
+
+  test('A run on worker threads writes output the same way', { skip: process.platform === 'win32' && 'Symlinks and POSIX file modes' }, async () => {
+    const dirInput = path.resolve(fixturesDir, 'tmp-atomic/in5');
+    const dirOutput = path.resolve(fixturesDir, 'tmp-atomic/out5');
+    const dirTarget = path.resolve(fixturesDir, 'tmp-atomic/target5');
+    for (const dir of [dirInput, dirOutput, dirTarget]) {
+      await fs.promises.mkdir(dir, { recursive: true });
+    }
+    for (const name of ['a.html', 'b.html']) {
+      await fs.promises.writeFile(path.resolve(dirInput, name), '<p   class="x"  >Text</p>');
+    }
+
+    const fileTarget = path.resolve(dirTarget, 'a.html');
+    const fileLink = path.resolve(dirOutput, 'a.html');
+    await fs.promises.writeFile(fileTarget, 'Previous output');
+    await fs.promises.symlink(path.relative(dirOutput, fileTarget), fileLink);
+
+    const fileMode = path.resolve(dirOutput, 'b.html');
+    await fs.promises.writeFile(fileMode, 'Previous output');
+    await fs.promises.chmod(fileMode, 0o600);
+    const { ino } = await fs.promises.stat(fileMode);
+
+    const { exitCode, stderr } = execCliWithStderr(['--input-dir', dirInput, '--output-dir', dirOutput, '--collapse-whitespace', '--workers', '2', '--verbose']);
+    assert.strictEqual(exitCode, 0, `The run is expected to succeed: ${stderr}`);
+    assert.match(stderr, /Worker threads: 2/, 'Without the pool this would test the in-process path again');
+
+    assert.ok((await fs.promises.lstat(fileLink)).isSymbolicLink(), 'The link should still be a link');
+    assert.strictEqual(await fs.promises.readFile(fileTarget, 'utf8'), '<p class="x">Text</p>', 'The file linked to should hold the output');
+    assert.strictEqual(await fs.promises.readFile(fileMode, 'utf8'), '<p class="x">Text</p>', 'b.html should have been rewritten');
+    assert.strictEqual((await fs.promises.stat(fileMode)).mode & 0o777, 0o600, 'b.html should stay 600');
+    // Writing in place keeps the inode (and the symlink and mode above along with it), so only a new one shows the output was moved into place
+    assert.notStrictEqual((await fs.promises.stat(fileMode)).ino, ino, 'b.html should have been replaced rather than written through');
+    assert.deepStrictEqual((await fs.promises.readdir(dirOutput)).sort(), ['a.html', 'b.html'], 'No temporary file should be left');
+  });
+});

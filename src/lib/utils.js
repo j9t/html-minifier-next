@@ -840,6 +840,28 @@ function findTagEnd(html, pos, limit = html.length) {
   return -1;
 }
 
+/**
+ * A package that resolves but fails to load—e.g., a native binding built for
+ * another platform—is not one another `npm install` fixes, so name what happened
+ * rather than the install command
+ *
+ * @param {string} label - Minifier name as it should read in the message
+ * @param {string} specifier - Package that failed to load
+ * @param {unknown} cause - Error the import rejected with
+ * @returns {string} Message describing the failure
+ */
+function describeDependencyFailure(label, specifier, cause) {
+  const err = /** @type {any} */ (cause);
+  const notInstalled =
+    err?.code === 'ERR_MODULE_NOT_FOUND' && String(err?.message).includes(`'${specifier}'`);
+  if (notInstalled) {
+    return `The ${label} minifier requires ${specifier} to be installed.\n` +
+      `Install it with: npm install ${specifier}`;
+  }
+  return `The ${label} minifier could not load ${specifier}: ` +
+    (cause instanceof Error ? cause.message : String(cause));
+}
+
 // Exports
 
 export {
@@ -857,5 +879,6 @@ export {
   parseRegExp,
   embedSource,
   lostFlag,
-  describeQuantifierRisk
+  describeQuantifierRisk,
+  describeDependencyFailure
 };
