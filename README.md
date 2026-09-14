@@ -390,11 +390,13 @@ When `minifySVG` is set to `true`, HTML Minifier Next uses [SVGO](https://svgo.d
 
 ```js
 const result = await minify(html, {
-  minifySVG: true // Enable with SVGO defaults
+  minifySVG: true // Enable with SVGO defaults fit for inline SVG
 });
 ```
 
-You can pass custom SVGO options:
+Unlike an SVG file, an inline SVG is part of the page. HMN runs SVGO’s `preset-default` with the plugins that assume a standalone file turned off (see overrides below). `style` elements in SVG are minified through `minifyCSS` and SVGO.
+
+You can pass custom SVGO options. Options without `plugins` (e.g., `{ floatPrecision: 2 }`) keep HMN’s plugin set; options with `plugins` replace it, so include the overrides for inline SVG unless the SVGs don’t depend on the rest of the page:
 
 ```js
 const result = await minify(html, {
@@ -403,6 +405,13 @@ const result = await minify(html, {
       name: 'preset-default',
       params: {
         overrides: {
+          // Inline SVG
+          cleanupIds: false,
+          inlineStyles: false,
+          minifyStyles: { usage: false },
+          removeHiddenElems: false,
+          removeUnknownsAndDefaults: { keepRoleAttr: true },
+          // Custom
           convertShapeToPath: false // Keep original shapes
         }
       }
@@ -414,7 +423,7 @@ const result = await minify(html, {
 **Important:**
 
 * SVG minification only applies within `<svg>` elements
-* Case sensitivity and self-closing slashes are automatically preserved in SVG (regardless of global settings)
+* Case sensitivity and self-closing slashes are automatically preserved in SVG (regardless of global settings); where SVGO reads, names are written the way HTML reads them (e.g., `viewbox` as `viewBox`)
 * For maximum compression, use `minifySVG` together with `collapseWhitespace` and other options
 
 ### CSS, JavaScript, and SVG cache configuration

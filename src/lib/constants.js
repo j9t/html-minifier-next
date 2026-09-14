@@ -211,6 +211,49 @@ const rawTextElements = new Set([...specialContentElements, ...genericRawTextEle
 // configuration error, and so not one that `continueOnMinifyError` waves through
 const MISSING_DEPENDENCY = 'HMN_MISSING_DEPENDENCY';
 
+// SVGO’s `preset-default` treats an SVG as a file of its own, but an inline SVG’s IDs, `style`
+// rules, and hidden sprites reach into the rest of the document, so the plugins that assume
+// otherwise stay off, and `minifyStyles` keeps the rules the SVG itself does not use
+const svgoPluginsInline = [{
+  name: 'preset-default',
+  params: {
+    overrides: {
+      cleanupIds: false,
+      inlineStyles: false,
+      minifyStyles: { usage: false },
+      removeHiddenElems: false,
+      removeUnknownsAndDefaults: { keepRoleAttr: true }
+    }
+  }
+}];
+
+// Mixed-case names the HTML parser gives SVG elements and attributes and MathML attributes, keyed
+// by the lowercase it reads every other name as (no lowercase name is both an element and an
+// attribute of different case, so one table serves both)
+// https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inforeign
+const namesForeignMixedCase = new Map([
+  // SVG elements
+  'altGlyph', 'altGlyphDef', 'altGlyphItem', 'animateColor', 'animateMotion', 'animateTransform',
+  'clipPath', 'feBlend', 'feColorMatrix', 'feComponentTransfer', 'feComposite', 'feConvolveMatrix',
+  'feDiffuseLighting', 'feDisplacementMap', 'feDistantLight', 'feDropShadow', 'feFlood', 'feFuncA',
+  'feFuncB', 'feFuncG', 'feFuncR', 'feGaussianBlur', 'feImage', 'feMerge', 'feMergeNode',
+  'feMorphology', 'feOffset', 'fePointLight', 'feSpecularLighting', 'feSpotLight', 'feTile',
+  'feTurbulence', 'foreignObject', 'glyphRef', 'linearGradient', 'radialGradient', 'textPath',
+  // SVG attributes
+  'attributeName', 'attributeType', 'baseFrequency', 'baseProfile', 'calcMode', 'clipPathUnits',
+  'diffuseConstant', 'edgeMode', 'filterUnits', 'gradientTransform', 'gradientUnits',
+  'kernelMatrix', 'kernelUnitLength', 'keyPoints', 'keySplines', 'keyTimes', 'lengthAdjust',
+  'limitingConeAngle', 'markerHeight', 'markerUnits', 'markerWidth', 'maskContentUnits', 'maskUnits',
+  'numOctaves', 'pathLength', 'patternContentUnits', 'patternTransform', 'patternUnits', 'pointsAtX',
+  'pointsAtY', 'pointsAtZ', 'preserveAlpha', 'preserveAspectRatio', 'primitiveUnits', 'refX', 'refY',
+  'repeatCount', 'repeatDur', 'requiredExtensions', 'requiredFeatures', 'specularConstant',
+  'specularExponent', 'spreadMethod', 'startOffset', 'stdDeviation', 'stitchTiles', 'surfaceScale',
+  'systemLanguage', 'tableValues', 'targetX', 'targetY', 'textLength', 'viewBox', 'viewTarget',
+  'xChannelSelector', 'yChannelSelector', 'zoomAndPan',
+  // MathML attributes
+  'definitionURL'
+].map(name => [name.toLowerCase(), name]));
+
 // Exports
 
 export {
@@ -261,6 +304,8 @@ export {
   // Misc
   srcsetElements,
   MISSING_DEPENDENCY,
+  namesForeignMixedCase,
+  svgoPluginsInline,
 
   // Tag omission rules
   optionalStartTags,

@@ -377,10 +377,23 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('<svg'), 'SVG output present');
   });
 
-  test('SVG with `style` element', async () => {
-    const result = await minify('<svg><style>.cls{fill:red}</style><rect class="cls" width="100" height="100"/></svg>', { minifySVG: true, collapseWhitespace: true });
-    // SVGO may inline styles or preserve them
-    assert.ok(result.includes('red') || result.includes('fill'), 'Style information should be preserved in some form');
+  test('CSS in SVG is minified', async () => {
+    const input = '<svg><style> .icon { fill : blue } .button { color : red } </style><path class="icon" style="fill : red ; stroke-width : 2px" d="M0 0h10v10z"/></svg>';
+
+    // Through `minifyCSS`, with or without SVGO
+    assert.strictEqual(
+      await minify(input, { minifyCSS: true }),
+      '<svg><style>.icon{fill:#00f}.button{color:red}</style><path class="icon" style="fill:red;stroke-width:2px" d="M0 0h10v10z"/></svg>'
+    );
+    assert.strictEqual(
+      await minify(input, { minifyCSS: true, minifySVG: true }),
+      '<svg><style>.icon{fill:#00f}.button{color:red}</style><path d="M0 0h10v10z" class="icon" style="fill:red;stroke-width:2px"/></svg>'
+    );
+
+    // Through SVGO alone, which keeps rules the SVG itself does not use
+    const result = await minify(input, { minifySVG: true });
+    assert.ok(result.includes('.icon{fill:#00f}') && result.includes('.button{color:red}'), result);
+    assert.ok(result.includes('style="fill:red;stroke-width:2px"'), result);
   });
 
   test('Empty SVG', async () => {
@@ -398,11 +411,111 @@ describe('SVG and MathML', () => {
   });
 
   test('SVG with `defs` and `use`', async () => {
-    // SVGO optimizes IDs (e.g., "c" → "a") but preserves the defs/use pattern
     const result = await minify('<svg><defs><circle id="c" cx="5" cy="5" r="5"/></defs><use href="#c"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('<defs>'), '`defs` should be preserved');
-    assert.ok(result.includes('<use'), '`use` should be preserved');
-    assert.ok(result.includes('href="#'), '`href` reference should be preserved');
+    assert.ok(result.includes('id="c"'), 'ID should be preserved');
+    assert.ok(result.includes('<use href="#c"/>'), '`use` and its reference should be preserved');
+  });
+
+  test('IDs stay unique across the SVGs of a document', async () => {
+    // Inline SVGs share the document’s IDs, so renaming each SVG’s IDs from `a` makes them collide
+    const result = await minify(
+      '<svg><defs><linearGradient id="red"><stop stop-color="red"/></linearGradient></defs><rect width="10" height="10" fill="url(#red)"/></svg>' +
+      '<svg><defs><mask id="round"><circle cx="5" cy="5" r="5" fill="#fff"/></mask></defs><rect width="10" height="10" mask="url(#round)"/></svg>',
+      { minifySVG: true }
+    );
+    assert.ok(result.includes('id="red"') && result.includes('url(#red)'), result);
+    assert.ok(result.includes('id="round"') && result.includes('url(#round)'), result);
+  });
+
+  test('IDs referenced from outside the SVG are kept', async () => {
+    const cases = [
+      ['<style>#mark{fill:red}</style><svg><path id="mark" d="M0 0h10v10z"/></svg>', 'id="mark"'],
+      ['<svg><g id="section"><path d="M0 0h10v10z"/></g></svg><a href="#section">Jump</a>', 'id="section"'],
+      ['<svg aria-labelledby="t"><title id="t">Logo</title><path d="M0 0h10v10z"/></svg>', 'id="t"'],
+      ['<svg aria-describedby="d"><desc id="d">Sales chart</desc><path d="M0 0h10v10z"/></svg>', 'id="d"']
+    ];
+    for (const [input, id] of cases) {
+      const result = await minify(input, { minifySVG: true });
+      assert.ok(result.includes(id), result);
+    }
+  });
+
+  test('Hidden SVGs keep the sprites and definitions other SVGs use', async () => {
+    const symbol = '<symbol id="s" viewBox="0 0 10 10"><path d="M0 0h10v10z"/></symbol>';
+    const cases = [
+      `<svg style="display:none">${symbol}</svg><svg><use href="#s"/></svg>`,
+      `<svg display="none">${symbol}</svg><svg><use href="#s"/></svg>`,
+      `<svg width="0" height="0">${symbol}</svg><svg><use href="#s"/></svg>`,
+      // Unused within its own SVG, a definition in `defs` is still one other SVGs use
+      `<svg><defs>${symbol}</defs></svg><svg><use href="#s"/></svg>`,
+      '<svg width="0" height="0"><filter id="s"><feGaussianBlur stdDeviation="2"/></filter></svg><img style="filter:url(#s)" src="a.png" alt="">'
+    ];
+    for (const input of cases) {
+      const result = await minify(input, { minifySVG: true });
+      assert.ok(result.includes('id="s"'), result);
+    }
+  });
+
+  test('`role` attributes are kept', async () => {
+    const result = await minify('<svg role="img" aria-label="Logo"><path d="M0 0h10v10z"/></svg>', { minifySVG: true });
+    assert.ok(result.includes('role="img"'), result);
+  });
+
+  test('`style` rules in an SVG are kept for the rest of the page', async () => {
+    // A `style` element inside an SVG applies to the whole document
+    const result = await minify('<svg><style>.button{color:red}.icon{fill:blue}</style><path class="icon" d="M0 0h10v10z"/></svg><svg><path class="icon" d="M0 0h10v10z"/></svg><button class="button">OK</button>', { minifySVG: true });
+    assert.ok(result.includes('.button{'), result);
+    assert.ok(result.includes('.icon{'), result);
+    assert.strictEqual(result.match(/class="icon"/g)?.length, 2, result);
+  });
+
+  test('SVGO options without `plugins` keep the plugins safe for inline SVG', async () => {
+    const result = await minify('<svg><defs><linearGradient id="red"><stop stop-color="red"/></linearGradient></defs><path fill="url(#red)" d="M0.123 0.123h10v10z"/></svg>', { minifySVG: { floatPrecision: 1 } });
+    assert.ok(result.includes('id="red"'), result);
+    assert.ok(result.includes('M.1'), '`floatPrecision` should apply');
+  });
+
+  test('SVGO `plugins` are passed as given', async () => {
+    // Setting `plugins` opts back into SVGO’s full defaults
+    const result = await minify('<svg><defs><linearGradient id="red"><stop stop-color="red"/></linearGradient></defs><path fill="url(#red)" d="M0 0h10v10z"/></svg>', { minifySVG: { plugins: ['preset-default'] } });
+    assert.ok(result.includes('id="a"'), result);
+  });
+
+  test('Names are written the way HTML reads them wherever SVGO reads them', async () => {
+    // HTML reads names in any case and gives SVG’s mixed-case ones their case (`viewbox` is `viewBox`);
+    // XML reads names as written, where SVGO would drop `viewbox` as unknown
+    const options = { minifySVG: true, continueOnMinifyError: false };
+    const result = await minify('<svg viewbox="0 0 10 10" preserveaspectratio="none"><defs><lineargradient id="g" gradientunits="userSpaceOnUse"><stop stop-color="red"/></lineargradient><filter id="f"><fegaussianblur stddeviation="2"/></filter></defs><rect width="10" height="10" fill="url(#g)" filter="url(#f)"/></svg>', options);
+    for (const expected of ['viewBox="0 0 10 10"', 'preserveAspectRatio="none"', '<linearGradient id="g" gradientUnits="userSpaceOnUse">', '</linearGradient>', '<feGaussianBlur stdDeviation="2"/>']) {
+      assert.ok(result.includes(expected), `Expected ${expected}: ${result}`);
+    }
+
+    assert.strictEqual(
+      await minify('<SVG VIEWBOX="0 0 10 10"><RECT WIDTH="10" HEIGHT="10"/></SVG>', options),
+      '<svg viewBox="0 0 10 10"><path d="M0 0h10v10H0z"/></svg>'
+    );
+
+    // Nested HTML and MathML are part of the block SVGO reads
+    const nested = await minify('<svg><foreignObject><DIV CLASS="a"><math><mi definitionurl="x">a</mi></math></DIV></foreignObject></svg>', options);
+    assert.ok(nested.includes('<div class="a">') && nested.includes('</div>'), nested);
+    assert.ok(nested.includes('definitionURL="x"'), nested);
+
+    // Where SVGO doesn’t read, names stay as written
+    assert.strictEqual(await minify('<svg viewbox="0 0 10 10"></svg>'), '<svg viewbox="0 0 10 10"></svg>');
+  });
+
+  test('Attributes differing only in case are one attribute wherever SVGO reads them', async () => {
+    // As in HTML, the first one wins—written as is, SVGO would drop the first as unknown and keep the second
+    assert.strictEqual(
+      await minify('<svg viewbox="0 0 1 1" viewBox="0 0 2 2"></svg>', { minifySVG: true, continueOnMinifyError: false }),
+      '<svg viewBox="0 0 1 1"/>'
+    );
+  });
+
+  test('The end tag of an `svg` or `math` element matches its start tag', async () => {
+    assert.strictEqual(await minify('<SVG><RECT/></SVG>'), '<SVG><RECT/></SVG>');
+    assert.strictEqual(await minify('<MATH><MI>x</MI></MATH>'), '<MATH><MI>x</MI></MATH>');
   });
 
   test('SVG with `foreignObject`', async () => {
