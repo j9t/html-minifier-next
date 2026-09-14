@@ -613,6 +613,27 @@ describe('SVG and MathML', () => {
     assert.strictEqual(result, await minify(input, { minifySVG: true }), 'SVG should minify the same with a custom cache size');
   });
 
+  test('SVGO options differing only in a plugin function do not share a cache entry', async () => {
+    const input = '<svg viewBox="0 0 1 1"><title>T</title><rect width="1" height="1"/></svg>';
+    // Same plugin name and source; only the closed-over element name differs
+    const removing = (/** @type {string} */ name) => ({
+      name: 'removeElementCustom',
+      fn: () => ({
+        element: {
+          enter: (/** @type {any} */ node, /** @type {any} */ parent) => {
+            if (node.name === name) parent.children = parent.children.filter((/** @type {any} */ child) => child !== node);
+          }
+        }
+      })
+    });
+
+    const resultTitle = await minify(input, { minifySVG: { plugins: [removing('title')] } });
+    const resultRect = await minify(input, { minifySVG: { plugins: [removing('rect')] } });
+
+    assert.ok(!resultTitle.includes('<title>') && resultTitle.includes('<rect'), resultTitle);
+    assert.ok(resultRect.includes('<title>') && !resultRect.includes('<rect'), resultRect);
+  });
+
   test('Large SVG inputs with identical first/last 50 chars are not confused in cache', async () => {
     const first50 = '<svg xmlns="http://www.w3.org/2000/svg" width="10"'; // exactly 50 chars
     const last50 = '<!-- ' + 'z'.repeat(35) + ' --></svg>'; // exactly 50 chars

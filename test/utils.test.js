@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { LRU, describeDependencyFailure, describeQuantifierRisk, embedSource } from '../src/lib/utils.js';
+import { LRU, describeDependencyFailure, describeQuantifierRisk, embedSource, stableStringify } from '../src/lib/utils.js';
 
 /** @param {string} source */
 const hasRiskyQuantifiers = source => describeQuantifierRisk(source) !== null;
@@ -71,6 +71,38 @@ describe('Utils', () => {
 
       assert.strictEqual(cache.get('a'), 1);
       assert.strictEqual(cache.get('b'), undefined);
+    });
+  });
+
+  // Cache keys are built from it, so values that behave differently must not stringify alike
+  describe('`stableStringify`', () => {
+    test('Key order does not matter', () => {
+      assert.strictEqual(stableStringify({ a: 1, b: [2, { c: 3, d: 4 }] }), stableStringify({ b: [2, { d: 4, c: 3 }], a: 1 }));
+    });
+
+    test('Regular expressions are told apart by source and flags', () => {
+      assert.strictEqual(stableStringify({ re: /a/g }), stableStringify({ re: /a/g }));
+      assert.notStrictEqual(stableStringify({ re: /a/ }), stableStringify({ re: /b/ }));
+      assert.notStrictEqual(stableStringify({ re: /a/ }), stableStringify({ re: /a/g }));
+      assert.notStrictEqual(stableStringify({ re: /a/ }), stableStringify({ re: {} }));
+      assert.notStrictEqual(stableStringify({ re: /a/ }), stableStringify({ re: '/a/' }));
+    });
+
+    test('Functions are told apart by identity, not source', () => {
+      const make = (/** @type {string} */ value) => () => value;
+      const fn = make('a');
+      assert.strictEqual(stableStringify({ fn }), stableStringify({ fn }));
+      assert.notStrictEqual(stableStringify({ fn }), stableStringify({ fn: make('b') }));
+      assert.notStrictEqual(stableStringify({ fn }), stableStringify({ fn: undefined }));
+      assert.notStrictEqual(stableStringify({ fn }), stableStringify({}));
+    });
+
+    test('Non-plain objects are told apart by identity', () => {
+      const map = new Map([['a', 1]]);
+      assert.strictEqual(stableStringify({ map }), stableStringify({ map }));
+      assert.notStrictEqual(stableStringify({ map }), stableStringify({ map: new Map([['b', 2]]) }));
+      assert.notStrictEqual(stableStringify({ map }), stableStringify({ map: {} }));
+      assert.strictEqual(stableStringify(Object.assign(Object.create(null), { a: 1 })), stableStringify({ a: 1 }));
     });
   });
 

@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.4.4] - 2026-09-14
+
+### Fixed
+
+* Fixed JavaScript config files losing values JSON cannot express—functions for `minifyCSS`, `minifyJS`, and `minifyURLs`, as well as in `minifySVG` plugins, were silently dropped, regular expressions for regex options made the run fail, and regular expressions in `removeUnusedCSS.safelist` were ignored
+* Fixed caches returning a result minified with different engine options when the options differed only in functions or regular expressions (e.g., a Lightning CSS visitor, Terser’s `format.comments`, or an SVGO plugin)
+
 ## [8.4.3] - 2026-09-14
 
 ### Changed

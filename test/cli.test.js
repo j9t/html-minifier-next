@@ -655,6 +655,112 @@ describe('CLI', () => {
     assert.strictEqual(off.stdout, input, '`"false"` should leave the CSS alone');
   });
 
+  // Values JSON cannot express must reach the minifier as the module exported them
+  const configModuleFunctions = [
+    'export default {',
+    '  minifyCSS: () => "CSS",',
+    '  minifyJS: () => "JS",',
+    '  minifyURLs: () => "URL"',
+    '};'
+  ].join('\n');
+  const inputFunctions = '<style>a { color: red }</style><script>var x = 1;</script><a href="https://example.com/">x</a>';
+  const outputFunctions = '<style>CSS</style><script>JS</script><a href="URL">x</a>';
+
+  test('Should apply function values from a JavaScript config file', () => {
+    const dir = setupConfigDir('config-module-functions', {});
+    fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), configModuleFunctions);
+    fs.writeFileSync(path.join(dir, 'input.html'), inputFunctions);
+
+    const { stdout, stderr, exitCode } = execCliInDir(['--config-file=hmn.config.mjs', 'input.html'], dir);
+
+    assert.strictEqual(exitCode, 0, stderr);
+    assert.strictEqual(stdout, outputFunctions);
+  });
+
+  test('Should apply function values from a JavaScript config file in a multi-file run', () => {
+    // Functions cannot be passed to worker threads, so the run has to stay in-process
+    const dir = setupConfigDir('config-module-functions-dir', {});
+    fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), configModuleFunctions);
+    fs.mkdirSync(path.join(dir, 'in'), { recursive: true });
+    for (const name of ['a.html', 'b.html']) {
+      fs.writeFileSync(path.join(dir, 'in', name), inputFunctions);
+    }
+
+    const { stderr, exitCode } = execCliInDir(['--config-file=hmn.config.mjs', '--input-dir=in', '--output-dir=out', '--workers=2'], dir);
+
+    assert.strictEqual(exitCode, 0, stderr);
+    for (const name of ['a.html', 'b.html']) {
+      assert.strictEqual(fs.readFileSync(path.join(dir, 'out', name), 'utf8'), outputFunctions, name);
+    }
+  });
+
+  test('Should keep regular expressions from a JavaScript config file', () => {
+    const dir = setupConfigDir('config-module-regexps', {});
+    fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), [
+      'export default {',
+      '  collapseWhitespace: true,',
+      '  customAttrCollapse: /^data-x$/,',
+      '  ignoreCustomFragments: [/\\{\\{[\\s\\S]*?\\}\\}/],',
+      '  minifyCSS: true,',
+      '  removeUnusedCSS: { safelist: [/^js-/] }',
+      '};'
+    ].join('\n'));
+    fs.writeFileSync(path.join(dir, 'input.html'), '<style>.js-a{color:red}.gone{color:blue}</style><p data-x="a\n  b">{{ keep   me }}   x</p>');
+
+    const { stdout, stderr, exitCode } = execCliInDir(['--config-file=hmn.config.mjs', 'input.html'], dir);
+
+    assert.strictEqual(exitCode, 0, stderr);
+    assert.strictEqual(stderr, '');
+    assert.strictEqual(stdout, '<style>.js-a{color:red}</style><p data-x="a b">{{ keep   me }} x</p>');
+  });
+
+  test('Should apply a single regular expression for an array option from a JavaScript config file', () => {
+    // Wrapped like a single string in a JSON config, rather than dropped
+    const dir = setupConfigDir('config-module-regexp-scalar', {});
+    fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), 'export default { collapseWhitespace: true, ignoreCustomFragments: /\\{\\{[\\s\\S]*?\\}\\}/ };');
+    fs.writeFileSync(path.join(dir, 'input.html'), '<p>{{ keep   me }}   x</p>');
+
+    const { stdout, stderr, exitCode } = execCliInDir(['--config-file=hmn.config.mjs', 'input.html'], dir);
+
+    assert.strictEqual(exitCode, 0, stderr);
+    assert.strictEqual(stdout, '<p>{{ keep   me }} x</p>');
+  });
+
+  test('Should leave array options unset for `null` and `undefined` in a JavaScript config file', () => {
+    for (const value of ['null', 'undefined']) {
+      const dir = setupConfigDir(`config-module-array-${value}`, {});
+      fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), `export default { collapseWhitespace: true, ignoreCustomFragments: ${value}, inlineCustomElements: ${value} };`);
+      fs.writeFileSync(path.join(dir, 'input.html'), '<p>{{ a   b }}   x</p>');
+
+      const { stdout, stderr, exitCode } = execCliInDir(['--config-file=hmn.config.mjs', 'input.html'], dir);
+
+      assert.strictEqual(exitCode, 0, `${value}: ${stderr}`);
+      assert.strictEqual(stdout, '<p>{{ a b }} x</p>', value);
+    }
+  });
+
+  test('Should apply SVGO plugin functions from a JavaScript config file', () => {
+    const dir = setupConfigDir('config-module-svgo-plugin', {});
+    fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), [
+      'export default {',
+      '  minifySVG: {',
+      '    plugins: [{',
+      '      name: "removeTitleCustom",',
+      '      fn: () => ({ element: { enter: (node, parent) => {',
+      '        if (node.name === "title") parent.children = parent.children.filter(child => child !== node);',
+      '      } } })',
+      '    }]',
+      '  }',
+      '};'
+    ].join('\n'));
+    fs.writeFileSync(path.join(dir, 'input.html'), '<svg viewBox="0 0 1 1"><title>T</title><rect width="1" height="1"/></svg>');
+
+    const { stdout, stderr, exitCode } = execCliInDir(['--config-file=hmn.config.mjs', 'input.html'], dir);
+
+    assert.strictEqual(exitCode, 0, stderr);
+    assert.strictEqual(stdout, '<svg viewBox="0 0 1 1"><rect width="1" height="1"/></svg>');
+  });
+
   test('Should prefer html-minifier-next.config.json over htmlminifier.config.json', () => {
     const dir = setupConfigDir('config-default-precedence', {
       'html-minifier-next.config.json': { removeComments: true },
@@ -2041,7 +2147,7 @@ describe('Parallel multi-file processing', () => {
     );
   });
 
-  test('A run whose bytes sit in one file stays in process', () => {
+  test('A run whose bytes sit in one file stays in-process', () => {
     // The one large file cannot be split, so the pool would have only the crumbs
     // around it to work on while paying for every worker it started
     buildSizedDir('par-skew-in', [3 * MB, 1024, 1024, 1024]);
@@ -2054,7 +2160,7 @@ describe('Parallel multi-file processing', () => {
     assert.match(stderr, /Worker threads: none/);
   });
 
-  test('A small run of small files stays in process', () => {
+  test('A small run of small files stays in-process', () => {
     buildInputDir('par-light-in', 4);
 
     const { stderr, exitCode } = execCliCapture([
@@ -2065,7 +2171,7 @@ describe('Parallel multi-file processing', () => {
     assert.match(stderr, /Worker threads: none/);
   });
 
-  test('A single file stays in process even when workers are asked for', () => {
+  test('A single file stays in-process even when workers are asked for', () => {
     const dir = buildInputDir('par-single-in', 1);
     assert.strictEqual(fs.readdirSync(dir).length, 1);
 
@@ -2299,8 +2405,8 @@ describe('Output file integrity', () => {
     assert.deepStrictEqual((await fs.promises.readdir(dirOutput)).sort(), ['a.html', 'b.html'], 'No temporary file should be left');
   });
 
-  test('A dangling symlinked output file is written through, in process and on worker threads', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
-    for (const [flow, flags] of [['in process', []], ['workers', ['--workers', '2', '--verbose']]]) {
+  test('A dangling symlinked output file is written through, in-process and on worker threads', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
+    for (const [flow, flags] of [['in-process', []], ['workers', ['--workers', '2', '--verbose']]]) {
       const dirBase = path.resolve(fixturesDir, `tmp-atomic/dangling-${flow.replace(' ', '-')}`);
       const dirInput = path.resolve(dirBase, 'in');
       const dirOutput = path.resolve(dirBase, 'out');

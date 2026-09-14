@@ -15,7 +15,7 @@
  * worker runs its own isolate and warms up its own JIT, so the useful worker count tops
  * out well short of the core count.
  *
- * Node-only: cli.js loads this module lazily and minifies in process wherever worker
+ * Node-only: cli.js loads this module lazily and minifies in-process wherever worker
  * threads are unavailable or the options can’t cross a structured clone.
  */
 
