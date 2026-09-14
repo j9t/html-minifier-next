@@ -2372,7 +2372,7 @@ describe('Output file integrity', () => {
       if (!fileTaken) {
         fileTaken = String(file);
         fs.writeFileSync(fileTaken, 'Not ours');
-        throw Object.assign(new Error('EEXIST: file already exists'), { code: 'EEXIST' });
+        throw Object.assign(new Error('EEXIST: File already exists'), { code: 'EEXIST' });
       }
       return open(file, ...rest);
     }, () => writeFileAtomic(fileOutput, 'Output'));
@@ -2391,9 +2391,23 @@ describe('Output file integrity', () => {
     await withOpen(async (open, file) => {
       fileTaken = String(file);
       fs.writeFileSync(fileTaken, 'Not ours');
-      throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+      throw Object.assign(new Error('EACCES: Permission denied'), { code: 'EACCES' });
     }, () => assert.rejects(writeFileAtomic(path.resolve(dirOutput, 'a.html'), 'Output'), { code: 'EACCES' }));
 
     assert.strictEqual(await fs.promises.readFile(fileTaken, 'utf8'), 'Not ours', 'Only a file this write created may be removed');
+  });
+
+  test('A symlink loop is refused rather than replaced', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
+    const { writeFileAtomic } = await import('../src/lib/file-write.js');
+    const dirOutput = path.resolve(fixturesDir, 'tmp-atomic/out9');
+    await fs.promises.mkdir(dirOutput, { recursive: true });
+    const fileOutput = path.resolve(dirOutput, 'a.html');
+    await fs.promises.symlink('b.html', fileOutput);
+    await fs.promises.symlink('a.html', path.resolve(dirOutput, 'b.html'));
+
+    await assert.rejects(writeFileAtomic(fileOutput, 'Output'), { code: 'ELOOP' });
+
+    assert.ok((await fs.promises.lstat(fileOutput)).isSymbolicLink(), 'The link should still be a link');
+    assert.deepStrictEqual((await fs.promises.readdir(dirOutput)).sort(), ['a.html', 'b.html'], 'No temporary file should be left');
   });
 });

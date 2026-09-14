@@ -145,7 +145,7 @@ describe('Options', () => {
 
   describe('Optional engines', () => {
     const swcNotInstalled = async () => {
-      const err = new Error('The swc minifier requires @swc/core to be installed.');
+      const err = new Error('The SWC minifier requires @swc/core to be installed.');
       err.code = MISSING_DEPENDENCY;
       throw err;
     };

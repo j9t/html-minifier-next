@@ -31,7 +31,8 @@ async function resolveTarget(outputFile) {
       file = path.resolve(dir, link);
     }
   }
-  return outputFile;
+  // A loop, which writing through would not resolve, either—refused so the rename cannot replace the link
+  throw Object.assign(new Error(`ELOOP: Too many symbolic links encountered, '${outputFile}'`), { code: 'ELOOP', path: outputFile });
 }
 
 /**
