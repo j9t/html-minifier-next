@@ -447,6 +447,8 @@ describe('SVG and MathML', () => {
       `<svg style="display:none">${symbol}</svg><svg><use href="#s"/></svg>`,
       `<svg display="none">${symbol}</svg><svg><use href="#s"/></svg>`,
       `<svg width="0" height="0">${symbol}</svg><svg><use href="#s"/></svg>`,
+      // Unused within its own SVG, a definition in `defs` is still one other SVGs use
+      `<svg><defs>${symbol}</defs></svg><svg><use href="#s"/></svg>`,
       '<svg width="0" height="0"><filter id="s"><feGaussianBlur stdDeviation="2"/></filter></svg><img style="filter:url(#s)" src="a.png" alt="">'
     ];
     for (const input of cases) {
