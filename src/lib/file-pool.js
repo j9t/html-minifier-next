@@ -21,6 +21,7 @@
 
 import fs from 'node:fs';
 import { isMainThread, parentPort, workerData, Worker } from 'node:worker_threads';
+import { writeFileAtomic } from './file-write.js';
 
 // This module is its own worker entry point: The pool spawns it by URL and the branch
 // below runs in the spawned copy. Keeping both halves in one file keeps the message
@@ -61,7 +62,7 @@ if (!isMainThread && parentPort) {
       const minified = await minify(data, taskOptions);
       if (!task.dryRun) {
         stage = 'write';
-        await fs.promises.writeFile(task.outputFile, minified, 'utf8');
+        await writeFileAtomic(task.outputFile, minified);
       }
       port.postMessage({
         id: task.id,

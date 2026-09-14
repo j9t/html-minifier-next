@@ -2,7 +2,7 @@ import { HTMLParser, endTag } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
+import { LRU, describeDependencyFailure, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
 import { collectUsedSymbols } from './lib/unused-css.js';
 
 import {
@@ -26,7 +26,8 @@ import {
   compactElements,
   looseElements,
   trailingElements,
-  pInlineElements
+  pInlineElements,
+  MISSING_DEPENDENCY
 } from './lib/constants.js';
 
 import {
@@ -516,17 +517,26 @@ async function getTerser() {
   return terserPromise;
 }
 
+/**
+ * @param {string} label - Minifier name as it should read in the message
+ * @param {string} specifier - Package that failed to load
+ * @param {unknown} cause - Error the import rejected with
+ * @returns {Error} Error marked as an unavailable dependency
+ */
+function unavailableDependency(label, specifier, cause) {
+  const err = new Error(describeDependencyFailure(label, specifier, cause), { cause });
+  /** @type {any} */ (err).code = MISSING_DEPENDENCY;
+  return err;
+}
+
 /** @type {Promise<any> | undefined} */
 let swcPromise;
 async function getSwc() {
   if (!swcPromise) {
     swcPromise = import('@swc/core')
       .then(m => m.default || m)
-      .catch(() => {
-        throw new Error(
-          'The swc minifier requires @swc/core to be installed.\n' +
-          'Install it with: npm install @swc/core'
-        );
+      .catch(err => {
+        throw unavailableDependency('swc', '@swc/core', err);
       });
   }
   return swcPromise;

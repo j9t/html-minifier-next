@@ -53,6 +53,7 @@ const commanderOptionKey = (key) => {
 import { getPreset, getPresetNames } from './src/presets.js';
 import { paramCase, parseRegExp } from './src/lib/utils.js';
 import { optionDefinitions } from './src/lib/option-definitions.js';
+import { writeFileAtomic } from './src/lib/file-write.js';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
@@ -681,7 +682,7 @@ program.helpOption('-h, --help', 'Display help for command');
       return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
     }
 
-    await fs.promises.writeFile(outputFile, minified, { encoding: 'utf8' }).catch(err => {
+    await writeFileAtomic(outputFile, minified).catch(err => {
       fatal('Cannot write ' + outputFile + '\n' + err.message);
     });
 
@@ -1000,7 +1001,7 @@ program.helpOption('-h, --help', 'Display help for command');
     if (programOptions.output) {
       try {
         await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
-        await fs.promises.writeFile(programOptions.output, minified, { encoding: 'utf8' });
+        await writeFileAtomic(programOptions.output, minified);
       } catch (err) {
         fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
       }
@@ -1188,7 +1189,7 @@ program.helpOption('-h, --help', 'Display help for command');
     if (programOptions.output) {
       try {
         await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
-        await fs.promises.writeFile(programOptions.output, minifiedCombined, 'utf8');
+        await writeFileAtomic(programOptions.output, minifiedCombined);
       } catch (err) {
         fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
       }

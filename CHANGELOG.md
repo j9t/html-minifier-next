@@ -4,6 +4,18 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.4.3] - 2026-09-14
+
+### Changed
+
+* Made the CLI write output by way of a temporary file, so that an exit leaving no chance to clean up cannot leave a half-written file
+* Ensured a minifier engine that cannot be loaded throws a configuration error rather than something `continueOnMinifyError` waves through with only a log entry
+
+### Fixed
+
+* Fixed the error for an engine package that is installed but fails to load, which pointed at the install command rather than naming the failure
+* Fixed a non-string `minifyJS` `engine` failing with a type error rather than the unsupported-engine message
+
 ## [8.4.2] - 2026-09-09
 
 ### Changed
