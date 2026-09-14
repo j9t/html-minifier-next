@@ -241,7 +241,7 @@ Where the modifiers disagree, the preserving one wins—`conservativeCollapse` a
 
 ### Sorting attributes and style classes
 
-Minifier options like `sortAttributes` and `sortClassNames` won’t impact the plain-text size of the output. However, using these options for more consistent ordering improves the compression ratio for Gzip and Brotli used over HTTP.
+Minifier options like `sortAttributes` and `sortClassNames` won’t impact the plain-text size of the output. However, `sortAttributes` (but not `sortClassNames`) improves the compression ratio for Gzip and Brotli used over HTTP.
 
 ### CSS minification
 

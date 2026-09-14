@@ -53,6 +53,7 @@ const commanderOptionKey = (key) => {
 import { getPreset, getPresetNames } from './src/presets.js';
 import { paramCase, parseRegExp } from './src/lib/utils.js';
 import { optionDefinitions } from './src/lib/option-definitions.js';
+import { writeFileAtomic } from './src/lib/file-write.js';
 
 const pkg = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
@@ -217,34 +218,6 @@ function readFile(file) {
     return fs.readFileSync(file, { encoding: 'utf8' });
   } catch (err) {
     fatal('Cannot read ' + file + '\n' + errorMessage(err));
-  }
-}
-
-let writeCounter = 0;
-
-/**
- * Write a file by way of a temporary file in the same folder, so that an exit
- * that leaves no chance to clean up—a native crash in a minifier, an OOM
- * kill—cannot leave a half-written file where the output belongs
- * @param {string} outputFile
- * @param {string} data
- */
-async function writeFileAtomic(outputFile, data) {
-  const tempFile = path.join(path.dirname(outputFile), `.${path.basename(outputFile)}.${process.pid}.${writeCounter++}.tmp`);
-  // The rename replaces the output rather than writing through it, so a mode set on the output has to be carried over
-  const stats = await fs.promises.stat(outputFile).catch(() => undefined);
-  const mode = stats ? stats.mode & 0o7777 : undefined;
-
-  try {
-    await fs.promises.writeFile(tempFile, data, { encoding: 'utf8', mode });
-    // `mode` on creation is subject to the umask, so the exact bits have to be set separately
-    if (mode !== undefined) {
-      await fs.promises.chmod(tempFile, mode);
-    }
-    await fs.promises.rename(tempFile, outputFile);
-  } catch (err) {
-    await fs.promises.rm(tempFile, { force: true });
-    throw err;
   }
 }
 

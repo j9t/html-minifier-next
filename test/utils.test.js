@@ -363,18 +363,16 @@ describe('Utils', () => {
     );
 
     test('A package that is not installed is answered with the install command', () => {
-      const message = describeDependencyFailure('OXVG SVG', '@oxvg/napi', notFound('@oxvg/napi'));
-      assert.match(message, /requires @oxvg\/napi to be installed/);
-      assert.match(message, /npm install @oxvg\/napi/);
+      const message = describeDependencyFailure('swc', '@swc/core', notFound('@swc/core'));
+      assert.match(message, /requires @swc\/core to be installed/);
+      assert.match(message, /npm install @swc\/core/);
     });
 
     test('A package that is installed but fails to load names the failure instead', () => {
-      // OXVG throws this when npm skipped the platform binary, and no reinstall of
-      // `@oxvg/napi` itself would change it
-      const message = describeDependencyFailure(
-        'OXVG SVG', '@oxvg/napi', new Error('Cannot find native binding.')
-      );
-      assert.match(message, /could not load @oxvg\/napi: Cannot find native binding\./);
+      // What a native package throws when npm skipped its platform binary, which no
+      // reinstall of the package itself would change
+      const message = describeDependencyFailure('swc', '@swc/core', new Error('Failed to load native binding'));
+      assert.match(message, /could not load @swc\/core: Failed to load native binding/);
       assert.doesNotMatch(message, /npm install/, 'Pointing at the install command would mislead');
     });
 

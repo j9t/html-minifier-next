@@ -12,6 +12,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - **Important:** OXVG support is currently experimental, it’s installed separately (`npm i -D @oxvg/napi`), and it’s configured as a map of job names rather than in SVGO’s plugin format (an SVGO configuration handed to it is refused)
   - **Important:** An internal error in OXVG ends the Node process rather than raising a catchable error, so `continueOnMinifyError` cannot absorb it and the rest of the run is lost
 
+## [8.4.3] - 2026-09-14
+
+### Changed
+
+* Made the CLI write output by way of a temporary file, so that an exit leaving no chance to clean up cannot leave a half-written file
+* Ensured a minifier engine that cannot be loaded throws a configuration error rather than something `continueOnMinifyError` waves through with only a log entry
+
+### Fixed
+
+* Fixed the error for an engine package that is installed but fails to load, which pointed at the install command rather than naming the failure
+* Fixed a non-string `minifyJS` `engine` failing with a type error rather than the unsupported-engine message
+
 ## [8.4.2] - 2026-09-09
 
 ### Changed

@@ -207,11 +207,11 @@ const escapableRawTextElements = new Set(['textarea', 'title']);
 // of `textarea` and `title`, where they are resolved as they are anywhere else
 const rawTextElements = new Set([...specialContentElements, ...genericRawTextElements]);
 
-// Exports
-
-// Marks the error for a minifier that was asked for but is not available—a
+// Marks the error for a minifier that was asked for but isn’t available—a
 // configuration error, and so not one that `continueOnMinifyError` waves through
 const MISSING_DEPENDENCY = 'HMN_MISSING_DEPENDENCY';
+
+// Exports
 
 export {
   // Regex patterns

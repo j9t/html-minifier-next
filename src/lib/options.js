@@ -157,21 +157,26 @@ function isMissingDependency(err) {
   return Boolean(err) && /** @type {any} */ (err).code === MISSING_DEPENDENCY;
 }
 
-// Engine names match lowercase; anything that is not a string passes through
-// untouched so that validation reports it instead of a type error
+// An unset (falsy) engine takes the fallback and names match lowercase; anything else
+// passes through untouched so that validation reports it instead of a type error
 /**
  * @param {unknown} engine - Configured engine name
  * @param {string} fallback - Engine to use when none is configured
  */
 function normalizeEngine(engine, fallback) {
-  if (engine === undefined || engine === null) return fallback;
+  if (!engine) return fallback;
   return typeof engine === 'string' ? engine.toLowerCase() : engine;
 }
 
 /** @param {unknown} engine - Engine name as it should read in an error message */
 function describeEngine(engine) {
   if (typeof engine === 'string') return engine;
-  return JSON.stringify(engine) ?? String(engine);
+  try {
+    return JSON.stringify(engine) ?? String(engine);
+  } catch {
+    // BigInt and cyclic values do not serialize
+    return String(engine);
+  }
 }
 
 // OXVG parses SVG as XML and so knows the five XML entities only, while SVGO

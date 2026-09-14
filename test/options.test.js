@@ -144,7 +144,13 @@ describe('Options', () => {
   });
 
   describe('Optional engines', () => {
-    const notInstalled = () => {
+    const swcNotInstalled = async () => {
+      const err = new Error('The SWC minifier requires @swc/core to be installed.');
+      err.code = MISSING_DEPENDENCY;
+      throw err;
+    };
+
+    const oxvgNotInstalled = async () => {
       const err = new Error('The OXVG SVG minifier requires @oxvg/napi to be installed.');
       err.code = MISSING_DEPENDENCY;
       throw err;
@@ -153,8 +159,23 @@ describe('Options', () => {
     test('An engine that is not installed is reported, however errors are handled', async () => {
       for (const continueOnMinifyError of [true, false]) {
         const options = processOptions(
+          { minifyJS: { engine: 'swc' }, continueOnMinifyError },
+          { getTerser: async () => ({}), getSwc: swcNotInstalled, jsMinifyCache: new Map() }
+        );
+
+        await assert.rejects(
+          async () => await options.minifyJS('var a = 1;', false),
+          /requires @swc\/core/,
+          `Asking for an engine that is missing is a configuration error (\`continueOnMinifyError: ${continueOnMinifyError}\`)`
+        );
+      }
+    });
+
+    test('The same is true of an SVG engine that is not installed', async () => {
+      for (const continueOnMinifyError of [true, false]) {
+        const options = processOptions(
           { minifySVG: { engine: 'oxvg' }, continueOnMinifyError },
-          { getSvgo: async () => (svg => ({ data: svg })), getOxvg: async () => notInstalled(), getDecodeHTML: async () => (text => text), svgMinifyCache: new Map() }
+          { getSvgo: async () => (svg => ({ data: svg })), getOxvg: oxvgNotInstalled, getDecodeHTML: async () => (text => text), svgMinifyCache: new Map() }
         );
 
         await assert.rejects(
@@ -165,25 +186,21 @@ describe('Options', () => {
       }
     });
 
-    test('The same is true of a JS engine that is not installed', async () => {
-      const swcNotInstalled = () => {
-        const err = new Error('The swc minifier requires @swc/core to be installed.');
-        err.code = MISSING_DEPENDENCY;
-        throw err;
-      };
+    test('A minification error is still tolerated', async () => {
+      const script = 'var a = 1;';
       const options = processOptions(
         { minifyJS: { engine: 'swc' }, continueOnMinifyError: true },
-        { getTerser: async () => ({}), getSwc: async () => swcNotInstalled(), jsMinifyCache: new Map() }
+        {
+          getTerser: async () => ({}),
+          getSwc: async () => ({ minify: async () => { throw new Error('Unexpected token'); } }),
+          jsMinifyCache: new Map()
+        }
       );
 
-      await assert.rejects(
-        async () => await options.minifyJS('var a = 1;', false),
-        /requires @swc\/core/,
-        'A missing JS engine should not pass the script through unminified'
-      );
+      assert.strictEqual(await options.minifyJS(script, false), script, 'Content the engine chokes on should pass through as before');
     });
 
-    test('A minification error is still tolerated', async () => {
+    test('The same is true of an SVG minification error', async () => {
       const svg = '<svg><rect width="1" height="1"/></svg>';
       const options = processOptions(
         { minifySVG: { engine: 'oxvg' }, continueOnMinifyError: true },
