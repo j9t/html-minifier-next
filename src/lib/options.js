@@ -4,7 +4,7 @@
 
 import { createUrlMinifier } from './urls.js';
 import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
-import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY } from './constants.js';
+import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY, svgoPluginsInline } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 import { findUnusedSymbols, normalizeUnusedCSSOptions } from './unused-css.js';
@@ -624,7 +624,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       const loadSvgo = getSvgo;
       const svgCache = svgMinifyCache;
 
-      const svgoOptions = typeof option === 'object' ? option : {};
+      // A config without `plugins` of its own keeps the plugins fit for inline SVG
+      const svgoConfig = typeof option === 'object' ? /** @type {{plugins?: unknown[]}} */ (option) : {};
+      const svgoOptions = { ...svgoConfig, plugins: svgoConfig.plugins ?? svgoPluginsInline };
 
       // Pre-compute option signature for cache keys
       const svgSig = stableStringify({

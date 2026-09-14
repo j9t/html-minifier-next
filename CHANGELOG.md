@@ -4,6 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.4.5] - 2026-09-14
+
+### Fixed
+
+* Fixed `minifySVG` breaking inline SVG by running SVGO plugins that treat each SVG as a standalone file; these plugins are now off unless the SVGO options set `plugins`
+* Fixed `minifySVG` removing SVG elements and attributes written in a case other than SVG’s own (e.g., `viewbox`); wherever SVGO reads, names are now written the way HTML reads them
+* Fixed the end tag of an `svg` or `math` element not written in lowercase coming out in lowercase (e.g., `<SVG>…</svg>`), which also kept SVGO from optimizing such an SVG
+
 ## [8.4.4] - 2026-09-14
 
 ### Fixed
