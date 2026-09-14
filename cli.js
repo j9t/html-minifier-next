@@ -263,6 +263,27 @@ const CONFIG_KEYS_EXTRA = new Set(['$schema', 'preset', 'fileExt', 'ignoreDir'])
 const CONFIG_FILES_DEFAULT = ['html-minifier-next.config.json', 'htmlminifier.config.json'];
 
 /**
+ * Parse a config value—strings as on the command line, anything else as it is, since
+ * a JSON round trip would drop what only a module config can hold (functions, regexes)
+ * @param {string} key Option definition key
+ * @param {string} type Option definition type
+ * @param {unknown} value
+ */
+function parseConfigValue(key, type, value) {
+  if (typeof value === 'string') return getParser(key, type)(value);
+  switch (type) {
+    case 'int':
+      return getParser(key, type)(String(value));
+    case 'regexpArray':
+      return (Array.isArray(value) ? value : [value]).map(parseRegExp);
+    case 'jsonArray':
+      return Array.isArray(value) ? value : [value];
+    default:
+      return value;
+  }
+}
+
+/**
  * Normalize and validate config object by applying parsers and transforming values.
  * @param {Record<string, any>} config - Raw config object
  * @returns {Record<string, any>} Normalized config object
@@ -282,8 +303,7 @@ function normalizeConfig(config) {
   Object.entries(optionDefinitions).forEach(function ([key, { type }]) {
     if (key in normalized) {
       if (type !== 'boolean' && type !== 'invertedBoolean') {
-        const value = normalized[key];
-        normalized[key] = getParser(key, type)(typeof value === 'string' ? value : JSON.stringify(value));
+        normalized[key] = parseConfigValue(key, type, normalized[key]);
       }
     }
   });
@@ -554,7 +574,7 @@ program.helpOption('-h, --help', 'Display help for command');
 
   /**
    * A pool for this run, or `null` where one wouldn’t pay or wouldn’t work—in which case
-   * the caller minifies in process exactly as before
+   * the caller minifies in-process exactly as before
    * @param {string[]} files
    */
   async function createPool(files) {
@@ -564,7 +584,7 @@ program.helpOption('-h, --help', 'Display help for command');
     // Whether the run went wide is worth saying, since the default weighs the file
     // count and the bytes there are to share out, neither of which the caller sees
     const inProcess = () => {
-      if (isVerbose) console.error('Worker threads: none (minifying in process)');
+      if (isVerbose) console.error('Worker threads: none (minifying in-process)');
       return null;
     };
     // `availableParallelism` reports what this process may actually use, which under a
@@ -594,7 +614,7 @@ program.helpOption('-h, --help', 'Display help for command');
     }
 
     // `log` is a closure over this process’s console and is rebuilt inside the worker;
-    // anything else unclonable (which the CLI itself never produces) stays in process
+    // anything else unclonable (such as a function from a module config) stays in-process
     const { log, ...options } = createOptions();
     try {
       structuredClone(options);
@@ -603,7 +623,7 @@ program.helpOption('-h, --help', 'Display help for command');
     }
 
     // A pool this small has nothing to share out and still pays for its workers, so an
-    // explicit request for them lands in process as `--workers=1` does
+    // explicit request for them lands in-process as `--workers=1` does
     const poolSize = Math.min(size, fileCount);
     if (poolSize <= 1) {
       return inProcess();

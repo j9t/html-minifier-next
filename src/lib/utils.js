@@ -2,13 +2,35 @@
  * General utility functions
  */
 
+// Functions and other non-plain objects have no structure to compare (closures with the
+// same source can behave differently), so they are told apart by identity
+/** @type {WeakMap<object, number>} */
+const objectIds = new WeakMap();
+let objectIdLast = 0;
+
+/** @param {object} obj */
+function objectId(obj) {
+  let id = objectIds.get(obj);
+  if (id === undefined) {
+    id = ++objectIdLast;
+    objectIds.set(obj, id);
+  }
+  return id;
+}
+
 /**
+ * Stringify with sorted keys, for cache keys—values that can behave differently must not
+ * stringify alike, so unquoted markers stand in for what JSON cannot express
  * @param {unknown} obj
  * @returns {string}
  */
 function stableStringify(obj) {
+  if (typeof obj === 'function') return 'function#' + objectId(obj);
   if (obj == null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (obj instanceof RegExp) return String(obj);
   if (Array.isArray(obj)) return '[' + obj.map(stableStringify).join(',') + ']';
+  const proto = Object.getPrototypeOf(obj);
+  if (proto !== Object.prototype && proto !== null) return 'object#' + objectId(obj);
   const keys = Object.keys(obj).sort();
   let out = '{';
   for (let i = 0; i < keys.length; i++) {

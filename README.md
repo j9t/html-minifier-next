@@ -83,6 +83,8 @@ export default {
 };
 ```
 
+A module can also hold values JSON cannot express, like regular expressions (e.g., `ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/]`) and functions (for `minifyCSS`, `minifyJS`, and `minifyURLs`, or in custom SVGO plugins for `minifySVG`). As functions cannot be passed to worker threads, a run using them minifies in-process.
+
 ### Node.js
 
 ```js

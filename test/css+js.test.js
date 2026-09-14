@@ -1400,6 +1400,25 @@ describe('CSS and JS', () => {
       assert.ok(!result.includes('console.log'), 'Console should be dropped from JS');
     });
 
+    test('Lightning CSS options differing only in a visitor function do not share a cache entry', async () => {
+      const input = '<style>a{color:red}</style>';
+      // Same source; only the closed-over channel value differs
+      const recoloring = (/** @type {number} */ r) => ({ Color: () => ({ type: 'rgb', r, g: 0, b: 0, alpha: 1 }) });
+
+      assert.strictEqual(await minify(input, { minifyCSS: { visitor: recoloring(1) } }), '<style>a{color:#010000}</style>');
+      assert.strictEqual(await minify(input, { minifyCSS: { visitor: recoloring(2) } }), '<style>a{color:#020000}</style>');
+    });
+
+    test('Terser options differing only in a regular expression do not share a cache entry', async () => {
+      const input = '<script>/*keep-a*/var a=1;/*keep-b*/var b=2;</script>';
+
+      const resultA = await minify(input, { minifyJS: { format: { comments: /keep-a/ } } });
+      const resultB = await minify(input, { minifyJS: { format: { comments: /keep-b/ } } });
+
+      assert.ok(resultA.includes('/*keep-a*/') && !resultA.includes('/*keep-b*/'), resultA);
+      assert.ok(resultB.includes('/*keep-b*/') && !resultB.includes('/*keep-a*/'), resultB);
+    });
+
     test('Custom CSS cache size', async () => {
       const input = '<style>body { color: blue; padding: 0; }</style>';
 
