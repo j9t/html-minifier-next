@@ -158,7 +158,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `mergeScripts`<br>`--merge-scripts` | Merge consecutive inline `script` elements into one (only merges compatible scripts with same `type`, matching `async`/`defer`/`nomodule`/`nonce`) | `false` |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://terser.org/) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
-| `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/)) | `false` (could be `true`, `Object`) |
+| `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/) or—experimental—[OXVG](https://github.com/noahbald/oxvg)) | `false` (could be `true`, `Object`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element—use with `maxLineLength` | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
@@ -408,6 +408,54 @@ const result = await minify(html, {
   }
 });
 ```
+
+You can choose between different SVG minifiers using the `engine` field:
+
+```js
+const result = await minify(html, {
+  minifySVG: {
+    engine: 'oxvg' // Use OXVG instead of SVGO
+  }
+});
+```
+
+**Available engines:**
+
+* `svgo` (default): The standard SVG optimizer
+* [`oxvg`](https://github.com/noahbald/oxvg): Rust-based optimizer, roughly twice as fast as SVGO across real-world tests and fastest on small icons, at broadly comparable compression (experimental; requires separate installation)
+
+**To use OXVG**, install it as a development dependency:
+
+```shell
+npm i -D @oxvg/napi
+```
+
+OXVG is pre-1.0, and its output differs from SVGO’s in the ways listed below—worth re-checking the result when switching an existing project over.
+
+**Important:** OXVG reserves panics for what it considers its own bugs, and a panic ends the Node process rather than raising an error. `continueOnMinifyError` does not apply—there is no JavaScript error to catch—and nothing else in the run completes: The panic message goes to STDERR, and the process exits with 134. SVGO throws an ordinary exception instead, which `continueOnMinifyError` can absorb. The behavior is [deliberate upstream](https://github.com/noahbald/oxvg/issues/281), and it’s the main reason to keep OXVG opt-in.
+
+**Important:** the two engines do not share a configuration format. SVGO reads a
+plugin pipeline, OXVG a map of job names to parameters:
+
+```js
+const result = await minify(html, {
+  minifySVG: {
+    engine: 'oxvg',
+    removeComments: {} // An OXVG job, not an SVGO plugin
+  }
+});
+```
+
+Passing SVGO options (`plugins`, `floatPrecision`, `multipass`, …) to OXVG is refused with an error. On its own OXVG would accept them silently and run no jobs at all, leaving SVG all but unminified.
+
+Naming a job replaces OXVG’s default pipeline rather than adding to it, so build on the defaults with its own `extend`: `{...extend({type: 'Default'}, {removeComments: {}})}`. `convertSvgoConfig` translates a list of plugin names, `preset-default` among them, though as of 0.0.7 it takes that one as a bare string only—`{name: 'preset-default'}` is refused—and wants plugin parameters in full, where SVGO takes partial overrides. (OXVG’s documentation writes `extend`’s first argument as `Extends.Default`, but 0.0.7 exports `Extends` as a type only, with no value to read `Default` from.)
+
+Named character references (`&nbsp;`, `&copy;`, and similar) are resolved before the SVG reaches OXVG, which parses XML and [would otherwise reject them](https://github.com/noahbald/oxvg/issues/274). SVGO resolves them on its own, so both engines emit the same characters. Names neither engine knows are left alone, and both then refuse the SVG.
+
+Two differences to expect from OXVG:
+
+* Space characters other than the plain space—non-breaking spaces, thin spaces, and the like—come out as a plain space in text and attribute values, however they were written (`&nbsp;`, `&#160;`, or the character itself). `xml:space="preserve"` keeps them; SVGO keeps them either way.
+* Path data closes with `Z` rather than SVGO’s `z`—identical in meaning and length, but it will show up in golden-file comparisons.
 
 **Important:**
 
