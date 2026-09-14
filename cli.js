@@ -274,10 +274,11 @@ function parseConfigValue(key, type, value) {
   switch (type) {
     case 'int':
       return getParser(key, type)(String(value));
+    // A single value is wrapped as its string form is; `null` and `undefined` leave the option unset
     case 'regexpArray':
-      return (Array.isArray(value) ? value : [value]).map(parseRegExp);
+      return value == null ? undefined : (Array.isArray(value) ? value : [value]).map(parseRegExp);
     case 'jsonArray':
-      return Array.isArray(value) ? value : [value];
+      return value == null ? undefined : (Array.isArray(value) ? value : [value]);
     default:
       return value;
   }

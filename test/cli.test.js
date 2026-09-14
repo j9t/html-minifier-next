@@ -714,6 +714,31 @@ describe('CLI', () => {
     assert.strictEqual(stdout, '<style>.js-a{color:red}</style><p data-x="a b">{{ keep   me }} x</p>');
   });
 
+  test('Should apply a single regular expression for an array option from a JavaScript config file', () => {
+    // Wrapped like a single string in a JSON config, rather than dropped
+    const dir = setupConfigDir('config-module-regexp-scalar', {});
+    fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), 'export default { collapseWhitespace: true, ignoreCustomFragments: /\\{\\{[\\s\\S]*?\\}\\}/ };');
+    fs.writeFileSync(path.join(dir, 'input.html'), '<p>{{ keep   me }}   x</p>');
+
+    const { stdout, stderr, exitCode } = execCliInDir(['--config-file=hmn.config.mjs', 'input.html'], dir);
+
+    assert.strictEqual(exitCode, 0, stderr);
+    assert.strictEqual(stdout, '<p>{{ keep   me }} x</p>');
+  });
+
+  test('Should leave array options unset for `null` and `undefined` in a JavaScript config file', () => {
+    for (const value of ['null', 'undefined']) {
+      const dir = setupConfigDir(`config-module-array-${value}`, {});
+      fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), `export default { collapseWhitespace: true, ignoreCustomFragments: ${value}, inlineCustomElements: ${value} };`);
+      fs.writeFileSync(path.join(dir, 'input.html'), '<p>{{ a   b }}   x</p>');
+
+      const { stdout, stderr, exitCode } = execCliInDir(['--config-file=hmn.config.mjs', 'input.html'], dir);
+
+      assert.strictEqual(exitCode, 0, `${value}: ${stderr}`);
+      assert.strictEqual(stdout, '<p>{{ a b }} x</p>', value);
+    }
+  });
+
   test('Should apply SVGO plugin functions from a JavaScript config file', () => {
     const dir = setupConfigDir('config-module-svgo-plugin', {});
     fs.writeFileSync(path.join(dir, 'hmn.config.mjs'), [
