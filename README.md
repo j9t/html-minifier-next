@@ -275,8 +275,8 @@ These figures were measured in September 2026 with HMN 8.4.5 on 31 pages of the 
 
 * elements with an `id` attribute,
 * `textarea` elements,
-* `audio`, `video`, and `script` elements with a `src` attribute, `iframe` elements with `src` or `srcdoc`, and `object` elements with `data`,
-* anything inside SVG and MathML.
+* `audio`, `video`, and `script` elements with a `src` attribute, `iframe` elements with `src` or `srcdoc`, `object` elements with `data`, and `applet` elements with `code`,
+* elements inside SVG and MathML—though an empty `svg` or `math` element itself is removed, and HTML inside them (as in `foreignObject` or `annotation-xml`) is still processed.
 
 Everything else goes, including elements that are empty on purpose: icons as well as icon links and buttons styled with CSS (e.g., `<i class="icon"></i>` or `<button aria-label="Close"></button>`), `canvas` elements that scripts draw into, empty `option` elements, and empty table cells (which shifts the cells that follow). Keep such elements with `removeEmptyElementsExcept`, for example `["td", "canvas", "<button aria-label>"]`. A parent that is left empty by the removal is kept.
 
