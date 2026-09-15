@@ -4,6 +4,22 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2026-09-15
+
+### Fixed
+
+* Fixed working-tree benchmark not passing each page’s URL to `minifyURLs` when that option came from a `preset` in the options file
+
+### Added
+
+* Added “Optimizing for compression” and “Removing empty elements” sections to the README, with measured effects of `sortAttributes`, attribute quotes, and `removeEmptyElements` on Gzip and Brotli output
+* Added Gzip and Brotli sizes to the backtest and the working-tree benchmark, as well as a `--preset` option to the benchmark
+* Added tests for backtest and benchmark scripts
+
+### Changed
+
+* Corrected the README on `sortAttributes`, which improves compression on average but not for every page
+
 ## [8.4.5] - 2026-09-14
 
 ### Fixed
