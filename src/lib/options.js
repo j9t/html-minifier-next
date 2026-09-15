@@ -47,8 +47,9 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   minifyJS: (text: string, inline?: boolean, isModule?: boolean) => string | Promise<string>,
  *   minifyURLs: (text: string) => string | Promise<string>,
  *   minifySVG: ((svgContent: string) => string | Promise<string>) | null,
- *   shouldMinifyCSS: ((text: string, type?: string) => boolean) | null,
- *   shouldMinifyJS: ((text: string, inline?: boolean) => boolean) | null,
+ *   canMinifyCSS: ((text: string, type?: string) => boolean) | null,
+ *   canMinifyJS: ((text: string, inline?: boolean) => boolean) | null,
+ *   canMinifySVG: ((text: string) => boolean) | null,
  *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
  *   cssContext?: CSSContext,
  *   parallelJS?: boolean,
@@ -99,7 +100,7 @@ function getUrlMinifyCache(site) {
 }
 
 // User-facing option keys that are valid but not listed in `optionDefinitions`
-const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace', 'shouldMinifyCSS', 'shouldMinifyJS']);
+const optionKeysExtra = new Set(['preset', 'log', 'canCollapseWhitespace', 'canTrimWhitespace', 'canMinifyCSS', 'canMinifyJS', 'canMinifySVG']);
 
 // Unknown option keys and preset names already warned about—warn once per
 // key per process, so repeated `minify` calls (e.g., batch runs) don’t flood STDERR
@@ -144,20 +145,27 @@ const optionDependencies = [
     clear: true
   },
   {
-    option: 'shouldMinifyCSS',
+    option: 'canMinifyCSS',
     requires: 'minifyCSS',
-    // Removal rides along with Lightning CSS, which a function of one’s own replaces
+    // This option is only used in the default `minifyCSS` implementation
     unusable: (/** @type {Record<string, any>} */ input) => typeof input.minifyCSS === 'function' && 'which a function of your own replaces',
     clear: true
   },
   {
-    option: 'shouldMinifyJS',
+    option: 'canMinifyJS',
     requires: 'minifyJS',
-    // Removal rides along with Terser/SWC, which a function of one’s own replaces
+    // This option is only used in the default `minifyJS` implementation
     unusable: (/** @type {Record<string, any>} */ input) => typeof input.minifyJS === 'function' && 'which a function of your own replaces',
     clear: true
   },
-  { option: 'trimCustomFragments', requires: 'collapseWhitespace' },
+  {
+    option: 'canMinifySVG',
+    requires: 'minifySVG',
+    // This option is only used in the default `minifySVG` implementation
+    unusable: (/** @type {Record<string, any>} */ input) => typeof input.minifySVG === 'function' && 'which a function of your own replaces',
+    clear: true
+  },
+  { option: 'trimCustomFragments', requires: 'collapseWhitespace' }
 ];
 
 // An empty array is a value the user supplied but did not populate, and so asks for
@@ -214,8 +222,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     minifyJS: identity,
     minifyURLs: identity,
     minifySVG: null,
-    shouldMinifyCSS: null,
-    shouldMinifyJS: null,
+    canMinifyCSS: null,
+    canMinifyJS: null,
+    canMinifySVG: null,
     removeUnusedCSS: null
   };
 
@@ -309,13 +318,17 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       if (typeof option === 'function') {
         options.log = option;
       }
-    } else if (key === 'shouldMinifyCSS') {
+    } else if (key === 'canMinifyCSS') {
       if (typeof option === 'function') {
-        options.shouldMinifyCSS = option;
+        options.canMinifyCSS = option;
       }
-    } else if (key === 'shouldMinifyJS') {
+    } else if (key === 'canMinifyJS') {
       if (typeof option === 'function') {
-        options.shouldMinifyJS = option;
+        options.canMinifyJS = option;
+      }
+    } else if (key === 'canMinifySVG') {
+      if (typeof option === 'function') {
+        options.canMinifySVG = option;
       }
     } else if (key === 'minifyCSS' && typeof option !== 'function') {
       if (!option || !getLightningCSS || !cssMinifyCache) {
@@ -333,9 +346,16 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return text;
         }
 
-        // Skip minification if the user-supplied hook says not to
-        if(options.shouldMinifyCSS && !options.shouldMinifyCSS(text, type)) {
-          return text;
+        // Leave the fragment unchanged if the user-supplied hook says not to
+        try {
+          if (options.canMinifyCSS && !options.canMinifyCSS(text, type)) {
+            return text;
+          }
+        } catch (err) {
+          if (!options.continueOnMinifyError) {
+            throw err;
+          }
+          options.log && options.log(err);
         }
 
         // Warnings are stored with the minified result and replayed on every hit, so a
@@ -532,9 +552,16 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return '';
         }
 
-        // Skip minification if the user-supplied hook says not to
-        if(options.shouldMinifyJS && !options.shouldMinifyJS(text, inline)) {
-          return text;
+        // Leave the fragment unchanged if the user-supplied hook says not to
+        try {
+          if (options.canMinifyJS && !options.canMinifyJS(text, inline)) {
+            return text;
+          }
+        } catch (err) {
+          if (!options.continueOnMinifyError) {
+            throw err;
+          }
+          options.log && options.log(err);
         }
 
         // Hybrid strategy: Always use Terser for inline JS (needs bare returns support)
@@ -673,6 +700,18 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       options.minifySVG = async function (/** @type {string} */ svgContent) {
         if (!svgContent || !svgContent.trim()) {
           return svgContent;
+        }
+
+        // Leave the block unchanged if the user-supplied hook says not to
+        try {
+          if (options.canMinifySVG && !options.canMinifySVG(svgContent)) {
+            return svgContent;
+          }
+        } catch (err) {
+          if (!options.continueOnMinifyError) {
+            throw err;
+          }
+          options.log && options.log(err);
         }
 
         const isCacheable = svgContent.length <= MAX_CACHE_ENTRY_SIZE;
