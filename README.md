@@ -193,6 +193,9 @@ A few options take functions and are therefore only available programmatically, 
 | `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
 | `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
+| `canMinifyCSS` | `Function(text, type)` that determines whether a given CSS code can be minified; called before any CSS minification is performed, and can be used to keep certain CSS fragments unchanged. Note that this will also bypass the `removeUnusedCSS` and `minifyURLs` options | `null` |
+| `canMinifyJS` | `Function(text, inline)` that determines whether a given JS code can be minified; called before any JS minification is performed, and can be used to keep certain JS fragments unchanged | `null` |
+| `canMinifySVG` | `Function(text)` that determines whether a given SVG code can be minified; called before any SVG minification is performed, and can be used to keep certain SVG blocks unchanged | `null` |
 
 ### Options that rely on another option
 
@@ -212,6 +215,9 @@ HTML Minifier Next: Ignoring `conservativeCollapse`—use with `collapseWhitespa
 | `preserveLineBreaks` | `collapseWhitespace` |
 | `removeEmptyElementsExcept` | `removeEmptyElements` |
 | `removeUnusedCSS` | `minifyCSS`, and not [a function of your own](#unused-css-removal) |
+| `canMinifyCSS` | `minifyCSS`, and not [a function of your own](#css-minification) |
+| `canMinifyJS` | `minifyJS`, and not [a function of your own](#javascript-minification) |
+| `canMinifySVG` | `minifySVG`, and not [a function of your own](#svg-minification) |
 | `trimCustomFragments` | `collapseWhitespace` |
 
 Passing the option `false`, or an empty array, asks for nothing and is not reported. `cacheCSS`, `cacheJS`, and `cacheSVG` are not listed: They size a cache rather than transform markup, and don’t change output.
@@ -321,6 +327,22 @@ const result = await minify(html, {
 });
 ```
 
+You can also leave certain CSS fragments unchanged by using the `canMinifyCSS` option, which takes a function that returns a boolean based on the CSS text and type.
+
+```js
+const result = await minify(html, {
+  minifyCSS: true,
+  canMinifyCSS: function(text, type) {
+    // `text`: CSS string to minify
+    // `type`: `inline` for style attributes, `media` for media queries, `undefined` for `<style>` elements
+    // Return false to skip minification for this CSS block
+    return !text.startsWith('/* skip */');
+  }
+});
+```
+
+Doing so also bypasses the `minifyURLs` and `removeUnusedCSS` options, because those run after minification.
+
 ### Unused CSS removal
 
 `removeUnusedCSS` removes rules from `style` elements whose class or ID selectors a document doesn’t reference. It needs to be used with `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
@@ -421,6 +443,20 @@ const result = await minify(html, {
 });
 ```
 
+You can also leave certain JavaScript fragments unchanged by using the `canMinifyJS` option, which takes a function that returns a boolean based on the JavaScript text and whether it’s inline.
+
+```js
+const result = await minify(html, {
+  minifyJS: true,
+  canMinifyJS: function(text, inline) {
+    // `text`: JavaScript string to minify
+    // `inline`: `true` for event handlers (e.g., `onclick`), `false` for `<script>` elements
+    // Return false to skip minification for this JavaScript block
+    return !text.startsWith('/* skip */');
+  }
+});
+```
+
 ### SVG minification
 
 When `minifySVG` is set to `true`, HTML Minifier Next uses [SVGO](https://svgo.dev/) to optimize inline SVG elements. Complete `<svg>` subtrees are extracted and processed as a block, enabling deep structural optimization:
@@ -453,6 +489,19 @@ const result = await minify(html, {
         }
       }
     }]
+  }
+});
+```
+
+You can also leave certain SVG blocks unchanged by using the `canMinifySVG` option, which takes a function that returns a boolean based on the SVG text and whether it’s inline.
+
+```js
+const result = await minify(html, {
+  minifySVG: true,
+  canMinifySVG: function(text) {
+    // `text`: SVG string to minify
+    // Return false to skip minification for this SVG block
+    return !text.includes('<!-- skip -->');
   }
 });
 ```
