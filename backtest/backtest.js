@@ -9,10 +9,11 @@
 //
 // For each commit it checks out src and package.json at that revision and reads the
 // matching minifier config via `git show` (falling back to the on-disk config), then
-// minifies every corpus file and records output size and median time; results are
-// written to results.json (with any failures in errors.log). Because it temporarily
-// checks out historical files, the working tree must have no uncommitted changes in
-// src, package.json, or html-minifier-next.config.json.
+// minifies every corpus file and records output size (raw, Gzip, and Brotli; see
+// compression.js) and median time; results are written to results.json (with any
+// failures in errors.log). Because it temporarily checks out historical files,
+// the working tree must have no uncommitted changes in src, package.json, or
+// html-minifier-next.config.json.
 //
 // Usage (from the backtest folder):
 //   npm run backtest: Test the last 50 commits (default)
@@ -28,13 +29,16 @@ import fs from 'fs/promises';
 import https from 'https';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import zlib from 'zlib';
-import Progress from 'progress';
+import { BROTLI_QUALITY, GZIP_LEVEL, compressedSizes } from './compression.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const dirRoot = path.join(__dirname, '..');
+
+// Run (or serve as a forked child) only when executed, not when imported by tests
+const isMain = Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 // Default number of commits to test when no parameter is provided
 const DEFAULT_COMMIT_COUNT = 50;
@@ -153,6 +157,12 @@ async function ensureHistoricalDeps() {
   });
 }
 
+// Loaded on use, so tests can import this module without the backtest’s own dependencies
+async function loadProgress() {
+  const { default: Progress } = await import('progress');
+  return Progress;
+}
+
 async function ensureInput() {
   await fs.mkdir(dirInput, { recursive: true });
 
@@ -169,6 +179,7 @@ async function ensureInput() {
   if (missing.length === 0) return;
 
   console.log(`Downloading ${missing.length} source file(s)…`);
+  const Progress = await loadProgress();
   const progress = new Progress('[:bar] :current/:total :etas', {
     width: 40,
     total: missing.length
@@ -261,7 +272,8 @@ async function minify(hash, options) {
         const duration = Math.round(median);
 
         if (minified != null) {
-          process.send({ name: fileName, size: minified.length, time: duration });
+          // Compressed after timing, so compression doesn’t count toward the minification time
+          process.send({ name: fileName, size: minified.length, ...compressedSizes(minified), time: duration });
         } else {
           throw new Error('Unexpected result: ' + minified);
         }
@@ -279,21 +291,111 @@ async function minify(hash, options) {
   }
 }
 
+// Parse “COUNT” or “COUNT/STEP”, throwing a message for the user on invalid input
+function parseRange(arg) {
+  const parts = arg.split('/');
+  if (parts.length > 2) {
+    throw new Error(`Invalid format “${arg}”—use \`COUNT\` or \`COUNT/STEP\``);
+  }
+  const count = parseInt(parts[0], 10);
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error(`Invalid commit count “${parts[0]}”—must be a positive integer`);
+  }
+  const step = parts.length === 2 ? parseInt(parts[1], 10) : 1;
+  if (!Number.isInteger(step) || step < 1) {
+    throw new Error(`Invalid step “${parts[1]}”—must be a positive integer`);
+  }
+  return { count, step };
+}
+
+// Ordinal for a positive integer (1st, 2nd, 3rd, 4th, etc.)
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// Use consistent number formatting for JSON (locale-independent)
+const formatNumber = new Intl.NumberFormat('en-US').format;
+
+// Commit hashes, most recent first
+function sortHashes(table) {
+  // Parse ISO dates directly from Git (format: “2025-12-27 18:23:13 +0100”)
+  return Object.keys(table).sort((a, b) => new Date(table[b].date) - new Date(table[a].date));
+}
+
+// Render a “ (±N%)” suffix against the older value, or nothing if there is none or it rounds to 0.00%
+function formatChange(curr, prev) {
+  if (!prev) {
+    return '';
+  }
+  const percent = (((curr - prev) / prev) * 100).toFixed(2);
+  if (percent === '0.00' || percent === '-0.00') {
+    return '';
+  }
+  return ` (${curr > prev ? '+' : ''}${percent}%)`;
+}
+
+// Build the results.json structure from the per-commit table
+function formatResults(table, names, step = 1, generated = new Date()) {
+  const hashes = sortHashes(table);
+
+  // JSON output—compact and readable format
+  const jsonOutput = {
+    summary: {
+      commits: hashes.length,
+      step: step,
+      sites: names.length,
+      compression: { gzip: GZIP_LEVEL, brotli: BROTLI_QUALITY },
+      generated: generated.toISOString().split('T')[0]
+    },
+    sites: {}
+  };
+
+  // Build per-site objects with date and hash keys
+  names.forEach(fileName => {
+    jsonOutput.sites[fileName] = {};
+
+    hashes.forEach((hash, index) => {
+      const data = table[hash];
+      const sizeData = data[fileName];
+
+      if (sizeData) {
+        const { size, gzip, brotli, time } = sizeData;
+        // Format: “YYYY-MM-DD HH:MM hash”
+        const dateShort = data.date.substring(0, 16); // “2025-12-27 18:23”
+        const key = `${dateShort} ${hash}`;
+
+        // Calculate deltas comparing to the entry displayed below (index + 1, chronologically older)
+        // This shows how the commit performs compared to the older one below it
+        let dataPrev = null;
+        for (let i = index + 1; i < hashes.length; i++) {
+          const candidateData = table[hashes[i]][fileName];
+          if (candidateData) {
+            dataPrev = candidateData;
+            break;
+          }
+        }
+
+        // Format value: “size · Gzip size · Brotli size @ time”, each value followed by “(±N%)” where it changed
+        jsonOutput.sites[fileName][key] = `${formatNumber(size)}${formatChange(size, dataPrev?.size)}` +
+          ` · Gzip ${formatNumber(gzip)}${formatChange(gzip, dataPrev?.gzip)}` +
+          ` · Brotli ${formatNumber(brotli)}${formatChange(brotli, dataPrev?.brotli)}` +
+          ` @ ${time} ms${formatChange(time, dataPrev?.time)}`;
+      }
+    });
+  });
+
+  return jsonOutput;
+}
+
 async function print(table, step = 1) {
   // Ensure output directory exists
   await fs.mkdir(DIR_OUTPUT, { recursive: true });
 
   const errors = [];
 
-  // Sort hashes by date (most recent first)
-  const hashes = Object.keys(table).sort((a, b) => {
-    // Parse ISO dates directly from Git (format: “2025-12-27 18:23:13 +0100”)
-    const dateA = new Date(table[a].date);
-    const dateB = new Date(table[b].date);
-    return dateB - dateA; // Descending order (newest first)
-  });
-
-  for (const hash of hashes) {
+  for (const hash of sortHashes(table)) {
     if (table[hash].error) {
       errors.push(hash + ' - ' + table[hash].error);
     }
@@ -312,107 +414,20 @@ async function print(table, step = 1) {
     }
   }
 
-  // JSON output—compact and readable format
-  const jsonOutput = {
-    summary: {
-      commits: hashes.length,
-      step: step,
-      sites: fileNames.length,
-      generated: new Date().toISOString().split('T')[0]
-    },
-    sites: {}
-  };
-
-  // Use consistent number formatting for JSON (locale-independent)
-  const formatNumber = new Intl.NumberFormat('en-US').format;
-
-  // Build per-site objects with date and hash keys
-  fileNames.forEach(fileName => {
-    jsonOutput.sites[fileName] = {};
-
-    hashes.forEach((hash, index) => {
-      const data = table[hash];
-      const sizeData = data[fileName];
-
-      if (sizeData) {
-        const { size, time } = sizeData;
-        // Format: “YYYY-MM-DD HH:MM hash”
-        const dateShort = data.date.substring(0, 16); // “2025-12-27 18:23”
-        const key = `${dateShort} ${hash}`;
-
-        // Calculate deltas comparing to the entry displayed below (index + 1, chronologically older)
-        // This shows how the commit performs compared to the older one below it
-        let dataPrev = null;
-        for (let i = index + 1; i < hashes.length; i++) {
-          const candidateData = table[hashes[i]][fileName];
-          if (candidateData) {
-            dataPrev = candidateData;
-            break;
-          }
-        }
-
-        const sizePrev = dataPrev ? dataPrev.size : null;
-        const timePrev = dataPrev ? dataPrev.time : null;
-        const sizeDelta = sizePrev ? size - sizePrev : 0;
-        const timeDelta = timePrev ? time - timePrev : 0;
-
-        // Format value: “size @ time” or “size (±size%) @ time (±time%)”
-        let value = `${formatNumber(size)} @ ${time} ms`;
-        if ((sizeDelta !== 0 || timeDelta !== 0) && sizePrev && timePrev) {
-          const sizePercent = ((sizeDelta / sizePrev) * 100).toFixed(2);
-          const timePercent = ((timeDelta / timePrev) * 100).toFixed(2);
-          const sizeSign = sizeDelta > 0 ? '+' : '';
-          const timeSign = timeDelta > 0 ? '+' : '';
-
-          // Only show change if not 0.00%
-          const sizeChange = sizePercent !== '0.00' ? ` (${sizeSign}${sizePercent}%)` : '';
-          const timeChange = timePercent !== '0.00' ? ` (${timeSign}${timePercent}%)` : '';
-
-          value = `${formatNumber(size)}${sizeChange} @ ${time} ms${timeChange}`;
-        }
-
-        jsonOutput.sites[fileName][key] = value;
-      }
-    });
-  });
-
-  await writeText(path.join(DIR_OUTPUT, 'results.json'), JSON.stringify(jsonOutput, null, 2));
+  await writeText(path.join(DIR_OUTPUT, 'results.json'), JSON.stringify(formatResults(table, fileNames, step), null, 2));
 }
 
-if (process.argv.length > 2 || !process.send) {
+if (isMain && (process.argv.length > 2 || !process.send)) {
   let count = DEFAULT_COMMIT_COUNT;
   let step = 1;
 
   if (process.argv.length > 2) {
-    const arg = process.argv[2];
-
-    // Parse “COUNT/STEP” or just “COUNT”
-    if (arg.includes('/')) {
-      const parts = arg.split('/');
-      if (parts.length !== 2) {
-        console.error(`Error: Invalid format “${arg}”—use \`COUNT\` or \`COUNT/STEP\``);
-        console.error('Examples: `backtest.js 50` or `backtest.js 500/10`');
-        process.exit(1);
-      }
-
-      count = parseInt(parts[0], 10);
-      step = parseInt(parts[1], 10);
-
-      if (!Number.isInteger(count) || count < 1) {
-        console.error(`Error: Invalid commit count “${parts[0]}”—must be a positive integer`);
-        process.exit(1);
-      }
-      if (!Number.isInteger(step) || step < 1) {
-        console.error(`Error: Invalid step “${parts[1]}”—must be a positive integer`);
-        process.exit(1);
-      }
-    } else {
-      count = parseInt(arg, 10);
-      if (!Number.isInteger(count) || count < 1) {
-        console.error(`Error: Invalid commit count “${arg}”—must be a positive integer`);
-        console.error('Example: `backtest.js 50`');
-        process.exit(1);
-      }
+    try {
+      ({ count, step } = parseRange(process.argv[2]));
+    } catch (err) {
+      console.error(`Error: ${err.message}`);
+      console.error('Examples: `backtest.js 50` or `backtest.js 500/10`');
+      process.exit(1);
     }
   } else {
     console.log(`Running backtest on last ${DEFAULT_COMMIT_COUNT} commits (use: \`backtest.js COUNT\` to specify)`);
@@ -440,14 +455,8 @@ if (process.argv.length > 2 || !process.send) {
 
       // Print backtest info after pre-flight checks pass
       if (step > 1) {
-        // Generate proper ordinal suffix (1st, 2nd, 3rd, 4th, etc.)
-        const getOrdinal = (n) => {
-          const s = ['th', 'st', 'nd', 'rd'];
-          const v = n % 100;
-          return n + (s[(v - 20) % 10] || s[v] || s[0]);
-        };
         const actualTests = Math.ceil(count / step);
-        console.log(`Testing last ${count} commits, sampling every ${getOrdinal(step)} commit (${actualTests} tests)`);
+        console.log(`Testing last ${count} commits, sampling every ${ordinal(step)} commit (${actualTests} tests)`);
       }
 
       // Clean-up function to restore files on exit/error
@@ -519,6 +528,7 @@ if (process.argv.length > 2 || !process.send) {
 
       const nThreads = os.cpus().length;
       let running = 0;
+      const Progress = await loadProgress();
       const progress = new Progress('[:bar] :etas', {
         width: 50,
         total: commits.length * 2
@@ -540,7 +550,7 @@ if (process.argv.length > 2 || !process.send) {
               progress.tick(1);
               forkTask();
             } else {
-              table[hash][data.name] = { size: data.size, time: data.time };
+              table[hash][data.name] = { size: data.size, gzip: data.gzip, brotli: data.brotli, time: data.time };
             }
           }).on('exit', async function () {
             progress.tick(1);
@@ -579,7 +589,7 @@ if (process.argv.length > 2 || !process.send) {
       });
     });
   }
-} else if (process.send) {
+} else if (isMain && process.send) {
   // Running as forked child process
 
   // Config file paths (repo-root-relative), ordered newest to oldest
@@ -627,3 +637,12 @@ if (process.argv.length > 2 || !process.send) {
     });
   });
 }
+
+// Exports
+
+export {
+  formatChange,
+  formatResults,
+  ordinal,
+  parseRange
+};

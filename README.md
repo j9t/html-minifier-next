@@ -108,7 +108,7 @@ HTML Minifier Next provides presets for common use cases. Presets are pre-config
 * `conservative`: Basic minification with whitespace collapsing, comment removal, and removal of select attributes.
 * `comprehensive`: More advanced minification for better file size reduction, including relevant conservative options plus attribute quote removal, optional tag removal, and more.
 
-To review the specific options set, [presets.js](https://github.com/j9t/html-minifier-next/blob/main/src/presets.js) lists them in an accessible manner.
+To review the specific options set, [presets.js](https://github.com/j9t/html-minifier-next/blob/main/src/presets.js) lists them in an accessible manner. For output served with Gzip or Brotli, see [“Optimizing for compression”](#optimizing-for-compression) for what to add.
 
 **Using presets:**
 
@@ -172,7 +172,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeComments`<br>`--remove-comments` | [Strip HTML comments](https://perfectionkills.com/experimenting-with-html-minifier/#remove_comments) | `false` |
 | `removeDefaultTypeAttributes`<br>`--remove-default-type-attributes` | Remove default `type` attributes from `style`/`link` (e.g., `type="text/css"`) and `script` (e.g., `type="text/javascript"`) elements; other `type` attribute values are left intact | `false` |
 | `removeEmptyAttributes`<br>`--remove-empty-attributes` | [Remove all attributes with whitespace-only values](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_or_blank_attributes) | `false` (could be `true`, `Function(attrName, tag)`) |
-| `removeEmptyElements`<br>`--remove-empty-elements` | [Remove all elements with empty contents](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_elements) | `false` |
+| `removeEmptyElements`<br>`--remove-empty-elements` | [Remove all elements with empty contents](#removing-empty-elements) | `false` |
 | `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve—use with `removeEmptyElements`; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<span aria-hidden='true'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
@@ -243,7 +243,44 @@ Where the modifiers disagree, the preserving one wins—`conservativeCollapse` a
 
 ### Sorting attributes and style classes
 
-Minifier options like `sortAttributes` and `sortClassNames` won’t impact the plain-text size of the output. However, `sortAttributes` (but not `sortClassNames`) improves the compression ratio for Gzip and Brotli used over HTTP.
+`sortAttributes` and `sortClassNames` reorder attributes and class names by frequency, so that repeated markup looks more alike. This doesn’t change the plain-text size of the output, only how well it compresses: `sortAttributes` makes Gzip and Brotli output slightly smaller on average, though not on every page (see [“Optimizing for compression”](#optimizing-for-compression)); `sortClassNames` doesn’t help, and alongside `sortAttributes` cancels most of its gain with Brotli.
+
+### Optimizing for compression
+
+Most HTML is served compressed, so the Gzip or Brotli size is often what counts—and it doesn’t always follow the raw size. Added to the `comprehensive` preset, these options changed output size as follows (average per page, relative to `comprehensive`):
+
+| Added to `comprehensive` | Raw | Gzip (level 6) | Brotli (quality 6) | Brotli (quality 11) |
+| --- | --- | --- | --- | --- |
+| `sortAttributes` | ±0% | −0.20% | −0.21% | −0.16% |
+| `sortAttributes`, `removeAttributeQuotes: false`, `quoteCharacter: '"'` | +1.75% | +0.08% | −0.15% | −0.39% |
+| `removeEmptyElements` | −1.15% | −0.75% | −0.68% | −0.63% |
+
+* **Gzip or on-the-fly Brotli:** Add `sortAttributes`. The gain is small and uneven, however, and sorting can double minification time for very large documents.
+* **Brotli precompressed at quality 11** (as for static files compressed at build time): Add `sortAttributes`, don’t remove attribute quotes, and make the quotes double quotes. Raw and Gzip output grow, so this only pays off when clients receive the precompressed Brotli files.
+* **`removeEmptyElements`** saves more than either, but may change the respective document—see [“Removing empty elements”](#removing-empty-elements) before enabling it.
+
+```shell
+# Gzip or on-the-fly Brotli
+npx html-minifier-next --preset comprehensive --sort-attributes input.html
+
+# Brotli precompressed at quality 11
+npx html-minifier-next --preset comprehensive --sort-attributes --no-remove-attribute-quotes --quote-character='"' input.html
+```
+
+These figures were measured in September 2026 with HMN 8.4.5 on 31 pages of the [backtest corpus](#regression-tests) (retrieved February 2026). They are indications, not guarantees, as they depend on the markup and will shift as HMN and the minifiers it bundles change. The [benchmark](#working-tree-benchmarks) reports Gzip and Brotli (quality 6) sizes to re-check them.
+
+### Removing empty elements
+
+`removeEmptyElements` removes elements without content—no text and no child elements (comments don’t count; whitespace does, unless `collapseWhitespace` removes it). It keeps:
+
+* elements with an `id` attribute,
+* `textarea` elements,
+* `audio`, `video`, and `script` elements with a `src` attribute, `iframe` elements with `src` or `srcdoc`, and `object` elements with `data`,
+* anything inside SVG and MathML.
+
+Everything else goes, including elements that are empty on purpose: icons as well as icon links and buttons styled with CSS (e.g., `<i class="icon"></i>` or `<button aria-label="Close"></button>`), `canvas` elements that scripts draw into, empty `option` elements, and empty table cells (which shifts the cells that follow). Keep such elements with `removeEmptyElementsExcept`, for example `["td", "canvas", "<button aria-label>"]`. A parent that is left empty by the removal is kept.
+
+Where the markup allows it, the option is effective: On a test corpus, it reduced output by 1.15% raw and 0.75% with Gzip on average (see [“Optimizing for compression”](#optimizing-for-compression)).
 
 ### CSS minification
 
@@ -286,7 +323,7 @@ const result = await minify(html, {
 
 ### Unused CSS removal
 
-`removeUnusedCSS` removes rules from `style` elements whose class or ID selectors the document doesn’t reference. It needs to be used with `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
+`removeUnusedCSS` removes rules from `style` elements whose class or ID selectors a document doesn’t reference. It needs to be used with `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
 
 ```js
 const result = await minify(html, {
@@ -731,7 +768,7 @@ npm i;
 npm run backtest
 ```
 
-The backtest tool tracks minification performance across Git history. Results are saved in the backtest folder as a JSON file, results.json.
+The backtest tool tracks minification performance—output size (raw, Gzip, and Brotli) and processing time—across Git history. Results are saved in the backtest folder (results.json).
 
 Parameters:
 
@@ -749,7 +786,7 @@ npm i;
 npm run benchmark
 ```
 
-It reuses the backtest corpus (run `npm run backtest` once to download it) and reports per-file output size and processing time.
+It reuses the backtest corpus (run `npm run backtest` once to download it) and reports per-file output size and processing time. Sizes are given raw and compressed—at common defaults for on-the-fly compression, i.e., Gzip at level 6 and Brotli at quality 6—since a change that shrinks raw output can still grow what is transferred.
 
 Parameters:
 
@@ -758,7 +795,8 @@ Parameters:
 * `--core`: Disables the external minifiers (CSS, JS, SVG, URLs) to isolate HMN’s processing time
 * `--cold`: Switches the minification caches off so CSS, JS, and SVG work is redone on every iteration—without it, warm caches serve those results from memory after the warm-up run and the benchmark cannot see changes to those minifiers
 * `--iterations=N`: Sets the number of timed iterations (default: 5)
-* `--config=PATH`: Uses an alternative options file (default: html-minifier-next.config.json)
+* `--config=PATH`: Uses an alternative options file (default: html-minifier-next.config.json); the file can name a `preset` to start from
+* `--preset=NAME`: Uses a preset instead of an options file (e.g., `--preset=comprehensive`)
 
 To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers, or `--cold` when measuring changes to the CSS, JS, or SVG minification paths.
 
