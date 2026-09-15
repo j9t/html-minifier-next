@@ -344,7 +344,7 @@ async function main() {
     const time = fastest(times);
     const noise = reproducibility(times);
     const worst = spread(times);
-    const size = minified.length;
+    const size = Buffer.byteLength(minified);
     // Compressed once, outside the timed iterations
     const { gzip, brotli } = compressedSizes(minified);
     noises.push({ noise, worst, time });

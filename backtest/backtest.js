@@ -273,7 +273,7 @@ async function minify(hash, options) {
 
         if (minified != null) {
           // Compressed after timing, so compression doesn’t count toward the minification time
-          process.send({ name: fileName, size: minified.length, ...compressedSizes(minified), time: duration });
+          process.send({ name: fileName, size: Buffer.byteLength(minified), ...compressedSizes(minified), time: duration });
         } else {
           throw new Error('Unexpected result: ' + minified);
         }
@@ -297,11 +297,13 @@ function parseRange(arg) {
   if (parts.length > 2) {
     throw new Error(`Invalid format “${arg}”—use \`COUNT\` or \`COUNT/STEP\``);
   }
-  const count = parseInt(parts[0], 10);
+  // Digits only, so that trailing characters (e.g., “10abc”) don’t pass for a number
+  const toInteger = part => /^\d+$/.test(part) ? Number(part) : NaN;
+  const count = toInteger(parts[0]);
   if (!Number.isInteger(count) || count < 1) {
     throw new Error(`Invalid commit count “${parts[0]}”—must be a positive integer`);
   }
-  const step = parts.length === 2 ? parseInt(parts[1], 10) : 1;
+  const step = parts.length === 2 ? toInteger(parts[1]) : 1;
   if (!Number.isInteger(step) || step < 1) {
     throw new Error(`Invalid step “${parts[1]}”—must be a positive integer`);
   }

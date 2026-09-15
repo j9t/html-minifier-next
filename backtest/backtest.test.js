@@ -16,12 +16,16 @@ describe('Backtest', () => {
     });
 
     test('Counts and steps that are not positive integers are rejected', () => {
-      for (const arg of ['0', '-5', 'all', '/2']) {
+      for (const arg of ['0', '-5', 'all', '/2', '10abc', '1.5']) {
         assert.throws(() => parseRange(arg), /Invalid commit count/, arg);
       }
-      for (const arg of ['5/0', '5/-1', '5/x', '5/']) {
+      for (const arg of ['5/0', '5/-1', '5/x', '5/', '50/2x']) {
         assert.throws(() => parseRange(arg), /Invalid step/, arg);
       }
+    });
+
+    test('Leading zeros are still read as numbers', () => {
+      assert.deepStrictEqual(parseRange('010/02'), { count: 10, step: 2 });
     });
 
     test('More than one slash is rejected', () => {
