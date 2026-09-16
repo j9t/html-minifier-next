@@ -193,7 +193,7 @@ A few options take functions and are therefore only available programmatically, 
 | `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `canMinifyCSS` | Synchronous `Function(text, type)` that determines whether `minifyCSS` may process a given piece of CSS—returning `false` [leaves it as if `minifyCSS` were off](#css-minification) | All CSS is minified |
 | `canMinifyJS` | Synchronous `Function(text, inline)` that determines whether `minifyJS` may process a given piece of JavaScript—returning `false` [leaves it unminified](#javascript-minification) | All JavaScript is minified |
-| `canMinifySVG` | Synchronous `Function(text)` that determines whether `minifySVG` may pass a given `svg` element to SVGO—returning `false` [skips SVGO for it](#svg-minification) | All SVG is minified |
+| `canMinifySVG` | Synchronous `Function(text)` that determines whether `minifySVG` may pass a given outermost `svg` element to SVGO—returning `false` [skips SVGO for it](#svg-minification) | All SVG is minified |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
 | `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
 
@@ -481,7 +481,7 @@ const result = await minify(html, {
 });
 ```
 
-To exempt individual `svg` elements, pass `canMinifySVG` a synchronous function. It receives each `svg` element as the HTML pass wrote it (e.g., without comments under `removeComments`), and one for which it returns `false` skips SVGO. To keep an `svg` element exactly as written, [wrap it in `<!-- htmlmin:ignore -->`](#ignoring-chunks-of-markup) instead.
+To exempt individual `svg` elements, pass `canMinifySVG` a synchronous function. It receives each outermost `svg` element, including any `svg` elements nested in it, as the HTML pass wrote it (e.g., without comments under `removeComments`), and one for which it returns `false` skips SVGO. To keep an `svg` element exactly as written, [wrap it in `<!-- htmlmin:ignore -->`](#ignoring-chunks-of-markup) instead.
 
 ```js
 const result = await minify(html, {

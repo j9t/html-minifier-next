@@ -114,11 +114,11 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  * @prop {((text: string) => boolean) | null} [canMinifySVG]
  *  Synchronous predicate that determines whether the built-in `minifySVG` may
- *  pass a given `svg` block to SVGO. It receives the block as serialized by the
- *  HTML pass (e.g., without comments under `removeComments`); returning false
- *  leaves the block as that pass wrote it.
+ *  pass a given outermost `svg` element, nested ones included, to SVGO. It
+ *  receives the element as serialized by the HTML pass (e.g., without comments
+ *  under `removeComments`); returning false leaves it as that pass wrote it.
  *
- *  Default: `null` (all SVG blocks are minified)
+ *  Default: `null` (all SVG is minified)
  *
  * @prop {(tag: string | null, attrs: HTMLAttribute[] | undefined, canTrimWhitespace: (tag: string) => boolean) => boolean} [canTrimWhitespace]
  *  Predicate that determines whether leading/trailing whitespace around

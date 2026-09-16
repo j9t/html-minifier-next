@@ -1137,6 +1137,20 @@ describe('SVG and MathML', () => {
       assert.strictEqual(result, received[0]);
     });
 
+    test('The hook receives nested `svg` elements only within the outermost one', async () => {
+      const received = [];
+      const source = '<svg><svg><rect width="100" height="100"/></svg></svg>';
+      const result = await minify(source, {
+        minifySVG: true,
+        canMinifySVG: text => {
+          received.push(text);
+          return false;
+        }
+      });
+      assert.deepStrictEqual(received, [source]);
+      assert.strictEqual(result, source);
+    });
+
     test('`htmlmin:ignore` keeps an `svg` element exactly as written', async () => {
       const source = '<!-- htmlmin:ignore --><svg>\n  <!-- keep -->\n  <rect width="100"  height="100" />\n</svg><!-- htmlmin:ignore -->';
       const result = await minify(source, { minifySVG: true, collapseWhitespace: true, removeComments: true });
