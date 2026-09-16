@@ -1960,14 +1960,27 @@ describe('CSS and JS', () => {
       assert.strictEqual(result, '<script>function keep(){return 1};function skip() { return 2; }</script>');
     });
 
-    test('The hook applies to scripts minified in parallel', async () => {
-      const input = '<script>var a = 1; console.log(a);</script><script>var b = 2; console.log(b);</script>';
-      const result = await minify(input, {
-        minifyJS: true,
-        parallelJS: true,
-        canMinifyJS: text => !text.includes('b = 2')
-      });
-      assert.strictEqual(result, '<script>var a=1;console.log(a)</script><script>var b = 2; console.log(b);</script>');
+    // SWC dispatches scripts in parallel before the parse reaches them
+    test('The hook sees the same calls, and has the same effect, under either engine', async () => {
+      const input = '<script> var a = 1; console.log(a); </script><script> var b = 2; console.log(b); </script><button onclick="var c = 3;">Go</button>';
+      for (const engine of ['terser', 'swc']) {
+        const received = [];
+        const result = await minify(input, {
+          collapseWhitespace: true,
+          minifyJS: { engine },
+          mergeScripts: false,
+          canMinifyJS: (text, inline) => {
+            received.push([text, inline]);
+            return !text.includes('b = 2');
+          }
+        });
+        assert.deepStrictEqual(received, [
+          ['var a = 1; console.log(a);', false],
+          ['var b = 2; console.log(b);', false],
+          ['var c = 3;', true]
+        ], `${engine}: hook calls`);
+        assert.strictEqual(result, '<script>var a=1;console.log(a)</script><script>var b = 2; console.log(b);</script><button onclick="var c=3">Go</button>', `${engine}: output`);
+      }
     });
 
     test('The hook is not called when `minifyJS` is a function', async () => {
