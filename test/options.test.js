@@ -50,8 +50,7 @@ describe('Options', () => {
   describe('Option dependencies', () => {
     test('Every entry names options that exist', () => {
       for (const { option, requires } of optionDependencies) {
-        if (optionKeysExtra.has(option)) continue;
-        assert.ok(Object.hasOwn(optionDefinitions, option), `\`${option}\` is not an option`);
+        assert.ok(Object.hasOwn(optionDefinitions, option) || optionKeysExtra.has(option), `\`${option}\` is not an option`);
         assert.ok(Object.hasOwn(optionDefinitions, requires), `\`${requires}\`, needed by \`${option}\`, is not an option`);
       }
     });
