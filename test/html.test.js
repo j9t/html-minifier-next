@@ -2823,6 +2823,16 @@ describe('HTML', () => {
       assert.strictEqual(await minify(input, off), output);
       assert.strictEqual(await minify('<div>x</div junk>', trim), '<div>x</div>');
 
+      // Fragments in end tags keep their spacing, as anywhere else
+      for (const source of ['<div>x</div <?= $x ?><?= $y ?>>', '<div>x</div <?= $x ?> <?= $y ?>>']) {
+        assert.strictEqual(await minify(source, trim), source);
+        assert.strictEqual(await minify(source, off), source);
+      }
+      input = '<div>x</div <?= $x ?>\n<?= $y ?>>';
+      assert.strictEqual(await minify(input, trim), '<div>x</div <?= $x ?> <?= $y ?>>');
+      assert.strictEqual(await minify(input, { ...trim, preserveLineBreaks: true }), input);
+      assert.strictEqual(await minify('<div>x</div\n<?= $x ?>\n>', { ...trim, preserveLineBreaks: true }), '<div>x</div\n<?= $x ?>\n>');
+
       // No line break comes between a tag name and what runs into it
       input = '<p{% if e %}class="error"{% endif %} id="p">x</p>';
       output = await minify(input, { ...trim, ...django, maxLineLength: 5 });
