@@ -2666,17 +2666,8 @@ describe('HTML', () => {
       '{% endif %}' +
       '</p>';
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[\s\S]*?%\}/g, /\{\{[\s\S]*?\}\}/g], quoteCharacter: '\'' }), input);
-    output = '<p {% if form.name.errors %} class=\'error\' {% endif %}>' +
-      '{{ form.name.label_tag }}' +
-      '{{ form.name }}' +
-      ' <label>{{ label }}</label> ' +
-      '{% if form.name.errors %}' +
-      '{% for error in form.name.errors %}' +
-      '<span class=\'error_msg\' style=\'color:#ff0000\'>{{ error }}</span>' +
-      '{% endfor %}' +
-      '{% endif %}' +
-      '</p>';
-    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[\s\S]*?%\}/g, /\{\{[\s\S]*?\}\}/g], quoteCharacter: '\'', collapseWhitespace: true }), output);
+    // Fragments running into the tag name and attributes stay there
+    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[\s\S]*?%\}/g, /\{\{[\s\S]*?\}\}/g], quoteCharacter: '\'', collapseWhitespace: true }), input);
 
     input = '<a href="/legal.htm"<?php echo e(Request::path() == \'/\' ? \' rel="nofollow"\':\'\'); ?>>Legal Notices</a>';
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/<\?php[\s\S]*?\?>/g] }), input);
@@ -2694,9 +2685,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g] }), input);
     // `trimCustomFragments` without `collapseWhitespace`, does not break the `{% foo %} {% bar %}` test
     assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g], trimCustomFragments: true }), input);
-    // `trimCustomFragments` with `collapseWhitespace`, changes output
-    output = '<img class="{% foo %}{% bar %}">';
-    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g], collapseWhitespace: true, trimCustomFragments: true }), output);
+    // `trimCustomFragments` with `collapseWhitespace` keeps the space separating class names
+    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/\{%[^%]*?%\}/g], collapseWhitespace: true, trimCustomFragments: true }), input);
 
     input = '<img class="titi.<%=tsItem_[0]%>">';
     assert.strictEqual(await minify(input), input);
@@ -2715,27 +2705,24 @@ describe('HTML', () => {
     input = '<? echo "foo"; ?> <span>bar</span>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
-    output = '<? echo "foo"; ?><span>bar</span>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, trimCustomFragments: true }), output);
+    // The space before an inline element is content, so it stays
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, trimCustomFragments: true }), input);
 
     input = ' <? echo "foo"; ?> bar';
     assert.strictEqual(await minify(input), input);
     output = '<? echo "foo"; ?> bar';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-    output = '<? echo "foo"; ?>bar';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, trimCustomFragments: true }), output);
 
     input = '<span>foo</span> <? echo "bar"; ?> baz';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
-    output = '<span>foo</span><? echo "bar"; ?>baz';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, trimCustomFragments: true }), output);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, trimCustomFragments: true }), input);
 
     input = '<span>foo</span> <? echo "bar"; ?> <? echo "baz"; ?> <span>foo</span>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
-    output = '<span>foo</span><? echo "bar"; ?><? echo "baz"; ?><span>foo</span>';
-    assert.strictEqual(await minify(input, { collapseWhitespace: true, trimCustomFragments: true }), output);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, trimCustomFragments: true }), input);
 
     input = 'foo <WC@bar> baz moo </WC@bar> loo';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/<(WC@[\s\S]*?)>(.*?)<\/\1>/] }), input);
@@ -2789,6 +2776,155 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/\{a%[\s\S]*?%a\}/i] }), '<p> {A%  x  %a} </p>');
     // Without the flag the pattern does not match, so the fragment is text like any other
     assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/\{a%[\s\S]*?%a\}/] }), '<p>{A% x %a}</p>');
+  });
+
+  describe('Whitespace around custom fragments', () => {
+    const off = { collapseWhitespace: true };
+    const trim = { collapseWhitespace: true, trimCustomFragments: true };
+    const django = { ignoreCustomFragments: [/\{%[\s\S]*?%\}/, /\{\{[\s\S]*?\}\}/] };
+
+    test('Tags keep the spacing of their source', async () => {
+      const inputs = [
+        '<div <?= $attrs ?>>x</div>',
+        '<div <?= $a ?> class="a" <?= $b ?>>x</div>',
+        '<input <?= $a ?> <?= $b ?>>',
+        '<p <?php if ($e): ?> class="error" <?php endif; ?>>x</p>',
+        '<div class="a"<?= $x ?>>x</div>',
+        '<div <?= $name ?>="x">y</div>',
+        // Fragments continuing a tag or attribute name
+        '<h<?= $n ?> class="a">x</h<?= $n ?>>',
+        '<div data-<?= $k ?>="1" data-<?= $l ?>="2">x</div>',
+        '<div data-<?= $k ?>-id="1">x</div>',
+        '<ul><li class="a"></li<?= $x ?>></ul>'
+      ];
+      for (const input of inputs) {
+        assert.strictEqual(await minify(input, off), input);
+        assert.strictEqual(await minify(input, trim), input);
+      }
+
+      for (const input of ['<p{% if error %}class="error"{% endif %}>x</p>', '<p{% if error %} class="error"{% endif %}>x</p>']) {
+        assert.strictEqual(await minify(input, { ...off, ...django }), input);
+        assert.strictEqual(await minify(input, { ...trim, ...django }), input);
+      }
+    });
+
+    test('Tags keep attributes next to fragments intact', async () => {
+      let input = '<div class="a"<?= $x ?>>x</div>';
+      assert.strictEqual(await minify(input, { ...trim, removeAttributeQuotes: true }), input);
+
+      input = '<div id="a" data-<?= $k ?>="1" class="b">x</div>';
+      let output = await minify(input, { ...trim, sortAttributes: true });
+      assert.ok(output.includes(' data-<?= $k ?>="1"'), output);
+
+      // No line break comes between a tag name and what runs into it
+      input = '<p{% if e %}class="error"{% endif %} id="p">x</p>';
+      output = await minify(input, { ...trim, ...django, maxLineLength: 5 });
+      assert.ok(output.startsWith('<p{% if e %}class="error"{% endif %}'), output);
+
+      input = '<p class=""<?= $x ?>>x</p>';
+      assert.strictEqual(await minify(input, { ...trim, removeEmptyAttributes: true }), input);
+
+      input = '<p <?= $x ?> class="">x</p>';
+      output = '<p <?= $x ?>>x</p>';
+      assert.strictEqual(await minify(input, { ...trim, removeEmptyAttributes: true }), output);
+    });
+
+    test('Tags lose whitespace only before `>`', async () => {
+      const input = '<div\n  <?= $attrs ?>\n>x</div>';
+      const output = '<div <?= $attrs ?>>x</div>';
+      assert.strictEqual(await minify(input, off), output);
+      assert.strictEqual(await minify(input, trim), output);
+      assert.strictEqual(await minify(input, { ...trim, preserveLineBreaks: true }), '<div\n<?= $attrs ?>\n>x</div>');
+
+      // Before `/`, whitespace keeps the slash off an unquoted value the fragment may output
+      assert.strictEqual(await minify('<img <?= $a ?> />', { ...trim, keepClosingSlash: true }), '<img <?= $a ?> />');
+    });
+
+    test('Text keeps whitespace that separates content', async () => {
+      const inputs = [
+        '<p>Hello <?= $name ?> !</p>',
+        '<p><b>Hi</b> <?= $name ?> <i>x</i></p>',
+        '<p>a<?= $a ?> <?= $b ?>c</p>',
+        '<p>a<?= $a ?>b</p>',
+        '<? echo "foo"; ?> <span>bar</span>'
+      ];
+      for (const input of inputs) {
+        assert.strictEqual(await minify(input, off), input);
+        assert.strictEqual(await minify(input, trim), input);
+      }
+
+      let input = '<p>a {{b}}{{c}} d</p>';
+      assert.strictEqual(await minify(input, { ...trim, ...django }), input);
+
+      input = '<p>Hello\n  <?= $name ?>\n  world</p>';
+      const output = '<p>Hello <?= $name ?> world</p>';
+      assert.strictEqual(await minify(input, off), output);
+      assert.strictEqual(await minify(input, trim), output);
+
+    });
+
+    test('Text loses whitespace where the minifier removes it anyway', async () => {
+      const cases = [
+        ['<ul>\n  <?php foreach ($a as $b): ?>\n  <li>x</li>\n  <?php endforeach; ?>\n</ul>', '<ul><?php foreach ($a as $b): ?><li>x</li><?php endforeach; ?></ul>'],
+        ['<?php include "h.php"; ?>\n<div>x</div>\n<?php include "f.php"; ?>', '<?php include "h.php"; ?><div>x</div><?php include "f.php"; ?>'],
+        ['<p>x</p>\n<?= $a ?>\n<p>y</p>', '<p>x</p><?= $a ?><p>y</p>'],
+        ['<p> <?= $a ?> text</p>', '<p><?= $a ?> text</p>'],
+        ['<p>text <?= $a ?> </p>', '<p>text <?= $a ?></p>'],
+        ['<li><?= $a ?> <li>b', '<li><?= $a ?><li>b'],
+        ['<p>a <br> <?= $a ?> b</p>', '<p>a<br><?= $a ?> b</p>'],
+        ['<script> <?= $a ?> </script>', '<script><?= $a ?></script>']
+      ];
+      for (const [input, output] of cases) {
+        assert.strictEqual(await minify(input, trim), output);
+      }
+
+      // Without trimming, the whitespace collapses to one space
+      assert.strictEqual(await minify('<p>x</p>\n<?= $a ?>\n<p>y</p>', off), '<p>x</p> <?= $a ?> <p>y</p>');
+      // `conservativeCollapse` never removes whitespace entirely
+      assert.strictEqual(await minify('<p>x</p>\n<?= $a ?>\n<p>y</p>', { ...trim, conservativeCollapse: true }), '<p>x</p> <?= $a ?> <p>y</p>');
+      // Line breaks are preserved as such
+      assert.strictEqual(await minify('<p>x</p>\n<?= $a ?>\n<p>y</p>', { ...trim, preserveLineBreaks: true }), '<p>x</p>\n<?= $a ?>\n<p>y</p>');
+    });
+
+    test('Attribute values keep whitespace that separates content', async () => {
+      const inputs = [
+        '<p class="a <?= $c ?> b">x</p>',
+        '<p class="<?= $c ?> <?= $d ?>">x</p>',
+        '<p title="Hello <?= $name ?> !">x</p>',
+        '<img alt="Photo of <?= $name ?>" src="a.png">',
+        '<p style="margin: 0 <?= $m ?> 1em">x</p>',
+        '<p onclick="go( <?= $id ?> )">x</p>'
+      ];
+      for (const input of inputs) {
+        assert.strictEqual(await minify(input, off), input);
+        assert.strictEqual(await minify(input, trim), input);
+      }
+
+      assert.strictEqual(await minify('<p class=" <?= $c ?> ">x</p>', trim), '<p class="<?= $c ?>">x</p>');
+    });
+
+    test('CSS and JavaScript keep whitespace next to fragments', async () => {
+      const options = { ...trim, minifyCSS: true, minifyJS: true };
+      const cases = [
+        ['<script>function f() { return <?= $x ?> }</script>', 'return <?= $x ?>'],
+        ['<script>x = a - <?= $n ?>;</script>', '- <?= $n ?>'],
+        ['<p onclick="go(a - <?= $n ?>)">x</p>', '- <?= $n ?>'],
+        ['<style>p { margin: 0 <?= $m ?> 1em }</style>', '0 <?= $m ?> 1em'],
+        ['<p style="margin: 0 <?= $m ?> 1em">x</p>', '0 <?= $m ?> 1em']
+      ];
+      for (const [input, expected] of cases) {
+        const output = await minify(input, options);
+        assert.ok(output.includes(expected), output);
+        assert.ok((await minify(input, trim)).includes(expected));
+      }
+    });
+
+    test('Comments and `pre` keep whitespace next to fragments', async () => {
+      for (const input of ['<!-- <?= $a ?> --><p>x</p>', '<pre>a  <?= $a ?>  b</pre>', '<textarea> <?= $a ?> </textarea>']) {
+        assert.strictEqual(await minify(input, off), input);
+        assert.strictEqual(await minify(input, trim), input);
+      }
+    });
   });
 
   test('Custom fragments that are never closed stay cheap', async () => {

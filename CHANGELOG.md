@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.5.1] - 2026-09-18
+
+### Fixed
+
+* Fixed `trimCustomFragments` breaking markup and changing content: It now removes whitespace next to custom fragments only where it would remove whitespace in plain markup, too, and keeps it in tags, attribute values, CSS, and JavaScript (e.g., before, `<div <?= $attrs ?>>` became `<div<?= $attrs ?>>`, `Hello <?= $name ?> !` became `Hello<?= $name ?>!`, `return <?= $x ?>` became `return<?= $x ?>`)
+* Fixed custom fragments running into tag and attribute names being separated from them (e.g., `data-<?= $key ?>="1"` became `data- <?= $key ?>="1"`), and dropped from end tags
+
 ## [8.5.0] - 2026-09-17
 
 ### Added

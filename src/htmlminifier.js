@@ -512,9 +512,10 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  Default: `false`
  *
  * @prop {boolean} [trimCustomFragments]
- *  When true, whitespace around ignored custom fragments may be trimmed
- *  more aggressively. This affects how preserved fragments interact with
- *  surrounding whitespace collapse.
+ *  When true, whitespace around ignored custom fragments is removed rather
+ *  than collapsed where the minifier removes whitespace anyway (e.g., between
+ *  block-level elements). Whitespace in tags, attribute values, CSS, and
+ *  JavaScript is kept.
  *
  *  Default: `false`
  *
@@ -623,6 +624,7 @@ const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript
 const RE_START_TAG = /^<[^/!]/;
 const RE_END_TAG = /^<\//;
 const RE_WHITESPACE_ONLY = /^\s+$/;
+const RE_TABS = /\t/g;
 const RE_TRAILING_WHITESPACE = /\s$/;
 
 // Pre-compiled patterns for `htmlmin:ignore` block content analysis
@@ -1065,6 +1067,15 @@ async function minifyHTML(value, options, partialMarkup) {
   const ignoredMarkupChunks = [];
   /** @type {Array<RegExpExecArray | null>} */
   const ignoredCustomMarkupChunks = [];
+  // Custom fragments whose surrounding whitespace is never trimmed: in tags, where it
+  // separates attributes, and in CSS and JavaScript, where minifiers can’t judge it
+  /** @type {Set<number>} */
+  const customMarkupInTags = new Set();
+  /** @type {Set<number>} */
+  const customMarkupInCode = new Set();
+  // Attributes joined with the custom fragments they run into, to be written as they are
+  /** @type {WeakSet<HTMLAttribute>} */
+  const opaqueAttrs = new WeakSet();
   /** @type {string | undefined} */
   let uidIgnore;
   /** @type {RegExp | undefined} */
@@ -1075,6 +1086,8 @@ async function minifyHTML(value, options, partialMarkup) {
   let uidPattern;
   /** @type {RegExp | undefined} */
   let uidAttrLeadingPattern;
+  /** @type {RegExp | undefined} */
+  let uidAttrExactPattern;
   // Create inline tags/text sets with custom elements
   const customElementsInput = options.inlineCustomElements ?? [];
   const customElementsArr = Array.isArray(customElementsInput) ? customElementsInput : Array.from(customElementsInput);
@@ -1149,12 +1162,14 @@ async function minifyHTML(value, options, partialMarkup) {
         uidAttr = uniqueId(value);
         uidPattern = new RegExp('(\\s*)' + uidAttr + '([0-9]+)' + uidAttr + '(\\s*)', 'g');
         uidAttrLeadingPattern = new RegExp('^\\s*' + uidAttr + '(\\d+)' + uidAttr);
+        uidAttrExactPattern = new RegExp('^' + uidAttr + '(\\d+)' + uidAttr + '$');
 
         if (options.minifyCSS !== identity) {
           options.minifyCSS = (function (/** @type {ProcessedOptions['minifyCSS']} */ fn) {
             return function (/** @type {string} */ text, /** @type {string | undefined} */ type, /** @type {ProcessedOptions['cssContext']} */ context) {
               text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                 const chunks = ignoredCustomMarkupChunks[+index];
+                customMarkupInCode.add(+index);
                 return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
               });
 
@@ -1168,6 +1183,7 @@ async function minifyHTML(value, options, partialMarkup) {
             return function (/** @type {string} */ text, /** @type {boolean | undefined} */ inline, /** @type {boolean | undefined} */ isModule) {
               return fn(text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ _match, /** @type {string} */ _prefix, /** @type {string} */ index) {
                 const chunks = ignoredCustomMarkupChunks[+index];
+                customMarkupInCode.add(+index);
                 return (chunks?.[1] ?? '') + uidAttr + index + uidAttr + (chunks?.[2] ?? '');
               }), inline, isModule);
             };
@@ -1181,6 +1197,77 @@ async function minifyHTML(value, options, partialMarkup) {
     };
 
     value = replaceCustomFragments(value, customFragments, replaceFragment);
+  }
+
+  // Record the custom fragments in (part of) a tag
+  function markTagFragments(/** @type {string} */ str) {
+    for (const uidMatch of str.matchAll(/** @type {RegExp} */ (uidPattern))) {
+      customMarkupInTags.add(+(uidMatch[2] ?? 0));
+    }
+  }
+
+  // Source text of an attribute, as far as it matters
+  function rawAttr(/** @type {HTMLAttribute} */ attr) {
+    if (opaqueAttrs.has(attr)) {
+      return attr.name;
+    }
+    let raw = attr.name;
+    // Skip values the parser filled in for bare boolean attributes
+    if (attr.value !== undefined && !(attr.quote === '' && attr.value === attr.name)) {
+      raw += (attr.customAssign ?? '=') + (attr.quote ?? '') + attr.value + (attr.quote ?? '');
+    }
+    return (attr.customOpen ?? '') + raw + (attr.customClose ?? '');
+  }
+
+  /**
+   * Join each attribute a custom fragment runs into without whitespace with that fragment,
+   * so that no later step separates, drops, changes, or reorders them
+   * @param {HTMLAttribute[]} attrs - Joined in place
+   * @returns {boolean} Whether the first attribute runs into the tag name
+   */
+  function joinFragmentAttrs(attrs) {
+    const pattern = /** @type {RegExp} */ (uidAttrExactPattern);
+    let joinsTag = false;
+    let writeIndex = 0;
+    // Padding of the previous attribute if that is a fragment without value
+    /** @type {RegExpExecArray | null | undefined} */
+    let prevChunks = null;
+    for (const attr of attrs) {
+      const uidMatch = pattern.exec(attr.name);
+      const chunks = uidMatch ? ignoredCustomMarkupChunks[+(uidMatch[1] ?? 0)] : null;
+      const joins = prevChunks ? prevChunks[2] === '' : chunks?.[1] === '';
+      prevChunks = attr.value === undefined ? chunks : null;
+      if (!joins) {
+        attrs[writeIndex++] = attr;
+        continue;
+      }
+      const prev = writeIndex ? attrs[writeIndex - 1] : undefined;
+      if (!prev) {
+        joinsTag = true;
+      }
+      /** @type {HTMLAttribute} */
+      const joined = { name: (prev ? rawAttr(prev) : '') + rawAttr(attr), customAssign: '=', customOpen: '', customClose: '', quote: '' };
+      opaqueAttrs.add(joined);
+      attrs[prev ? writeIndex - 1 : writeIndex++] = joined;
+    }
+    attrs.length = writeIndex;
+    return joinsTag;
+  }
+
+  /**
+   * Restore the whitespace on one side of a custom fragment
+   * @param {string} str - Whitespace the minifier left there and the fragment’s own padding
+   * @param {boolean} trim
+   * @param {boolean} leading
+   */
+  function restoreFragmentSide(str, trim, leading) {
+    if (!str) {
+      return str;
+    }
+    return collapseWhitespace(str, {
+      preserveLineBreaks: options.preserveLineBreaks,
+      conservativeCollapse: !trim
+    }, leading, !leading);
   }
 
   function canCollapseWhitespace(/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
@@ -1754,6 +1841,10 @@ async function minifyHTML(value, options, partialMarkup) {
 
       buffer.push(openTag);
 
+      const fragmentJoinsTag = uidAttrExactPattern ? joinFragmentAttrs(attrs) : false;
+      // Whatever runs into the tag name has to stay first
+      const tagFragment = fragmentJoinsTag ? attrs.shift() : undefined;
+
       // Remove duplicate attributes (per HTML spec, first occurrence wins)
       // Duplicate attributes result in invalid HTML
       // https://html.spec.whatwg.org/multipage/parsing.html#attribute-name-state
@@ -1763,11 +1854,17 @@ async function minifyHTML(value, options, partialMarkup) {
         // By the time tags are processed, `createSortFns` has replaced any truthy non-function value
         /** @type {(tag: string, attrs: HTMLAttribute[]) => void} */ (options.sortAttributes)(tag, attrs);
       }
+      if (tagFragment) {
+        attrs.unshift(tagFragment);
+      }
 
       const attrResults = new Array(attrs.length);
       let anyThenable = false;
       for (let i = 0; i < attrs.length; i++) {
-        const result = normalizeAttr(/** @type {HTMLAttribute} */ (attrs[i]), attrs, tag, options, minifyHTML);
+        const attr = /** @type {HTMLAttribute} */ (attrs[i]);
+        const result = opaqueAttrs.has(attr)
+          ? { name: attr.name, value: undefined, attr }
+          : normalizeAttr(attr, attrs, tag, options, minifyHTML);
         if (!anyThenable && isThenable(result)) {
           anyThenable = true;
         }
@@ -1785,11 +1882,18 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
       if (lastKeptIndex !== -1) {
-        buffer.push(' ');
+        if (!fragmentJoinsTag) {
+          buffer.push(' ');
+        }
         for (let i = 0; i <= lastKeptIndex; i++) {
           const normalizedAttr = normalizedAttrs[i];
           if (normalizedAttr) {
-            buffer.push(buildAttr(normalizedAttr, hasUnarySlash, options, i === lastKeptIndex, uidAttr));
+            if (uidAttr && normalizedAttr.name.includes(uidAttr)) {
+              markTagFragments(normalizedAttr.name);
+            }
+            const builtAttr = buildAttr(normalizedAttr, hasUnarySlash, options, i === lastKeptIndex, uidAttr);
+            // One entry with the tag name, so that no line break can come between them
+            buffer.push(i === 0 && fragmentJoinsTag ? buffer.pop() + builtAttr : builtAttr);
           }
         }
       } else if (optional && optionalStartTags.has(tag)) {
@@ -1815,7 +1919,7 @@ async function minifyHTML(value, options, partialMarkup) {
         currentTag = '';
       }
     },
-    end: function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ autoGenerated) {
+    end: function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ autoGenerated, /** @type {string | undefined} */ rest) {
       // As in `start`: `lowerTag` stays '' when no foreign content is around
       let lowerTag = '';
       // Named as the start tag was: an `svg` or `math` element in its own context,
@@ -1833,6 +1937,15 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
       tag = name(tag);
+      let endTagText = '</' + tag + '>';
+      // Custom fragments after the name are kept, next to it if they were in the source
+      if (rest && uidAttr && rest.includes(uidAttr)) {
+        markTagFragments(rest);
+        const uidMatch = /** @type {RegExp} */ (uidAttrLeadingPattern).exec(rest);
+        const joinsTag = uidMatch !== null && rest.startsWith('\t' + uidAttr) &&
+          ignoredCustomMarkupChunks[+(uidMatch[1] ?? 0)]?.[1] === '';
+        endTagText = '</' + tag + (joinsTag ? '' : ' ') + trimWhitespace(rest) + '>';
+      }
 
       // Check if current tag is in a whitespace stack
       if (options.collapseWhitespace) {
@@ -1894,7 +2007,7 @@ async function minifyHTML(value, options, partialMarkup) {
           if (autoGenerated && !options.includeAutoGeneratedTags) {
             optionalEndTagEmitted = false;
           } else {
-            buffer.push('</' + tag + '>');
+            buffer.push(endTagText);
           }
           charsPrevTag = '/' + tag;
           if (!inlineElements.has(tag)) {
@@ -1907,7 +2020,7 @@ async function minifyHTML(value, options, partialMarkup) {
         if (autoGenerated && !options.includeAutoGeneratedTags) {
           optionalEndTagEmitted = false;
         } else {
-          buffer.push('</' + tag + '>');
+          buffer.push(endTagText);
         }
         charsPrevTag = '/' + tag;
         if (!inlineElements.has(tag)) {
@@ -2024,21 +2137,26 @@ async function minifyHTML(value, options, partialMarkup) {
 
   return joinResultSegments(buffer, options, uidPattern
     ? function (/** @type {string} */ str) {
-      return str.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ prefix, /** @type {string} */ index, /** @type {string} */ suffix) {
-        let chunk = ignoredCustomMarkupChunks[+index]?.[0] ?? match;
-        if (options.collapseWhitespace) {
-          if (prefix !== '\t') {
-            chunk = prefix + chunk;
-          }
-          if (suffix !== '\t') {
-            chunk += suffix;
-          }
-          return collapseWhitespace(chunk, {
-            preserveLineBreaks: options.preserveLineBreaks,
-            conservativeCollapse: !options.trimCustomFragments
-          }, /^[ \n\r\t\f]/.test(chunk), /[ \n\r\t\f]$/.test(chunk));
+      return str.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ prefix, /** @type {string} */ index, /** @type {string} */ suffix, /** @type {number} */ offset, /** @type {string} */ string) {
+        const chunks = ignoredCustomMarkupChunks[+index];
+        if (!chunks) {
+          return match;
         }
-        return chunk;
+        if (!options.collapseWhitespace) {
+          return chunks[0];
+        }
+        const leading = chunks[1] ?? '';
+        const trailing = chunks[2] ?? '';
+        const fragment = chunks[0].slice(leading.length, chunks[0].length - trailing.length);
+        const inTag = customMarkupInTags.has(+index);
+        const keep = inTag || customMarkupInCode.has(+index) || !options.trimCustomFragments;
+        // The padding tabs are whitespace to the minifier, so where one is gone, the
+        // minifier removed the whitespace, which makes it safe to trim
+        const trimLeading = !keep && prefix === '';
+        const trimTrailing = inTag ? string.charCodeAt(offset + match.length) === 62 /* > */ : !keep && suffix === '';
+        return restoreFragmentSide(prefix.replace(RE_TABS, '') + leading, trimLeading, true) +
+          fragment +
+          restoreFragmentSide(suffix.replace(RE_TABS, '') + trailing, trimTrailing, false);
       });
     }
     : identity, uidIgnore

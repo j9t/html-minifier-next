@@ -197,7 +197,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   trimCustomFragments: {
-    description: 'Trim whitespace around custom fragments (`--ignore-custom-fragments`)—use with `--collapse-whitespace`',
+    description: 'Trim whitespace around custom fragments (`--ignore-custom-fragments`) where it does not affect the output—use with `--collapse-whitespace`',
     type: 'boolean'
   },
   strictCustomFragments: {

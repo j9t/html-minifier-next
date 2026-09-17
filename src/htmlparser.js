@@ -1033,11 +1033,14 @@ export class HTMLParser {
         stackIndex = 0;
       }
 
+      // Whatever follows the name, which browsers drop but a custom fragment may stand in for
+      const rest = tag.length > tagName.length + 3 ? tag.slice(tagName.length + 2, -1) : '';
+
       if (stackIndex >= 0) {
         // Close all the open elements, up the stack
         for (let i = stack.length - 1; i >= stackIndex; i--) {
           if (handler.end) {
-            handler.end(stack[i]?.tag, stack[i]?.attrs, i > stackIndex || !tag);
+            handler.end(stack[i]?.tag, stack[i]?.attrs, i > stackIndex || !tag, i === stackIndex ? rest : '');
           }
         }
 
@@ -1048,7 +1051,7 @@ export class HTMLParser {
       } else if (handler.partialMarkup && tagName) {
         // In partial markup mode, preserve stray end tags
         if (handler.end) {
-          handler.end(tagName, [], false);
+          handler.end(tagName, [], false, rest);
         }
       } else if (lowerTagName === 'br') {
         if (handler.start) {
