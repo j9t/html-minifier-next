@@ -2816,6 +2816,13 @@ describe('HTML', () => {
       let output = await minify(input, { ...trim, sortAttributes: true });
       assert.ok(output.includes(' data-<?= $k ?>="1"'), output);
 
+      // Whatever else an end tag holds is dropped, as without fragments
+      input = '<div>x</div <?= $x ?> junk>';
+      output = '<div>x</div <?= $x ?>>';
+      assert.strictEqual(await minify(input, trim), output);
+      assert.strictEqual(await minify(input, off), output);
+      assert.strictEqual(await minify('<div>x</div junk>', trim), '<div>x</div>');
+
       // No line break comes between a tag name and what runs into it
       input = '<p{% if e %}class="error"{% endif %} id="p">x</p>';
       output = await minify(input, { ...trim, ...django, maxLineLength: 5 });

@@ -1944,7 +1944,10 @@ async function minifyHTML(value, options, partialMarkup) {
         const uidMatch = /** @type {RegExp} */ (uidAttrLeadingPattern).exec(rest);
         const joinsTag = uidMatch !== null && rest.startsWith('\t' + uidAttr) &&
           ignoredCustomMarkupChunks[+(uidMatch[1] ?? 0)]?.[1] === '';
-        endTagText = '</' + tag + (joinsTag ? '' : ' ') + trimWhitespace(rest) + '>';
+        // Anything else an end tag holds is dropped, as without fragments
+        const marker = uidAttr;
+        const fragments = Array.from(rest.matchAll(/** @type {RegExp} */ (uidPattern)), uid => marker + (uid[2] ?? '') + marker);
+        endTagText = '</' + tag + (joinsTag ? '' : ' ') + fragments.join(' ') + '>';
       }
 
       // Check if current tag is in a whitespace stack
