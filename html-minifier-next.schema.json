@@ -132,7 +132,7 @@
       }
     },
     "ignoreCustomFragments": {
-      "description": "Array of regexes that allow to ignore certain fragments, when matched (e.g., `<?php … ?>`, `{{ … }}`)",
+      "description": "Array of regexes that allow to ignore certain fragments, when matched (e.g., `<?php … ?>`, `{{ … }}`, etc.)",
       "type": [
         "string",
         "array"
@@ -253,7 +253,7 @@
       "type": "boolean"
     },
     "removeEmptyElementsExcept": {
-      "description": "Array of elements to preserve (e.g., `td`, `<span aria-hidden=\"true\">`)—use with `--remove-empty-elements`",
+      "description": "Array of elements to preserve (e.g., `td`, `<span aria-hidden=\"true\">`, etc.)—use with `--remove-empty-elements`",
       "type": [
         "string",
         "array"
