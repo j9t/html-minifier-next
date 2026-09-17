@@ -95,6 +95,31 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  Default: Built-in `canCollapseWhitespace` function
  *
+ * @prop {((text: string, type?: 'inline' | 'media') => boolean) | null} [canMinifyCSS]
+ *  Synchronous predicate that determines whether the built-in `minifyCSS` may
+ *  process a given piece of CSS—`type` is `undefined` for `style` elements,
+ *  `'inline'` for `style` attributes, and `'media'` for `media` attributes.
+ *  Returning false leaves that CSS as if `minifyCSS` were off, including its URLs
+ *  and unused rules (within `svg` elements, SVGO still minifies it under `minifySVG`).
+ *
+ *  Default: `null` (all CSS is minified)
+ *
+ * @prop {((text: string, inline?: boolean) => boolean) | null} [canMinifyJS]
+ *  Synchronous predicate that determines whether the built-in `minifyJS` may
+ *  process a given piece of JavaScript—`inline` is true for event handler
+ *  attributes. Returning false leaves that JavaScript unminified (`mergeScripts`
+ *  still applies).
+ *
+ *  Default: `null` (all JavaScript is minified)
+ *
+ * @prop {((text: string) => boolean) | null} [canMinifySVG]
+ *  Synchronous predicate that determines whether the built-in `minifySVG` may
+ *  pass a given outermost `svg` element, nested ones included, to SVGO. It
+ *  receives the element as serialized by the HTML pass (e.g., without comments
+ *  under `removeComments`); returning false leaves it as that pass wrote it.
+ *
+ *  Default: `null` (all SVG is minified)
+ *
  * @prop {(tag: string | null, attrs: HTMLAttribute[] | undefined, canTrimWhitespace: (tag: string) => boolean) => boolean} [canTrimWhitespace]
  *  Predicate that determines whether leading/trailing whitespace around
  *  the element may be trimmed.

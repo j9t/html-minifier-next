@@ -191,6 +191,9 @@ A few options take functions and are therefore only available programmatically, 
 | Option | Description | Default |
 | --- | --- | --- |
 | `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
+| `canMinifyCSS` | Synchronous `Function(text, type)` that determines whether `minifyCSS` may process a given piece of CSS—returning `false` [leaves it as if `minifyCSS` were off](#css-minification) | All CSS is minified |
+| `canMinifyJS` | Synchronous `Function(text, inline)` that determines whether `minifyJS` may process a given piece of JavaScript—returning `false` [leaves it unminified](#javascript-minification) | All JavaScript is minified |
+| `canMinifySVG` | Synchronous `Function(text)` that determines whether `minifySVG` may pass a given outermost `svg` element to SVGO—returning `false` [skips SVGO for it](#svg-minification) | All SVG is minified |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
 | `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
 
@@ -204,6 +207,9 @@ HTML Minifier Next: Ignoring `conservativeCollapse`—use with `collapseWhitespa
 
 | Option | Needs |
 | --- | --- |
+| `canMinifyCSS` | `minifyCSS`, and not [a function of your own](#css-minification) |
+| `canMinifyJS` | `minifyJS`, and not [a function of your own](#javascript-minification) |
+| `canMinifySVG` | `minifySVG`, and not [a function of your own](#svg-minification) |
 | `collapseInlineTagWhitespace` | `collapseWhitespace` |
 | `conservativeCollapse` | `collapseWhitespace` |
 | `customEventAttributes` | `minifyJS` |
@@ -321,6 +327,15 @@ const result = await minify(html, {
 });
 ```
 
+To exempt individual pieces of CSS, pass `canMinifyCSS` a synchronous function. It receives the CSS and its type—`undefined` for `style` elements, `'inline'` for `style` attributes, and `'media'` for `media` attributes. CSS for which it returns `false` comes out as if `minifyCSS` were off, so its URLs are not minified and its unused rules not removed, either. (Within `svg` elements, `minifySVG` has SVGO minify CSS as well—exempt those with [`canMinifySVG`](#svg-minification).)
+
+```js
+const result = await minify(html, {
+  minifyCSS: true,
+  canMinifyCSS: text => !text.includes('/* keep */')
+});
+```
+
 ### Unused CSS removal
 
 `removeUnusedCSS` removes rules from `style` elements whose class or ID selectors a document doesn’t reference. It needs to be used with `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
@@ -421,6 +436,15 @@ const result = await minify(html, {
 });
 ```
 
+To exempt individual pieces of JavaScript, pass `canMinifyJS` a synchronous function. It receives the JavaScript and whether it is inline—`true` for event handler attributes (e.g., `onclick`), `false` for `script` elements. JavaScript for which it returns `false` is left unminified, though `mergeScripts` still merges it with adjacent scripts:
+
+```js
+const result = await minify(html, {
+  minifyJS: true,
+  canMinifyJS: text => !text.includes('/* keep */')
+});
+```
+
 ### SVG minification
 
 When `minifySVG` is set to `true`, HTML Minifier Next uses [SVGO](https://svgo.dev/) to optimize inline SVG elements. Complete `<svg>` subtrees are extracted and processed as a block, enabling deep structural optimization:
@@ -454,6 +478,15 @@ const result = await minify(html, {
       }
     }]
   }
+});
+```
+
+To exempt individual `svg` elements, pass `canMinifySVG` a synchronous function. It receives each outermost `svg` element, including any `svg` elements nested in it, as the HTML pass wrote it (e.g., without comments under `removeComments`), and one for which it returns `false` skips SVGO. To keep an `svg` element exactly as written, [wrap it in `<!-- htmlmin:ignore -->`](#ignoring-chunks-of-markup) instead.
+
+```js
+const result = await minify(html, {
+  minifySVG: true,
+  canMinifySVG: text => !text.includes('data-keep')
 });
 ```
 

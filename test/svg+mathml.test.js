@@ -1109,4 +1109,112 @@ describe('SVG and MathML', () => {
     assert.strictEqual(after.gets, before.gets, 'Oversized input should never reach `cache.get()`');
     assert.strictEqual(after.size, before.size, 'Oversized input should never be stored in the cache');
   });
+
+  describe('`canMinifySVG`', () => {
+    const input = '<svg><rect width="100" height="100" fill="red"/></svg><svg><circle cx="50" cy="50" r="40" fill="blue"/></svg>';
+
+    test('A `false` return skips SVGO for that `svg` element', async () => {
+      assert.strictEqual(await minify(input, { minifySVG: true, canMinifySVG: () => false }), input);
+      assert.strictEqual(
+        await minify(input, { minifySVG: true, canMinifySVG: text => text.includes('rect') }),
+        '<svg><path fill="red" d="M0 0h100v100H0z"/></svg><svg><circle cx="50" cy="50" r="40" fill="blue"/></svg>'
+      );
+    });
+
+    test('The hook receives each `svg` element as the HTML pass wrote it', async () => {
+      const received = [];
+      const source = '<svg>\n  <!-- keep -->\n  <rect width="100"  height="100" />\n</svg>';
+      const result = await minify(source, {
+        minifySVG: true,
+        collapseWhitespace: true,
+        removeComments: true,
+        canMinifySVG: text => {
+          received.push(text);
+          return false;
+        }
+      });
+      assert.deepStrictEqual(received, ['<svg><rect width="100" height="100"/></svg>']);
+      assert.strictEqual(result, received[0]);
+    });
+
+    test('The hook receives nested `svg` elements only within the outermost one', async () => {
+      const received = [];
+      const source = '<svg><svg><rect width="100" height="100"/></svg></svg>';
+      const result = await minify(source, {
+        minifySVG: true,
+        canMinifySVG: text => {
+          received.push(text);
+          return false;
+        }
+      });
+      assert.deepStrictEqual(received, [source]);
+      assert.strictEqual(result, source);
+    });
+
+    test('`htmlmin:ignore` keeps an `svg` element exactly as written', async () => {
+      const source = '<!-- htmlmin:ignore --><svg>\n  <!-- keep -->\n  <rect width="100"  height="100" />\n</svg><!-- htmlmin:ignore -->';
+      const result = await minify(source, { minifySVG: true, collapseWhitespace: true, removeComments: true });
+      assert.strictEqual(result, '<svg>\n  <!-- keep -->\n  <rect width="100"  height="100" />\n</svg>');
+    });
+
+    test('CSS within an `svg` element is only kept by `canMinifySVG`', async () => {
+      const source = '<svg><style>.a { fill: red; }</style><rect class="a" width="10" height="10"/></svg>';
+      const options = { minifySVG: true, minifyCSS: true, canMinifyCSS: () => false };
+      assert.ok((await minify(source, options)).includes('<style>.a{fill:red}</style>'), 'SVGO should still minify the CSS');
+      assert.strictEqual(await minify(source, { ...options, canMinifySVG: () => false }), source);
+    });
+
+    test('The hook is not called when `minifySVG` is a function', async () => {
+      let calls = 0;
+      const logs = [];
+      const result = await minify(input, {
+        minifySVG: text => text.replace(/fill="[^"]*"/g, ''),
+        canMinifySVG: () => {
+          calls++;
+          return false;
+        },
+        log: message => logs.push(String(message))
+      });
+      assert.ok(!result.includes('fill='), 'The function should still apply');
+      assert.strictEqual(calls, 0);
+      assert.ok(logs.some(message => message.includes('canMinifySVG') && message.includes('function of your own')));
+    });
+
+    test('Setting the hook without `minifySVG` is reported', async () => {
+      const logs = [];
+      await minify(input, {
+        canMinifySVG: () => true,
+        log: message => logs.push(String(message))
+      });
+      assert.ok(logs.some(message => message.includes('canMinifySVG') && message.includes('minifySVG')));
+    });
+
+    test('A hook that throws skips SVGO, or rejects without `continueOnMinifyError`', async () => {
+      const canMinifySVG = () => { throw new Error('Hook failure'); };
+      const logs = [];
+      const result = await minify(input, {
+        minifySVG: true,
+        canMinifySVG,
+        log: message => logs.push(String(message))
+      });
+      assert.strictEqual(result, input);
+      assert.ok(logs.some(message => message.includes('Hook failure')));
+
+      await assert.rejects(minify(input, { minifySVG: true, continueOnMinifyError: false, canMinifySVG }), /Hook failure/);
+    });
+
+    test('A hook that returns a promise is an error, whether it resolves or rejects', async () => {
+      for (const canMinifySVG of [async () => false, () => Promise.reject(new Error('Hook failure'))]) {
+        const logs = [];
+        const result = await minify(input, {
+          minifySVG: true,
+          canMinifySVG,
+          log: message => logs.push(String(message))
+        });
+        assert.strictEqual(result, input, 'The SVG should be left unminified');
+        assert.ok(logs.some(message => message.includes('`canMinifySVG` must return a boolean')));
+        await assert.rejects(minify(input, { minifySVG: true, continueOnMinifyError: false, canMinifySVG }), TypeError);
+      }
+    });
+  });
 });

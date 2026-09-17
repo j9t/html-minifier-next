@@ -187,6 +187,15 @@ async function testFunctionOptions() {
     canCollapseWhitespace: (tag, _attrs, _canCollapseWhitespace) => {
       return tag !== 'pre';
     },
+    canMinifyCSS: (text: string, type?: 'inline' | 'media') => {
+      return type !== 'media' && !text.includes('/* keep */');
+    },
+    canMinifyJS: (text: string, inline?: boolean) => {
+      return !inline && !text.includes('/* keep */');
+    },
+    canMinifySVG: (text: string) => {
+      return !text.includes('data-keep');
+    },
     canTrimWhitespace: (tag, _attrs, _canTrimWhitespace) => {
       return tag !== 'textarea';
     },
