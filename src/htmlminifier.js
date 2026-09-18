@@ -1,4 +1,4 @@
-import { HTMLParser, endTag } from './htmlparser.js';
+import { HTMLParser } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
@@ -297,7 +297,8 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  * @prop {number} [maxLineLength]
  *  Maximum line length for the output. When set the minifier will wrap
- *  output to the given number of characters where possible.
+ *  output to the given number of characters where possible, splitting
+ *  lines only in tags—between attributes or before a tag’s `>`.
  *
  *  Default: No limit
  *
@@ -350,8 +351,8 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  Default: `false`
  *
  * @prop {boolean} [noNewlinesBeforeTagClose]
- *  When wrapping lines, prevent inserting a newline directly before a
- *  closing tag (useful to keep tags like `</a>` on the same line).
+ *  When wrapping lines, never split a line in an end tag (e.g., keeps
+ *  `</a>` from becoming `</a` and `>` on two lines).
  *
  *  Default: `false`
  *
@@ -1047,6 +1048,8 @@ async function minifyHTML(value, options, partialMarkup) {
 
   /** @type {string[]} */
   const buffer = [];
+  // Parallel to `buffer`: whether an entry belongs to a start or end tag, the only place lines may break
+  const bufferTags = options.maxLineLength ? /** @type {boolean[]} */ ([]) : null;
   /** @type {string} */
   let charsPrevTag = '';
   let currentChars = '';
@@ -1278,12 +1281,22 @@ async function minifyHTML(value, options, partialMarkup) {
     return options.canTrimWhitespace(tag, attrs, defaultCanTrimWhitespace);
   }
 
+  function bufferPush(/** @type {string} */ entry, /** @type {boolean} */ isTag) {
+    buffer.push(entry);
+    bufferTags?.push(isTag);
+  }
+
+  function bufferTruncate(/** @type {number} */ length) {
+    buffer.length = Math.max(0, length);
+    if (bufferTags) bufferTags.length = buffer.length;
+  }
+
   function removeStartTag() {
     let index = buffer.length - 1;
     while (index > 0 && !RE_START_TAG.test(buffer[index] ?? '')) {
       index--;
     }
-    buffer.length = Math.max(0, index);
+    bufferTruncate(index);
   }
 
   // Whether the element being parsed holds text rather than markup. The namespace decides
@@ -1339,13 +1352,14 @@ async function minifyHTML(value, options, partialMarkup) {
     const noTrim = stackNoTrimWhitespace.length > 0;
     if (index < buffer.length - 1 && (keepsWhitespace() || noTrim) && RE_END_TAG.test(buffer[index] ?? '')) {
       buffer.splice(index, 1);
+      bufferTags?.splice(index, 1);
       // Only collapsed whitespace can merge
       if (options.collapseWhitespace && !noTrim) {
         mergeWhitespaceRuns(index);
       }
       return;
     }
-    buffer.length = Math.max(0, index);
+    bufferTruncate(index);
   }
 
   // Look for trailing whitespaces, bypass any inline tags
@@ -1545,7 +1559,7 @@ async function minifyHTML(value, options, partialMarkup) {
     if (text) {
       hasChars = true;
     }
-    buffer.push(text);
+    bufferPush(text, false);
   }
 
   // Comment finalization (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
@@ -1656,7 +1670,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
     }
 
-    buffer.push(comment);
+    bufferPush(comment, false);
   }
 
   // Inline scripts are minified one at a time as the parse reaches them, which serializes
@@ -1839,7 +1853,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const needsXMLSlash = unary && Boolean(options.insideSVG) && Boolean(options.minifySVG);
       const hasUnarySlash = needsXMLSlash || (unarySlash && (useNameParentForTag ? optionsParent : options).keepClosingSlash);
 
-      buffer.push(openTag);
+      bufferPush(openTag, true);
 
       const fragmentJoinsTag = uidAttrExactPattern ? joinFragmentAttrs(attrs) : false;
       // Whatever runs into the tag name has to stay first
@@ -1883,7 +1897,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
       if (lastKeptIndex !== -1) {
         if (!fragmentJoinsTag) {
-          buffer.push(' ');
+          bufferPush(' ', true);
         }
         for (let i = 0; i <= lastKeptIndex; i++) {
           const normalizedAttr = normalizedAttrs[i];
@@ -1893,7 +1907,11 @@ async function minifyHTML(value, options, partialMarkup) {
             }
             const builtAttr = buildAttr(normalizedAttr, hasUnarySlash, options, i === lastKeptIndex, uidAttr);
             // One entry with the tag name, so that no line break can come between them
-            buffer.push(i === 0 && fragmentJoinsTag ? buffer.pop() + builtAttr : builtAttr);
+            if (i === 0 && fragmentJoinsTag) {
+              buffer[buffer.length - 1] += builtAttr;
+            } else {
+              bufferPush(builtAttr, true);
+            }
           }
         }
       } else if (optional && optionalStartTags.has(tag)) {
@@ -1901,7 +1919,7 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalStartTag = tag;
       }
 
-      buffer.push(buffer.pop() + (hasUnarySlash ? '/' : '') + '>');
+      buffer[buffer.length - 1] += (hasUnarySlash ? '/' : '') + '>';
 
       if (autoGenerated && !options.includeAutoGeneratedTags) {
         removeStartTag();
@@ -2010,7 +2028,7 @@ async function minifyHTML(value, options, partialMarkup) {
           if (autoGenerated && !options.includeAutoGeneratedTags) {
             optionalEndTagEmitted = false;
           } else {
-            buffer.push(endTagText);
+            bufferPush(endTagText, true);
           }
           charsPrevTag = '/' + tag;
           if (!inlineElements.has(tag)) {
@@ -2023,7 +2041,7 @@ async function minifyHTML(value, options, partialMarkup) {
         if (autoGenerated && !options.includeAutoGeneratedTags) {
           optionalEndTagEmitted = false;
         } else {
-          buffer.push(endTagText);
+          bufferPush(endTagText, true);
         }
         charsPrevTag = '/' + tag;
         if (!inlineElements.has(tag)) {
@@ -2099,10 +2117,10 @@ async function minifyHTML(value, options, partialMarkup) {
       commentFinalize(text);
     },
     doctype: function (/** @type {string} */ doctype) {
-      buffer.push(options.useShortDoctype
+      bufferPush(options.useShortDoctype
         ? '<!doctype' +
         (options.removeTagWhitespace ? '' : ' ') + 'html>'
-        : collapseWhitespaceAll(doctype));
+        : collapseWhitespaceAll(doctype), false);
     }
   });
 
@@ -2119,7 +2137,10 @@ async function minifyHTML(value, options, partialMarkup) {
     );
     for (let i = svgBlocks.length - 1; i >= 0; i--) {
       const block = svgBlocks[i];
-      if (block) buffer.splice(block.start, block.end - block.start, optimized[i] ?? '');
+      if (block) {
+        buffer.splice(block.start, block.end - block.start, optimized[i] ?? '');
+        bufferTags?.splice(block.start, block.end - block.start, false);
+      }
     }
   }
 
@@ -2138,7 +2159,7 @@ async function minifyHTML(value, options, partialMarkup) {
     squashTrailingWhitespace('br');
   }
 
-  return joinResultSegments(buffer, options, uidPattern
+  return joinResultSegments(buffer, bufferTags ?? [], [uidAttr, uidIgnore].filter(marker => marker !== undefined), options, uidPattern
     ? function (/** @type {string} */ str) {
       return str.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ prefix, /** @type {string} */ index, /** @type {string} */ suffix, /** @type {number} */ offset, /** @type {string} */ string) {
         const chunks = ignoredCustomMarkupChunks[+index];
@@ -2173,46 +2194,74 @@ async function minifyHTML(value, options, partialMarkup) {
 
 /**
  * @param {string[]} results
+ * @param {boolean[]} resultTags Whether each result belongs to a start or end tag
+ * @param {string[]} markers Custom fragment and `htmlmin:ignore` placeholder markers
  * @param {ProcessedOptions} options
  * @param {Function} restoreCustom
  * @param {Function} restoreIgnore
  */
-function joinResultSegments(results, options, restoreCustom, restoreIgnore) {
+function joinResultSegments(results, resultTags, markers, options, restoreCustom, restoreIgnore) {
   let str;
   const maxLineLength = options.maxLineLength;
-  const noNewlinesBeforeTagClose = options.noNewlinesBeforeTagClose;
 
   if (maxLineLength) {
-    let line = ''; const lines = [];
-    // Index-based scan—`Array.shift()` is O(n) per call, which would make this
-    // loop quadratic on documents with many segments
-    let index = 0;
-    while (index < results.length) {
-      const len = line.length;
-      const cur = results[index] ?? '';
-      const end = cur.indexOf('\n');
-      const isClosingTag = Boolean(cur.match(endTag));
-      const shouldKeepSameLine = noNewlinesBeforeTagClose && isClosingTag;
-
-      if (end < 0) {
-        line += restoreIgnore(restoreCustom(cur));
-        index++;
+    // Whitespace in tags is the only whitespace that can’t change the output, so lines break
+    // there alone—in place of the space between attributes, or right before a tag’s `>`
+    const noNewlinesBeforeTagClose = options.noNewlinesBeforeTagClose;
+    /** @type {string[]} */
+    const lines = [];
+    let lineLength = 0;
+    // Output since the last break opportunity, and what that opportunity is when not taken;
+    // fragments are restored by chunk, as whitespace around them decides how they come back
+    let chunk = '';
+    /** @type {string | null} */
+    let separator = null;
+    const flush = (/** @type {string | null} */ nextSeparator) => {
+      chunk = restoreIgnore(restoreCustom(chunk));
+      const newline = chunk.indexOf('\n');
+      const head = newline < 0 ? chunk.length : newline;
+      // A line already too long gains nothing from moving a `>` that ends a line of its own
+      const isUseless = separator === '' && head === 1 && lineLength > maxLineLength;
+      if (separator !== null) {
+        if (lineLength > 0 && lineLength + separator.length + head > maxLineLength && !isUseless) {
+          lines.push('\n');
+          lineLength = 0;
+        } else if (separator) {
+          lines.push(separator);
+          lineLength += separator.length;
+        }
+      }
+      lines.push(chunk);
+      lineLength = newline < 0 ? lineLength + chunk.length : chunk.length - chunk.lastIndexOf('\n') - 1;
+      chunk = '';
+      separator = nextSeparator;
+    };
+    for (let index = 0; index < results.length; index++) {
+      const result = results[index] ?? '';
+      if (!resultTags[index]) {
+        chunk += result;
+      } else if (markers.length && markers.some(marker => result.includes(marker))) {
+        // Whitespace next to a fragment stays as is, as it may belong to it
+        if (!chunk && separator !== null) {
+          chunk = separator;
+          separator = null;
+        }
+        chunk += result;
+      } else if (result.charCodeAt(result.length - 1) === 32 /* space */) {
+        chunk += result.slice(0, -1);
+        flush(' ');
+      } else if (result.charCodeAt(result.length - 1) === 62 /* > */ &&
+          result.charCodeAt(result.length - 2) !== 47 /* / */ &&
+          !(noNewlinesBeforeTagClose && result.startsWith('</'))) {
+        chunk += result.slice(0, -1);
+        flush('');
+        chunk = '>';
       } else {
-        line += restoreIgnore(restoreCustom(cur.slice(0, end)));
-        results[index] = cur.slice(end + 1);
-      }
-      if (len > 0 && line.length > maxLineLength && !shouldKeepSameLine) {
-        lines.push(line.slice(0, len));
-        line = line.slice(len);
-      } else if (end >= 0) {
-        lines.push(line);
-        line = '';
+        chunk += result;
       }
     }
-    if (line) {
-      lines.push(line);
-    }
-    str = lines.join('\n');
+    flush(null);
+    str = lines.join('');
   } else {
     str = restoreIgnore(restoreCustom(results.join('')));
   }

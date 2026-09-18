@@ -156,13 +156,13 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `inlineCustomElements`<br>`--inline-custom-elements` | Array of names of custom elements which are inline, for whitespace handling—use with `collapseWhitespace` | `[]` |
 | `keepClosingSlash`<br>`--keep-closing-slash` | Keep the trailing slash on void elements and other start tags that carry one, and read it as closing the element | `false` |
 | `maxInputLength`<br>`--max-input-length` | Maximum input length to prevent ReDoS attacks (disabled by default) | `undefined` |
-| `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points | `undefined` |
+| `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; output will be split by newlines in tags only (between attributes or before a tag’s `>`), where they can’t change the page, so lines may run longer | `undefined` |
 | `mergeScripts`<br>`--merge-scripts` | Merge consecutive inline `script` elements into one (only merges compatible scripts with same `type`, matching `async`/`defer`/`nomodule`/`nonce`) | `false` |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://terser.org/) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
 | `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/)) | `false` (could be `true`, `Object`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
-| `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never add a newline before a tag that closes an element—use with `maxLineLength` | `false` |
+| `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never split a line in a tag that closes an element—use with `maxLineLength` | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
 | `preserveLineBreaks`<br>`--preserve-line-breaks` | Always collapse to one line break (never remove it entirely) when whitespace between tags includes a line break—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
 | `preventAttributesEscaping`<br>`--prevent-attributes-escaping` | Prevents the escaping of the values of attributes | `false` |
