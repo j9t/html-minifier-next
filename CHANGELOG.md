@@ -4,6 +4,17 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.5.2] - 2026-09-18
+
+### Fixed
+
+* Fixed `maxLineLength` changing how pages render and producing output that changed again when minified once more: Lines now split only in tags, between attributes or before a tag’s `>`, and no longer in text, `pre`, `textarea`, `script`, or `style` content, or between tags (e.g., before, `<p>Welcome <b>xyzxyz</b>.</p>` became `<p>\nWelcome \n<b>xyzxyz\n</b>.</p>`, and `<div data-attr="foo"></div>` became `<div data-attr="foo">\n</div>`, which no longer matched `:empty`)
+* Fixed `maxLineLength` doubling the space before custom fragments in tags (e.g., `<p <?= $attrs ?>>` became `<p  <?= $attrs ?>>`)
+
+### Changed
+
+* Changed `noNewlinesBeforeTagClose` to keep end tags whole, now that lines no longer split before them
+
 ## [8.5.1] - 2026-09-18
 
 ### Fixed

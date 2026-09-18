@@ -4621,19 +4621,14 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, options), input);
 
     input = '<div data-attr="foo"></div>';
-    assert.strictEqual(await minify(input, options), '<div data-attr="foo">\n</div>');
+    assert.strictEqual(await minify(input, options), '<div data-attr="foo"\n></div>');
 
     input = [
       '<code>    hello   world   ',
       '    world   hello  </code>'
     ].join('\n');
     assert.strictEqual(await minify(input), input);
-    assert.strictEqual(await minify(input, options), [
-      '<code>',
-      '    hello   world   ',
-      '    world   hello  ',
-      '</code>'
-    ].join('\n'));
+    assert.strictEqual(await minify(input, options), input.replace('<code>', '<code\n>').replace('</code>', '</code\n>'));
 
     assert.strictEqual(await minify('<p title="</p>">x</p>'), '<p title="</p>">x</p>');
     assert.strictEqual(await minify('<p title=" <!-- hello world --> ">x</p>'), '<p title=" <!-- hello world --> ">x</p>');
@@ -4642,70 +4637,157 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p foo:bar=baz>xxx</p>'), '<p foo:bar=baz>xxx</p>');
 
     input = [
-      '<div><div><div><div><div>',
-      '<div><div><div><div><div>',
-      'i\'m 10 levels deep</div>',
-      '</div></div></div></div>',
-      '</div></div></div></div>',
-      '</div>'
+      '<div><div><div><div><div',
+      '><div><div><div><div><div',
+      '>i\'m 10 levels deep</div',
+      '></div></div></div></div',
+      '></div></div></div></div',
+      '></div>'
     ];
     assert.strictEqual(await minify(input.join('')), input.join(''));
     assert.strictEqual(await minify(input.join(''), options), input.join('\n'));
 
     input = [
-      '<div><div><?foo?><div>',
-      '<div><div><?bar?><div>',
-      '<div><div>',
-      'i\'m 9 levels deep</div>',
-      '</div></div><%baz%></div>',
-      '</div></div><%moo%></div>',
-      '</div>'
+      '<div><div><?foo?><div',
+      '><div><div><?bar?><div',
+      '><div><div',
+      '>i\'m 9 levels deep</div',
+      '></div></div><%baz%></div',
+      '></div></div><%moo%></div',
+      '></div>'
     ];
     assert.strictEqual(await minify(input.join('')), input.join(''));
     assert.strictEqual(await minify(input.join(''), options), input.join('\n'));
 
-    assert.strictEqual(await minify('<script>alert(\'<!--\')</script>', options), '<script>alert(\'<!--\')\n</script>');
+    assert.strictEqual(await minify('<script>alert(\'<!--\')</script>', options), '<script\n>alert(\'<!--\')</script>');
+    assert.strictEqual(await minify('<script>alert(\'<!-- foo -->\')</script>', options), '<script\n>alert(\'<!-- foo -->\')</script>');
     input = '<script>\nalert(\'<!-- foo -->\')\n</script>';
-    assert.strictEqual(await minify('<script>alert(\'<!-- foo -->\')</script>', options), input);
     assert.strictEqual(await minify(input, options), input);
-    assert.strictEqual(await minify('<script>alert(\'-->\')</script>', options), '<script>alert(\'-->\')\n</script>');
+    assert.strictEqual(await minify('<script>alert(\'-->\')</script>', options), '<script\n>alert(\'-->\')</script>');
 
-    assert.strictEqual(await minify('<a title="x"href=" ">foo</a>', options), '<a title="x" href="">foo\n</a>');
-    assert.strictEqual(await minify('<p id=""class=""title="">x', options), '<p id="" class="" \ntitle="">x');
+    assert.strictEqual(await minify('<a title="x"href=" ">foo</a>', options), '<a title="x" href=""\n>foo</a>');
+    assert.strictEqual(await minify('<p id=""class=""title="">x', options), '<p id="" class=""\ntitle="">x');
     assert.strictEqual(await minify('<p x="x\'"">x</p>', options), '<p x="x\'">x</p>', 'trailing quote should be ignored');
-    assert.strictEqual(await minify('<a href="#"><p>Click me</p></a>', options), '<a href="#"><p>Click me\n</p></a>');
+    assert.strictEqual(await minify('<a href="#"><p>Click me</p></a>', options), '<a href="#"><p\n>Click me</p></a>');
+    assert.strictEqual(await minify('<span><button>Hit me</button></span>', options), '<span><button\n>Hit me</button></span>');
     input = '<span><button>Hit me\n</button></span>';
-    assert.strictEqual(await minify('<span><button>Hit me</button></span>', options), input);
     assert.strictEqual(await minify(input, options), input);
     assert.strictEqual(await minify('<object type="image/svg+xml" data="image.svg"><div>[fallback image]</div></object>', options),
-      '<object \ntype="image/svg+xml" \ndata="image.svg"><div>\n[fallback image]</div>\n</object>'
+      '<object\ntype="image/svg+xml"\ndata="image.svg"><div\n>[fallback image]</div\n></object>'
     );
 
-    assert.strictEqual(await minify('<ng-include src="x"></ng-include>', options), '<ng-include src="x">\n</ng-include>');
-    assert.strictEqual(await minify('<ng:include src="x"></ng:include>', options), '<ng:include src="x">\n</ng:include>');
+    assert.strictEqual(await minify('<ng-include src="x"></ng-include>', options), '<ng-include src="x"\n></ng-include>');
+    assert.strictEqual(await minify('<ng:include src="x"></ng:include>', options), '<ng:include src="x"\n></ng:include>');
     assert.strictEqual(await minify('<ng-include src="\'views/partial-notification.html\'"></ng-include><div ng-view=""></div>', options),
-      '<ng-include \nsrc="\'views/partial-notification.html\'">\n</ng-include><div \nng-view=""></div>'
+      '<ng-include\nsrc="\'views/partial-notification.html\'"\n></ng-include><div\nng-view=""></div>'
     );
 
     input = [
-      '<some-tag-1></some-tag-1>',
-      '<some-tag-2></some-tag-2>',
-      '<some-tag-3>4',
-      '</some-tag-3>'
+      '<some-tag-1></some-tag-1',
+      '><some-tag-2></some-tag-2',
+      '><some-tag-3',
+      '>4</some-tag-3>'
     ];
     assert.strictEqual(await minify(input.join('')), input.join(''));
     assert.strictEqual(await minify(input.join(''), options), input.join('\n'));
 
     assert.strictEqual(await minify('[\']["]', options), '[\']["]');
-    assert.strictEqual(await minify('<a href="/test.html"><div>hey</div></a>', options), '<a href="/test.html">\n<div>hey</div></a>');
-    assert.strictEqual(await minify(':) <a href="https://example.com">link</a>', options), ':) <a \nhref="https://example.com">\nlink</a>');
-    assert.strictEqual(await minify(':) <a href="https://example.com">\nlink</a>', options), ':) <a \nhref="https://example.com">\nlink</a>');
-    assert.strictEqual(await minify(':) <a href="https://example.com">\n\nlink</a>', options), ':) <a \nhref="https://example.com">\n\nlink</a>');
+    assert.strictEqual(await minify('<a href="/test.html"><div>hey</div></a>', options), '<a href="/test.html"><div\n>hey</div></a>');
+    assert.strictEqual(await minify(':) <a href="https://example.com">link</a>', options), ':) <a\nhref="https://example.com"\n>link</a>');
+    assert.strictEqual(await minify(':) <a href="https://example.com">\nlink</a>', options), ':) <a\nhref="https://example.com">\nlink</a>');
+    assert.strictEqual(await minify(':) <a href="https://example.com">\n\nlink</a>', options), ':) <a\nhref="https://example.com">\n\nlink</a>');
 
     assert.strictEqual(await minify('<a href>ok</a>', options), '<a href>ok</a>');
 
     options.noNewlinesBeforeTagClose = true;
-    assert.strictEqual(await minify('<a title="x"href=" ">foo</a>', options), '<a title="x" href="">foo</a>');
+    assert.strictEqual(await minify('<a title="x"href=" ">foo</a>', options), '<a title="x" href=""\n>foo</a>');
+    assert.strictEqual(await minify('<p>xyzxyzxyz</p><p>xyzxyzxyz</p>', options), '<p>xyzxyzxyz</p><p\n>xyzxyzxyz</p>');
+  });
+
+  test('Max line length only breaks lines in tags', async () => {
+    // Walks the wrapped and the unwrapped output side by side: Each line break has to stand
+    // in a tag, in place of a space or right before the `>`
+    const assertBreaksInTags = (/** @type {string} */ wrapped, /** @type {string} */ flat, /** @type {string} */ message) => {
+      let j = 0;
+      for (let i = 0; i < wrapped.length; i++, j++) {
+        if (wrapped[i] === flat[j]) continue;
+        assert.strictEqual(wrapped[i], '\n', message);
+        const before = flat.slice(0, j).replace(/<\?[\s\S]*?\?>/g, '');
+        assert.ok(before.lastIndexOf('<') > before.lastIndexOf('>'), `Line break outside a tag: ${message}`);
+        if (flat[j] === ' ') continue;
+        assert.strictEqual(flat[j], '>', message);
+        j--;
+      }
+      assert.strictEqual(j, flat.length, message);
+    };
+
+    const inputs = [
+      '<p>Welcome <b>xyzxyz</b>.</p>',
+      '<div data-attr="foo"></div>',
+      '<p id="a" class="b c" title="d e f">Some text that runs long</p>',
+      '<p>Text  with\n  line breaks and <em>inline</em> <span>elements</span></p>',
+      '<pre>  keep\n   this   <b>as</b> is  </pre>',
+      '<textarea>  keep\n   this   as is  </textarea>',
+      '<code>    hello   world   \n    world   hello  </code>',
+      '<script>alert(\'<!--\')</script><script>\nalert(\'<!-- foo -->\')\n</script>',
+      '<style>p { color: red }</style>',
+      '<!-- a comment with some words --><p>x</p>',
+      '<ul><li>one</li><li>two</li></ul>',
+      '<input type="checkbox" checked><br><img src="a.png" alt="An image">',
+      '<svg viewBox="0 0 10 10"><path d="M0 0h10"/></svg>',
+      '<p title=unquoted>x</p><a href=foo/>y</a>',
+      '<span>a -></span><span>b ></span>',
+      '<!-- htmlmin:ignore --><div  class="x"  >  kept  </div><!-- htmlmin:ignore --><p>x</p>',
+      '<p <?= $attrs ?> class="x">Hello <?= $name ?>!</p><div>x</div <?= $y ?>>',
+      '<p{% if e %} class="error"{% endif %} id="p">x</p>'
+    ];
+    const variants = [
+      {},
+      { collapseWhitespace: true },
+      { collapseWhitespace: true, conservativeCollapse: true },
+      { collapseWhitespace: true, preserveLineBreaks: true },
+      { collapseWhitespace: true, ignoreCustomFragments: [] },
+      { collapseWhitespace: true, ignoreCustomFragments: [/<\?[\s\S]*?\?>/, /\{%[\s\S]*?%\}/] },
+      { collapseWhitespace: true, trimCustomFragments: true, ignoreCustomFragments: [/<\?[\s\S]*?\?>/, /\{%[\s\S]*?%\}/] },
+      { decodeEntities: false },
+      { collapseWhitespace: true, noNewlinesBeforeTagClose: true },
+      { collapseWhitespace: true, removeTagWhitespace: true },
+      { collapseWhitespace: true, removeAttributeQuotes: true, keepClosingSlash: true }
+    ];
+    for (const input of inputs) {
+      for (const variant of variants) {
+        // Fragments in end tags only parse as such
+        const flat = await minify(input, variant).catch(() => null);
+        if (flat === null) continue;
+        // Output without its `htmlmin:ignore` comments can’t come out the same way twice
+        const isStable = await minify(flat, variant) === flat;
+        for (const maxLineLength of [1, 5, 10, 25]) {
+          const options = { ...variant, maxLineLength };
+          const message = `${JSON.stringify(input)} with ${JSON.stringify(options)}`;
+          const wrapped = await minify(input, options);
+          assertBreaksInTags(wrapped, flat, message);
+          if (isStable) {
+            assert.strictEqual(await minify(wrapped, options), wrapped, `Unstable output: ${message}`);
+          }
+          if (variant.noNewlinesBeforeTagClose) {
+            assert.doesNotMatch(wrapped, /<\/[^>]*\n/, message);
+          }
+        }
+      }
+    }
+
+    const options = { maxLineLength: 10 };
+    assert.strictEqual(await minify('<p>Welcome <b>xyzxyz</b>.</p>', options), '<p\n>Welcome <b\n>xyzxyz</b\n>.</p>');
+    assert.strictEqual(await minify('<div data-attr="foo"></div>', options), '<div\ndata-attr="foo"\n></div>');
+    assert.strictEqual(await minify('<p>Welcome <b>xyzxyz</b>.</p>', { ...options, noNewlinesBeforeTagClose: true }), '<p\n>Welcome <b\n>xyzxyz</b>.</p>');
+    // Nothing to break at
+    assert.strictEqual(await minify('<p>A long line of text</p>', { maxLineLength: 1 }), '<p\n>A long line of text</p>');
+    assert.strictEqual(await minify('<pre>A long line of text</pre>', { maxLineLength: 1 }), '<pre\n>A long line of text</pre>');
+    // A line already too long keeps a `>` that nothing would follow on its own line
+    assert.strictEqual(await minify('<meta name="description" content="A description that runs long">\n<meta property="og:image" content="x.png">', { maxLineLength: 30 }),
+      '<meta name="description"\ncontent="A description that runs long">\n<meta property="og:image"\ncontent="x.png">');
+    // A line at the limit still breaks, to stay within it
+    assert.strictEqual(await minify('<a>xxxx</a>', { maxLineLength: 8 }), '<a\n>xxxx</a\n>');
   });
 
   test('Custom attribute collapse', async () => {
@@ -4949,7 +5031,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p id=""class=""title="">x', {
       maxLineLength: 25,
       includeAutoGeneratedTags: false
-    }), '<p id="" class="" \ntitle="">x');
+    }), '<p id="" class=""\ntitle="">x');
 
     input = '<p>foo';
     assert.strictEqual(await minify(input, { includeAutoGeneratedTags: false }), input);

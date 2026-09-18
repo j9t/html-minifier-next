@@ -101,7 +101,7 @@ const optionDefinitions = {
     type: 'int'
   },
   maxLineLength: {
-    description: 'Specify a maximum line length; compressed output will be split by newlines at valid HTML split-points',
+    description: 'Specify a maximum line length; output will be split by newlines in tags only (between attributes or before a tag’s `>`), where they can’t change the page, so lines may run longer',
     type: 'int'
   },
   mergeScripts: {
@@ -125,7 +125,7 @@ const optionDefinitions = {
     type: 'json'
   },
   noNewlinesBeforeTagClose: {
-    description: 'Never add a newline before a tag that closes an element—use with `--max-line-length`',
+    description: 'Never split a line in a tag that closes an element—use with `--max-line-length`',
     type: 'boolean'
   },
   partialMarkup: {

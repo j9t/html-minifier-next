@@ -67,7 +67,6 @@ const qnameCapture = (function () {
 })();
 const startTagOpen = new RegExp('^<' + qnameCapture);
 const endTagOpen = new RegExp('^</' + qnameCapture);
-export const endTag = new RegExp('^</' + qnameCapture + '[^>]*>');
 
 let IS_REGEX_CAPTURING_BROKEN = false;
 'x'.replace(/x(.)?/g, function (/** @type {string} */ m, /** @type {string | undefined} */ g) {
