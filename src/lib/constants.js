@@ -50,6 +50,15 @@ const inlineElementsToKeepWhitespace = new Set(['comment', 'img', 'input', 'wbr'
 // Form control elements (for conditional whitespace collapsing)
 const formControlElements = new Set(['input', 'button', 'select', 'textarea', 'output', 'meter', 'progress']);
 
+// End-tag spellings (`/a`) of a set of element names
+/** @param {Iterable<string>} names */
+const toEndTags = names => new Set(Array.from(names, name => '/' + name));
+
+// Membership under either spelling, for the whitespace checks that ignore the slash;
+// looking a tag up as it comes keeps the hot path from slicing one string per call
+const inlineElementsToKeepWhitespaceWithinEither = new Set([...inlineElementsToKeepWhitespaceWithin, ...toEndTags(inlineElementsToKeepWhitespaceWithin)]);
+const formControlElementsEither = new Set([...formControlElements, ...toEndTags(formControlElements)]);
+
 // Default attribute values
 
 // Default attribute values (could apply to any element)
@@ -285,7 +294,9 @@ export {
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
   inlineElementsToKeepWhitespace,
-  formControlElements,
+  inlineElementsToKeepWhitespaceWithinEither,
+  formControlElementsEither,
+  toEndTags,
 
   // Default values
   generalDefaults,

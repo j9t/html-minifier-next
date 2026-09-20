@@ -32,6 +32,9 @@ import {
 } from './lib/constants.js';
 
 import {
+  buildInlineSets,
+  defaultInlineSets,
+  endsWithWhitespace,
   trimWhitespace,
   collapseWhitespaceAll,
   collapseWhitespace,
@@ -1102,6 +1105,9 @@ async function minifyHTML(value, options, partialMarkup) {
   const inlineElements = normalizedCustomElements.length
     ? new Set([...inlineElementsToKeepWhitespaceAround, ...normalizedCustomElements])
     : inlineElementsToKeepWhitespaceAround;
+  const inlineSets = normalizedCustomElements.length
+    ? buildInlineSets(inlineElements, inlineTextSet)
+    : defaultInlineSets;
 
   // Parse `removeEmptyElementsExcept` option
   /** @type {Array<{tag: string, attrs: {[x: string]: string | undefined} | null}>} */
@@ -1364,13 +1370,27 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // Look for trailing whitespaces, bypass any inline tags
   function trimTrailingWhitespace(/** @type {number} */ index, /** @type {string} */ nextTag) {
+    // Nothing to the left of the text is in play here, so only its trailing run can
+    // change—unless preserved line breaks bring the leading run into play, too
+    const trailingOnly = !options.preserveLineBreaks;
     for (let prevTag = ''; index >= 0 && canTrimWhitespace(prevTag, emptyAttrs); index--) {
       const str = buffer[index] ?? '';
       const endTagName = matchPlainEndTag(str);
       if (endTagName !== null) {
         prevTag = endTagName;
-      } else if (str.charCodeAt(str.length - 1) === 62 /* > */ ||
-          (buffer[index] = collapseWhitespaceSmart(str, '', nextTag, emptyAttrs, emptyAttrs, options, inlineElements, inlineTextSet))) {
+        continue;
+      }
+      // A tag ends the search, and so does text that survives collapsing. Text with no
+      // trailing run comes back from the call unchanged, so it can end the search on
+      // the spot; empty text cannot, as the search has to carry on past it
+      if (str.charCodeAt(str.length - 1) === 62 /* > */) {
+        break;
+      }
+      if (trailingOnly && str && !endsWithWhitespace(str)) {
+        break;
+      }
+      buffer[index] = collapseWhitespaceSmart(str, '', nextTag, emptyAttrs, emptyAttrs, options, inlineSets);
+      if (buffer[index]) {
         break;
       }
     }
@@ -1386,7 +1406,9 @@ async function minifyHTML(value, options, partialMarkup) {
     // minification run then removes
     while (charsIndex > 0) {
       const item = buffer[charsIndex] ?? '';
-      if (!/^(?:<!|$)/.test(item) || (uidIgnore && item.indexOf(uidIgnore) !== -1)) {
+      // Comments and empty entries only, as `<!…` or nothing at all
+      const skippable = item === '' || (item.charCodeAt(0) === 60 /* < */ && item.charCodeAt(1) === 33 /* ! */);
+      if (!skippable || (uidIgnore && item.indexOf(uidIgnore) !== -1)) {
         break;
       }
       charsIndex--;
@@ -1473,12 +1495,12 @@ async function minifyHTML(value, options, partialMarkup) {
               }
               trimTrailingWhitespace(tagIndex - 1, 'br');
             }
-          } else if (inlineTextSet.has(textPrevTag.charAt(0) === '/' ? textPrevTag.slice(1) : textPrevTag)) {
+          } else if (inlineSets.withinEither.has(textPrevTag)) {
             text = collapseWhitespace(text, options, /(?:^|\s)$/.test(currentChars), false);
           }
         }
         if (textPrevTag || textNextTag) {
-          text = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineElements, inlineTextSet);
+          text = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineSets);
         } else {
           text = collapseWhitespace(text, options, true, true);
         }

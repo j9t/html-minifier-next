@@ -9,14 +9,18 @@ import {
   RE_NBSP_TRAILING_GROUP,
   RE_NBSP_TRAILING_STRIP,
   inlineElementsToKeepWhitespace,
+  inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
-  formControlElements
+  inlineElementsToKeepWhitespaceWithinEither,
+  formControlElementsEither,
+  toEndTags
 } from './constants.js';
 
 const RE_ANY_WS_NBSP = /[ \n\r\t\f\xA0]/;
 const RE_TAB_NBSP = /[\t\xA0]/;
 const RE_ASCII_WS_RUN = /[ \n\r\f]+/g;
-const RE_NEEDS_COLLAPSE = /[\n\r\f]| {2}/;
+// Every reason `collapseWhitespaceAllKnown` has to do any work at all, in one scan
+const RE_COLLAPSIBLE = /[\t\xA0\n\r\f]| {2}/;
 const RE_NON_WS = /\S/;
 
 // Trim whitespace
@@ -39,6 +43,12 @@ function isAsciiWs(code) {
 /** @param {number} code */
 function isWsOrNbsp(code) {
   return code === 32 || code === 10 || code === 13 || code === 9 || code === 12 || code === 160;
+}
+
+// Whether the last character is whitespace, no-break space included
+/** @param {string} str */
+function endsWithWhitespace(str) {
+  return str.length > 0 && isWsOrNbsp(str.charCodeAt(str.length - 1));
 }
 
 // Collapse all whitespace
@@ -65,10 +75,15 @@ function collapseWhitespaceAll(str) {
 // As `collapseWhitespaceAll`, for callers that already know `str` holds whitespace
 /** @param {string} str */
 function collapseWhitespaceAllKnown(str) {
+  // Most text reaching here is already collapsed, so settle that in one scan rather
+  // than two—single spaces with no tab and no no-break space leave nothing to do
+  if (!RE_COLLAPSIBLE.test(str)) {
+    return str;
+  }
   // Only a tab or a no-break space makes the replacement depend on the run itself;
   // without either, every run becomes one space and no per-match callback is needed
   if (!RE_TAB_NBSP.test(str)) {
-    return RE_NEEDS_COLLAPSE.test(str) ? str.replace(RE_ASCII_WS_RUN, ' ') : str;
+    return str.replace(RE_ASCII_WS_RUN, ' ');
   }
   return str.replace(RE_ALL_WS_NBSP, collapseRun);
 }
@@ -199,6 +214,36 @@ function collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll)
 
 // Collapse whitespace smartly based on surrounding tags
 
+/**
+ * @typedef {object} InlineSets
+ * @prop {Set<string>} around - Elements whose surrounding whitespace is kept
+ * @prop {Set<string>} aroundEnd - The same, spelled as end tags
+ * @prop {Set<string>} within - Elements whose inner whitespace is kept
+ * @prop {Set<string>} withinEnd - The same, spelled as end tags
+ * @prop {Set<string>} withinEither - `within` under both spellings
+ */
+
+/**
+ * Inline-element membership for the whitespace pass, each set paired with its end-tag
+ * spelling so a lookup takes the tag as it comes rather than slicing off the slash
+ * @param {Set<string>} around
+ * @param {Set<string>} within
+ * @returns {InlineSets}
+ */
+function buildInlineSets(around, within) {
+  const withinEnd = toEndTags(within);
+  return {
+    around,
+    aroundEnd: toEndTags(around),
+    within,
+    withinEnd,
+    withinEither: new Set([...within, ...withinEnd])
+  };
+}
+
+// The sets for a document without custom inline elements, built once
+const defaultInlineSets = buildInlineSets(inlineElementsToKeepWhitespaceAround, inlineElementsToKeepWhitespaceWithin);
+
 // Check if an input element has `type="hidden"`; module-scope so the hot path
 // doesn’t allocate a closure per text node
 /**
@@ -221,10 +266,9 @@ function isHiddenInput(attrs) {
  * @param {Array<{name: string, value?: string}>} prevAttrs
  * @param {Array<{name: string, value?: string}>} nextAttrs
  * @param {{preserveLineBreaks?: boolean, conservativeCollapse?: boolean, collapseInlineTagWhitespace?: boolean}} options
- * @param {Set<string>} inlineElements
- * @param {Set<string>} inlineTextSet
+ * @param {InlineSets} inlineSets
  */
-function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineElements, inlineTextSet) {
+function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineSets) {
   if (!str) return str;
 
   // Fast path: No whitespace at all—every decision below would leave `str`
@@ -253,7 +297,7 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
     }
     // Aggressive mode: Collapse between all form controls
     if (inlineOption && (!trimLeft || !trimRight) &&
-        formControlElements.has(stripSlash(prevTag)) && formControlElements.has(stripSlash(nextTag))) {
+        formControlElementsEither.has(prevTag) && formControlElementsEither.has(nextTag)) {
       trimLeft = true;
       trimRight = true;
     }
@@ -262,21 +306,21 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
   if (trimLeft) {
     if (inlineOption) {
       // Still preserve whitespace around inline text elements
-      if (inlineElementsToKeepWhitespaceWithin.has(stripSlash(prevTag))) {
+      if (inlineElementsToKeepWhitespaceWithinEither.has(prevTag)) {
         trimLeft = false;
       }
     } else {
-      trimLeft = prevTag.charCodeAt(0) === 47 /* / */ ? !inlineElements.has(prevTag.slice(1)) : !inlineTextSet.has(prevTag);
+      trimLeft = prevTag.charCodeAt(0) === 47 /* / */ ? !inlineSets.aroundEnd.has(prevTag) : !inlineSets.within.has(prevTag);
     }
   }
 
   if (trimRight) {
     if (inlineOption) {
-      if (inlineElementsToKeepWhitespaceWithin.has(stripSlash(nextTag))) {
+      if (inlineElementsToKeepWhitespaceWithinEither.has(nextTag)) {
         trimRight = false;
       }
     } else {
-      trimRight = nextTag.charCodeAt(0) === 47 /* / */ ? !inlineTextSet.has(nextTag.slice(1)) : !inlineElements.has(nextTag);
+      trimRight = nextTag.charCodeAt(0) === 47 /* / */ ? !inlineSets.withinEnd.has(nextTag) : !inlineSets.around.has(nextTag);
     }
   }
 
@@ -285,11 +329,6 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
     return str;
   }
   return collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll);
-}
-
-/** @param {string} tag */
-function stripSlash(tag) {
-  return tag && tag.charCodeAt(0) === 47 /* / */ ? tag.slice(1) : tag;
 }
 
 // Collapse/trim whitespace for given tag
@@ -312,6 +351,9 @@ function canTrimWhitespace(tag) {
 // Exports
 
 export {
+  buildInlineSets,
+  defaultInlineSets,
+  endsWithWhitespace,
   trimWhitespace,
   collapseWhitespaceAll,
   collapseWhitespace,

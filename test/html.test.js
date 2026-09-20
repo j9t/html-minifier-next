@@ -4296,6 +4296,51 @@ describe('HTML', () => {
     assert.strictEqual(collapseWhitespace(' \n\t ', conservative, true, true, false), ' ');
   });
 
+  // The whitespace set is exactly `[ \n\r\t\f\xA0]`; anything else is content, and the
+  // fast paths that decide “is there whitespace here at all” must agree with that on
+  // strings of every length, short ones included
+  test('Whitespace detection covers exactly the whitespace set', () => {
+    // A vertical tab and the Unicode spaces are content, however long the text
+    for (const character of ['\v', '\u2003', '\u3000', '\uFEFF']) {
+      const short = 'a' + character + 'b';
+      const long = short + 'c'.repeat(300);
+      assert.strictEqual(collapseWhitespaceAll(short), short);
+      assert.strictEqual(collapseWhitespaceAll(long), long);
+      assert.strictEqual(trimWhitespace(character + 'a' + character), character + 'a' + character);
+      assert.strictEqual(collapseWhitespace(short, {}, true, true, true), short);
+    }
+
+    // Every member of the ASCII set is found, alone and at either end of a long text
+    const padding = 'c'.repeat(300);
+    for (const character of [' ', '\n', '\r', '\t', '\f']) {
+      assert.strictEqual(collapseWhitespace(character + 'a', {}, true, false, false), 'a');
+      assert.strictEqual(collapseWhitespace(character + padding, {}, true, false, false), padding);
+      assert.strictEqual(collapseWhitespace(padding + character, {}, false, true, false), padding);
+    }
+
+    // A no-break space counts as whitespace for detection but survives trimming
+    assert.strictEqual(collapseWhitespace('\xA0' + padding, {}, true, false, false), '\xA0' + padding);
+    assert.strictEqual(collapseWhitespace(padding + '\xA0', {}, false, true, false), padding + '\xA0');
+    assert.strictEqual(collapseWhitespace(' \xA0', {}, true, true, false), '\xA0');
+  });
+
+  test('`collapseWhitespaceAll` on text with nothing to collapse', () => {
+    // Single spaces, no tab, no no-break space: The text comes back untouched
+    for (const text of ['a b', 'a b c', 'a b '.repeat(200), ' ', 'a']) {
+      assert.strictEqual(collapseWhitespaceAll(text), text);
+    }
+
+    // Each reason to do work is found on its own, in long text as in short
+    const padding = 'c'.repeat(300);
+    assert.strictEqual(collapseWhitespaceAll('a  b'), 'a b');
+    assert.strictEqual(collapseWhitespaceAll(padding + '  ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \n ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \r ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \f ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \t ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \xA0 ' + padding), padding + ' \xA0 ' + padding);
+  });
+
   test('Ignore custom comments', async () => {
     let input;
 
