@@ -175,7 +175,7 @@ describe('Options', () => {
       for (const continueOnMinifyError of [true, false]) {
         const options = processOptions(
           { minifySVG: { engine: 'oxvg' }, continueOnMinifyError },
-          { getSvgo: async () => (svg => ({ data: svg })), getOxvg: oxvgNotInstalled, getDecodeHTML: async () => (text => text), svgMinifyCache: new Map() }
+          { getSvgo: async () => (svg => ({ data: svg })), getOxvg: oxvgNotInstalled, getDecodeHTMLStrict: async () => (text => text), svgMinifyCache: new Map() }
         );
 
         await assert.rejects(
@@ -207,7 +207,7 @@ describe('Options', () => {
         {
           getSvgo: async () => (input => ({ data: input })),
           getOxvg: async () => ({ optimise: () => { throw new Error('unknown entity reference'); }, extend: () => ({}) }),
-          getDecodeHTML: async () => (text => text),
+          getDecodeHTMLStrict: async () => (text => text),
           svgMinifyCache: new Map()
         }
       );

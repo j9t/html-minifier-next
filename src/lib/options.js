@@ -220,19 +220,22 @@ function describeEngine(engine) {
 // OXVG parses SVG as XML and knows the five XML entities only, while SVGO
 // resolves the HTML set and emits the characters themselves. Resolving named
 // references first keeps the engines at parity; names neither of them knows
-// stay as they are, and both reject them.
-const namedReference = /&([a-zA-Z][a-zA-Z0-9]*);/g;
+// stay as they are, and both reject them. A CDATA section is matched whole so
+// that what it holds is left alone—its text is literal, and decoding there
+// would rewrite CSS and script content.
+const namedReference = /<!\[CDATA\[[\s\S]*?\]\]>|&([a-zA-Z][a-zA-Z0-9]*);/g;
 const xmlEntities = new Set(['amp', 'apos', 'gt', 'lt', 'quot']);
 
 /**
  * @param {string} svg - SVG source
- * @param {(input: string) => string} decodeHTML - Decoder from `entities`
+ * @param {(input: string) => string} decodeStrict - `decodeHTMLStrict` from `entities`
  * @returns {string} Source with named character references resolved
  */
-function resolveNamedReferences(svg, decodeHTML) {
+function resolveNamedReferences(svg, decodeStrict) {
   if (!svg.includes('&')) return svg;
-  return svg.replace(namedReference, (reference, /** @type {string} */ name) =>
-    xmlEntities.has(name) ? reference : decodeHTML(reference)
+  // A name is captured only for a reference; a CDATA section leaves it unset
+  return svg.replace(namedReference, (match, /** @type {string | undefined} */ name) =>
+    name === undefined || xmlEntities.has(name) ? match : decodeStrict(match)
   );
 }
 
@@ -240,10 +243,10 @@ function resolveNamedReferences(svg, decodeHTML) {
 
 /**
  * @param {MinifierOptions} inputOptions - User-provided options
- * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, getOxvg?: Function | undefined, getDecodeHTML?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
+ * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, getOxvg?: Function | undefined, getDecodeHTMLStrict?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
  * @returns {ProcessedOptions} Normalized options with defaults applied
  */
-const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, getOxvg, getDecodeHTML, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
+const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, getOxvg, getDecodeHTMLStrict, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
   /** @type {ProcessedOptions} */
   const options = {
     name: lowercase,
@@ -688,14 +691,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         }
       };
     } else if (key === 'minifySVG' && typeof option !== 'function') {
-      if (!option || !getSvgo || !getOxvg || !getDecodeHTML || !svgMinifyCache) {
+      if (!option || !getSvgo || !getOxvg || !getDecodeHTMLStrict || !svgMinifyCache) {
         return;
       }
 
       // Capture to preserve TypeScript narrowing across the async closure boundary below
       const loadSvgo = getSvgo;
       const loadOxvg = getOxvg;
-      const loadDecodeHTML = getDecodeHTML;
+      const loadDecodeStrict = getDecodeHTMLStrict;
       const svgCache = svgMinifyCache;
 
       // Parse configuration
@@ -775,9 +778,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
           const inFlight = (async () => {
             if (svgEngine === 'oxvg') {
-              const [oxvg, decodeHTML] = await Promise.all([loadOxvg(), loadDecodeHTML()]);
+              const [oxvg, decodeStrict] = await Promise.all([loadOxvg(), loadDecodeStrict()]);
               oxvgJobs ??= oxvgNamesJobs ? oxvgOptions : oxvgJobsInline(oxvg.extend);
-              return oxvg.optimise(resolveNamedReferences(svgContent, decodeHTML), oxvgJobs);
+              return oxvg.optimise(resolveNamedReferences(svgContent, decodeStrict), oxvgJobs);
             }
             const optimize = await loadSvgo();
             const result = optimize(svgContent, svgoOptions);

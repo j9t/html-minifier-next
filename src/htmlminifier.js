@@ -608,6 +608,15 @@ async function getDecodeHTML() {
   return decodeHTMLPromise;
 }
 
+/** @type {Promise<Function> | undefined} */
+let decodeHTMLStrictPromise;
+async function getDecodeHTMLStrict() {
+  if (!decodeHTMLStrictPromise) {
+    decodeHTMLStrictPromise = import('entities').then(m => m.decodeHTMLStrict);
+  }
+  return decodeHTMLStrictPromise;
+}
+
 // Minification caches (initialized on first use with configurable sizes)
 /** @type {LRU | null} */
 let cssMinifyCache = null;
@@ -2471,7 +2480,7 @@ export const minify = async function (value, options) {
       getSwc,
       getSvgo,
       getOxvg,
-      getDecodeHTML,
+      getDecodeHTMLStrict,
       cssMinifyCache: caches.cssMinifyCache ?? undefined,
       jsMinifyCache: caches.jsMinifyCache ?? undefined,
       svgMinifyCache: caches.svgMinifyCache ?? undefined

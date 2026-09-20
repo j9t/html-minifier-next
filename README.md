@@ -549,12 +549,13 @@ Passing SVGO options (`plugins`, `floatPrecision`, `multipass`, …) to OXVG is 
 
 As with SVGO’s `plugins`, a config that names no job of its own keeps a job set fit for inline SVG: `cleanupIds`, `inlineStyles`, and `removeHiddenElems` are off, `minifyStyles` leaves the rules the SVG itself does not use, and `removeUnknownsAndDefaults` keeps `role`. Naming any job replaces OXVG’s default pipeline rather than adding to it—that job set included—so build on the defaults with its own `extend`: `{...extend({type: 'Default'}, {removeComments: {}})}`. `convertSvgoConfig` translates a list of plugin names, `preset-default` among them, though as of 0.0.8 it takes that one as a bare string only—`{name: 'preset-default'}` is refused—and wants plugin parameters in full, where SVGO takes partial overrides. (OXVG’s documentation writes `extend`’s first argument as `Extends.Default`, but 0.0.8 exports `Extends` as a type only, with no value to read `Default` from.)
 
-Named character references (`&nbsp;`, `&copy;`, and similar) are resolved before the SVG reaches OXVG, which parses XML and [would otherwise reject them](https://github.com/noahbald/oxvg/issues/274). SVGO resolves them on its own, so both engines emit the same characters. Names neither engine knows are left alone, and both then refuse the SVG.
+Named character references (`&nbsp;`, `&copy;`, and similar) are resolved before the SVG reaches OXVG, which parses XML and [would otherwise reject them](https://github.com/noahbald/oxvg/issues/274). SVGO resolves them on its own, so both engines emit the same characters. Names neither engine knows are left alone—including one that merely starts with a name they do know, such as `&notit;`—and both then refuse the SVG. What a CDATA section holds is left alone as well, since its text is literal.
 
 Two differences to expect from OXVG:
 
 * Space characters other than the plain space—non-breaking spaces, thin spaces, and the like—come out as a plain space in text and attribute values, however they were written (`&nbsp;`, `&#160;`, or the character itself). `xml:space="preserve"` keeps them in text, but not in attribute values; SVGO keeps them either way.
 * Path data closes with `Z` rather than SVGO’s `z`—identical in meaning and length, but it will show up in golden-file comparisons.
+* A `style` element whose CSS parses is written back unescaped, so an `&` or `<` in it (from `&amp;` or `&lt;`) comes out bare—harmless in HTML, where `style` is raw text, but the SVG on its own is then no longer well-formed XML, and [minifying the output a second time fails](https://github.com/noahbald/oxvg/issues/288). SVGO escapes it and is stable.
 
 **Important:**
 

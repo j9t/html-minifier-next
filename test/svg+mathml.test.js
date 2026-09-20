@@ -1513,4 +1513,72 @@ describe('SVG and MathML', () => {
       );
     }
   });
+
+  test('SVG: A name that only starts with a known one is not part-decoded', async () => {
+    // `decodeHTML` resolves the legacy prefix and keeps the rest, so `&ltfoo;`
+    // would reach the parser as `<foo;`—markup conjured out of text
+    for (const reference of ['&notit;', '&ampx;', '&ltfoo;', '&copyx;']) {
+      const input = `<svg><title>${reference}</title><rect width="10" height="10"/></svg>`;
+
+      for (const engine of ['oxvg', 'svgo']) {
+        await assert.rejects(
+          async () => await minify(input, { minifySVG: { engine }, continueOnMinifyError: false }),
+          `${engine} should refuse \`${reference}\` rather than decode part of it`
+        );
+      }
+
+      assert.ok(
+        (await minify(input, { minifySVG: { engine: 'oxvg' } })).includes(reference),
+        `\`${reference}\` should come back as it was written`
+      );
+    }
+  });
+
+  test('SVG: OXVG writes a parsed style sheet back unescaped, where SVGO escapes it', async () => {
+    // Upstream’s limit, asserted so that a release lifting it reads as a
+    // correction rather than as a break (oxvg, `<style>` write-back): CSS that
+    // parses is re-serialized without escaping, so `&` and `<` come out bare
+    const input = '<svg xmlns="http://www.w3.org/2000/svg"><style>.a{background:url("a.png?x=1&amp;y=2")}</style><rect class="a" width="1" height="1"/></svg>';
+
+    const svgo = await minify(input, { minifySVG: { engine: 'svgo' }, continueOnMinifyError: false });
+    assert.ok(svgo.includes('&amp;'), `SVGO should keep the reference: ${svgo}`);
+
+    const oxvg = await minify(input, { minifySVG: { engine: 'oxvg' }, continueOnMinifyError: false });
+    assert.ok(oxvg.includes('x=1&y=2'), `OXVG should be seen to drop the escaping: ${oxvg}`);
+
+    // Which costs idempotency: what OXVG wrote, OXVG cannot read again
+    await assert.rejects(
+      async () => await minify(oxvg, { minifySVG: { engine: 'oxvg' }, continueOnMinifyError: false }),
+      /entity/i,
+      'Minifying the result a second time should still fail'
+    );
+    assert.strictEqual(
+      await minify(svgo, { minifySVG: { engine: 'svgo' }, continueOnMinifyError: false }),
+      svgo,
+      'SVGO should be stable across a second pass'
+    );
+  });
+
+  test('SVG: References inside CDATA are left as the text they are', async () => {
+    // CDATA content is literal, so resolving there would rewrite script and CSS
+    const cases = [
+      '<svg><script><![CDATA[var s="&copy;";]]></script><rect width="10" height="10"/></svg>',
+      '<svg><title><![CDATA[A&copy;B]]></title><rect width="10" height="10"/></svg>',
+      '<svg><style><![CDATA[.a{font-family:"A&copy;B"}]]></style><rect width="10" height="10"/></svg>'
+    ];
+
+    for (const input of cases) {
+      const result = await minify(input, { minifySVG: { engine: 'oxvg' }, continueOnMinifyError: false });
+
+      // Written back escaped in a text node and raw in `style`, but text either way
+      assert.ok(result.includes('copy;'), `The reference should survive as text: ${result}`);
+      assert.ok(!result.includes('\u00a9'), `Nothing should have been resolved: ${result}`);
+    }
+
+    // Outside CDATA the same reference still resolves
+    assert.ok(
+      (await minify('<svg><title>A&copy;B</title><rect width="10" height="10"/></svg>', { minifySVG: { engine: 'oxvg' } })).includes('A\u00a9B'),
+      'An ordinary named reference should still be resolved'
+    );
+  });
 });
