@@ -4,7 +4,7 @@
 
 import { createUrlMinifier } from './urls.js';
 import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, isThenable, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
-import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY, svgoPluginsInline } from './constants.js';
+import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY, svgoPluginsInline, oxvgJobsInline } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 import { findUnusedSymbols, normalizeUnusedCSSOptions } from './unused-css.js';
@@ -217,14 +217,33 @@ function describeEngine(engine) {
   }
 }
 
+// OXVG parses SVG as XML and knows the five XML entities only, while SVGO
+// resolves the HTML set and emits the characters themselves. Resolving named
+// references first keeps the engines at parity; names neither of them knows
+// stay as they are, and both reject them.
+const namedReference = /&([a-zA-Z][a-zA-Z0-9]*);/g;
+const xmlEntities = new Set(['amp', 'apos', 'gt', 'lt', 'quot']);
+
+/**
+ * @param {string} svg - SVG source
+ * @param {(input: string) => string} decodeHTML - Decoder from `entities`
+ * @returns {string} Source with named character references resolved
+ */
+function resolveNamedReferences(svg, decodeHTML) {
+  if (!svg.includes('&')) return svg;
+  return svg.replace(namedReference, (reference, /** @type {string} */ name) =>
+    xmlEntities.has(name) ? reference : decodeHTML(reference)
+  );
+}
+
 // Main options processor
 
 /**
  * @param {MinifierOptions} inputOptions - User-provided options
- * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
+ * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, getOxvg?: Function | undefined, getDecodeHTML?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
  * @returns {ProcessedOptions} Normalized options with defaults applied
  */
-const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
+const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getSvgo, getOxvg, getDecodeHTML, cssMinifyCache, jsMinifyCache, svgMinifyCache } = {}) => {
   /** @type {ProcessedOptions} */
   const options = {
     name: lowercase,
@@ -669,21 +688,64 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         }
       };
     } else if (key === 'minifySVG' && typeof option !== 'function') {
-      if (!option || !getSvgo || !svgMinifyCache) {
+      if (!option || !getSvgo || !getOxvg || !getDecodeHTML || !svgMinifyCache) {
         return;
       }
 
       // Capture to preserve TypeScript narrowing across the async closure boundary below
       const loadSvgo = getSvgo;
+      const loadOxvg = getOxvg;
+      const loadDecodeHTML = getDecodeHTML;
       const svgCache = svgMinifyCache;
 
+      // Parse configuration
+      const svgConfig = typeof option === 'object' ? option : {};
+      const svgEngine = normalizeEngine(svgConfig.engine, 'svgo');
+
+      // Validate engine
+      const supportedSVGEngines = ['svgo', 'oxvg'];
+      if (!supportedSVGEngines.includes(/** @type {string} */ (svgEngine))) {
+        throw new Error(`Unsupported SVG minifier engine: \`${describeEngine(svgEngine)}\`. Supported engines: ${supportedSVGEngines.join(', ')}`);
+      }
+
+      // Extract engine-specific options (excluding `engine` field itself)
+      const svgEngineOptions = { ...svgConfig };
+      delete svgEngineOptions.engine;
+
+      // The engines take unrelated configuration shapes: SVGO reads a plugin
+      // pipeline, OXVG a map of job names to parameters, and any object handed
+      // to OXVG replaces its defaults rather than merging into them. OXVG names
+      // the offending key and stops there; catching the SVGO-only keys first
+      // says what to reach for instead.
+      if (svgEngine === 'oxvg') {
+        const svgoOnlyKeys = ['datauri', 'floatPrecision', 'js2svg', 'multipass', 'path', 'plugins'];
+        const carried = svgoOnlyKeys.filter(k => k in svgEngineOptions);
+        if (carried.length) {
+          throw new Error(
+            `SVG minifier engine \`oxvg\` does not accept SVGO options: ${carried.map(k => `“${k}”`).join(', ')}. ` +
+            'OXVG takes a map of job names to parameters (for example `{removeComments: {}}`). ' +
+            'Configure it in its own terms, or translate a plugin list with `convertSvgoConfig` from `@oxvg/napi`.'
+          );
+        }
+      }
+
       // A config without `plugins` of its own keeps the plugins fit for inline SVG
-      const svgoConfig = typeof option === 'object' ? /** @type {{plugins?: unknown[]}} */ (option) : {};
-      const svgoOptions = { ...svgoConfig, plugins: svgoConfig.plugins ?? svgoPluginsInline };
+      const svgoConfig = /** @type {{plugins?: unknown[]}} */ (svgEngineOptions);
+      const svgoOptions = svgEngine === 'svgo'
+        ? { ...svgoConfig, plugins: svgoConfig.plugins ?? svgoPluginsInline }
+        : {};
+
+      // The same for OXVG, whose jobs stand in for the plugins: Naming any of them
+      // replaces the pipeline, so a config that names none keeps the inline job set
+      const oxvgOptions = svgEngine === 'oxvg' ? svgEngineOptions : {};
+      const oxvgNamesJobs = Object.keys(oxvgOptions).length > 0;
+      /** @type {Object | undefined} */
+      let oxvgJobs;
 
       // Pre-compute option signature for cache keys
       const svgSig = stableStringify({
-        ...svgoOptions,
+        engine: svgEngine,
+        ...svgEngineOptions,
         cont: !!options.continueOnMinifyError
       });
 
@@ -712,6 +774,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           }
 
           const inFlight = (async () => {
+            if (svgEngine === 'oxvg') {
+              const [oxvg, decodeHTML] = await Promise.all([loadOxvg(), loadDecodeHTML()]);
+              oxvgJobs ??= oxvgNamesJobs ? oxvgOptions : oxvgJobsInline(oxvg.extend);
+              return oxvg.optimise(resolveNamedReferences(svgContent, decodeHTML), oxvgJobs);
+            }
             const optimize = await loadSvgo();
             const result = optimize(svgContent, svgoOptions);
             return result.data;
@@ -723,7 +790,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return resolved;
         } catch (err) {
           if (svgKey !== undefined) svgCache.delete(svgKey);
-          if (!options.continueOnMinifyError) {
+          if (!options.continueOnMinifyError || isMissingDependency(err)) {
             throw err;
           }
           options.log && options.log(err);

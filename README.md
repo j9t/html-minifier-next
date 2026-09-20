@@ -160,7 +160,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `mergeScripts`<br>`--merge-scripts` | Merge consecutive inline `script` elements into one (only merges compatible scripts with same `type`, matching `async`/`defer`/`nomodule`/`nonce`) | `false` |
 | `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
 | `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://terser.org/) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
-| `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/)) | `false` (could be `true`, `Object`) |
+| `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/) or—experimental—[OXVG](https://github.com/noahbald/oxvg)) | `false` (could be `true`, `Object`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never split a line in a tag that closes an element—use with `maxLineLength` | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
@@ -193,7 +193,7 @@ A few options take functions and are therefore only available programmatically, 
 | `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `canMinifyCSS` | Synchronous `Function(text, type)` that determines whether `minifyCSS` may process a given piece of CSS—returning `false` [leaves it as if `minifyCSS` were off](#css-minification) | All CSS is minified |
 | `canMinifyJS` | Synchronous `Function(text, inline)` that determines whether `minifyJS` may process a given piece of JavaScript—returning `false` [leaves it unminified](#javascript-minification) | All JavaScript is minified |
-| `canMinifySVG` | Synchronous `Function(text)` that determines whether `minifySVG` may pass a given outermost `svg` element to SVGO—returning `false` [skips SVGO for it](#svg-minification) | All SVG is minified |
+| `canMinifySVG` | Synchronous `Function(text)` that determines whether `minifySVG` may pass a given outermost `svg` element to its engine—returning `false` [skips minification for it](#svg-minification) | All SVG is minified |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
 | `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
 
@@ -481,7 +481,7 @@ const result = await minify(html, {
 });
 ```
 
-To exempt individual `svg` elements, pass `canMinifySVG` a synchronous function. It receives each outermost `svg` element, including any `svg` elements nested in it, as the HTML pass wrote it (e.g., without comments under `removeComments`), and one for which it returns `false` skips SVGO. To keep an `svg` element exactly as written, [wrap it in `<!-- htmlmin:ignore -->`](#ignoring-chunks-of-markup) instead.
+To exempt individual `svg` elements, pass `canMinifySVG` a synchronous function. It receives each outermost `svg` element, including any `svg` elements nested in it, as the HTML pass wrote it (e.g., without comments under `removeComments`), and one for which it returns `false` skips minification, whichever engine is in use. To keep an `svg` element exactly as written, [wrap it in `<!-- htmlmin:ignore -->`](#ignoring-chunks-of-markup) instead.
 
 ```js
 const result = await minify(html, {
@@ -489,6 +489,72 @@ const result = await minify(html, {
   canMinifySVG: text => !text.includes('data-keep')
 });
 ```
+
+You can choose between different SVG minifiers using the `engine` field:
+
+```js
+const result = await minify(html, {
+  minifySVG: {
+    engine: 'oxvg' // Use OXVG instead of SVGO
+  }
+});
+```
+
+**Available engines:**
+
+* `svgo` (default): The standard SVG optimizer
+* [`oxvg`](https://github.com/noahbald/oxvg): Rust-based optimizer, roughly twice as fast as SVGO across real-world tests and fastest on small icons, at broadly comparable compression (experimental; requires separate installation)
+
+**To use OXVG**, install it as a development dependency:
+
+```shell
+npm i -D @oxvg/napi
+```
+
+HMN needs 0.0.8 or later: Earlier releases abort the process on ordinary `style` values like `fill:var(--brand)`.
+
+OXVG is pre-1.0, and its output differs from SVGO’s in the ways listed below—it’s worth re-checking the result when switching an existing project over.
+
+**Important:** OXVG reserves panics for what it considers its own bugs, and a panic ends the Node process rather than raising an error. `continueOnMinifyError` does not apply—there is no JavaScript error to catch—and nothing else in the run completes: The panic message goes to STDERR, and the process exits with 134. SVGO throws an ordinary exception instead, which `continueOnMinifyError` can absorb. The behavior is [deliberate upstream](https://github.com/noahbald/oxvg/issues/281), and it’s the main reason to keep OXVG opt-in.
+
+If a run ends that way, the STDERR message starts with `panicked at` and names a file under `crates/`, which is OXVG’s own source. Set `engine: 'svgo'` to get the build through: SVGO minifies the same SVG without such a complaint. Consider reporting the case [to the OXVG project](https://github.com/noahbald/oxvg/issues) together with the `svg` element that triggered it.
+
+The message does not say which SVG that was. To find it, log each one as it is handed over and read the last line before the abort:
+
+```js
+const result = await minify(html, {
+  minifySVG: { engine: 'oxvg' },
+  canMinifySVG: text => {
+    console.error(text.slice(0, 200));
+    return true;
+  }
+});
+```
+
+`canMinifySVG` is API-only, so from the CLI, minify the files one at a time instead and see which one dies.
+
+**Important:** The two SVG engines do not share a configuration format. SVGO reads a
+plugin pipeline, OXVG a map of job names to parameters:
+
+```js
+const result = await minify(html, {
+  minifySVG: {
+    engine: 'oxvg',
+    removeComments: {} // An OXVG job, not an SVGO plugin
+  }
+});
+```
+
+Passing SVGO options (`plugins`, `floatPrecision`, `multipass`, …) to OXVG is refused, with an error that names the way to translate them. As of 0.0.8, OXVG refuses keys it does not know as well, though it names the key and nothing more.
+
+As with SVGO’s `plugins`, a config that names no job of its own keeps a job set fit for inline SVG: `cleanupIds`, `inlineStyles`, and `removeHiddenElems` are off, `minifyStyles` leaves the rules the SVG itself does not use, and `removeUnknownsAndDefaults` keeps `role`. Naming any job replaces OXVG’s default pipeline rather than adding to it—that job set included—so build on the defaults with its own `extend`: `{...extend({type: 'Default'}, {removeComments: {}})}`. `convertSvgoConfig` translates a list of plugin names, `preset-default` among them, though as of 0.0.8 it takes that one as a bare string only—`{name: 'preset-default'}` is refused—and wants plugin parameters in full, where SVGO takes partial overrides. (OXVG’s documentation writes `extend`’s first argument as `Extends.Default`, but 0.0.8 exports `Extends` as a type only, with no value to read `Default` from.)
+
+Named character references (`&nbsp;`, `&copy;`, and similar) are resolved before the SVG reaches OXVG, which parses XML and [would otherwise reject them](https://github.com/noahbald/oxvg/issues/274). SVGO resolves them on its own, so both engines emit the same characters. Names neither engine knows are left alone, and both then refuse the SVG.
+
+Two differences to expect from OXVG:
+
+* Space characters other than the plain space—non-breaking spaces, thin spaces, and the like—come out as a plain space in text and attribute values, however they were written (`&nbsp;`, `&#160;`, or the character itself). `xml:space="preserve"` keeps them in text, but not in attribute values; SVGO keeps them either way.
+* Path data closes with `Z` rather than SVGO’s `z`—identical in meaning and length, but it will show up in golden-file comparisons.
 
 **Important:**
 

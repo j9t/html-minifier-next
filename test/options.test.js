@@ -150,6 +150,12 @@ describe('Options', () => {
       throw err;
     };
 
+    const oxvgNotInstalled = async () => {
+      const err = new Error('The OXVG SVG minifier requires @oxvg/napi to be installed.');
+      err.code = MISSING_DEPENDENCY;
+      throw err;
+    };
+
     test('An engine that is not installed is reported, however errors are handled', async () => {
       for (const continueOnMinifyError of [true, false]) {
         const options = processOptions(
@@ -160,6 +166,21 @@ describe('Options', () => {
         await assert.rejects(
           async () => await options.minifyJS('var a = 1;', false),
           /requires @swc\/core/,
+          `Asking for an engine that is missing is a configuration error (\`continueOnMinifyError: ${continueOnMinifyError}\`)`
+        );
+      }
+    });
+
+    test('The same is true of an SVG engine that is not installed', async () => {
+      for (const continueOnMinifyError of [true, false]) {
+        const options = processOptions(
+          { minifySVG: { engine: 'oxvg' }, continueOnMinifyError },
+          { getSvgo: async () => (svg => ({ data: svg })), getOxvg: oxvgNotInstalled, getDecodeHTML: async () => (text => text), svgMinifyCache: new Map() }
+        );
+
+        await assert.rejects(
+          async () => await options.minifySVG('<svg><rect width="1" height="1"/></svg>'),
+          /requires @oxvg\/napi/,
           `Asking for an engine that is missing is a configuration error (\`continueOnMinifyError: ${continueOnMinifyError}\`)`
         );
       }
@@ -177,6 +198,21 @@ describe('Options', () => {
       );
 
       assert.strictEqual(await options.minifyJS(script, false), script, 'Content the engine chokes on should pass through as before');
+    });
+
+    test('The same is true of an SVG minification error', async () => {
+      const svg = '<svg><rect width="1" height="1"/></svg>';
+      const options = processOptions(
+        { minifySVG: { engine: 'oxvg' }, continueOnMinifyError: true },
+        {
+          getSvgo: async () => (input => ({ data: input })),
+          getOxvg: async () => ({ optimise: () => { throw new Error('unknown entity reference'); }, extend: () => ({}) }),
+          getDecodeHTML: async () => (text => text),
+          svgMinifyCache: new Map()
+        }
+      );
+
+      assert.strictEqual(await options.minifySVG(svg), svg, 'Content the engine chokes on should pass through as before');
     });
   });
 });

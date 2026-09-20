@@ -227,6 +227,24 @@ const svgoPluginsInline = [{
   }
 }];
 
+// OXVG makes the same standalone-file assumption as SVGO, so its default jobs
+// are adjusted the way `svgoPluginsInline` adjusts the plugins: The three that
+// reach outside the SVG are dropped, and the two that have a parameter for it
+// are set. Naming a job replaces OXVG’s defaults rather than adding to them,
+// so this starts from `extend`, and a job is switched off by being absent,
+// not by `false`.
+function oxvgJobsInline(/** @type {Function} */ extend) {
+  const jobs = extend({ type: 'Default' }, {});
+  delete jobs.cleanupIds;
+  delete jobs.inlineStyles;
+  delete jobs.removeHiddenElems;
+  return {
+    ...jobs,
+    minifyStyles: { ...jobs.minifyStyles, usage: { type: 'False' } },
+    removeUnknownsAndDefaults: { ...jobs.removeUnknownsAndDefaults, keepRoleAttr: true }
+  };
+}
+
 // Mixed-case names the HTML parser gives SVG elements and attributes and MathML attributes, keyed
 // by the lowercase it reads every other name as (no lowercase name is both an element and an
 // attribute of different case, so one table serves both)
@@ -306,6 +324,7 @@ export {
   MISSING_DEPENDENCY,
   namesForeignMixedCase,
   svgoPluginsInline,
+  oxvgJobsInline,
 
   // Tag omission rules
   optionalStartTags,

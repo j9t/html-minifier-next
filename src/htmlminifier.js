@@ -340,12 +340,17 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  Default: `false`
  *
- * @prop {boolean | Object} [minifySVG]
+ * @prop {boolean | Object | {engine?: 'svgo' | 'oxvg', [key: string]: any}} [minifySVG]
  *  When true, enables SVG minification using [SVGO](https://github.com/svg/svgo).
  *  Complete SVG subtrees are extracted and optimized as a block, with the SVGO
  *  plugins that assume a standalone SVG file turned off.
- *  If an object is provided, it is passed to SVGO as configuration options; unless
- *  it sets `plugins`, it keeps that plugin set.
+ *  If an object is provided, it configures minification:
+ *  - `engine`: The minifier to use (`svgo` or—experimental—`oxvg`). Default: `svgo`.
+ *    Note: An internal error in OXVG ends the process rather than raising an error,
+ *    so `continueOnMinifyError` does not cover it and the rest of the run is lost.
+ *  - Any other properties are passed to the selected engine (SVGO options if
+ *    `engine: 'svgo'`, OXVG jobs if `engine: 'oxvg'`—the two are not interchangeable).
+ *    Either keeps the plugins or jobs fit for inline SVG, unless it names its own.
  *  If disabled, SVG content is minified using standard HTML rules only.
  *
  *  Default: `false`
@@ -579,6 +584,19 @@ async function getSvgo() {
     svgoPromise = import('svgo').then(m => m.optimize);
   }
   return svgoPromise;
+}
+
+/** @type {Promise<{optimise: Function, extend: Function}> | undefined} */
+let oxvgPromise;
+async function getOxvg() {
+  if (!oxvgPromise) {
+    oxvgPromise = import('@oxvg/napi')
+      .then(m => m.default || m)
+      .catch(err => {
+        throw unavailableDependency('OXVG SVG', '@oxvg/napi', err);
+      });
+  }
+  return oxvgPromise;
 }
 
 /** @type {Promise<Function> | undefined} */
@@ -2452,6 +2470,8 @@ export const minify = async function (value, options) {
       getTerser,
       getSwc,
       getSvgo,
+      getOxvg,
+      getDecodeHTML,
       cssMinifyCache: caches.cssMinifyCache ?? undefined,
       jsMinifyCache: caches.jsMinifyCache ?? undefined,
       svgMinifyCache: caches.svgMinifyCache ?? undefined

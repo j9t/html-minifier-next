@@ -99,7 +99,7 @@ const demoConfig = {
     label: 'Minify SVG',
     checked: false,
     disabled: true,
-    helpText: 'Minify SVG elements (uses SVGO; disabled in web demo because it requires Node.js)'
+    helpText: 'Minify SVG elements (uses SVGO or OXVG; disabled in web demo because it requires Node.js)'
   },
   minifyURLs: {
     label: 'Minify URLs',
