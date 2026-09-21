@@ -2616,6 +2616,26 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
   });
 
+  test('Comment removal next to a preserved line break', async () => {
+    // Removing a comment can leave the line break that followed it standing alone between
+    // the text and the next tag. The backward scan for trailing whitespace treats such an
+    // entry as text and stops there, rather than stepping over it as it does for a comment,
+    // so the line break survives and the space ahead of it goes
+    const options = { collapseWhitespace: true, removeComments: true, preserveLineBreaks: true };
+    assert.strictEqual(await minify('foo <!-- c -->\n<div>x</div>', options), 'foo\n<div>x</div>');
+    assert.strictEqual(await minify('foo <!-- c -->\r\n<div>x</div>', options), 'foo\n<div>x</div>');
+    assert.strictEqual(await minify('foo <!-- c -->\r<div>x</div>', options), 'foo\n<div>x</div>');
+    assert.strictEqual(await minify('foo <!-- c --> \n <div>x</div>', options), 'foo\n<div>x</div>');
+    assert.strictEqual(await minify('<p>foo <!-- c -->\n</p>', options), '<p>foo\n</p>');
+    assert.strictEqual(await minify('<div>a <!-- c -->\n<span>b</span></div>', options), '<div>a\n<span>b</span></div>');
+
+    // A line break between two removed comments is reached the same way
+    assert.strictEqual(await minify('foo<!-- c -->\n<!-- d -->\n<div>x</div>', options), 'foo\n<div>x</div>');
+
+    // Without `preserveLineBreaks` the run goes entirely
+    assert.strictEqual(await minify('foo <!-- c -->\n<div>x</div>', { collapseWhitespace: true, removeComments: true }), 'foo<div>x</div>');
+  });
+
   // https://github.com/kangax/html-minifier/issues/10
   test('Ignore custom fragments', async () => {
     let input, output;
@@ -4294,6 +4314,51 @@ describe('HTML', () => {
     // Whitespace-only text
     assert.strictEqual(collapseWhitespace(' \n\t ', plain, true, true, false), '');
     assert.strictEqual(collapseWhitespace(' \n\t ', conservative, true, true, false), ' ');
+  });
+
+  // The whitespace set is exactly `[ \n\r\t\f\xA0]`; anything else is content, and the
+  // fast paths that decide “is there whitespace here at all” must agree with that on
+  // strings of every length, short ones included
+  test('Whitespace detection covers exactly the whitespace set', () => {
+    // A vertical tab and the Unicode spaces are content, however long the text
+    for (const character of ['\v', '\u2003', '\u3000', '\uFEFF']) {
+      const short = 'a' + character + 'b';
+      const long = short + 'c'.repeat(300);
+      assert.strictEqual(collapseWhitespaceAll(short), short);
+      assert.strictEqual(collapseWhitespaceAll(long), long);
+      assert.strictEqual(trimWhitespace(character + 'a' + character), character + 'a' + character);
+      assert.strictEqual(collapseWhitespace(short, {}, true, true, true), short);
+    }
+
+    // Every member of the ASCII set is found, alone and at either end of a long text
+    const padding = 'c'.repeat(300);
+    for (const character of [' ', '\n', '\r', '\t', '\f']) {
+      assert.strictEqual(collapseWhitespace(character + 'a', {}, true, false, false), 'a');
+      assert.strictEqual(collapseWhitespace(character + padding, {}, true, false, false), padding);
+      assert.strictEqual(collapseWhitespace(padding + character, {}, false, true, false), padding);
+    }
+
+    // A no-break space counts as whitespace for detection but survives trimming
+    assert.strictEqual(collapseWhitespace('\xA0' + padding, {}, true, false, false), '\xA0' + padding);
+    assert.strictEqual(collapseWhitespace(padding + '\xA0', {}, false, true, false), padding + '\xA0');
+    assert.strictEqual(collapseWhitespace(' \xA0', {}, true, true, false), '\xA0');
+  });
+
+  test('`collapseWhitespaceAll` on text with nothing to collapse', () => {
+    // Single spaces, no tab, no no-break space: The text comes back untouched
+    for (const text of ['a b', 'a b c', 'a b '.repeat(200), ' ', 'a']) {
+      assert.strictEqual(collapseWhitespaceAll(text), text);
+    }
+
+    // Each reason to do work is found on its own, in long text as in short
+    const padding = 'c'.repeat(300);
+    assert.strictEqual(collapseWhitespaceAll('a  b'), 'a b');
+    assert.strictEqual(collapseWhitespaceAll(padding + '  ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \n ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \r ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \f ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \t ' + padding), padding + ' ' + padding);
+    assert.strictEqual(collapseWhitespaceAll(padding + ' \xA0 ' + padding), padding + ' \xA0 ' + padding);
   });
 
   test('Ignore custom comments', async () => {
@@ -7013,7 +7078,8 @@ describe('HTML', () => {
       'and conservativeCollapse': { removeOptionalTags: true, collapseWhitespace: true, conservativeCollapse: true },
       'and preserveLineBreaks': { removeOptionalTags: true, collapseWhitespace: true, preserveLineBreaks: true },
       'and includeAutoGeneratedTags': { removeOptionalTags: true, includeAutoGeneratedTags: true },
-      'collapseWhitespace with removeComments': { collapseWhitespace: true, removeComments: true }
+      'collapseWhitespace with removeComments': { collapseWhitespace: true, removeComments: true },
+      'and preserveLineBreaks, too': { collapseWhitespace: true, removeComments: true, preserveLineBreaks: true }
     };
 
     for (const [documentName, html] of Object.entries(documents)) {
@@ -7042,7 +7108,8 @@ describe('HTML', () => {
       'and includeAutoGeneratedTags': { removeOptionalTags: true, includeAutoGeneratedTags: true },
       'collapseWhitespace with removeComments': { collapseWhitespace: true, removeComments: true },
       'conservativeCollapse': { collapseWhitespace: true, conservativeCollapse: true },
-      'preserveLineBreaks': { collapseWhitespace: true, preserveLineBreaks: true }
+      'preserveLineBreaks': { collapseWhitespace: true, preserveLineBreaks: true },
+      'removeComments with preserveLineBreaks': { collapseWhitespace: true, removeComments: true, preserveLineBreaks: true }
     };
 
     for (const first of fragments) {
