@@ -110,7 +110,7 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('CSS: Preserve important comments', async () => {
+  test('CSS: Preserves important comments', async () => {
     const input = '<style>/*! Important license */ body { color: red; }</style>';
     const result = await minify(input, { minifyCSS: true });
 
@@ -309,7 +309,7 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('myVariable'), 'Variable name should be mangled');
   });
 
-  test('JS: Drop console statements (`compress: { drop_console: true }`)', async () => {
+  test('JS: Drops console statements (`compress: { drop_console: true }`)', async () => {
     const input = '<script>console.log("debug"); alert("keep this");</script>';
     const output = '<script>alert("keep this")</script>';
 
@@ -1483,7 +1483,7 @@ describe('CSS and JS', () => {
       }
     });
 
-    test('Option overrides env var', async () => {
+    test('Option overrides environment variable', async () => {
       const input = '<style>.foo { border: none; }</style>';
 
       // Set env var first
@@ -1558,7 +1558,7 @@ describe('CSS and JS', () => {
       assert.strictEqual(stats.hits, 1, 'The repeated call should hit, as it does by default');
     });
 
-    test('Negative env var returns undefined (uses default)', async () => {
+    test('Negative environment variable returns undefined (uses default)', async () => {
       const input = '<style>.test { color: red; }</style>';
 
       // Set negative env var—should be ignored
@@ -1576,7 +1576,7 @@ describe('CSS and JS', () => {
       }
     });
 
-    test('Infinity env var returns undefined (uses default)', async () => {
+    test('Infinity environment variable returns undefined (uses default)', async () => {
       const input = '<style>.test { color: blue; }</style>';
 
       // Set `Infinity` env var—should be ignored
@@ -1594,7 +1594,7 @@ describe('CSS and JS', () => {
       }
     });
 
-    test('Invalid string env var returns undefined (uses default)', async () => {
+    test('Invalid string environment variable returns undefined (uses default)', async () => {
       const input = '<style>.test { color: green; }</style>';
 
       // Set invalid string env var—should be ignored
@@ -1651,7 +1651,7 @@ describe('CSS and JS', () => {
       assert.strictEqual(after.limit, 500, 'Default cache limit should be reported');
     });
 
-    test('`getCacheStats()` omits caches with no effect on untouched caches', async () => {
+    test('`getCacheStats()` leaves untouched caches unchanged', async () => {
       // Only CSS caching is exercised—JS and SVG lookups must not be incremented by this call
       const jsBefore = getCacheStats().js;
       const svgBefore = getCacheStats().svg;
