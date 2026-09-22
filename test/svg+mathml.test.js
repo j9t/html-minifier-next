@@ -44,14 +44,14 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Preserve case sensitivity', async () => {
+  test('Preserves case sensitivity', async () => {
     // SVG element and attribute names preserve case (camelCase)
     const result = await minify('<svg><text textLength="100" lengthAdjust="spacingAndGlyphs">Text</text></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('textLength="100"'), 'camelCase attribute `textLength` preserved');
     assert.ok(result.includes('lengthAdjust="spacingAndGlyphs"'), 'camelCase attribute `lengthAdjust` preserved');
   });
 
-  test('Preserve self-closing slashes in SVG', async () => {
+  test('Preserves self-closing slashes in SVG', async () => {
     // Self-closing tags should keep slashes within SVG
     const result = await minify('<svg><circle cx="5" cy="5" r="2"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('/>'), 'Self-closing slash should be preserved in SVG');
@@ -246,19 +246,19 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Preserve `viewBox`', async () => {
+  test('Preserves `viewBox`', async () => {
     // SVGO v4 preserves `viewBox` by default
     const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('viewBox="0 0 100 100"'), '`viewBox` should be preserved');
   });
 
-  test('Preserve `title` element', async () => {
+  test('Preserves `title` element', async () => {
     // SVGO v4 preserves `<title>` by default (accessibility)
     const result = await minify('<svg><title>My SVG</title><rect width="100" height="100"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('<title>My SVG</title>'), '`title` should be preserved');
   });
 
-  test('Text content preserved', async () => {
+  test('Preserves text content', async () => {
     assert.strictEqual(
       await minify('<svg><text x="10" y="20">Hello World</text></svg>', { minifySVG: true, collapseWhitespace: true }),
       '<svg><text x="10" y="20">Hello World</text></svg>'
@@ -771,7 +771,7 @@ describe('SVG and MathML', () => {
     assert.ok(result2.includes('#0f0') || result2.includes('lime'), 'Second result should contain the correct fill');
   });
 
-  test('SVG and MathML elements should not be removed by `removeEmptyElements`', async () => {
+  test('SVG and MathML elements are not removed by `removeEmptyElements`', async () => {
     // SVG elements define their content via attributes (like `d`, `cx`, `r`)
     // They should not be removed as "empty" even without text content
 

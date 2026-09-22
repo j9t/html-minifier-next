@@ -32,7 +32,7 @@ Use `npx html-minifier-next --help` to check all available options:
 
 | Option | Description | Example |
 | --- | --- | --- |
-| `--zero`, `-z` | Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options) | `npx html-minifier-next --zero` |
+| `--zero`, `-z` | Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—the flag is ignored when combined with other options) | `npx html-minifier-next --zero` |
 | `--input-dir <dir>`, `-I <dir>` | Specify an input directory | `--input-dir=src` |
 | `--ignore-dir <patterns>`, `-X <patterns>` | Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting) | `--ignore-dir=libs`, `--ignore-dir=libs,vendor,node_modules` |
 | `--output-dir <dir>`, `-O <dir>` | Specify an output directory | `--output-dir=dist` |
@@ -220,7 +220,7 @@ HTML Minifier Next: Ignoring `conservativeCollapse`—use with `collapseWhitespa
 | `removeUnusedCSS` | `minifyCSS`, and not [a function of your own](#unused-css-removal) |
 | `trimCustomFragments` | `collapseWhitespace` |
 
-Passing the option `false`, or an empty array, asks for nothing and is not reported. `cacheCSS`, `cacheJS`, and `cacheSVG` are not listed: They size a cache rather than transform markup, and don’t change output.
+Passing the option `false`, or an empty array, asks for nothing and is not reported. `cacheCSS`, `cacheJS`, and `cacheSVG` are not included because they size a cache rather than transform markup, and therefore don’t change output.
 
 ### Combining whitespace options
 
@@ -503,12 +503,11 @@ HTML Minifier Next uses in-memory caches to improve performance when processing 
 ```js
 const result = await minify(html, {
   minifyCSS: true,
+  cacheCSS: 750, // CSS cache size, default: 500
   minifyJS: true,
+  cacheJS: 250, // JS cache size, default: 500
   minifySVG: true,
-  // Configure cache sizes (in number of entries)
-  cacheCSS: 750,  // CSS cache size, default: 500
-  cacheJS: 250,   // JS cache size, default: 500
-  cacheSVG: 100   // SVG cache size, default: 500
+  cacheSVG: 100 // SVG cache size, default: 500
 });
 ```
 

@@ -330,7 +330,7 @@ function normalizeConfig(config) {
 
 /** @type {Record<string, any>} */
 let config = {};
-program.option('-z, --zero', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—flag is ignored when combined with other options)');
+program.option('-z, --zero', 'Minify all HTML files in the current folder and its subfolders in place (except node_modules), using comprehensive settings (standalone—the flag is ignored when combined with other options)');
 program.option('-I --input-dir <dir>', 'Specify an input directory');
 program.option('-X --ignore-dir <patterns>', 'Exclude directories—relative to input directory—from processing (comma-separated, overrides config file setting)');
 program.option('-O --output-dir <dir>', 'Specify an output directory');
