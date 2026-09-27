@@ -1340,14 +1340,17 @@ async function minifyHTML(value, options, partialMarkup) {
     if (after === buffer.length) {
       return;
     }
+    const next = buffer[after] ?? '';
+    if (!RE_BLANKS_LINE_BREAK_START.test(next)) {
+      return;
+    }
     // Blanks between nodes removed from the same line belong to that line
     let before = first;
     while (before >= 0 && (buffer[before] === '' || RE_BLANKS_ONLY.test(buffer[before] ?? ''))) {
       before--;
     }
     const prev = buffer[before] ?? '';
-    const next = buffer[after] ?? '';
-    if ((before >= 0 && !RE_LINE_BREAK_BLANKS_END.test(prev)) || !RE_BLANKS_LINE_BREAK_START.test(next)) {
+    if (before >= 0 && !RE_LINE_BREAK_BLANKS_END.test(prev)) {
       return;
     }
     for (let i = before + 1; i <= first; i++) {
