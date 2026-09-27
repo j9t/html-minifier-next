@@ -17,12 +17,12 @@
 //   npm run benchmark:ab -- main --pairs=3 --rounds=10 --collapse=on|off|both
 //   npm run benchmark:ab -- main --files=ECMAScript,BBC --top=10
 //
-// The ref’s src is extracted to backtest/.ab and removed again after the run. The corpus is
-// shared with backtest.js; run `npm run backtest` once to download it.
+// The ref’s src is extracted to a folder of the run’s own in backtest/.ab, removed after the
+// run. The corpus is shared with backtest.js; run `npm run backtest` once to download it.
 
 import { execFileSync, spawnSync } from 'child_process';
 import fs from 'fs/promises';
-import { existsSync, mkdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, rmdirSync } from 'fs';
 import path from 'path';
 import { performance } from 'perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -42,8 +42,8 @@ function parseArgs(argv) {
     if (key === '--aa') {
       args.aa = true;
     } else if (key === '--pairs' || key === '--rounds' || key === '--top') {
-      const n = parseInt(value, 10);
-      if (Number.isNaN(n) || n < (key === '--top' ? 0 : 1)) {
+      const n = /^\d+$/.test(value ?? '') ? Number(value) : NaN;
+      if (!Number.isSafeInteger(n) || n < (key === '--top' ? 0 : 1)) {
         throw new Error(`Invalid value for \`${key}\`: “${value}”`);
       }
       args[key.slice(2)] = n;
@@ -94,7 +94,7 @@ async function worker(dirA, dirB, modes, rounds, files) {
           const start = performance.now();
           const output = await minifiers[key](inputs[i], optionsMode);
           best[key][i] = Math.min(best[key][i], performance.now() - start);
-          size[key][i] = output.length;
+          size[key][i] = outputSize(output);
         }
       }
     }
@@ -115,6 +115,11 @@ function extractRef(ref, dirTarget) {
   mkdirSync(dirTarget, { recursive: true });
   const archive = execFileSync('git', ['archive', ref, 'src'], { cwd: DIR_REPO, maxBuffer: 1 << 28 });
   execFileSync('tar', ['-x', '-C', dirTarget], { input: archive });
+}
+
+// UTF-8 bytes, as benchmark.js reports
+function outputSize(output) {
+  return Buffer.byteLength(output);
 }
 
 function sum(list) {
@@ -157,8 +162,11 @@ async function main() {
   }
 
   const commit = execFileSync('git', ['rev-parse', '--short', args.ref], { cwd: DIR_REPO, encoding: 'utf8' }).trim();
-  const dirA = path.join(DIR_AB, commit);
-  const dirB = args.aa ? path.join(DIR_AB, commit + '-copy') : DIR_REPO;
+  // One folder per run, so that runs side by side don’t remove each other’s
+  mkdirSync(DIR_AB, { recursive: true });
+  const dirRun = mkdtempSync(path.join(DIR_AB, commit + '-'));
+  const dirA = path.join(dirRun, 'a');
+  const dirB = args.aa ? path.join(dirRun, 'b') : DIR_REPO;
   const labelB = args.aa ? `${args.ref} (copy)` : 'working tree';
 
   console.log(`A: ${args.ref} @ ${commit}; B: ${labelB}`);
@@ -193,7 +201,12 @@ async function main() {
       }
     }
   } finally {
-    rmSync(DIR_AB, { recursive: true, force: true });
+    rmSync(dirRun, { recursive: true, force: true });
+    try {
+      rmdirSync(DIR_AB);
+    } catch {
+      // Another run still uses it
+    }
   }
 }
 
@@ -211,5 +224,6 @@ if (process.argv[2] === '--worker') {
 
 export {
   combineRuns,
+  outputSize,
   parseArgs
 };

@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { combineRuns, parseArgs } from './benchmark-ab.js';
+import { combineRuns, outputSize, parseArgs } from './benchmark-ab.js';
 
 describe('A/B benchmark', () => {
   describe('`parseArgs`', () => {
@@ -21,9 +21,20 @@ describe('A/B benchmark', () => {
       assert.throws(() => parseArgs([]), /Git ref/);
       assert.throws(() => parseArgs(['main', '--pairs=0']), /--pairs/);
       assert.throws(() => parseArgs(['main', '--rounds=x']), /--rounds/);
+      assert.throws(() => parseArgs(['main', '--pairs=3abc']), /--pairs/);
+      assert.throws(() => parseArgs(['main', '--rounds=1e3']), /--rounds/);
+      assert.throws(() => parseArgs(['main', '--top=-1']), /--top/);
+      assert.throws(() => parseArgs(['main', '--rounds=99999999999999999999']), /--rounds/);
       assert.throws(() => parseArgs(['main', '--collapse=maybe']), /--collapse/);
       assert.throws(() => parseArgs(['main', 'other']), /other/);
       assert.throws(() => parseArgs(['main', '--cold']), /--cold/);
+    });
+  });
+
+  describe('`outputSize`', () => {
+    test('Counts UTF-8 bytes, as the regular benchmark does', () => {
+      assert.strictEqual(outputSize('<p>a</p>'), 8);
+      assert.strictEqual(outputSize('<p>ä\u00a0€😀</p>'), 18);
     });
   });
 
