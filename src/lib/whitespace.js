@@ -94,6 +94,8 @@ function collapseWhitespaceAllKnown(str) {
 // literal or as a character reference; numeric references and `&nbsp` also work without
 // the semicolon in text
 const RE_NO_BREAK_SPACE_WS = /([ \n\r\t\f]*)(\xA0|\u202F|\u2007|&(?:nbsp;?|NonBreakingSpace;|numsp;|#0*(?:160|8239|8199)(?![0-9]);?|#[xX]0*(?:[aA]0|202[fF]|2007)(?![0-9a-fA-F]);?))([ \n\r\t\f]*)/g;
+// Decoded text holds references only as text, so there the characters alone count
+const RE_NO_BREAK_SPACE_CHAR_WS = /([ \n\r\t\f]*)([\xA0\u202F\u2007])([ \n\r\t\f]*)/g;
 const RE_LINE_BREAK = /[\n\r]/;
 
 /**
@@ -110,16 +112,18 @@ function keepLineBreaks(_match, before, noBreakSpace, after) {
 // rescans the run in front of it
 /**
  * @param {string} str
- * @param {{preserveLineBreaks?: boolean | undefined}} options
+ * @param {{decodeEntities?: boolean | undefined, preserveLineBreaks?: boolean | undefined}} options
  */
 function collapseNoBreakSpaces(str, options) {
-  if (!str || (str.indexOf('\xA0') === -1 && str.indexOf('\u202F') === -1 && str.indexOf('\u2007') === -1 && str.indexOf('&') === -1)) {
+  const decoded = Boolean(options.decodeEntities);
+  if (!str || (str.indexOf('\xA0') === -1 && str.indexOf('\u202F') === -1 && str.indexOf('\u2007') === -1 && (decoded || str.indexOf('&') === -1))) {
     return str;
   }
+  const pattern = decoded ? RE_NO_BREAK_SPACE_CHAR_WS : RE_NO_BREAK_SPACE_WS;
   if (options.preserveLineBreaks) {
-    return str.replace(RE_NO_BREAK_SPACE_WS, keepLineBreaks);
+    return str.replace(pattern, keepLineBreaks);
   }
-  return str.replace(RE_NO_BREAK_SPACE_WS, '$2');
+  return str.replace(pattern, '$2');
 }
 
 // Collapse whitespace with options

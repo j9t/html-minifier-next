@@ -4311,6 +4311,14 @@ describe('HTML', () => {
     // Decoded entities
     assert.strictEqual(await minify('<p>a &nbsp; b &#8239; c &numsp; d</p>', { ...options, decodeEntities: true }), '<p>a\xA0b\u202Fc\u2007d</p>');
 
+    // Decoded text holds references only as text, so the space around them stays
+    for (const escaped of ['&amp;nbsp;', '&amp;#160;', '&amp;numsp;', '&amp;amp;nbsp;']) {
+      input = `<p>a ${escaped} b</p>`;
+      assert.strictEqual(await minify(input, options), input, escaped);
+      assert.strictEqual(await minify(input, { ...options, decodeEntities: true }), await minify(input, { collapseWhitespace: true, decodeEntities: true }), escaped);
+    }
+    assert.strictEqual(await minify('<p>a &amp;nbsp; &nbsp; b</p>', { ...options, decodeEntities: true }), '<p>a &ampnbsp;\xA0b</p>');
+
     // The no-break space still separates, so `conservativeCollapse` lets the space next to it go
     assert.strictEqual(await minify('<p>a <b>b &nbsp; </b> c</p>', { ...options, conservativeCollapse: true }), '<p>a <b>b&nbsp;</b> c</p>');
 
