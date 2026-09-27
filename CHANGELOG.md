@@ -10,6 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Fixed removed comments and tags leaving lines with nothing but whitespace behind when whitespace isn’t collapsed: Such lines are now removed, too, while blank lines from the source and whitespace in `pre`, `textarea`, and similar elements stay
 * Fixed output starting or ending in whitespace: Whitespace at the start and end of the output now goes, regardless of options, unless kept verbatim (e.g., in `pre` left open at the end), next to custom fragments, or under `conservativeCollapse` or `preserveLineBreaks`
+* Fixed `removeOptionalTags` dropping whitespace in `pre` along with an end tag omitted at its end, under `collapseWhitespace`
 
 ## [8.6.0] - 2026-09-27
 

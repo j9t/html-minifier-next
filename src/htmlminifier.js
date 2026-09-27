@@ -1422,7 +1422,8 @@ async function minifyHTML(value, options, partialMarkup) {
     }
   }
 
-  function removeEndTag() {
+  // `insideNoTrim` stands in for the stack once the end tag that omits this one has left it
+  function removeEndTag(/** @type {boolean} */ insideNoTrim = false) {
     let index = buffer.length - 1;
     while (index > 0 && !RE_END_TAG.test(buffer[index] ?? '')) {
       index--;
@@ -1430,7 +1431,7 @@ async function minifyHTML(value, options, partialMarkup) {
     // Text that follows the end tag is kept as is, so drop the tag alone. Whitespace kept
     // verbatim—in `pre`, in `textarea`, or wherever `canTrimWhitespace` says so—counts as
     // kept text too, no matter how whitespace is collapsed elsewhere.
-    const noTrim = stackNoTrimWhitespace.length > 0;
+    const noTrim = insideNoTrim || stackNoTrimWhitespace.length > 0;
     if (index < buffer.length - 1 && (keepsWhitespace() || noTrim) && RE_END_TAG.test(buffer[index] ?? '')) {
       buffer.splice(index, 1);
       bufferTags?.splice(index, 1);
@@ -2079,6 +2080,7 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       // Check if current tag is in a whitespace stack
+      const insideNoTrim = stackNoTrimWhitespace.length > 0;
       if (stackNoTrimWhitespace.length) {
         if (tag === stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1]) {
           if (tag === 'pre' || tag === 'textarea') preTextareaDepth--;
@@ -2111,7 +2113,7 @@ async function minifyHTML(value, options, partialMarkup) {
         // (https://html.spec.whatwg.org/multipage/syntax.html#optional-tags);
         // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
         if (tag && optionalEndTag && optionalEndTagEmitted && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || (!pInlineElements.has(tag) && !tag.includes('-')))) {
-          removeEndTag();
+          removeEndTag(insideNoTrim);
         }
         optionalEndTag = optionalEndTags.has(tag) ? tag : '';
         optionalEndTagEmitted = true;

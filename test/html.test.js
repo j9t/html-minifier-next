@@ -2663,8 +2663,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div>\n  <!-- c --> a\n</div>', options), '<div>\n   a\n</div>');
     assert.strictEqual(await minify('<div>a <!-- c -->\n</div>', options), '<div>a \n</div>');
 
-    // Whitespace in `pre` is left alone
+    // Whitespace in `pre` is left alone, also where the end of `pre` omits a tag in it
     assert.strictEqual(await minify('<pre>a\n  <!-- c -->\n</pre>', options), '<pre>a\n  \n</pre>');
+    assert.strictEqual(await minify('<pre><li>a  \n  </li>  \n</pre>', options), '<pre><li>a  \n    \n</pre>');
+    assert.strictEqual(await minify('<pre><li>a</li>  \n\n</pre>', { removeOptionalTags: true, collapseWhitespace: true }), '<pre><li>a  \n\n</pre>');
   });
 
   test('Trims whitespace at either end of the output', async () => {
