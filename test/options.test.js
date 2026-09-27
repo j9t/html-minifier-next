@@ -73,6 +73,7 @@ describe('Options', () => {
     test('An option that needs another one says so when it is missing', async () => {
       const cases = [
         ['collapseInlineTagWhitespace', { collapseInlineTagWhitespace: true }, 'collapseWhitespace', '--collapse-whitespace'],
+        ['collapseNoBreakSpaces', { collapseNoBreakSpaces: true }, 'collapseWhitespace', '--collapse-whitespace'],
         ['conservativeCollapse', { conservativeCollapse: true }, 'collapseWhitespace', '--collapse-whitespace'],
         ['preserveLineBreaks', { preserveLineBreaks: true }, 'collapseWhitespace', '--collapse-whitespace'],
         ['trimCustomFragments', { trimCustomFragments: true }, 'collapseWhitespace', '--collapse-whitespace'],
@@ -97,6 +98,7 @@ describe('Options', () => {
     test('An option paired with the one it needs stays quiet', async () => {
       const cases = [
         { collapseInlineTagWhitespace: true, collapseWhitespace: true },
+        { collapseNoBreakSpaces: true, collapseWhitespace: true },
         { conservativeCollapse: true, collapseWhitespace: true },
         { preserveLineBreaks: true, collapseWhitespace: true },
         { trimCustomFragments: true, collapseWhitespace: true },

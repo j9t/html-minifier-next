@@ -1100,7 +1100,7 @@ describe('CSS and JS', () => {
     });
 
     test('Survives out-of-range escapes instead of throwing', async () => {
-      // `\FFFFFF` exceeds the maximum code point; per CSS Syntax it resolves to U+FFFD
+      // `\FFFFFF` exceeds the maximum code point; per CSS Syntax it resolves to `U+FFFD`
       const input = style(String.raw`.\FFFFFF{color:red}.b{color:red}`) + '<p class="b"></p>';
       const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
 
@@ -1176,7 +1176,7 @@ describe('CSS and JS', () => {
     });
 
     test('Keeps offsets aligned when lowercasing changes length', async () => {
-      // U+0130 lowercases to two code units, which would shift every later offset—and
+      // `U+0130` lowercases to two code units, which would shift every later offset—and
       // a shifted strip leaves `class` glued to the preceding text, so it stops parsing
       const input = '<p title="\u0130\u0130\u0130">x</p>' +
         '<style>.used{color:red}.gone{color:red}</style><p class="used"></p>';

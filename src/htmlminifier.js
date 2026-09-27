@@ -37,6 +37,7 @@ import {
   endsWithWhitespace,
   trimWhitespace,
   collapseWhitespaceAll,
+  collapseNoBreakSpaces,
   collapseWhitespace,
   collapseWhitespaceSmart,
   canCollapseWhitespace as defaultCanCollapseWhitespace,
@@ -181,6 +182,15 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  * @prop {boolean} [collapseInlineTagWhitespace]
  *  When false (default) whitespace around `inline` tags is preserved in
  *  more cases. When true, whitespace around inline tags may be collapsed.
+ *  Must also enable `collapseWhitespace` to have effect.
+ *
+ *  Default: `false`
+ *
+ * @prop {boolean} [collapseNoBreakSpaces]
+ *  Remove whitespace next to a no-break space (`U+00A0`), narrow no-break
+ *  space (`U+202F`), or figure space (`U+2007`) in text (for example
+ *  `a &nbsp; b` → `a&nbsp;b`), which changes how the text renders. Runs of
+ *  no-break spaces are kept.
  *  Must also enable `collapseWhitespace` to have effect.
  *
  *  Default: `false`
@@ -1510,6 +1520,9 @@ async function minifyHTML(value, options, partialMarkup) {
       }
       if (!stackNoCollapseWhitespace.length && textNextTag !== 'html' && !(textPrevTag && textNextTag)) {
         text = collapseWhitespace(text, options, false, false, true);
+      }
+      if (options.collapseNoBreakSpaces && !stackNoCollapseWhitespace.length && !holdsRawText()) {
+        text = collapseNoBreakSpaces(text, options);
       }
     }
     return text;

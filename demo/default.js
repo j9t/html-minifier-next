@@ -36,6 +36,10 @@ const demoConfig = {
     label: 'Collapse inline tag whitespace',
     unsafe: true
   },
+  collapseNoBreakSpaces: {
+    label: 'Collapse no-break spaces',
+    unsafe: true
+  },
   collapseWhitespace: {
     label: 'Collapse whitespace',
     checked: true
