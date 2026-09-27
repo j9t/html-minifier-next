@@ -68,7 +68,7 @@
       "type": "boolean"
     },
     "collapseNoBreakSpaces": {
-      "description": "Remove whitespace next to no-break spaces and narrow no-break spaces in text (e.g., `a &nbsp; b` → `a&nbsp;b`), keeping runs of them—use with `--collapse-whitespace`",
+      "description": "Remove whitespace next to no-break spaces, narrow no-break spaces, and figure spaces in text (e.g., `a &nbsp; b` → `a&nbsp;b`), keeping runs of them—use with `--collapse-whitespace`",
       "type": "boolean"
     },
     "collapseWhitespace": {

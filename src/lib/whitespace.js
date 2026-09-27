@@ -90,9 +90,10 @@ function collapseWhitespaceAllKnown(str) {
 
 // Collapse whitespace into adjacent no-break spaces
 
-// A no-break space (`U+00A0`) or narrow no-break space (`U+202F`), literal or as a character
-// reference; numeric references and `&nbsp` also work without the semicolon in text
-const RE_NO_BREAK_SPACE_WS = /([ \n\r\t\f]*)(\xA0|\u202F|&(?:nbsp;?|NonBreakingSpace;|#0*(?:160|8239)(?![0-9]);?|#[xX]0*(?:[aA]0|202[fF])(?![0-9a-fA-F]);?))([ \n\r\t\f]*)/g;
+// A no-break space (`U+00A0`), narrow no-break space (`U+202F`), or figure space (`U+2007`),
+// literal or as a character reference; numeric references and `&nbsp` also work without
+// the semicolon in text
+const RE_NO_BREAK_SPACE_WS = /([ \n\r\t\f]*)(\xA0|\u202F|\u2007|&(?:nbsp;?|NonBreakingSpace;|numsp;|#0*(?:160|8239|8199)(?![0-9]);?|#[xX]0*(?:[aA]0|202[fF]|2007)(?![0-9a-fA-F]);?))([ \n\r\t\f]*)/g;
 const RE_LINE_BREAK = /[\n\r]/;
 
 /**
@@ -112,7 +113,7 @@ function keepLineBreaks(_match, before, noBreakSpace, after) {
  * @param {{preserveLineBreaks?: boolean | undefined}} options
  */
 function collapseNoBreakSpaces(str, options) {
-  if (!str || (str.indexOf('\xA0') === -1 && str.indexOf('\u202F') === -1 && str.indexOf('&') === -1)) {
+  if (!str || (str.indexOf('\xA0') === -1 && str.indexOf('\u202F') === -1 && str.indexOf('\u2007') === -1 && str.indexOf('&') === -1)) {
     return str;
   }
   if (options.preserveLineBreaks) {

@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `collapseNoBreakSpaces` option that works with `collapseWhitespace` to enable removing whitespace next to no-break spaces and narrow no-break spaces in text, whether written as characters or character references (e.g., `a &nbsp; b` becomes `a&nbsp;b`, `5 &#8239;km` becomes `5&#8239;km`); runs of no-break spaces are kept
+* Added `collapseNoBreakSpaces` option that works with `collapseWhitespace` to enable removing whitespace next to no-break spaces, narrow no-break spaces, and figure spaces in text, whether written as characters or character references (e.g., `a &nbsp; b` becomes `a&nbsp;b`, `5 &#8239;km` becomes `5&#8239;km`); runs of no-break spaces are kept
 
 ## [8.5.3] - 2026-09-21
 

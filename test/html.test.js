@@ -4265,20 +4265,43 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p>5 \u202Fkm</p>', options), '<p>5\u202Fkm</p>');
     assert.strictEqual(await minify('<p>5 &#8239; km</p>', options), '<p>5&#8239;km</p>');
 
-    // Every way of writing either character
-    for (const nbsp of ['&nbsp;', '&nbsp', '&NonBreakingSpace;', '&#160;', '&#160', '&#0160;', '&#xA0;', '&#Xa0;', '&#x00a0', '&#8239;', '&#x202F;', '&#x202f']) {
-      assert.strictEqual(await minify(`<p>a ${nbsp} b</p>`, options), `<p>a${nbsp}b</p>`, nbsp);
+    // Figure space
+    assert.strictEqual(await minify('<p>1 \u20072 &numsp; 3</p>', options), '<p>1\u20072&numsp;3</p>');
+
+    // Every way of writing each character, with what it decodes to
+    const noBreakSpaces = {
+      '\xA0': '\xA0', '&nbsp;': '\xA0', '&nbsp': '\xA0', '&NonBreakingSpace;': '\xA0', '&#160;': '\xA0', '&#160': '\xA0', '&#0160;': '\xA0', '&#xA0;': '\xA0', '&#Xa0;': '\xA0', '&#x00a0': '\xA0',
+      '\u202F': '\u202F', '&#8239;': '\u202F', '&#x202F;': '\u202F', '&#x202f': '\u202F',
+      '\u2007': '\u2007', '&numsp;': '\u2007', '&#8199;': '\u2007', '&#08199': '\u2007', '&#x2007;': '\u2007', '&#X2007': '\u2007'
+    };
+    for (const noBreakSpace of Object.keys(noBreakSpaces)) {
+      assert.strictEqual(await minify(`<p>a ${noBreakSpace} b</p>`, options), `<p>a${noBreakSpace}b</p>`, noBreakSpace);
     }
 
-    // Neither character, only one that begins alike
-    for (const other of ['&#1601;', '&#16;', '&#xA01;', '&#x202F0;', '&nbs;', '&amp;nbsp;', '&NonBreakingSpace']) {
+    // All of them at once, as written and decoded
+    input = `<p>a ${Object.keys(noBreakSpaces).join(' \t')} b</p>`;
+    assert.strictEqual(await minify(input, options), `<p>a${Object.keys(noBreakSpaces).join('')}b</p>`);
+    assert.strictEqual(await minify(input, { ...options, decodeEntities: true }), `<p>a${Object.values(noBreakSpaces).join('')}b</p>`);
+
+    // Not a no-break space, only one that begins alike, or one without width
+    const others = [
+      '&#1601;', '&#16;', '&#xA01;', '&#x202F0;', '&#81990;', '&#x20070;', '&nbs;', '&amp;nbsp;', '&NonBreakingSpace', '&numsp',
+      '\u2009', '&thinsp;', '&#8201;', '\u200A', '&hairsp;', '\u2002', '&ensp;', '\u2003', '&emsp;', '\u3000',
+      '\u2060', '&NoBreak;', '\uFEFF', '&#xFEFF;', '\u200B', '&ZeroWidthSpace;'
+    ];
+    for (const other of others) {
       assert.strictEqual(await minify(`<p>a ${other} b</p>`, options), `<p>a ${other} b</p>`, other);
     }
+
+    // Only whitespace next to a no-break space goes, whatever other spaces are around
+    input = '<p>a \u2009 &nbsp; &thinsp; \u2007 \u200A b</p>';
+    assert.strictEqual(await minify(input, options), '<p>a \u2009&nbsp;&thinsp;\u2007\u200A b</p>');
 
     // Runs of no-break spaces are intentional, so every one of them stays
     assert.strictEqual(await minify('<p>a&nbsp;&nbsp;&nbsp;b</p>', options), '<p>a&nbsp;&nbsp;&nbsp;b</p>');
     assert.strictEqual(await minify('<p>a &nbsp; &nbsp; b</p>', options), '<p>a&nbsp;&nbsp;b</p>');
     assert.strictEqual(await minify('<p>a\xA0\xA0 \u202F b</p>', options), '<p>a\xA0\xA0\u202Fb</p>');
+    assert.strictEqual(await minify('<p>a&numsp;&numsp; \u2007\xA0b</p>', options), '<p>a&numsp;&numsp;\u2007\xA0b</p>');
 
     // At the edges of an element’s text, too
     assert.strictEqual(await minify('<p> \xA0 a \xA0 </p>', options), '<p>\xA0a\xA0</p>');
@@ -4286,7 +4309,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div> \xA0 </div>', options), '<div>\xA0</div>');
 
     // Decoded entities
-    assert.strictEqual(await minify('<p>a &nbsp; b &#8239; c</p>', { ...options, decodeEntities: true }), '<p>a\xA0b\u202Fc</p>');
+    assert.strictEqual(await minify('<p>a &nbsp; b &#8239; c &numsp; d</p>', { ...options, decodeEntities: true }), '<p>a\xA0b\u202Fc\u2007d</p>');
 
     // The no-break space still separates, so `conservativeCollapse` lets the space next to it go
     assert.strictEqual(await minify('<p>a <b>b &nbsp; </b> c</p>', { ...options, conservativeCollapse: true }), '<p>a <b>b&nbsp;</b> c</p>');
