@@ -141,6 +141,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
 | `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Collapse whitespace more aggressively between inline elements—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
+| `collapseNoBreakSpaces`<br>`--collapse-no-break-spaces` | Remove whitespace next to no-break spaces and narrow no-break spaces in text (e.g., `a &nbsp; b` → `a&nbsp;b`), keeping runs of them—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
 | `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace); [enable other whitespace options](#combining-whitespace-options) | `false` |
 | `conservativeCollapse`<br>`--conservative-collapse` | Always collapse to one space (never remove it entirely)—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
 | `continueOnMinifyError`<br>`--continue-on-minify-error`<br>`--no-continue-on-minify-error` | Continue on minification errors; when `false`, minification errors throw and abort processing | `true` |
@@ -211,6 +212,7 @@ HTML Minifier Next: Ignoring `conservativeCollapse`—use with `collapseWhitespa
 | `canMinifyJS` | `minifyJS`, and not [a function of your own](#javascript-minification) |
 | `canMinifySVG` | `minifySVG`, and not [a function of your own](#svg-minification) |
 | `collapseInlineTagWhitespace` | `collapseWhitespace` |
+| `collapseNoBreakSpaces` | `collapseWhitespace` |
 | `conservativeCollapse` | `collapseWhitespace` |
 | `customEventAttributes` | `minifyJS` |
 | `inlineCustomElements` | `collapseWhitespace` |
@@ -224,7 +226,7 @@ Passing the option `false`, or an empty array, asks for nothing and is not repor
 
 ### Combining whitespace options
 
-`collapseInlineTagWhitespace`, `conservativeCollapse`, and `preserveLineBreaks` are modifiers: They do nothing on their own, and only take effect when `collapseWhitespace` is enabled.
+`collapseInlineTagWhitespace`, `collapseNoBreakSpaces`, `conservativeCollapse`, and `preserveLineBreaks` are modifiers: They do nothing on their own, and only take effect when `collapseWhitespace` is enabled.
 
 Given input
 
@@ -854,7 +856,7 @@ This writes a .cpuprofile file to the working directory. Load it with `npx speed
 
 ## Acknowledgements
 
-With many thanks to the previous authors of and contributors to HTML Minifier, especially [Juriy “kangax” Zaytsev](https://github.com/kangax), and to everyone who helped make this new edition better, particularly [Daniel Ruf](https://github.com/DanielRuf), [Jonas Geiler](https://github.com/jonasgeiler), and [Chris Morgan](https://github.com/chris-morgan)!
+With many thanks to the previous authors of and contributors to HTML Minifier, especially [Juriy “kangax” Zaytsev](https://github.com/kangax), and to everyone who helped make this new edition better, particularly [Daniel Ruf](https://github.com/DanielRuf), [Jonas Geiler](https://github.com/jonasgeiler), [Chris Morgan](https://github.com/chris-morgan), and [Andreas Borutta](https://github.com/fermiongithub)!
 
 ***
 

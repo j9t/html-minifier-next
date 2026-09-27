@@ -138,6 +138,7 @@ const optionDependencies = [
   { option: 'canMinifyJS', requires: 'minifyJS', unusable: replacedByOwnFunction('minifyJS'), clear: true },
   { option: 'canMinifySVG', requires: 'minifySVG', unusable: replacedByOwnFunction('minifySVG'), clear: true },
   { option: 'collapseInlineTagWhitespace', requires: 'collapseWhitespace' },
+  { option: 'collapseNoBreakSpaces', requires: 'collapseWhitespace' },
   { option: 'conservativeCollapse', requires: 'collapseWhitespace' },
   { option: 'customEventAttributes', requires: 'minifyJS' },
   { option: 'inlineCustomElements', requires: 'collapseWhitespace' },

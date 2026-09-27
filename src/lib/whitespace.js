@@ -88,6 +88,39 @@ function collapseWhitespaceAllKnown(str) {
   return str.replace(RE_ALL_WS_NBSP, collapseRun);
 }
 
+// Collapse whitespace into adjacent no-break spaces
+
+// A no-break space (`U+00A0`) or narrow no-break space (`U+202F`), literal or as a character
+// reference; numeric references and `&nbsp` also work without the semicolon in text
+const RE_NO_BREAK_SPACE_WS = /([ \n\r\t\f]*)(\xA0|\u202F|&(?:nbsp;?|NonBreakingSpace;|#0*(?:160|8239)(?![0-9]);?|#[xX]0*(?:[aA]0|202[fF])(?![0-9a-fA-F]);?))([ \n\r\t\f]*)/g;
+const RE_LINE_BREAK = /[\n\r]/;
+
+/**
+ * @param {string} _match
+ * @param {string} before
+ * @param {string} noBreakSpace
+ * @param {string} after
+ */
+function keepLineBreaks(_match, before, noBreakSpace, after) {
+  return (RE_LINE_BREAK.test(before) ? before : '') + noBreakSpace + (RE_LINE_BREAK.test(after) ? after : '');
+}
+
+// Callers pass text whose whitespace runs are already collapsed, as each match
+// rescans the run in front of it
+/**
+ * @param {string} str
+ * @param {{preserveLineBreaks?: boolean | undefined}} options
+ */
+function collapseNoBreakSpaces(str, options) {
+  if (!str || (str.indexOf('\xA0') === -1 && str.indexOf('\u202F') === -1 && str.indexOf('&') === -1)) {
+    return str;
+  }
+  if (options.preserveLineBreaks) {
+    return str.replace(RE_NO_BREAK_SPACE_WS, keepLineBreaks);
+  }
+  return str.replace(RE_NO_BREAK_SPACE_WS, '$2');
+}
+
 // Collapse whitespace with options
 
 /**
@@ -356,6 +389,7 @@ export {
   endsWithWhitespace,
   trimWhitespace,
   collapseWhitespaceAll,
+  collapseNoBreakSpaces,
   collapseWhitespace,
   collapseWhitespaceSmart,
   canCollapseWhitespace,

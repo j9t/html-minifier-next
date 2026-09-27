@@ -39,6 +39,10 @@ const optionDefinitions = {
     description: 'Collapse whitespace more aggressively between inline elements—use with `--collapse-whitespace`',
     type: 'boolean'
   },
+  collapseNoBreakSpaces: {
+    description: 'Remove whitespace next to no-break spaces and narrow no-break spaces in text (e.g., `a &nbsp; b` → `a&nbsp;b`), keeping runs of them—use with `--collapse-whitespace`',
+    type: 'boolean'
+  },
   collapseWhitespace: {
     description: 'Collapse whitespace that contributes to text nodes in a document tree',
     type: 'boolean'

@@ -6,6 +6,7 @@
   "collapseAttributeWhitespace": true,
   "collapseBooleanAttributes": true,
   "collapseInlineTagWhitespace": true,
+  "collapseNoBreakSpaces": true,
   "collapseWhitespace": true,
   "conservativeCollapse": false,
   "continueOnMinifyError": true,

@@ -70,7 +70,7 @@ function unescapeIdentifier(identifier) {
     if (!hex) {
       return literal;
     }
-    // Per CSS Syntax spec, a null, surrogate, or out-of-range escape becomes U+FFFD
+    // Per CSS Syntax spec, a null, surrogate, or out-of-range escape becomes `U+FFFD`
     const code = parseInt(hex, 16);
     return (code === 0 || code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF))
       ? '\uFFFD'

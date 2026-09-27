@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.6.0] - 2026-09-27
+
+### Added
+
+* Added `collapseNoBreakSpaces` option that works with `collapseWhitespace` to enable removing whitespace next to no-break spaces and narrow no-break spaces in text, whether written as characters or character references (e.g., `a &nbsp; b` becomes `a&nbsp;b`, `5 &#8239;km` becomes `5&#8239;km`); runs of no-break spaces are kept
+
 ## [8.5.3] - 2026-09-21
 
 ### Changed

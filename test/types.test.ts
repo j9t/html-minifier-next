@@ -35,6 +35,7 @@ async function testBooleanOptions() {
     caseSensitive: false,
     collapseBooleanAttributes: true,
     collapseInlineTagWhitespace: false,
+    collapseNoBreakSpaces: false,
     collapseWhitespace: true,
     conservativeCollapse: false,
     continueOnMinifyError: true,
