@@ -4,13 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [8.6.1] - 2026-09-27
+## [8.7.0] - 2026-09-28
 
 ### Fixed
 
 * Fixed removed comments and tags leaving lines with nothing but whitespace behind when whitespace isn’t collapsed: Such lines are now removed, too, while blank lines from the source and whitespace in `pre`, `textarea`, and similar elements stay
-* Fixed output starting or ending in whitespace: Whitespace at the start and end of the output now goes, regardless of options, unless kept verbatim (e.g., in `pre` left open at the end), next to custom fragments, or under `conservativeCollapse` or `preserveLineBreaks`
 * Fixed `removeOptionalTags` dropping whitespace in `pre` along with an end tag omitted at its end, under `collapseWhitespace`
+
+### Changed
+
+* Changed output no longer to start or end in whitespace: Whitespace at the start and end of the output is now removed, regardless of options, unless kept verbatim (e.g., in `pre` left open at the end), next to custom fragments, in partial markup (`partialMarkup`), or under `conservativeCollapse` or `preserveLineBreaks`
 
 ## [8.6.0] - 2026-09-27
 

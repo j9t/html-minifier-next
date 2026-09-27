@@ -2643,6 +2643,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div>\n  <span>a</span>\n  <!-- c -->\n</div>', options), '<div>\n  <span>a</span>\n</div>');
     assert.strictEqual(await minify('<div>\n  <!-- c -->  \n</div>', options), '<div>\n</div>');
     assert.strictEqual(await minify('<div>\n  <!-- a -->\n  <!-- b -->\n</div>', options), '<div>\n</div>');
+    assert.strictEqual(await minify('<div>\n  <!-- a --> <!-- b -->\n</div>', options), '<div>\n</div>');
+    assert.strictEqual(await minify('<div>\n  <span>a</span> <!-- c -->\n</div>', options), '<div>\n  <span>a</span> \n</div>');
     assert.strictEqual(await minify('<div>\r\n  <!-- c -->\r\n</div>', options), '<div>\r\n</div>');
 
     // Omitted tags
@@ -2691,6 +2693,12 @@ describe('HTML', () => {
     // Modifiers that promise to keep whitespace keep it here, too
     assert.strictEqual(await minify(' <p>a</p> ', { collapseWhitespace: true, conservativeCollapse: true }), ' <p>a</p> ');
     assert.strictEqual(await minify('\n<p>a</p>\n', { collapseWhitespace: true, preserveLineBreaks: true }), '\n<p>a</p>\n');
+
+    // Partial markup ends where other markup joins it, so `collapseWhitespace` alone decides
+    assert.strictEqual(await minify('Hello ', { partialMarkup: true }), 'Hello ');
+    assert.strictEqual(await minify(' <b>x</b> ', { partialMarkup: true }), ' <b>x</b> ');
+    assert.strictEqual(await minify('<!-- c --> world', { partialMarkup: true, removeComments: true }), ' world');
+    assert.strictEqual(await minify(' <b>x</b> ', { partialMarkup: true, collapseWhitespace: true }), '<b>x</b>');
   });
 
   // https://github.com/kangax/html-minifier/issues/10

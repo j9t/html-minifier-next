@@ -643,6 +643,7 @@ const RE_TRAILING_WHITESPACE = /\s$/;
 const RE_LINE_BREAK_BLANKS_END = /(?:\r\n?|\n)[ \t]*$/;
 const RE_BLANKS_LINE_BREAK_START = /^[ \t]*(?:\r\n?|\n)/;
 const RE_BLANKS_START = /^[ \t]+/;
+const RE_BLANKS_ONLY = /^[ \t]+$/;
 
 // Pre-compiled patterns for `htmlmin:ignore` block content analysis
 const RE_HTML_COMMENT_START = /^\s*<!--/;
@@ -1334,15 +1335,23 @@ async function minifyHTML(value, options, partialMarkup) {
   // whitespace behind: The text around the removal (at `index`) drops that line. The start
   // of the output counts as a line break, and blank lines of the source stay.
   function removeWhitespaceLine(/** @type {number} */ index) {
-    const [before, after] = findNeighbors(index);
+    const [first, after] = findNeighbors(index);
     // The end of the output is left to `trimOutputWhitespace`
     if (after === buffer.length) {
       return;
+    }
+    // Blanks between nodes removed from the same line belong to that line
+    let before = first;
+    while (before >= 0 && (buffer[before] === '' || RE_BLANKS_ONLY.test(buffer[before] ?? ''))) {
+      before--;
     }
     const prev = buffer[before] ?? '';
     const next = buffer[after] ?? '';
     if ((before >= 0 && !RE_LINE_BREAK_BLANKS_END.test(prev)) || !RE_BLANKS_LINE_BREAK_START.test(next)) {
       return;
+    }
+    for (let i = before + 1; i <= first; i++) {
+      buffer[i] = '';
     }
     // The line break goes on the side of the text before the removal, so that the text after
     // it keeps its own for a removal that may follow
@@ -1355,9 +1364,10 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   // Whitespace at either end of the output goes, but not verbatim whitespace, nor whitespace
-  // that `conservativeCollapse` or `preserveLineBreaks` promise to keep
+  // that `conservativeCollapse` or `preserveLineBreaks` promise to keep, nor that of partial
+  // markup, whose ends join other markup
   function trimOutputWhitespace() {
-    if (options.collapseWhitespace && (options.conservativeCollapse || options.preserveLineBreaks)) {
+    if (options.partialMarkup || (options.collapseWhitespace && (options.conservativeCollapse || options.preserveLineBreaks))) {
       return;
     }
     // Tags start with `<` and end with `>`, so whitespace at either end belongs to text
@@ -1639,7 +1649,11 @@ async function minifyHTML(value, options, partialMarkup) {
       }
     }
     charsPrevTag = /^\s*$/.test(text) ? textPrevTag : 'comment';
-    if (options.decodeEntities && text && !holdsRawText()) {
+    const rawText = Boolean(text) && holdsRawText();
+    if (text) {
+      textVerbatim = rawText || stackNoTrimWhitespace.length > 0;
+    }
+    if (options.decodeEntities && text && !rawText) {
       // Escape any `&` symbols that start either:
       // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
       // 2. or any other character reference (i.e., one that does end with `;`)
@@ -1665,9 +1679,6 @@ async function minifyHTML(value, options, partialMarkup) {
       hasChars = true;
     }
     const followsRemoval = removed && Boolean(text) && !options.collapseWhitespace && !stackNoTrimWhitespace.length;
-    if (text) {
-      textVerbatim = stackNoTrimWhitespace.length > 0 || holdsRawText();
-    }
     bufferPush(text, false);
     if (followsRemoval) {
       removeWhitespaceLine(buffer.length - 1);
