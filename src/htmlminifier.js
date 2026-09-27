@@ -640,6 +640,9 @@ const RE_END_TAG = /^<\//;
 const RE_WHITESPACE_ONLY = /^\s+$/;
 const RE_TABS = /\t/g;
 const RE_TRAILING_WHITESPACE = /\s$/;
+const RE_LINE_BREAK_BLANKS_END = /(?:\r\n?|\n)[ \t]*$/;
+const RE_BLANKS_LINE_BREAK_START = /^[ \t]*(?:\r\n?|\n)/;
+const RE_BLANKS_START = /^[ \t]+/;
 
 // Pre-compiled patterns for `htmlmin:ignore` block content analysis
 const RE_HTML_COMMENT_START = /^\s*<!--/;
@@ -1079,6 +1082,10 @@ async function minifyHTML(value, options, partialMarkup) {
   let optionalStartTag = '';
   let optionalEndTag = '';
   let optionalEndTagEmitted = false;
+  // Whether a node was removed since the last output
+  let removed = false;
+  // Whether the latest text was kept verbatim, as in `pre` or `script`
+  let textVerbatim = false;
   /** @type {string[]} */
   const ignoredMarkupChunks = [];
   /** @type {Array<RegExpExecArray | null>} */
@@ -1300,11 +1307,76 @@ async function minifyHTML(value, options, partialMarkup) {
   function bufferPush(/** @type {string} */ entry, /** @type {boolean} */ isTag) {
     buffer.push(entry);
     bufferTags?.push(isTag);
+    if (entry) removed = false;
   }
 
   function bufferTruncate(/** @type {number} */ length) {
     buffer.length = Math.max(0, length);
     if (bufferTags) bufferTags.length = buffer.length;
+    removed = true;
+  }
+
+  // The nearest entries before and from `index` that aren’t empty, as removed nodes leave them
+  /** @returns {[number, number]} */
+  function findNeighbors(/** @type {number} */ index) {
+    let before = index - 1;
+    while (before >= 0 && buffer[before] === '') {
+      before--;
+    }
+    let after = index;
+    while (after < buffer.length && buffer[after] === '') {
+      after++;
+    }
+    return [before, after];
+  }
+
+  // With whitespace kept as is, a removed node must not leave a line of nothing but
+  // whitespace behind: The text around the removal (at `index`) drops that line. The start
+  // of the output counts as a line break, and blank lines of the source stay.
+  function removeWhitespaceLine(/** @type {number} */ index) {
+    const [before, after] = findNeighbors(index);
+    // The end of the output is left to `trimOutputWhitespace`
+    if (after === buffer.length) {
+      return;
+    }
+    const prev = buffer[before] ?? '';
+    const next = buffer[after] ?? '';
+    if ((before >= 0 && !RE_LINE_BREAK_BLANKS_END.test(prev)) || !RE_BLANKS_LINE_BREAK_START.test(next)) {
+      return;
+    }
+    // The line break goes on the side of the text before the removal, so that the text after
+    // it keeps its own for a removal that may follow
+    if (before < 0) {
+      buffer[after] = next.replace(RE_BLANKS_LINE_BREAK_START, '');
+    } else {
+      buffer[before] = prev.replace(RE_LINE_BREAK_BLANKS_END, '');
+      buffer[after] = next.replace(RE_BLANKS_START, '');
+    }
+  }
+
+  // Whitespace at either end of the output goes, but not verbatim whitespace, nor whitespace
+  // that `conservativeCollapse` or `preserveLineBreaks` promise to keep
+  function trimOutputWhitespace() {
+    if (options.collapseWhitespace && (options.conservativeCollapse || options.preserveLineBreaks)) {
+      return;
+    }
+    // Tags start with `<` and end with `>`, so whitespace at either end belongs to text
+    if (!textVerbatim) {
+      let index = buffer.length - 1;
+      while (index >= 0 && (buffer[index] === '' || RE_WS_ONLY.test(buffer[index] ?? ''))) {
+        buffer[index--] = '';
+      }
+      if (index >= 0) {
+        buffer[index] = (buffer[index] ?? '').replace(RE_WS_END, '');
+      }
+    }
+    let index = 0;
+    while (index < buffer.length && (buffer[index] === '' || RE_WS_ONLY.test(buffer[index] ?? ''))) {
+      buffer[index++] = '';
+    }
+    if (index < buffer.length) {
+      buffer[index] = (buffer[index] ?? '').replace(RE_WS_START, '');
+    }
   }
 
   function removeStartTag() {
@@ -1332,14 +1404,7 @@ async function minifyHTML(value, options, partialMarkup) {
   // single character it is due: a line break under `preserveLineBreaks`, a no-break space
   // where the run holds one, a space under `conservativeCollapse`
   function mergeWhitespaceRuns(/** @type {number} */ index) {
-    let before = index - 1;
-    while (before >= 0 && buffer[before] === '') {
-      before--;
-    }
-    let after = index;
-    while (after < buffer.length && buffer[after] === '') {
-      after++;
-    }
+    const [before, after] = findNeighbors(index);
     if (before < 0 || after >= buffer.length) {
       return;
     }
@@ -1369,9 +1434,13 @@ async function minifyHTML(value, options, partialMarkup) {
     if (index < buffer.length - 1 && (keepsWhitespace() || noTrim) && RE_END_TAG.test(buffer[index] ?? '')) {
       buffer.splice(index, 1);
       bufferTags?.splice(index, 1);
-      // Only collapsed whitespace can merge
-      if (options.collapseWhitespace && !noTrim) {
-        mergeWhitespaceRuns(index);
+      // Collapsed whitespace can merge, kept whitespace can leave a line of only whitespace
+      if (!noTrim) {
+        if (options.collapseWhitespace) {
+          mergeWhitespaceRuns(index);
+        } else {
+          removeWhitespaceLine(index);
+        }
       }
       return;
     }
@@ -1452,7 +1521,7 @@ async function minifyHTML(value, options, partialMarkup) {
         // Multiple newlines are likely intentional formatting, single newline is often a template artifact
         // Treat CRLF (`\r\n`), CR (`\r`), and LF (`\n`) as single line-ending units
         if (textNextTag && textNextTag === '/' + topTag && /[^\r\n](?:\r\n|\r|\n)[ \t]*$/.test(text)) {
-          text = text.replace(/(?:\r\n|\r|\n)[ \t]*$/, '');
+          text = text.replace(RE_LINE_BREAK_BLANKS_END, '');
         }
       }
     }
@@ -1594,7 +1663,14 @@ async function minifyHTML(value, options, partialMarkup) {
     if (text) {
       hasChars = true;
     }
+    const followsRemoval = removed && Boolean(text) && !options.collapseWhitespace && !stackNoTrimWhitespace.length;
+    if (text) {
+      textVerbatim = stackNoTrimWhitespace.length > 0 || holdsRawText();
+    }
     bufferPush(text, false);
+    if (followsRemoval) {
+      removeWhitespaceLine(buffer.length - 1);
+    }
   }
 
   // Comment finalization (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
@@ -1858,19 +1934,18 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalEndTagEmitted = false;
       }
 
-      // Set whitespace flags for nested tags (e.g., `<code>` within a `<pre>`)
-      if (options.collapseWhitespace) {
-        if (!stackNoTrimWhitespace.length) {
-          squashTrailingWhitespace(tag);
+      // Set whitespace flags for nested tags (e.g., `<code>` within a `<pre>`); verbatim
+      // whitespace is tracked without `collapseWhitespace` too, as `removeWhitespaceLine` spares it
+      if (options.collapseWhitespace && !stackNoTrimWhitespace.length) {
+        squashTrailingWhitespace(tag);
+      }
+      if (!unary) {
+        if (!canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
+          stackNoTrimWhitespace.push(tag);
+          if (tag === 'pre' || tag === 'textarea') preTextareaDepth++;
         }
-        if (!unary) {
-          if (!canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
-            stackNoTrimWhitespace.push(tag);
-            if (tag === 'pre' || tag === 'textarea') preTextareaDepth++;
-          }
-          if (!canCollapseWhitespace(tag, attrs) || stackNoCollapseWhitespace.length) {
-            stackNoCollapseWhitespace.push(tag);
-          }
+        if (options.collapseWhitespace && (!canCollapseWhitespace(tag, attrs) || stackNoCollapseWhitespace.length)) {
+          stackNoCollapseWhitespace.push(tag);
         }
       }
 
@@ -2004,19 +2079,17 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       // Check if current tag is in a whitespace stack
-      if (options.collapseWhitespace) {
-        if (stackNoTrimWhitespace.length) {
-          if (tag === stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1]) {
-            if (tag === 'pre' || tag === 'textarea') preTextareaDepth--;
-            stackNoTrimWhitespace.pop();
-          }
-        } else {
-          squashTrailingWhitespace('/' + tag);
+      if (stackNoTrimWhitespace.length) {
+        if (tag === stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1]) {
+          if (tag === 'pre' || tag === 'textarea') preTextareaDepth--;
+          stackNoTrimWhitespace.pop();
         }
-        if (stackNoCollapseWhitespace.length &&
-            tag === stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
-          stackNoCollapseWhitespace.pop();
-        }
+      } else if (options.collapseWhitespace) {
+        squashTrailingWhitespace('/' + tag);
+      }
+      if (stackNoCollapseWhitespace.length &&
+          tag === stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
+        stackNoCollapseWhitespace.pop();
       }
 
       let isElementEmpty = false;
@@ -2145,11 +2218,15 @@ async function minifyHTML(value, options, partialMarkup) {
           text = prefix + text + suffix;
         } else {
           text = '';
+          removed = true;
         }
       } else {
         text = prefix + text + suffix;
       }
       commentFinalize(text);
+    },
+    strayEnd: function () {
+      removed = true;
     },
     doctype: function (/** @type {string} */ doctype) {
       bufferPush(options.useShortDoctype
@@ -2190,9 +2267,12 @@ async function minifyHTML(value, options, partialMarkup) {
       removeEndTag();
     }
   }
+  // Collapsing also trims whitespace before trailing inline end tags; trimming the output
+  // catches what it leaves at either end, like a space after a removed leading comment
   if (options.collapseWhitespace) {
     squashTrailingWhitespace('br');
   }
+  trimOutputWhitespace();
 
   return joinResultSegments(buffer, bufferTags ?? [], [uidAttr, uidIgnore].filter(marker => marker !== undefined), options, uidPattern
     ? function (/** @type {string} */ str) {

@@ -249,6 +249,8 @@ you get the following output (condensed, `\n` represents an actual line break):
 
 Where the modifiers disagree, the preserving one wins—`conservativeCollapse` and `preserveLineBreaks` do not let `collapseInlineTagWhitespace` remove a space or line break entirely.
 
+Regardless of these options, whitespace at the start and end of the output goes, and so do lines that a removed comment or tag leaves with nothing but whitespace (blank lines of the source stay). Whitespace stays, however, where it’s kept verbatim (in `pre` or `textarea`, or in `pre`, `textarea`, or `script` content left open at the end), next to custom fragments where their handling keeps it (see `trimCustomFragments`), and where `conservativeCollapse` or `preserveLineBreaks` keep it.
+
 ### Sorting attributes and style classes
 
 `sortAttributes` and `sortClassNames` reorder attributes and class names by frequency, so that repeated markup looks more alike. This doesn’t change the plain-text size of the output, only how well it compresses: `sortAttributes` makes Gzip and Brotli output slightly smaller on average, though not on every page (see [“Optimizing for compression”](#optimizing-for-compression)); `sortClassNames` doesn’t help, and alongside `sortAttributes` cancels most of its gain with Brotli.

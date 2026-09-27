@@ -19,6 +19,7 @@ import { endlessRawTextElements, escapableRawTextElements, genericRawTextElement
  *   chars?: Function,
  *   comment?: Function,
  *   doctype?: Function,
+ *   strayEnd?: Function,
  *   continueOnParseError?: boolean | undefined,
  *   partialMarkup?: boolean | undefined,
  *   wantsNextTag?: boolean | undefined,
@@ -1063,6 +1064,9 @@ export class HTMLParser {
         if (handler.end) {
           handler.end(tagName, []);
         }
+      } else if (handler.strayEnd) {
+        // An end tag with nothing to close is dropped
+        handler.strayEnd();
       }
       // Returned so the parse loop can skip lowercasing the name again
       return lowerTagName;
