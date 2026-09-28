@@ -28,6 +28,7 @@ describe('A/B benchmark', () => {
       assert.throws(() => parseArgs(['main', '--collapse=maybe']), /--collapse/);
       assert.throws(() => parseArgs(['main', 'other']), /other/);
       assert.throws(() => parseArgs(['main', '--cold']), /--cold/);
+      assert.throws(() => parseArgs(['main', '--aa=false']), /--aa=false/);
     });
   });
 

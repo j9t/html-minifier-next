@@ -39,7 +39,7 @@ function parseArgs(argv) {
   const args = { ref: null, aa: false, pairs: 3, rounds: 10, modes: ['on', 'off'], files: null, top: 5 };
   for (const arg of argv) {
     const [key, value] = arg.split('=');
-    if (key === '--aa') {
+    if (arg === '--aa') {
       args.aa = true;
     } else if (key === '--pairs' || key === '--rounds' || key === '--top') {
       const n = /^\d+$/.test(value ?? '') ? Number(value) : NaN;
