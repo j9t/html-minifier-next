@@ -640,10 +640,10 @@ const RE_END_TAG = /^<\//;
 const RE_WHITESPACE_ONLY = /^\s+$/;
 const RE_TABS = /\t/g;
 const RE_TRAILING_WHITESPACE = /\s$/;
-const RE_LINE_BREAK_BLANKS_END = /(?:\r\n?|\n)[ \t]*$/;
-const RE_BLANKS_LINE_BREAK_START = /^[ \t]*(?:\r\n?|\n)/;
-const RE_BLANKS_START = /^[ \t]+/;
-const RE_BLANKS_ONLY = /^[ \t]+$/;
+const RE_LINE_BREAK_BLANKS_END = /(?:\r\n?|\n)[ \t\f]*$/;
+const RE_BLANKS_LINE_BREAK_START = /^[ \t\f]*(?:\r\n?|\n)/;
+const RE_BLANKS_START = /^[ \t\f]+/;
+const RE_BLANKS_ONLY = /^[ \t\f]+$/;
 
 // Pre-compiled patterns for `htmlmin:ignore` block content analysis
 const RE_HTML_COMMENT_START = /^\s*<!--/;

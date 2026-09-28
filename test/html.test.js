@@ -2646,6 +2646,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div>\n  <!-- a --> <!-- b -->\n</div>', options), '<div>\n</div>');
     assert.strictEqual(await minify('<div>\n  <span>a</span> <!-- c -->\n</div>', options), '<div>\n  <span>a</span> \n</div>');
     assert.strictEqual(await minify('<div>\r\n  <!-- c -->\r\n</div>', options), '<div>\r\n</div>');
+    assert.strictEqual(await minify('<div>\n\f<!-- c -->\n</div>', options), '<div>\n</div>');
+    assert.strictEqual(await minify('<div>\n  <!-- a -->\f<!-- b -->\n</div>', options), '<div>\n</div>');
 
     // Omitted tags
     assert.strictEqual(await minify('<ul>\n  <li>a\n  </li>\n</ul>', options), '<ul>\n  <li>a\n</ul>');
