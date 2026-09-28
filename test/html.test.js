@@ -357,7 +357,7 @@ describe('HTML', () => {
   test('Space normalization around text', async () => {
     let input, output;
     input = '   <p>blah</p>\n\n\n   ';
-    assert.strictEqual(await minify(input), input);
+    assert.strictEqual(await minify(input), '<p>blah</p>');
     output = '<p>blah</p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
     output = ' <p>blah</p> ';
@@ -2177,49 +2177,49 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true, removeEmptyElements: true }), output);
 
     input = ' <html></html>';
-    output = ' ';
+    output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true }), output);
 
     input = '<html> </html>';
-    output = ' ';
+    output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true }), output);
 
     input = '<html></html> ';
-    output = ' ';
+    output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true }), output);
 
     input = ' <html><body></body></html>';
-    output = ' ';
+    output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true }), output);
 
     input = '<html> <body></body></html>';
-    output = ' ';
+    output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true }), output);
 
     input = '<html><body> </body></html>';
-    output = '<body> ';
+    output = '<body>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true }), output);
 
     input = '<html><body></body> </html>';
-    output = ' ';
+    output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true }), output);
 
     input = '<html><body></body></html> ';
-    output = ' ';
+    output = '';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
     output = '';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeOptionalTags: true }), output);
@@ -2289,7 +2289,7 @@ describe('HTML', () => {
 
     // Whitespace between elements must not block end tag omission (issue #329)
     input = '<!doctype html>\n<title>Test</title>\n<p>First</p>\n<p>Second</p>\n';
-    output = '<!doctype html>\n<title>Test</title>\n<p>First\n<p>Second\n';
+    output = '<!doctype html>\n<title>Test</title>\n<p>First\n<p>Second';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
     // Whitespace itself is left untouched
@@ -2634,6 +2634,73 @@ describe('HTML', () => {
 
     // Without `preserveLineBreaks` the run goes entirely
     assert.strictEqual(await minify('foo <!-- c -->\n<div>x</div>', { collapseWhitespace: true, removeComments: true }), 'foo<div>x</div>');
+  });
+
+  test('Removal leaves no whitespace-only line behind', async () => {
+    const options = { removeComments: true, removeOptionalTags: true };
+
+    // Removed comments
+    assert.strictEqual(await minify('<div>\n  <span>a</span>\n  <!-- c -->\n</div>', options), '<div>\n  <span>a</span>\n</div>');
+    assert.strictEqual(await minify('<div>\n  <!-- c -->  \n</div>', options), '<div>\n</div>');
+    assert.strictEqual(await minify('<div>\n  <!-- a -->\n  <!-- b -->\n</div>', options), '<div>\n</div>');
+    assert.strictEqual(await minify('<div>\n  <!-- a --> <!-- b -->\n</div>', options), '<div>\n</div>');
+    assert.strictEqual(await minify('<div>\n  <span>a</span> <!-- c -->\n</div>', options), '<div>\n  <span>a</span> \n</div>');
+    assert.strictEqual(await minify('<div>\r\n  <!-- c -->\r\n</div>', options), '<div>\r\n</div>');
+    assert.strictEqual(await minify('<div>\n\f<!-- c -->\n</div>', options), '<div>\n</div>');
+    assert.strictEqual(await minify('<div>\n  <!-- a -->\f<!-- b -->\n</div>', options), '<div>\n</div>');
+
+    // Omitted tags
+    assert.strictEqual(await minify('<ul>\n  <li>a\n  </li>\n</ul>', options), '<ul>\n  <li>a\n</ul>');
+    assert.strictEqual(await minify('<div>\n  <p>a\n  </p>\n</div>', options), '<div>\n  <p>a\n</div>');
+    assert.strictEqual(await minify('<!doctype html>\n<html>\n  <head>\n    <title>T</title>\n    <!-- c -->\n  </head>\n  <body>\n    <p>Text</p>\n  </body>\n</html>\n', options), '<!doctype html>\n  <head>\n    <title>T</title>\n  </head>\n  <body>\n    <p>Text');
+
+    // Removed empty elements
+    assert.strictEqual(await minify('<div>\n  <span></span>\n</div>', { removeEmptyElements: true }), '<div>\n</div>');
+
+    // End tags the parser drops, having nothing to close
+    assert.strictEqual(await minify('<p>a</p>\n  </body>\n<p>b'), '<p>a</p>\n<p>b');
+    assert.strictEqual(await minify('<div>\n  </span>\n</div>'), '<div>\n</div>');
+
+    // Lines that were blank already, or that hold more than the removed node, stay
+    assert.strictEqual(await minify('<div>\n\n  <!-- c -->\n</div>', options), '<div>\n\n</div>');
+    assert.strictEqual(await minify('<div>\n  <!-- c -->\n\n</div>', options), '<div>\n\n</div>');
+    assert.strictEqual(await minify('<div>\n  <!-- c --> a\n</div>', options), '<div>\n   a\n</div>');
+    assert.strictEqual(await minify('<div>a <!-- c -->\n</div>', options), '<div>a \n</div>');
+
+    // Whitespace in `pre` is left alone, also where the end of `pre` omits a tag in it
+    assert.strictEqual(await minify('<pre>a\n  <!-- c -->\n</pre>', options), '<pre>a\n  \n</pre>');
+    assert.strictEqual(await minify('<pre><li>a  \n  </li>  \n</pre>', options), '<pre><li>a  \n    \n</pre>');
+    assert.strictEqual(await minify('<pre><li>a</li>  \n\n</pre>', { removeOptionalTags: true, collapseWhitespace: true }), '<pre><li>a  \n\n</pre>');
+  });
+
+  test('Trims whitespace at either end of the output', async () => {
+    assert.strictEqual(await minify('\n\t<p>a</p>\n\n  '), '<p>a</p>');
+    assert.strictEqual(await minify('<p>a</p>\r\n\r\n'), '<p>a</p>');
+    assert.strictEqual(await minify('\n\n'), '');
+    assert.strictEqual(await minify('<!-- c -->\n<!doctype html>\n<p>a', { removeComments: true }), '<!doctype html>\n<p>a');
+    assert.strictEqual(await minify('<span>a</span>\n  <!-- c -->', { removeComments: true }), '<span>a</span>');
+
+    // Not whitespace, but content
+    assert.strictEqual(await minify('\u00a0a\u00a0'), '\u00a0a\u00a0');
+
+    // Verbatim whitespace stays, while whitespace after it goes
+    assert.strictEqual(await minify('<pre>a  '), '<pre>a  ');
+    assert.strictEqual(await minify('<textarea>a\n\n'), '<textarea>a\n\n');
+    assert.strictEqual(await minify('<script>a  '), '<script>a  ');
+    assert.strictEqual(await minify('\n<pre>\n  a\n</pre>\n'), '<pre>\n  a\n</pre>');
+
+    // Whitespace around custom fragments is up to `trimCustomFragments`
+    assert.strictEqual(await minify('  <?php echo 1 ?>  '), '  <?php echo 1 ?>  ');
+
+    // Modifiers that promise to keep whitespace keep it here, too
+    assert.strictEqual(await minify(' <p>a</p> ', { collapseWhitespace: true, conservativeCollapse: true }), ' <p>a</p> ');
+    assert.strictEqual(await minify('\n<p>a</p>\n', { collapseWhitespace: true, preserveLineBreaks: true }), '\n<p>a</p>\n');
+
+    // Partial markup ends where other markup joins it, so `collapseWhitespace` alone decides
+    assert.strictEqual(await minify('Hello ', { partialMarkup: true }), 'Hello ');
+    assert.strictEqual(await minify(' <b>x</b> ', { partialMarkup: true }), ' <b>x</b> ');
+    assert.strictEqual(await minify('<!-- c --> world', { partialMarkup: true, removeComments: true }), ' world');
+    assert.strictEqual(await minify(' <b>x</b> ', { partialMarkup: true, collapseWhitespace: true }), '<b>x</b>');
   });
 
   // https://github.com/kangax/html-minifier/issues/10
@@ -5841,7 +5908,7 @@ describe('HTML', () => {
 
     // Re-minifying stays idempotent, as the cell that ends before the next row is closed there
     input = '<table><tr><td><p>x</p>\n</td>\n</tr>\n<tr><td>y</td></tr></table>';
-    const output = '<table><tr><td><p>x\n\n\n<tr><td>y</table>';
+    const output = '<table><tr><td><p>x\n<tr><td>y</table>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true, includeAutoGeneratedTags: true }), output);
     assert.strictEqual(await minify(output, { removeOptionalTags: true, includeAutoGeneratedTags: true }), output);
   });

@@ -249,6 +249,8 @@ you get the following output (condensed, `\n` represents an actual line break):
 
 Where the modifiers disagree, the preserving one wins—`conservativeCollapse` and `preserveLineBreaks` do not let `collapseInlineTagWhitespace` remove a space or line break entirely.
 
+Regardless of these options, whitespace at the start and end of the output goes, and so do lines that a removed comment or tag leaves with nothing but whitespace (blank lines of the source stay). Whitespace stays, however, where it’s kept verbatim (in `pre` or `textarea`, or in `pre`, `textarea`, or `script` content left open at the end), next to custom fragments where their handling keeps it (see `trimCustomFragments`), at either end of partial markup (cf. `partialMarkup`), and where `conservativeCollapse` or `preserveLineBreaks` keep it.
+
 ### Sorting attributes and style classes
 
 `sortAttributes` and `sortClassNames` reorder attributes and class names by frequency, so that repeated markup looks more alike. This doesn’t change the plain-text size of the output, only how well it compresses: `sortAttributes` makes Gzip and Brotli output slightly smaller on average, though not on every page (see [“Optimizing for compression”](#optimizing-for-compression)); `sortClassNames` doesn’t help, and alongside `sortAttributes` cancels most of its gain with Brotli.
@@ -677,7 +679,7 @@ By default, HMN parses markup into a complete tree structure, then modifies it (
 
 _Input markup (e.g., `<p id="">foo`) → Internal representation of markup in a form of tree (e.g., `{ tag: "p", attr: "id", children: ["foo"] }`) → Transformation of internal representation (e.g., removal of `id` attribute) → Output of resulting markup (e.g., `<p>foo</p>`)_
 
-For partial HTML fragments (such as template includes, SSI fragments, or closing tags without opening tags), use the `partialMarkup: true` option. This preserves stray end tags (closing tags without corresponding opening tags) and prevents auto-closing of unclosed tags at the end of input. Note that normal HTML auto-closing rules still apply during parsing—for example, a closing parent tag will still auto-close its unclosed child elements.
+For partial HTML fragments (such as template includes, SSI fragments, or closing tags without opening tags), use the `partialMarkup: true` option. This preserves stray end tags (closing tags without corresponding opening tags) and prevents auto-closing of unclosed tags at the end of input. Note that normal HTML auto-closing rules still apply during parsing—for example, a closing parent tag will still auto-close its unclosed child elements. Whitespace at the start and end of a fragment stays, too, as it may separate the fragment from what surrounds it (unless `collapseWhitespace` removes it).
 
 To validate complete HTML markup, use [the W3C validator](https://validator.w3.org/) or one of [several validator packages](https://meiert.com/blog/html-validator-packages/).
 
@@ -841,6 +843,8 @@ Parameters:
 * `--preset=NAME`: Uses a preset instead of an options file (e.g., `--preset=comprehensive`)
 
 To compare branches (A/B run), execute `npm run benchmark -- --save` on `main`, then `npm run benchmark` on the branch to see the deltas. Add `--core` on both ends when measuring changes to HMN rather than bundled minifiers, or `--cold` when measuring changes to the CSS, JS, or SVG minification paths.
+
+For changes of around 1% or less, use `npm run benchmark:ab -- main` instead: It times the working tree against any Git ref in the same session, runs both in turn per file, averages both loading orders, and reports `collapseWhitespace` on and off separately. Add `--aa` to compare the ref with a copy of itself—the noise floor any finding must clear. The script’s header lists further parameters.
 
 Reported times are the *fastest* iteration, not the median: Interference can only make a run slower, so the minimum is the most stable estimate. Each run also reports its noise—how far the reported figure moves between the first and second half of the iterations—and any delta smaller than that is marked `within noise` rather than shown as a win or a regression. Raise `--iterations` until the noise sits below the change you are trying to measure.
 

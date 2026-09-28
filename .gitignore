@@ -1,3 +1,4 @@
+backtest/.ab/
 backtest/input/
 backtest/benchmark-baseline.json
 backtest/errors.log
