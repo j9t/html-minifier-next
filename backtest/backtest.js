@@ -461,7 +461,7 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
         console.log(`Testing last ${count} commits, sampling every ${ordinal(step)} commit (${actualTests} tests)`);
       }
 
-      // Clean-up function to restore files on exit/error
+      // Cleanup function to restore files on exit/error
       let cleanupCalled = false;
       const cleanup = async function (reason) {
         if (cleanupCalled) return;
@@ -487,7 +487,7 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
         });
       };
 
-      // Register clean-up handlers for various exit scenarios
+      // Register cleanup handlers for various exit scenarios
       const sigintHandler = async () => {
         await cleanup('SIGINT (Ctrl+C)');
         process.exit(130);
@@ -566,7 +566,7 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
               // Successful completion—clean up and unregister handlers
               await cleanup();
 
-              // Unregister clean-up handlers to prevent duplicate clean-up
+              // Unregister cleanup handlers to prevent duplicate cleanup
               process.removeListener('SIGINT', sigintHandler);
               process.removeListener('SIGTERM', sigtermHandler);
               process.removeListener('uncaughtException', uncaughtExceptionHandler);

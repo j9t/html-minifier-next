@@ -1,4 +1,4 @@
-// @@ Extend to the Git walk (checkout, restore, and clean-up) and the forked minification, e.g., against a fixture repository
+// @@ Extend to the Git walk (checkout, restore, and cleanup) and the forked minification, e.g., against a fixture repository
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert';

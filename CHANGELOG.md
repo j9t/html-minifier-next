@@ -1442,7 +1442,7 @@ If you rely on specific CSS output formatting, review your CSS after upgrading a
 
 ### Removed
 
-* Removed orphaned .lintstagedrc.yml file left from Husky refactoring clean-up
+* Removed orphaned .lintstagedrc.yml file left from Husky refactoring cleanup
 * Removed non-functional .github/workflows/benchmarks.yml workflow
 
 ## [2.1.1] - 2025-09-13

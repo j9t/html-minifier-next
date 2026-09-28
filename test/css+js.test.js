@@ -1478,7 +1478,7 @@ describe('CSS and JS', () => {
 
         assert.ok(result.includes('.test{color:purple}'), 'CSS should minify with env var cache size');
       } finally {
-        // Clean-up always runs, even if assertion fails
+        // Cleanup always runs, even if assertion fails
         delete process.env.HMN_CACHE_CSS;
       }
     });
@@ -1498,7 +1498,7 @@ describe('CSS and JS', () => {
 
         assert.ok(result.includes('.foo{border:none}'), 'Option should override env var');
       } finally {
-        // Clean-up always runs, even if assertion fails
+        // Cleanup always runs, even if assertion fails
         delete process.env.HMN_CACHE_CSS;
       }
     });
