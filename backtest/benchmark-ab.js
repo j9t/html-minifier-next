@@ -22,7 +22,7 @@
 
 import { execFileSync, spawnSync } from 'child_process';
 import fs from 'fs/promises';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, rmdirSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
 import path from 'path';
 import { performance } from 'perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'url';
@@ -202,11 +202,6 @@ async function main() {
     }
   } finally {
     rmSync(dirRun, { recursive: true, force: true });
-    try {
-      rmdirSync(DIR_AB);
-    } catch {
-      // Another run still uses it
-    }
   }
 }
 
