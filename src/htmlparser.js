@@ -301,7 +301,7 @@ export class HTMLParser {
     // Sticky regex versions for position-based matching (avoids string slicing)
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
     const endTagOpenY = new RegExp(endTagOpen.source.slice(1), 'y');
-    const doctypeY = /<!DOCTYPE[^<>]+>/iy;
+    const doctypeY = /<!DOCTYPE[^<>]*>/iy;
     const commentTestY = /<!--/y;
     const conditionalTestY = /<!\[/y;
 

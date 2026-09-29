@@ -4419,6 +4419,12 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p>a<table><tr><td>b</table></p><p>c</p>', { removeOptionalTags: true }), '<p>a<table><tr><td>b</table></p><p>c');
     assert.strictEqual(await minify(tableInP, { removeOptionalTags: true, useShortDoctype: true }), '<div><p>a<table><tr><td>b</table></p></div>');
 
+    // A doctype without a name sets quirks mode
+    assert.strictEqual(await minify('<!DOCTYPE><p>a</p><table><tr><td>b</table>', { removeOptionalTags: true }), '<!DOCTYPE><p>a</p><table><tr><td>b</table>');
+    assert.strictEqual(await minify('<!doctype ><p>a</p><table><tr><td>b</table>', { removeOptionalTags: true }), '<!doctype ><p>a</p><table><tr><td>b</table>');
+    assert.strictEqual(await minify('<!DOCTYPE><p>a</p><table><tr><td>b</table>', { removeOptionalTags: true, useShortDoctype: true }), '<!doctype html><p>a<table><tr><td>b</table>');
+    assert.strictEqual(await minify('<!DOCTYPE> <p>a</p>', { collapseWhitespace: true }), '<!DOCTYPE><p>a</p>');
+
     // Only a doctype ahead of any tag sets the mode, and only the first
     assert.strictEqual(await minify('<!-- a --><!doctype html><p>a</p><table><tr><td>b</table>', { removeOptionalTags: true }), '<!-- a --><!doctype html><p>a<table><tr><td>b</table>');
     assert.strictEqual(await minify('<p>a</p><!doctype html><p>b</p><table><tr><td>c</table>', { removeOptionalTags: true }), '<p>a<!doctype html><p>b</p><table><tr><td>c</table>');

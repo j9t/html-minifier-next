@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed `removeOptionalTags` omitting a stray `</p>`, which browsers read as an empty `p` (e.g., the last `</p>` in `<p>a<div>b</div></p>` or `<p>a<p>b</p></p>`), as well as the end tag before it
 * Fixed `removeOptionalTags` omitting `</p>` before end tags that don’t close it in browsers, like `</span>`, `</label>`, `</foreignObject>`, or `</title>` in SVG, which pulled the rest of the page into the `p`: `</p>` is now only omitted before end tags like `</div>`, `</li>`, or `</td>`
 * Fixed the parser closing an open `p` at `table`, and `removeOptionalTags` omitting `</p>` before it, under doctypes that set quirks mode (like HTML 3.2), where `table` doesn’t close a `p`; which doctypes do follows the HTML parser (so that, for example, XHTML 1.0 Strict, HTML 4.01 Strict, and `<!doctype html system "about:legacy-compat">` don’t), markup whose doctype `useShortDoctype` replaces is read as no-quirks, and without a doctype, what either mode needs stays
+* Fixed a doctype without a name (`<!DOCTYPE>`) causing a parse error; it now sets quirks mode, as in browsers
 * Fixed end tags of formatting elements like `a`, `em`, or `strong` being dropped where the parser found them stray, although browsers still act on them, and `removeEmptyElements` removing such an element where a block closed it, although browsers reopen it after the block
 
 ### Added
