@@ -407,8 +407,11 @@ describe('Utils', () => {
         '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">',
         '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">',
         '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">',
-        // Trailing characters after the system identifier don’t force quirks mode
-        '<!DOCTYPE html SYSTEM "about:legacy-compat" x>'
+        // Trailing characters after the system identifier don’t force quirks mode,
+        // nor does missing whitespace before either identifier
+        '<!DOCTYPE html SYSTEM "about:legacy-compat" x>',
+        '<!DOCTYPE html PUBLIC"-//W3C//DTD XHTML 1.0 Strict//EN""http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+        '<!DOCTYPE html SYSTEM\'about:legacy-compat\'>'
       ]) {
         assert.strictEqual(isQuirksDoctype(doctype), false, doctype);
       }
