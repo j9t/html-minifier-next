@@ -4425,6 +4425,16 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<!DOCTYPE><p>a</p><table><tr><td>b</table>', { removeOptionalTags: true, useShortDoctype: true }), '<!doctype html><p>a<table><tr><td>b</table>');
     assert.strictEqual(await minify('<!DOCTYPE> <p>a</p>', { collapseWhitespace: true }), '<!DOCTYPE><p>a</p>');
 
+    // Only a doctype after nothing but comments and whitespace sets the mode; after other text, like template
+    // code that may render to text or nothing, the mode is unknown
+    const tableAfterP = '<p>a</p><table><tr><td>b</table>';
+    assert.strictEqual(await minify('﻿ \n<!-- a --> <!doctype html>' + tableAfterP, { removeOptionalTags: true }), '﻿ \n<!-- a --> <!doctype html><p>a<table><tr><td>b</table>');
+    assert.strictEqual(await minify('<?php x ?><!doctype html>' + tableAfterP, { removeOptionalTags: true }), '<?php x ?><!doctype html>' + tableAfterP);
+    assert.strictEqual(await minify('a<!doctype html>' + tableAfterP, { removeOptionalTags: true }), 'a<!doctype html>' + tableAfterP);
+    assert.strictEqual(await minify('<?php x ?><!doctype html>' + tableInP, { removeOptionalTags: true }), '<?php x ?><!doctype html><div><p>a<table><tr><td>b</table></p></div>');
+    assert.strictEqual(await minify('<?php x ?>' + doctypeQuirks + tableInP, { removeOptionalTags: true }), '<?php x ?>' + doctypeQuirks + '<div><p>a<table><tr><td>b</table></p></div>');
+    assert.strictEqual(await minify('<?php x ?>' + doctypeQuirks + tableAfterP, { removeOptionalTags: true, useShortDoctype: true }), '<?php x ?><!doctype html>' + tableAfterP);
+
     // Only a doctype ahead of any tag sets the mode, and only the first
     assert.strictEqual(await minify('<!-- a --><!doctype html><p>a</p><table><tr><td>b</table>', { removeOptionalTags: true }), '<!-- a --><!doctype html><p>a<table><tr><td>b</table>');
     assert.strictEqual(await minify('<p>a</p><!doctype html><p>b</p><table><tr><td>c</table>', { removeOptionalTags: true }), '<p>a<!doctype html><p>b</p><table><tr><td>c</table>');

@@ -6,7 +6,7 @@
  */
 
 import { isThenable, isQuirksDoctype, embedSource, findTagEnd } from './lib/utils.js';
-import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
+import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_ENCODING, RE_WS_ONLY } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -271,12 +271,12 @@ export class HTMLParser {
     const stack = [];
     /** @type {string} */
     let lastTag = '';
-    // The document mode, which only a doctype ahead of any tag sets (with
-    // `noQuirksMode`, to no-quirks, as the doctype gets replaced by the HTML
-    // one): `table` closes an open `p` in no-quirks mode but not in quirks
-    // mode; without a doctype (as in a fragment) the mode is unknown, so the
-    // `p` stays open as in quirks mode, and its end tag, which no-quirks mode
-    // reads as stray, has to stay, too
+    // The document mode, which only the first doctype sets, and only after
+    // nothing but comments and whitespace (with `noQuirksMode`, to no-quirks,
+    // as the doctype gets replaced by the HTML one): `table` closes an open `p`
+    // in no-quirks mode but not in quirks mode; without such a doctype (as in a
+    // fragment) the mode is unknown, so the `p` stays open as in quirks mode,
+    // and its end tag, which no-quirks mode reads as stray, has to stay, too
     /** @type {'' | 'quirks' | 'no-quirks'} */
     let docMode = '';
     let docModeSettable = true;
@@ -525,6 +525,16 @@ export class HTMLParser {
           text = fullHtml.substring(pos);
           advance(fullLength - pos);
         }
+        // Text keeps a later doctype from setting the mode (template code may render to text
+        // or to nothing), except for whitespace and a byte order mark at the start, which
+        // browsers strip (as it runs before the first tag only, this costs next to nothing)
+        if (docModeSettable) {
+          const bom = pos === text.length && text.charCodeAt(0) === 0xFEFF;
+          const rest = bom ? text.slice(1) : text;
+          if (rest && !RE_WS_ONLY.test(rest)) {
+            docModeSettable = false;
+          }
+        }
 
         // Next tag for whitespace processing context
         if (handler.wantsNextTag) {
@@ -610,6 +620,7 @@ export class HTMLParser {
       if (pos === lastPos) {
         if (handler.continueOnParseError) {
           // Skip the problematic character and continue
+          docModeSettable = false;
           if (handler.chars) {
             const result = handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
             if (isThenable(result)) await result;
