@@ -99,7 +99,7 @@ const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
 // (other start tags, like `meta` or `style`, go in it, or are ignored, like `td` outside a table)
 // Elements that end the scope the `p` is looked for in, https://html.spec.whatwg.org/multipage/parsing.html#has-an-element-in-button-scope
 const buttonScopeBoundaries = new Set(['applet', 'button', 'caption', 'html', 'marquee', 'object', 'table', 'td', 'template', 'th']);
-const closesP = new Set(['address', 'article', 'aside', 'blockquote', 'center', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'li', 'listing', 'main', 'menu', 'nav', 'ol', 'plaintext', 'pre', 'search', 'section', 'summary', 'table', 'ul', 'xmp']);
+const closesP = new Set(['address', 'article', 'aside', 'blockquote', 'center', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'li', 'listing', 'main', 'menu', 'nav', 'ol', 'p', 'plaintext', 'pre', 'search', 'section', 'summary', 'table', 'ul', 'xmp']);
 
 // A tag name ends at whitespace, a slash, or the closing bracket, so `</scriptx>` names a
 // different element and does not end this one

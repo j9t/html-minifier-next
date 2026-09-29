@@ -4364,6 +4364,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p><span>a<div>b</div></span></p>', { removeOptionalTags: true }), '<p><span>a<div>b</div></p>');
     assert.strictEqual(await minify('<p><a href="x">a<h2>b</h2></a></p>', { removeOptionalTags: true }), '<p><a href="x">a<h2>b</h2></a></p>');
 
+    // A `p` start tag closes an open `p` further up, too, but not past a scope boundary like `button`
+    assert.strictEqual(await minify('<p><span>a<p>b</p></span></p>'), '<p><span>a<p>b</p></p>');
+    assert.strictEqual(await minify('<p><button><p>x</p></button></p>', { removeOptionalTags: true }), '<p><button><p>x</button>');
+
     // With scripting, `noscript` holds text, so a block in it doesn’t close the `p`
     assert.strictEqual(await minify('<p>a<noscript><div>x</div></noscript>b</p>'), '<p>a<noscript><div>x</div></noscript>b</p>');
 
