@@ -140,6 +140,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
+| `collapseEmptyAttributes`<br>`--collapse-empty-attributes` | Omit empty attribute values (e.g., `alt=""` → `alt`) | `false` |
 | `collapseInlineTagWhitespace`<br>`--collapse-inline-tag-whitespace` | Collapse whitespace more aggressively between inline elements—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
 | `collapseNoBreakSpaces`<br>`--collapse-no-break-spaces` | Remove whitespace next to no-break spaces, narrow no-break spaces, and figure spaces in text (e.g., `a &nbsp; b` → `a&nbsp;b`), keeping runs of them—use with [`collapseWhitespace`](#combining-whitespace-options) | `false` |
 | `collapseWhitespace`<br>`--collapse-whitespace` | [Collapse whitespace that contributes to text nodes in a document tree](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_whitespace); [enable other whitespace options](#combining-whitespace-options) | `false` |
@@ -174,7 +175,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeDefaultTypeAttributes`<br>`--remove-default-type-attributes` | Remove default `type` attributes from `style`/`link` (e.g., `type="text/css"`) and `script` (e.g., `type="text/javascript"`) elements; other `type` attribute values are left intact | `false` |
 | `removeEmptyAttributes`<br>`--remove-empty-attributes` | [Remove all attributes with whitespace-only values](https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_or_blank_attributes) | `false` (could be `true`, `Function(attrName, tag)`) |
 | `removeEmptyElements`<br>`--remove-empty-elements` | [Remove all elements with empty contents](#removing-empty-elements) | `false` |
-| `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve—use with `removeEmptyElements`; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<span aria-hidden='true'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
+| `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve—use with `removeEmptyElements`; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<i class='test'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
@@ -247,6 +248,8 @@ you get the following output (condensed, `\n` represents an actual line break):
 | `collapseWhitespace`, `preserveLineBreaks` | `<nav>\n<button>A</button> <button>B</button>\n</nav>` |
 | `collapseWhitespace`, `preserveLineBreaks`, `collapseInlineTagWhitespace` | `<nav>\n<button>A</button><button>B</button>\n</nav>` |
 
+`collapseInlineTagWhitespace` only removes whitespace between tags, and keeps it around text-level elements (like `a`, `code`, or `em`), where it separates words: `<p><button>A</button> <button>B</button> or <code>C</code> <code>D</code></p>` becomes `<p><button>A</button><button>B</button> or <code>C</code> <code>D</code></p>`.
+
 Where the modifiers disagree, the preserving one wins—`conservativeCollapse` and `preserveLineBreaks` do not let `collapseInlineTagWhitespace` remove a space or line break entirely.
 
 Regardless of these options, whitespace at the start and end of the output goes, and so do lines that a removed comment or tag leaves with nothing but whitespace (blank lines of the source stay). Whitespace stays, however, where it’s kept verbatim (in `pre` or `textarea`, or in `pre`, `textarea`, or `script` content left open at the end), next to custom fragments where their handling keeps it (see `trimCustomFragments`), at either end of partial markup (cf. `partialMarkup`), and where `conservativeCollapse` or `preserveLineBreaks` keep it.
@@ -261,9 +264,9 @@ Most HTML is served compressed, so the Gzip or Brotli size is often what counts�
 
 | Added to `comprehensive` | Raw | Gzip (level 6) | Brotli (quality 6) | Brotli (quality 11) |
 | --- | --- | --- | --- | --- |
-| `sortAttributes` | ±0% | −0.20% | −0.21% | −0.16% |
-| `sortAttributes`, `removeAttributeQuotes: false`, `quoteCharacter: '"'` | +1.75% | +0.08% | −0.15% | −0.39% |
-| `removeEmptyElements` | −1.15% | −0.75% | −0.68% | −0.63% |
+| `sortAttributes` | ±0% | −0.19% | −0.22% | −0.10% |
+| `sortAttributes`, `removeAttributeQuotes: false`, `quoteCharacter: '"'` | +1.71% | +0.08% | −0.17% | −0.38% |
+| `removeEmptyElements` | −1.12% | −0.62% | −0.54% | −0.54% |
 
 * **Gzip or on-the-fly Brotli:** Add `sortAttributes`. The gain is small and uneven, however, and sorting can double minification time for very large documents.
 * **Brotli precompressed at quality 11** (as for static files compressed at build time): Add `sortAttributes`, don’t remove attribute quotes, and make the quotes double quotes. Raw and Gzip output grow, so this only pays off when clients receive the precompressed Brotli files.
@@ -277,20 +280,21 @@ npx html-minifier-next --preset comprehensive --sort-attributes input.html
 npx html-minifier-next --preset comprehensive --sort-attributes --no-remove-attribute-quotes --quote-character='"' input.html
 ```
 
-These figures were measured in September 2026 with HMN 8.4.5 on 31 pages of the [backtest corpus](#regression-tests) (retrieved February 2026). They are indications, not guarantees, as they depend on the markup and will shift as HMN and the minifiers it bundles change. The [benchmark](#working-tree-benchmarks) reports Gzip and Brotli (quality 6) sizes to re-check them.
+These figures were measured in September 2026 with HMN 8.8.0 on 31 pages of the [backtest corpus](#regression-tests) (retrieved February 2026). They are indications, not guarantees, as they depend on the markup and will shift as HMN and the minifiers it bundles change. The [benchmark](#working-tree-benchmarks) reports Gzip and Brotli (quality 6) sizes to re-check them.
 
 ### Removing empty elements
 
 `removeEmptyElements` removes elements without content—no text and no child elements (comments don’t count; whitespace does, unless `collapseWhitespace` removes it). It keeps:
 
 * elements with an `id` attribute,
-* `textarea` elements,
+* elements with a `role`, `tabindex`, or ARIA attribute (e.g., `aria-label` or `aria-hidden`), unless its value is empty,
+* custom elements (e.g., `<my-player></my-player>`), `canvas`, and `textarea` elements,
 * `audio`, `video`, and `script` elements with a `src` attribute, `iframe` elements with `src` or `srcdoc`, `object` elements with `data`, and `applet` elements with `code`,
 * elements inside SVG and MathML—though an empty `svg` or `math` element itself is removed, and HTML inside them (as in `foreignObject` or `annotation-xml`) is still processed.
 
-Everything else goes, including elements that are empty on purpose: icons as well as icon links and buttons styled with CSS (e.g., `<i class="icon"></i>` or `<button aria-label="Close"></button>`), `canvas` elements that scripts draw into, empty `option` elements, and empty table cells (which shifts the cells that follow). Keep such elements with `removeEmptyElementsExcept`, for example `["td", "canvas", "<button aria-label>"]`. A parent that is left empty by the removal is kept.
+Everything else goes, including elements that are empty on purpose: icons and other elements styled with CSS (e.g., `<i class="test"></i>` or `<span style="width:50%"></span>`), named anchors (`<a name="top"></a>`), other elements that scripts fill, empty `option` elements, and empty table cells (which shifts the cells that follow). Keep such elements with `removeEmptyElementsExcept`, for example `["td", "<i class='test'>"]`. A parent that is left empty by the removal goes, too, unless the above keeps it.
 
-Where the markup allows it, the option is effective: On a test corpus, it reduced output by 1.15% raw and 0.75% with Gzip on average (see [“Optimizing for compression”](#optimizing-for-compression)).
+Where the markup allows it, the option is effective: On a test corpus, it reduced output by 1.12% raw and 0.62% with Gzip on average (see [“Optimizing for compression”](#optimizing-for-compression)).
 
 ### CSS minification
 

@@ -2,7 +2,7 @@ import {describe, test} from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { minify } from '../src/htmlminifier.js';
+import { minify, getPreset } from '../src/htmlminifier.js';
 import { trimWhitespace, collapseWhitespaceAll, collapseWhitespace } from '../src/lib/whitespace.js';
 
 describe('HTML', () => {
@@ -1880,7 +1880,7 @@ describe('HTML', () => {
     input = '<div>unary <span></span><link></div>';
     output = '<div>unary <link></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true }), output);
-    output = '<div>unary<link></div>';
+    output = '<div>unary <link></div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), output);
 
     input = '<div>Empty <!-- NOT --> </div>';
@@ -1908,6 +1908,62 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeEmptyElements: true }), output);
   });
 
+  test('Removes elements left empty by removing empty elements', async () => {
+    const options = { removeEmptyElements: true };
+
+    assert.strictEqual(await minify('<div><span></span></div>', options), '');
+    assert.strictEqual(await minify('<div><div><div></div></div></div>', options), '');
+    assert.strictEqual(await minify('<p>a<span class="x"><b></b><i></i></span>b</p>', options), '<p>ab</p>');
+    assert.strictEqual(await minify('<div><span></span><!-- x --><span></span></div>', options), '');
+
+    // With whitespace collapsed, whitespace around the removed element goes, too
+    assert.strictEqual(await minify('<p><span class="field">  <span class="content"></span>  </span><b>x</b></p>', { ...options, collapseWhitespace: true }), '<p><b>x</b></p>');
+
+    // Elements with other content stay
+    assert.strictEqual(await minify('<div><span></span>text</div>', options), '<div>text</div>');
+    assert.strictEqual(await minify('<div><span></span><img src="a.png"></div>', options), '<div><img src="a.png"></div>');
+    assert.strictEqual(await minify('<div><span></span><b>x</b></div>', options), '<div><b>x</b></div>');
+    assert.strictEqual(await minify('<div> <span></span> </div>', options), '<div>  </div>');
+
+    // Elements with kept empty elements stay
+    assert.strictEqual(await minify('<div><span id="x"></span></div>', options), '<div><span id="x"></span></div>');
+    assert.strictEqual(await minify('<div><textarea></textarea></div>', options), '<div><textarea></textarea></div>');
+    assert.strictEqual(await minify('<tr><td></td><td></td></tr>', { ...options, removeEmptyElementsExcept: ['td'] }), '<tr><td></td><td></td></tr>');
+    assert.strictEqual(await minify('<div><svg><g></g></svg></div>', options), '<div><svg><g></g></svg></div>');
+
+    // An element whose start tag was omitted stays, and so does what holds it—rather than the wrong element going
+    assert.strictEqual(await minify('<div>x<table><tbody><tr><td></td></tr></tbody></table></div>', { ...options, removeOptionalTags: true }), '<div>x<table></table></div>');
+    assert.strictEqual(await minify('<div>x<table><tbody><tr><td></td></tr></tbody></table></div>', options), '<div>x</div>');
+  });
+
+  test('Keeps empty elements with accessibility semantics or focus, custom elements, and `canvas`', async () => {
+    const options = { removeEmptyElements: true };
+
+    for (const input of [
+      '<span role="img" aria-label="Logo" class="logo"></span>',
+      '<div aria-live="polite"></div>',
+      '<span aria-describedby="hint"></span>',
+      '<span class="icon" aria-hidden="true"></span>',
+      '<div tabindex="0"></div>'
+    ]) {
+      assert.strictEqual(await minify(input, options), input);
+    }
+
+    assert.strictEqual(await minify('<div ARIA-LIVE="polite"></div>', options), '<div aria-live="polite"></div>');
+
+    // Custom elements and `canvas` are there for scripts to fill or draw into
+    for (const input of ['<my-player data-src="a.json"></my-player>', '<canvas></canvas>', '<div><x-y></x-y></div>']) {
+      assert.strictEqual(await minify(input, options), input);
+    }
+
+    // Elements with other attributes go, as do those whose protecting attributes are empty
+    assert.strictEqual(await minify('<p>a<span class="bar" style="width:50%"></span></p>', options), '<p>a</p>');
+    assert.strictEqual(await minify('<p>a<a name="top"></a></p>', options), '<p>a</p>');
+    assert.strictEqual(await minify('<p>a<span class="icon" title="Icon"></span></p>', options), '<p>a</p>');
+    assert.strictEqual(await minify('<p>a<span aria-hidden="" role=" "></span></p>', options), '<p>a</p>');
+    assert.strictEqual(await minify('<div role=""><span></span></div>', options), '');
+  });
+
   test('`removeEmptyElementsExcept`', async () => {
     let input, output;
 
@@ -1926,19 +1982,19 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td', 'th'] }), output);
 
     // HTML-like markup with double quotes
-    input = '<div><span aria-hidden="true"></span><span class="other"></span></div>';
-    output = '<div><span aria-hidden="true"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
+    input = '<div><span data-icon="true"></span><span class="other"></span></div>';
+    output = '<div><span data-icon="true"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span data-icon="true">'] }), output);
 
     // HTML-like markup with single quotes
-    input = '<div><span aria-hidden="true"></span><span class="other"></span></div>';
-    output = '<div><span aria-hidden="true"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ["<span aria-hidden='true'>"] }), output);
+    input = '<div><span data-icon="true"></span><span class="other"></span></div>';
+    output = '<div><span data-icon="true"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ["<span data-icon='true'>"] }), output);
 
     // HTML-like markup with unquoted attribute
-    input = '<div><span aria-hidden="true"></span><span class="other"></span></div>';
-    output = '<div><span aria-hidden="true"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden=true>'] }), output);
+    input = '<div><span data-icon="true"></span><span class="other"></span></div>';
+    output = '<div><span data-icon="true"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span data-icon=true>'] }), output);
 
     // Closing tag in markup (should work the same)
     input = '<div><td></td><span></span></div>';
@@ -1946,24 +2002,24 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<td></td>'] }), output);
 
     // Element with matching tag but different attribute value should be removed
-    input = '<div><span aria-hidden="true"></span><span aria-hidden="false"></span></div>';
-    output = '<div><span aria-hidden="true"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
+    input = '<div><span data-icon="true"></span><span data-icon="false"></span></div>';
+    output = '<div><span data-icon="true"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span data-icon="true">'] }), output);
 
     // Multiple attributes must all match
-    input = '<div><span class="icon" aria-hidden="true"></span><span class="icon"></span></div>';
-    output = '<div><span class="icon" aria-hidden="true"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span class="icon" aria-hidden="true">'] }), output);
+    input = '<div><span class="icon" data-icon="true"></span><span class="icon"></span></div>';
+    output = '<div><span class="icon" data-icon="true"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span class="icon" data-icon="true">'] }), output);
 
     // Additional attributes are allowed
-    input = '<div><span class="icon" aria-hidden="true" data-test="x"></span></div>';
-    output = '<div><span class="icon" aria-hidden="true" data-test="x"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
+    input = '<div><span class="icon" data-icon="true" data-test="x"></span></div>';
+    output = '<div><span class="icon" data-icon="true" data-test="x"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span data-icon="true">'] }), output);
 
     // Mixed formats in array
-    input = '<div><td></td><span aria-hidden="true"></span><div></div></div>';
-    output = '<div><td></td><span aria-hidden="true"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td', '<span aria-hidden="true">'] }), output);
+    input = '<div><td></td><span data-icon="true"></span><div></div></div>';
+    output = '<div><td></td><span data-icon="true"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td', '<span data-icon="true">'] }), output);
 
     // Case insensitivity (tags are normalized via `options.name`)
     input = '<div><TD></TD><Span></Span></div>';
@@ -1971,9 +2027,9 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td'], caseSensitive: false }), output);
 
     // Bulma burger example
-    input = '<a role="button" class="navbar-burger"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></a>';
-    output = '<a role="button" class="navbar-burger"><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></a>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
+    input = '<a role="button" class="navbar-burger"><span data-icon="true"></span><span data-icon="true"></span><span data-icon="true"></span></a>';
+    output = '<a role="button" class="navbar-burger"><span data-icon="true"></span><span data-icon="true"></span><span data-icon="true"></span></a>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span data-icon="true">'] }), output);
 
     // Empty table cell example
     input = '<table><tr><td>Kira</td><td>Goddess</td><td></td></tr></table>';
@@ -1996,24 +2052,24 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { caseSensitive: true, removeEmptyElements: true, removeEmptyElementsExcept: ['TD'] }), output);
 
     // Attribute order invariance
-    input = '<div><span aria-hidden="true" class="icon"></span></div>';
-    output = '<div><span aria-hidden="true" class="icon"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span class="icon" aria-hidden="true">'] }), output);
+    input = '<div><span data-icon="true" class="icon"></span></div>';
+    output = '<div><span data-icon="true" class="icon"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span class="icon" data-icon="true">'] }), output);
 
     // Unquoted attribute value matches quoted spec
-    input = '<div><span aria-hidden=true></span></div>';
-    output = '<div><span aria-hidden=true></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
+    input = '<div><span data-icon=true></span></div>';
+    output = '<div><span data-icon=true></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span data-icon="true">'] }), output);
 
     // Case-insensitive attribute name matching (uppercase HTML attribute)
-    input = '<div><span ARIA-HIDDEN="true"></span></div>';
-    output = '<div><span aria-hidden="true"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
+    input = '<div><span DATA-ICON="true"></span></div>';
+    output = '<div><span data-icon="true"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span data-icon="true">'] }), output);
 
     // Case-insensitive attribute name matching (mixed case HTML attribute)
-    input = '<div><span Aria-Hidden="true"></span></div>';
-    output = '<div><span aria-hidden="true"></span></div>';
-    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span aria-hidden="true">'] }), output);
+    input = '<div><span Data-Icon="true"></span></div>';
+    output = '<div><span data-icon="true"></span></div>';
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span data-icon="true">'] }), output);
 
     // Boolean attribute matching—element with boolean attribute is preserved
     input = '<div><button disabled></button><button></button></div>';
@@ -2104,6 +2160,41 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div contenteditable="false"></div>', { collapseBooleanAttributes: true }), '<div contenteditable="false"></div>');
   });
 
+  test('Collapses empty attributes', async () => {
+    const options = { collapseEmptyAttributes: true };
+
+    assert.strictEqual(await minify('<img src="a.png" alt="">', options), '<img src="a.png" alt>');
+    assert.strictEqual(await minify('<img alt=\'\' src="a.png">', options), '<img alt src="a.png">');
+    assert.strictEqual(await minify('<div data-link="" class="a"></div>', options), '<div data-link class="a"></div>');
+    assert.strictEqual(await minify('<option value="">None</option>', options), '<option value>None</option>');
+    assert.strictEqual(await minify('<img alt="" src=a.png>', { ...options, removeAttributeQuotes: true }), '<img alt src=a.png>');
+    assert.strictEqual(await minify('<img src=a.png alt="">', { ...options, removeAttributeQuotes: true, keepClosingSlash: true }), '<img src=a.png alt>');
+    assert.strictEqual(await minify('<img src="a.png" alt=""/>', { ...options, keepClosingSlash: true }), '<img src="a.png" alt/>');
+
+    // Values that aren’t empty stay
+    assert.strictEqual(await minify('<img alt=" " src="a.png">', options), '<img alt=" " src="a.png">');
+    assert.strictEqual(await minify('<p title="0">a</p>', options), '<p title="0">a</p>');
+
+    // A value emptied by `collapseAttributeWhitespace` is collapsed, too
+    assert.strictEqual(await minify('<img alt=" " src="a.png">', { ...options, collapseAttributeWhitespace: true }), '<img alt src="a.png">');
+
+    // `removeEmptyAttributes` still removes the attributes it covers
+    assert.strictEqual(await minify('<p class="" data-x="">a</p>', { ...options, removeEmptyAttributes: true }), '<p data-x>a</p>');
+
+    // Without the option, empty values stay
+    assert.strictEqual(await minify('<img src="a.png" alt="">'), '<img src="a.png" alt="">');
+
+    // The “comprehensive” preset includes the option
+    assert.strictEqual(await minify('<img src="a.png" alt="">', getPreset('comprehensive')), '<img src=a.png alt>');
+  });
+
+  test('Collapses empty attributes only where assigned by `=`', async () => {
+    assert.strictEqual(await minify('<div a=="" class=""></div>', { collapseEmptyAttributes: true, customAttrAssign: [/==/] }), '<div a=="" class></div>');
+
+    // Where the name takes the custom assignment’s other characters, the HTML parser reads the same attribute
+    assert.strictEqual(await minify('<div flex?=""></div>', { collapseEmptyAttributes: true, customAttrAssign: [/\?=/] }), '<div flex?></div>');
+  });
+
   test('Keeps trailing slashes in tags', async () => {
     assert.strictEqual(await minify('<img src="test"/>', { keepClosingSlash: true }), '<img src="test"/>');
     // https://github.com/kangax/html-minifier/issues/233
@@ -2161,9 +2252,9 @@ describe('HTML', () => {
     input = '<p>foo';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
 
+    // A stray `</p>` stands for an empty `p`, whose start tag is omitted already
     input = '</p>';
-    output = '';
-    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), input);
     assert.strictEqual(await minify(input, { removeOptionalTags: true, includeAutoGeneratedTags: true }), '<p>');
 
     input = '<body></body>';
@@ -2604,7 +2695,8 @@ describe('HTML', () => {
     output = '<p>a<ol><li>item</li></ol></p>';
     assert.strictEqual(await minify(input), output);
 
-    output = '<p>a<ol><li>item</ol>';
+    // The `</p>` after the list is a stray one, which browsers read as an empty `p`
+    output = '<p>a<ol><li>item</ol></p>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
     output = '<p>a</p><ol><li>item</li></ol>';
@@ -3490,6 +3582,19 @@ describe('HTML', () => {
     output = '<script>let a=1;let b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true }), output);
 
+    // Whitespace that may separate text moves after the merged script
+    input = '<p>a<script>let a=1</script> <script>let b=2</script>b</p>';
+    output = '<p>a<script>let a=1;let b=2</script> b</p>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+    assert.strictEqual(await minify(input, { mergeScripts: true, collapseWhitespace: true }), output);
+    input = '<p>a<script></script> <script></script>b</p>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), '<p>a<script></script> b</p>');
+    assert.strictEqual(await minify(input, { mergeScripts: true, collapseWhitespace: true }), '<p>a<script></script> b</p>');
+    assert.strictEqual(await minify(input, { mergeScripts: true, removeEmptyElements: true }), '<p>a b</p>');
+    input = '<p>a <script>let a=1</script>\n<script>let b=2</script>b</p>';
+    output = '<p>a <script>let a=1;let b=2</script>b</p>';
+    assert.strictEqual(await minify(input, { mergeScripts: true }), output);
+
     // Merge three consecutive scripts
     input = '<script>let a=1</script><script>let b=2</script><script>let c=3</script>';
     output = '<script>let a=1;let b=2;let c=3</script>';
@@ -4176,8 +4281,118 @@ describe('HTML', () => {
     output = '<p>where <math><mi>R</mi></math> is the Rici tensor.</p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
-    output = '<p>where<math><mi>R</mi></math>is the Rici tensor.</p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
+  });
+
+  test('Preserves whitespace between text and elements with `collapseInlineTagWhitespace`', async () => {
+    const options = { collapseWhitespace: true, collapseInlineTagWhitespace: true };
+
+    assert.strictEqual(await minify('<p>The <code>this</code> Keyword</p>', options), '<p>The <code>this</code> Keyword</p>');
+    assert.strictEqual(await minify('<p>A <dfn>term</dfn>, a <cite>title</cite>, and a <q>quote</q>.</p>', options), '<p>A <dfn>term</dfn>, a <cite>title</cite>, and a <q>quote</q>.</p>');
+    assert.strictEqual(await minify('<p>Name <bdi>إيان</bdi> and <bdo dir=rtl>abc</bdo> here</p>', options), '<p>Name <bdi>إيان</bdi> and <bdo dir=rtl>abc</bdo> here</p>');
+    assert.strictEqual(await minify('<p>Price <data value=1>10</data> EUR</p>', options), '<p>Price <data value=1>10</data> EUR</p>');
+    assert.strictEqual(await minify('<p>Press <button>OK</button> now</p>', options), '<p>Press <button>OK</button> now</p>');
+    assert.strictEqual(await minify('<p><button>A</button> or <button>B</button></p>', options), '<p><button>A</button> or <button>B</button></p>');
+
+    // Whitespace inside elements is still collapsed where it would be without the option
+    assert.strictEqual(await minify('<p>Run <code> npm test </code> first</p>', options), await minify('<p>Run <code> npm test </code> first</p>', { collapseWhitespace: true }));
+  });
+
+  test('Preserves whitespace between text-level elements with `collapseInlineTagWhitespace`', async () => {
+    const options = { collapseWhitespace: true, collapseInlineTagWhitespace: true };
+
+    assert.strictEqual(await minify('<p><code>a</code> <code>b</code></p>', options), '<p><code>a</code> <code>b</code></p>');
+    assert.strictEqual(await minify('<p><q>a</q> <cite>b</cite></p>', options), '<p><q>a</q> <cite>b</cite></p>');
+    assert.strictEqual(await minify('<p><label>a</label> <label>b</label></p>', options), '<p><label>a</label> <label>b</label></p>');
+    assert.strictEqual(await minify('<p><ruby>漢<rt>kan</rt></ruby> <ruby>字<rt>ji</rt></ruby></p>', options), '<p><ruby>漢<rt>kan</rt></ruby> <ruby>字<rt>ji</rt></ruby></p>');
+
+    // Whitespace between form controls is still removed
+    assert.strictEqual(await minify('<p><button>a</button> <select><option>b</select></p>', options), '<p><button>a</button><select><option>b</select></p>');
+  });
+
+  test('Preserves whitespace between text and custom inline elements with `collapseInlineTagWhitespace`', async () => {
+    const input = '<p>Hi <my-el>x</my-el> <my-el>y</my-el> there</p>';
+    const output = '<p>Hi <my-el>x</my-el><my-el>y</my-el> there</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true, inlineCustomElements: ['my-el'] }), output);
+  });
+
+  test('Preserves whitespace around embedded and other rendered phrasing elements', async () => {
+    for (const element of ['audio controls', 'canvas', 'iframe', 'map', 'picture', 'slot', 'video']) {
+      const name = element.split(' ')[0];
+      const input = `<p>a <${element}></${name}> b</p>`;
+      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    }
+    assert.strictEqual(await minify('<p>a <embed src="x.svg"> b</p>', { collapseWhitespace: true }), '<p>a <embed src="x.svg"> b</p>');
+
+    // Within `map` and `slot`, which render what they hold, whitespace is kept like within `span`
+    assert.strictEqual(await minify('<p>a<slot> b </slot>c</p>', { collapseWhitespace: true }), '<p>a<slot> b </slot>c</p>');
+  });
+
+  test('Preserves whitespace next to text around elements that don’t render', async () => {
+    for (const [element, end] of [['script', '</script>'], ['template', '</template>'], ['noscript', '</noscript>'], ['datalist', '</datalist>'], ['link rel="x"', ''], ['meta itemprop="x"', '']]) {
+      const input = `<div>a <${element}>${end} b</div>`;
+      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+      assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), input);
+    }
+
+    // Between tags, the element on the other side decides
+    assert.strictEqual(await minify('<div>a</div> <script></script> <div>b</div>', { collapseWhitespace: true }), '<div>a</div><script></script><div>b</div>');
+    assert.strictEqual(await minify('<p><a>x</a> <script></script><a>y</a></p>', { collapseWhitespace: true }), '<p><a>x</a> <script></script><a>y</a></p>');
+    assert.strictEqual(await minify('<head> <meta charset="utf-8"> <link rel="x"> <script></script> </head>', { collapseWhitespace: true }), '<head><meta charset="utf-8"><link rel="x"><script></script></head>');
+
+    // Between two such elements, what lies beyond both decides, and one space is enough
+    for (const input of ['<p>a<script></script> <script></script>b</p>', '<p><b>a</b><script></script> <link rel="x"><b>b</b></p>', '<div>a<script></script> <template><div>x</div></template>b</div>']) {
+      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    }
+    assert.strictEqual(await minify('<p>a<script></script> <style></style> <script></script>b</p>', { collapseWhitespace: true }), '<p>a<script></script> <style></style><script></script>b</p>');
+    assert.strictEqual(await minify('<p>a<script></script> <script></script> b</p>', { collapseWhitespace: true }), '<p>a<script></script><script></script> b</p>');
+    assert.strictEqual(await minify('<p>a <script></script> <script></script>b</p>', { collapseWhitespace: true }), '<p>a <script></script><script></script>b</p>');
+    assert.strictEqual(await minify('<div>a<script></script> <script></script></div>', { collapseWhitespace: true }), '<div>a<script></script><script></script></div>');
+    assert.strictEqual(await minify('<div>a<script></script> <script></script><div>b</div></div>', { collapseWhitespace: true }), '<div>a<script></script><script></script><div>b</div></div>');
+  });
+
+  test('Keeps elements that don’t close `p` inside it', async () => {
+    // Only flow elements like `div` close an open `p`; `meta`, `style`, and others go in it
+    assert.strictEqual(await minify('<p>a <meta itemprop="x" content="1"> b</p>', { collapseWhitespace: true }), '<p>a <meta itemprop="x" content="1"> b</p>');
+    assert.strictEqual(await minify('<p>a <style>x</style> b</p>', { collapseWhitespace: true }), '<p>a <style>x</style> b</p>');
+    assert.strictEqual(await minify('<div><p>a <meta itemprop="x" content="1"> b</p><p>c</p></div>', { collapseWhitespace: true, removeOptionalTags: true }), '<div><p>a <meta itemprop="x" content="1"> b<p>c</div>');
+    assert.strictEqual(await minify('<div><p>a <div>b</div></div>', { collapseWhitespace: true }), '<div><p>a<div>b</div></div>');
+  });
+
+  test('Closes an open `p` further up at start tags that close it', async () => {
+    // Browsers close the `p` at `div` (the `span` with it) and read the later `</p>` as an empty `p`
+    assert.strictEqual(await minify('<p><span>a<div>b</div></span></p>', { removeOptionalTags: true }), '<p><span>a<div>b</div></p>');
+    assert.strictEqual(await minify('<p><a href="x">a<h2>b</h2></a></p>', { removeOptionalTags: true }), '<p><a href="x">a<h2>b</h2></a></p>');
+
+    // With scripting, `noscript` holds text, so a block in it doesn’t close the `p`
+    assert.strictEqual(await minify('<p>a<noscript><div>x</div></noscript>b</p>'), '<p>a<noscript><div>x</div></noscript>b</p>');
+
+    // An end tag is only omitted before a start tag that is written (here, the implied `p` of a stray `</p>` is not)
+    assert.strictEqual(await minify('<div><p>a<p>b</p></p></div>', { removeOptionalTags: true }), '<div><p>a<p>b</p></p></div>');
+
+    // `</p>` is only omitted before end tags that close a `p` in browsers, which ignore `</span>` while a `p` is open in it
+    assert.strictEqual(await minify('<div><span><p>a</p></span><b>c</b></div>', { removeOptionalTags: true }), '<div><span><p>a</p></span><b>c</b></div>');
+    assert.strictEqual(await minify('<div><label><p>a</p></label>b</div>', { removeOptionalTags: true }), '<div><label><p>a</p></label>b</div>');
+    for (const parent of ['div', 'section', 'li', 'td', 'blockquote', 'button']) {
+      assert.ok(!(await minify(`<${parent}><p>a</p></${parent}>`, { removeOptionalTags: true })).includes('</p>'), parent);
+    }
+
+    // In quirks mode, which a legacy doctype may set, `table` doesn’t close a `p`
+    const input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN"><p>a</p><table><tr><td>b</table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN"><p>a</p><table><tr><td>b</table>');
+    assert.strictEqual(await minify(input, { removeOptionalTags: true, useShortDoctype: true }), '<!doctype html><p>a<table><tr><td>b</table>');
+    assert.strictEqual(await minify('<!doctype html><p>a</p><table><tr><td>b</table>', { removeOptionalTags: true }), '<!doctype html><p>a<table><tr><td>b</table>');
+
+    // A `p` beyond a scope boundary stays open
+    assert.strictEqual(await minify('<p><button>a<div>b</div></button>c</p><p>d</p>', { removeOptionalTags: true }), '<p><button>a<div>b</div></button>c<p>d');
+
+    // A formatting element closed along with the `p` is reopened by browsers, so it stays even when empty
+    assert.strictEqual(await minify('<p><em><ul><li>b</ul></em></p>', { removeEmptyElements: true }), '<p><em><ul><li>b</ul></em></p>');
+  });
+
+  test('Preserves whitespace around `data`', async () => {
+    assert.strictEqual(await minify('<p>Price <data value="1">10</data> EUR</p>', { collapseWhitespace: true }), '<p>Price <data value="1">10</data> EUR</p>');
+    assert.strictEqual(await minify('<p>Price <data value="1"> 10 </data> EUR</p>', { collapseWhitespace: true }), '<p>Price <data value="1">10 </data>EUR</p>');
   });
 
   test('Preserves whitespace around inline text elements with `collapseInlineTagWhitespace`', async () => {
@@ -5279,8 +5494,7 @@ describe('HTML', () => {
 
     input = '</p>';
     assert.strictEqual(await minify(input, { includeAutoGeneratedTags: false }), input);
-    output = '';
-    assert.strictEqual(await minify(input, { includeAutoGeneratedTags: false, removeOptionalTags: true }), output);
+    assert.strictEqual(await minify(input, { includeAutoGeneratedTags: false, removeOptionalTags: true }), input);
 
     input = '<select><option>foo<option>bar</select>';
     assert.strictEqual(await minify(input, { includeAutoGeneratedTags: false }), input);
@@ -7079,14 +7293,14 @@ describe('HTML', () => {
 
     // Whitespace in the elements that are not preformatted still collapses, as it does in
     // any other text
-    assert.strictEqual(await minify('<div> a  <iframe> x  y </iframe>  b </div>', { collapseWhitespace: true }), '<div>a<iframe>x y</iframe>b</div>');
+    assert.strictEqual(await minify('<div> a  <iframe> x  y </iframe>  b </div>', { collapseWhitespace: true }), '<div>a <iframe>x y</iframe> b</div>');
 
     // `noscript`, `noframes`, and `noembed` are raw text as well, and stay markup all the
     // same: What they hold is markup to the UA that displays it, so it is minified as markup
     const optionsCollapsing = { ...options, collapseWhitespace: true };
     assert.strictEqual(await minify('<noscript><p class="y"> a </p><!-- c --></noscript>', optionsCollapsing), '<noscript><p class=y>a</p></noscript>');
-    assert.strictEqual(await minify('<noframes><p class="y"> a </p><!-- c --></noframes>', optionsCollapsing), '<noframes><p class=y>a</noframes>');
-    assert.strictEqual(await minify('<noembed><p class="y"> a </p><!-- c --></noembed>', optionsCollapsing), '<noembed><p class=y>a</noembed>');
+    assert.strictEqual(await minify('<noframes><div><p class="y"> a </p><!-- c --></div></noframes>', optionsCollapsing), '<noframes><div><p class=y>a</div></noframes>');
+    assert.strictEqual(await minify('<noembed><div><p class="y"> a </p><!-- c --></div></noembed>', optionsCollapsing), '<noembed><div><p class=y>a</div></noembed>');
     // Which is why their character references are resolved, as they are in any other markup
     assert.strictEqual(await minify('<noframes>a&amp;b</noframes>', { decodeEntities: true }), '<noframes>a&b</noframes>');
   });

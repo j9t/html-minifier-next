@@ -35,6 +35,10 @@ const optionDefinitions = {
     description: 'Omit attribute values from boolean attributes',
     type: 'boolean'
   },
+  collapseEmptyAttributes: {
+    description: 'Omit empty attribute values (e.g., `alt=""` → `alt`)',
+    type: 'boolean'
+  },
   collapseInlineTagWhitespace: {
     description: 'Collapse whitespace more aggressively between inline elements—use with `--collapse-whitespace`',
     type: 'boolean'
@@ -173,7 +177,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   removeEmptyElementsExcept: {
-    description: 'Array of elements to preserve (e.g., `td`, `<span aria-hidden="true">`, etc.)—use with `--remove-empty-elements`',
+    description: 'Array of elements to preserve (e.g., `td`, `<i class="test">`, etc.)—use with `--remove-empty-elements`',
     type: 'jsonArray'
   },
   removeOptionalTags: {

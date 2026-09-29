@@ -111,7 +111,21 @@ function canRemoveElement(tag, attrs) {
     return false;
   }
 
+  // Nor must elements that carry accessibility semantics or take focus—unless the value is empty
+  for (const attr of attrs) {
+    const name = attr.name.toLowerCase();
+    if ((name === 'role' || name === 'tabindex' || name.startsWith('aria-')) && attr.value?.trim()) {
+      return false;
+    }
+  }
+
+  // Custom elements and `canvas` are there for scripts to fill or draw into
+  if (tag.includes('-')) {
+    return false;
+  }
+
   switch (tag) {
+    case 'canvas':
     case 'textarea':
       return false;
     case 'audio':

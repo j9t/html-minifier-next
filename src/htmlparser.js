@@ -6,7 +6,7 @@
  */
 
 import { isThenable, embedSource, findTagEnd } from './lib/utils.js';
-import { endlessRawTextElements, escapableRawTextElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
+import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -95,8 +95,11 @@ const svgIntegrationPoints = new Set(['foreignobject', 'desc', 'title']);
 const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
 
 // HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
-// Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
-const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'center', 'col', 'colgroup', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'listing', 'main', 'menu', 'menuitem', 'meta', 'nav', 'ol', 'optgroup', 'option', 'param', 'plaintext', 'pre', 'rp', 'rt', 'search', 'section', 'source', 'style', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul', 'xmp']);
+// Start tags that close an open `p`, https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inbody
+// (other start tags, like `meta` or `style`, go in it, or are ignored, like `td` outside a table)
+// Elements that end the scope the `p` is looked for in, https://html.spec.whatwg.org/multipage/parsing.html#has-an-element-in-button-scope
+const buttonScopeBoundaries = new Set(['applet', 'button', 'caption', 'html', 'marquee', 'object', 'table', 'td', 'template', 'th']);
+const closesP = new Set(['address', 'article', 'aside', 'blockquote', 'center', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'li', 'listing', 'main', 'menu', 'nav', 'ol', 'plaintext', 'pre', 'search', 'section', 'summary', 'table', 'ul', 'xmp']);
 
 // A tag name ends at whitespace, a slash, or the closing bracket, so `</scriptx>` names a
 // different element and does not end this one
@@ -262,7 +265,8 @@ export class HTMLParser {
     const fullHtml = this.html;
     const fullLength = fullHtml.length;
 
-    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[], namespace: string}>} */
+    // `pScope` is the index of the `p` a start tag would close from within the entry, or -1
+    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[], namespace: string, pScope: number}>} */
     const stack = [];
     /** @type {string} */
     let lastTag = '';
@@ -887,8 +891,9 @@ export class HTMLParser {
       const lowerTagName = tagName.toLowerCase();
       let unarySlash = match.unarySlash;
 
-      if (lastTagLower === 'p' && nonPhrasing.has(lowerTagName)) {
-        await parseEndTag('', lastTag);
+      const pIndex = stack.length ? (stack[stack.length - 1]?.pScope ?? -1) : -1;
+      if (pIndex >= 0 && closesP.has(lowerTagName)) {
+        await parseEndTag('', stack[pIndex]?.tag ?? 'p');
       }
       // A row or cell start tag closes the row or cell still open in the same table,
       // which may sit deeper down the stack than the element that was opened last
@@ -916,7 +921,7 @@ export class HTMLParser {
       if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
         lastTag = 'colgroup';
         lastTagLower = 'colgroup';
-        stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [], namespace: namespaceInside(stack[stack.length - 1]) });
+        pushOpenElement(lastTag, 'colgroup', []);
         if (handler.start) {
           await handler.start(lastTag, [], false, '', true);
         }
@@ -995,7 +1000,7 @@ export class HTMLParser {
       }));
 
       if (!unary) {
-        stack.push({ tag: tagName, lowerTag: lowerTagName, attrs, namespace: namespaceInside(stack[stack.length - 1]) });
+        pushOpenElement(tagName, lowerTagName, attrs);
         lastTag = tagName;
         lastTagLower = lowerTagName;
         unarySlash = '';
@@ -1011,7 +1016,25 @@ export class HTMLParser {
       return lowerTagName;
     }
 
-    // `needle` must already be lowercase
+    // `needle` must already be lowercase.
+    // Pushes an open element, noting the `p` in scope from within it: its own index
+    // for a `p`, none past a scope boundary, foreign element, or `noscript` (which
+    // holds text with scripting), and otherwise its parent’s
+    function pushOpenElement(/** @type {string} */ tag, /** @type {string} */ lowerTag, /** @type {HTMLAttribute[]} */ attrs) {
+      const parent = stack.length ? stack[stack.length - 1] : undefined;
+      const namespace = namespaceInside(parent);
+      let pScope = -1;
+      if (!namespace) {
+        if (lowerTag === 'p') {
+          pScope = stack.length;
+        } else if (parent && parent.pScope !== -1 && !buttonScopeBoundaries.has(lowerTag) && lowerTag !== 'svg' && lowerTag !== 'math' && lowerTag !== 'noscript') {
+          // Most elements sit outside any `p`, so the boundary checks only run inside one
+          pScope = parent.pScope;
+        }
+      }
+      stack.push({ tag, lowerTag, attrs, namespace, pScope });
+    }
+
     function findTag(/** @type {string} */ needle) {
       let stackIndex;
       for (stackIndex = stack.length - 1; stackIndex >= 0; stackIndex--) {
@@ -1048,8 +1071,8 @@ export class HTMLParser {
         stack.length = stackIndex;
         lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
         lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
-      } else if (handler.partialMarkup && tagName) {
-        // In partial markup mode, preserve stray end tags
+      } else if ((handler.partialMarkup || formattingElements.has(lowerTagName)) && tagName) {
+        // In partial markup mode, preserve stray end tags, and those of formatting elements always
         if (handler.end) {
           handler.end(tagName, [], false, rest);
         }

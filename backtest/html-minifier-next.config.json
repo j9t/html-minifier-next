@@ -5,6 +5,7 @@
   "caseSensitive": false,
   "collapseAttributeWhitespace": true,
   "collapseBooleanAttributes": true,
+  "collapseEmptyAttributes": true,
   "collapseInlineTagWhitespace": true,
   "collapseNoBreakSpaces": true,
   "collapseWhitespace": true,

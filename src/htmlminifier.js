@@ -15,8 +15,11 @@ import {
   RE_WS_ONLY,
   RE_WS_NBSP_END,
   RE_STYLE_ELEMENT,
+  formattingElements,
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
+  inlineElementsTransparent,
+  inlineElementsTransparentAfter,
   specialContentElements,
   rawTextElements,
   htmlElements,
@@ -26,7 +29,7 @@ import {
   compactElements,
   looseElements,
   trailingElements,
-  pInlineElements,
+  pClosingParents,
   namesForeignMixedCase,
   MISSING_DEPENDENCY
 } from './lib/constants.js';
@@ -179,9 +182,17 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  Default: `false`
  *
+ * @prop {boolean} [collapseEmptyAttributes]
+ *  Collapse attributes with empty values to their name only (for example
+ *  `alt=""` → `alt`), which the HTML parser reads the same way.
+ *
+ *  Default: `false`
+ *
  * @prop {boolean} [collapseInlineTagWhitespace]
  *  When false (default) whitespace around `inline` tags is preserved in
- *  more cases. When true, whitespace around inline tags may be collapsed.
+ *  more cases. When true, whitespace between inline tags may be collapsed,
+ *  except around text-level elements (like `a`, `code`, or `em`); whitespace
+ *  next to text is kept as without the option.
  *  Must also enable `collapseWhitespace` to have effect.
  *
  *  Default: `false`
@@ -442,7 +453,7 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  * @prop {boolean} [removeEmptyElements]
  *  Remove elements that are empty and safe to remove (for example
- *  `<script />` without `src`).
+ *  `<script />` without `src`), including elements left empty that way.
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_empty_elements
  *
  *  Default: `false`
@@ -454,7 +465,7 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  Accepts tag names or HTML-like element specifications:
  *
  *  * Tag name only: `["td", "span"]`—preserves all empty elements of these types
- *  * With valued attributes: `["<span aria-hidden='true'>"]`—preserves only when attribute values match
+ *  * With valued attributes: `["<i class='test'>"]`—preserves only when attribute values match
  *  * With boolean attributes: `["<input disabled>"]`—preserves only when boolean attribute is present
  *  * Mixed: `["<button type='button' disabled>"]`—all specified attributes must match
  *
@@ -636,6 +647,9 @@ const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript
 
 // Pre-compiled patterns for buffer scanning
 const RE_START_TAG = /^<[^/!]/;
+const RE_START_TAG_NAME = /^<([^\s/>]+)/;
+const RE_LEADING_WHITESPACE = /^[ \t\n\r\f]/;
+const RE_ASCII_WHITESPACE = /[ \t\n\r\f]/;
 const RE_END_TAG = /^<\//;
 const RE_WHITESPACE_ONLY = /^\s+$/;
 const RE_TABS = /\t/g;
@@ -728,12 +742,15 @@ function mergeConsecutiveScripts(html) {
     // is not concatenable; even identical non-JS types are incompatible
     const mergeable = !('src' in a1) && DEFAULT_JS_TYPES.has((a1.type || '').toLowerCase());
     let mergedAny = false;
+    // Whitespace between the scripts, which may separate text around them
+    let gap = '';
 
     // Absorb all directly following compatible scripts
     while (mergeable) {
       // Skip optional whitespace and check for a consecutive <script> tag
       let i = afterClose;
       while (i < html.length && (html[i] === ' ' || html[i] === '\t' || html[i] === '\n' || html[i] === '\r' || html[i] === '\f')) i++;
+      const gapNext = html.slice(afterClose, i);
       if (html.slice(i, i + 7).toLowerCase() !== '<script' || (html.charAt(i + 7) !== '>' && !/\s/.test(html.charAt(i + 7)))) break;
 
       const tagEnd2 = findTagEnd(html, i + 7);
@@ -774,11 +791,16 @@ function mergeConsecutiveScripts(html) {
 
       afterClose = close2.index + close2[0].length;
       mergedAny = true;
+      gap ||= gapNext;
     }
 
     if (mergedAny) {
+      // Whitespace goes after the merged script, unless nothing or whitespace is on either side anyway
+      if (gap && (!m1.index || afterClose === html.length || RE_ASCII_WHITESPACE.test(html.charAt(m1.index - 1) + html.charAt(afterClose)))) {
+        gap = '';
+      }
       // Use first script’s attributes (they are compatible)
-      segments.push(html.slice(consumedPos, m1.index), `<script${attrs1Str}>${mergedContent}</script>`);
+      segments.push(html.slice(consumedPos, m1.index), `<script${attrs1Str}>${mergedContent}</script>${gap}`);
       consumedPos = afterClose;
     }
 
@@ -1072,6 +1094,19 @@ async function minifyHTML(value, options, partialMarkup) {
   let currentChars = '';
   /** @type {boolean} */
   let hasChars = false;
+  // Open elements under `removeEmptyElements`, so that an element whose content went is removed, too:
+  // where its start tag sits in `buffer`, and whether anything kept went in since
+  /** @type {Array<{tag: string, index: number, empty: boolean}>} */
+  const openElements = [];
+  // A start tag the parser implied without writing it, whose end tag, if it comes next, is a stray
+  // one that browsers read as an empty element (as `</p>` is), so it must not be omitted
+  let impliedStartTag = '';
+  // Whether a doctype other than the HTML one stays, which may set quirks mode
+  let hasLegacyDoctype = false;
+  // Under `collapseWhitespace`, where a space sits between elements that don’t render, kept until
+  // what follows them shows whether it separates anything, and how deep inside such elements parsing is
+  let transparentGapIndex = -1;
+  let transparentDepth = 0;
   let currentTag = '';
   /** @type {Array<{name: string, value?: string, quote?: string, customAssign?: string, customOpen?: string, customClose?: string}>} */
   let currentAttrs = [];
@@ -1314,6 +1349,7 @@ async function minifyHTML(value, options, partialMarkup) {
   function bufferTruncate(/** @type {number} */ length) {
     buffer.length = Math.max(0, length);
     if (bufferTags) bufferTags.length = buffer.length;
+    if (transparentGapIndex >= buffer.length) transparentGapIndex = -1;
     removed = true;
   }
 
@@ -1392,12 +1428,23 @@ async function minifyHTML(value, options, partialMarkup) {
     }
   }
 
-  function removeStartTag() {
+  function lastStartTagIndex() {
     let index = buffer.length - 1;
     while (index > 0 && !RE_START_TAG.test(buffer[index] ?? '')) {
       index--;
     }
-    bufferTruncate(index);
+    return index;
+  }
+
+  function removeStartTag() {
+    bufferTruncate(lastStartTagIndex());
+  }
+
+  function markOpenElementFilled() {
+    // Guarded, as reading index -1 is a slow property lookup, and this runs for every text node
+    if (openElements.length) {
+      /** @type {{empty: boolean}} */ (openElements[openElements.length - 1]).empty = false;
+    }
   }
 
   // Whether the element being parsed holds text rather than markup. The namespace decides
@@ -1493,6 +1540,10 @@ async function minifyHTML(value, options, partialMarkup) {
   // which may not be trimmed due to a following comment or an empty
   // element which has now been removed
   function squashTrailingWhitespace(/** @type {string} */ nextTag) {
+    if (transparentGapIndex !== -1 && !transparentDepth && !inlineElementsTransparentAfter.has(nextTag) && !inlineElementsTransparent.has(nextTag)) {
+      buffer[transparentGapIndex] = collapseWhitespaceSmart(' ', '', nextTag, emptyAttrs, emptyAttrs, options, inlineSets);
+      transparentGapIndex = -1;
+    }
     let charsIndex = buffer.length - 1;
     // Step back over every trailing comment and empty entry, not just one—a single step
     // stops the search at the comment itself, leaving whitespace behind that a second
@@ -1506,7 +1557,36 @@ async function minifyHTML(value, options, partialMarkup) {
       }
       charsIndex--;
     }
+    // Right before an element that doesn’t render, the text’s own pass has weighed both sides already
+    if (charsIndex === buffer.length - 1 && inlineElementsTransparent.has(nextTag)) {
+      return;
+    }
     trimTrailingWhitespace(charsIndex, nextTag);
+  }
+
+  // Whether what comes before the elements that don’t render at the end of `buffer` would run into what follows them
+  function precedesTransparentRun() {
+    for (let index = buffer.length - 1; index >= 0; index--) {
+      const str = buffer[index] ?? '';
+      if (!str) continue;
+      if (str.charCodeAt(0) !== 60 /* < */) {
+        return !endsWithWhitespace(str);
+      }
+      const endTagName = matchPlainEndTag(str);
+      const tag = endTagName === null ? (RE_START_TAG_NAME.exec(str)?.[1] ?? '') : '/' + endTagName;
+      if (!inlineElementsTransparentAfter.has(tag.toLowerCase())) {
+        return collapseWhitespaceSmart(' ', tag, '', emptyAttrs, emptyAttrs, options, inlineSets) !== '';
+      }
+      // Skip what an element that doesn’t render holds
+      if (endTagName !== null) {
+        const startTag = '<' + endTagName.toLowerCase();
+        while (index > 0 && !(buffer[index - 1] ?? '').toLowerCase().startsWith(startTag)) {
+          index--;
+        }
+        index--;
+      }
+    }
+    return false;
   }
 
   // Per-text-node context for `charsCollapse`/`charsFinalize`, set by the `chars`
@@ -1593,7 +1673,29 @@ async function minifyHTML(value, options, partialMarkup) {
           }
         }
         if (textPrevTag || textNextTag) {
-          text = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineSets);
+          const collapsed = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineSets);
+          if (!transparentDepth && inlineElementsTransparentAfter.has(textPrevTag)) {
+            // Between elements that don’t render, whitespace stays pending when it may separate text, and one space does
+            if (!collapsed && text && inlineElementsTransparent.has(textNextTag)) {
+              if (transparentGapIndex === -1 && precedesTransparentRun()) {
+                transparentGapIndex = buffer.length;
+                text = ' ';
+              } else {
+                text = '';
+              }
+            } else {
+              // Text that follows decides, while a tag that follows does so in `squashTrailingWhitespace`
+              if (transparentGapIndex !== -1 && collapsed) {
+                if (RE_LEADING_WHITESPACE.test(collapsed)) {
+                  buffer[transparentGapIndex] = '';
+                }
+                transparentGapIndex = -1;
+              }
+              text = collapsed;
+            }
+          } else {
+            text = collapsed;
+          }
         } else {
           text = collapseWhitespace(text, options, true, true);
         }
@@ -1680,6 +1782,7 @@ async function minifyHTML(value, options, partialMarkup) {
     currentChars += text;
     if (text) {
       hasChars = true;
+      markOpenElementFilled();
     }
     const followsRemoval = removed && Boolean(text) && !options.collapseWhitespace && !stackNoTrimWhitespace.length;
     bufferPush(text, false);
@@ -1888,6 +1991,7 @@ async function minifyHTML(value, options, partialMarkup) {
             // Omitting a start and end tag both would keep the block well-formed, which this misses
             options.removeOptionalTags = false;
             options.collapseBooleanAttributes = false;
+            options.collapseEmptyAttributes = false;
             options.includeAutoGeneratedTags = true;
           }
           options.removeTagWhitespace = false;
@@ -1937,8 +2041,10 @@ async function minifyHTML(value, options, partialMarkup) {
         }
         optionalStartTag = '';
         // End-tag-followed-by-start-tag omission rules
-        if (htmlTag && canRemovePrecedingTag(optionalEndTag, tag)) {
-          if (optionalEndTagEmitted) {
+        // In quirks mode, `table` doesn’t close a `p`
+        if (htmlTag && canRemovePrecedingTag(optionalEndTag, tag) && !(hasLegacyDoctype && optionalEndTag === 'p' && tag === 'table')) {
+          // Only a start tag that gets written can stand in for the end tag
+          if (optionalEndTagEmitted && (!autoGenerated || options.includeAutoGeneratedTags)) {
             removeEndTag();
           }
           // `<colgroup>` cannot be omitted if preceding `</colgroup>` is omitted
@@ -1953,6 +2059,9 @@ async function minifyHTML(value, options, partialMarkup) {
       // whitespace is tracked without `collapseWhitespace` too, as `removeWhitespaceLine` spares it
       if (options.collapseWhitespace && !stackNoTrimWhitespace.length) {
         squashTrailingWhitespace(tag);
+      }
+      if (options.collapseWhitespace && !unary && inlineElementsTransparent.has(tag)) {
+        transparentDepth++;
       }
       if (!unary) {
         if (!canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
@@ -1979,6 +2088,15 @@ async function minifyHTML(value, options, partialMarkup) {
       const hasUnarySlash = needsXMLSlash || (unarySlash && (useNameParentForTag ? optionsParent : options).keepClosingSlash);
 
       bufferPush(openTag, true);
+
+      if (options.removeEmptyElements) {
+        if (unary) {
+          markOpenElementFilled();
+        } else {
+          // A start tag not written can’t be removed with its element
+          openElements.push({ tag, index: buffer.length - 1, empty: !autoGenerated || Boolean(options.includeAutoGeneratedTags) });
+        }
+      }
 
       const fragmentJoinsTag = uidAttrExactPattern ? joinFragmentAttrs(attrs) : false;
       // Whatever runs into the tag name has to stay first
@@ -2046,7 +2164,8 @@ async function minifyHTML(value, options, partialMarkup) {
 
       buffer[buffer.length - 1] += (hasUnarySlash ? '/' : '') + '>';
 
-      if (autoGenerated && !options.includeAutoGeneratedTags) {
+      impliedStartTag = autoGenerated && !options.includeAutoGeneratedTags ? tag : '';
+      if (impliedStartTag) {
         removeStartTag();
         optionalStartTag = '';
         currentTag = '';
@@ -2103,16 +2222,26 @@ async function minifyHTML(value, options, partialMarkup) {
       } else if (options.collapseWhitespace) {
         squashTrailingWhitespace('/' + tag);
       }
+      if (transparentDepth && inlineElementsTransparent.has(tag)) {
+        transparentDepth--;
+      }
       if (stackNoCollapseWhitespace.length &&
           tag === stackNoCollapseWhitespace[stackNoCollapseWhitespace.length - 1]) {
         stackNoCollapseWhitespace.pop();
       }
+
+      const endsImpliedStart = !autoGenerated && impliedStartTag === tag;
+      impliedStartTag = '';
 
       let isElementEmpty = false;
       if (tag === currentTag) {
         currentTag = '';
         isElementEmpty = !hasChars;
       }
+      // A stray end tag has no open element of its own
+      const openElement = options.removeEmptyElements && openElements[openElements.length - 1]?.tag === tag ? openElements.pop() : undefined;
+      // Emptied by removing what it held, as long as its start tag is still the last one written
+      const isElementEmptied = !isElementEmpty && Boolean(openElement?.empty) && lastStartTagIndex() === openElement?.index;
 
       if (options.removeOptionalTags) {
         // `<html>`, `<head>` or `<body>` may be omitted if the element is empty
@@ -2123,17 +2252,20 @@ async function minifyHTML(value, options, partialMarkup) {
         // `</html>` or `</body>` may be omitted if not followed by comment,
         // `</head>` may be omitted if not followed by space or comment,
         // `</p>` may be omitted if no more content in parent,
-        // unless parent is in `pInlineElements` or is a custom element
+        // as long as the parent’s end tag closes the `p` in browsers (`pClosingParents`)
         // (https://html.spec.whatwg.org/multipage/syntax.html#optional-tags);
         // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
-        if (tag && optionalEndTag && optionalEndTagEmitted && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || (!pInlineElements.has(tag) && !tag.includes('-')))) {
+        if (tag && optionalEndTag && optionalEndTagEmitted && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || pClosingParents.has(tag))) {
           removeEndTag(insideNoTrim);
         }
-        optionalEndTag = optionalEndTags.has(tag) ? tag : '';
+        optionalEndTag = optionalEndTags.has(tag) && !endsImpliedStart ? tag : '';
         optionalEndTagEmitted = true;
       }
 
-      if (options.removeEmptyElements && isElementEmpty && !options.insideForeignContent && canRemoveElement(tag, attrs)) {
+      let isElementRemoved = false;
+      // A formatting element closed by a block is reopened after it by browsers, so it has to stay
+      if (options.removeEmptyElements && (isElementEmpty || isElementEmptied) && !options.insideForeignContent && canRemoveElement(tag, attrs) &&
+          !(autoGenerated && formattingElements.has(tag))) {
         let preserve = false;
         if (removeEmptyElementsExcept.length) {
           // Normalize attribute names for comparison with specs
@@ -2144,6 +2276,7 @@ async function minifyHTML(value, options, partialMarkup) {
         if (!preserve) {
           // Remove last element from buffer
           removeStartTag();
+          isElementRemoved = true;
           optionalStartTag = '';
           optionalEndTag = '';
           optionalEndTagEmitted = false;
@@ -2173,6 +2306,11 @@ async function minifyHTML(value, options, partialMarkup) {
         } else if (isElementEmpty) {
           currentChars += '|';
         }
+      }
+
+      // A kept element fills the one it sits in
+      if (openElement && !isElementRemoved) {
+        markOpenElementFilled();
       }
 
       // SVG subtree capture: Record end position for post-processing with SVGO
@@ -2245,6 +2383,7 @@ async function minifyHTML(value, options, partialMarkup) {
       removed = true;
     },
     doctype: function (/** @type {string} */ doctype) {
+      hasLegacyDoctype = !options.useShortDoctype && !/^<!doctype\s+html\s*>$/i.test(doctype);
       bufferPush(options.useShortDoctype
         ? '<!doctype' +
         (options.removeTagWhitespace ? '' : ' ') + 'html>'

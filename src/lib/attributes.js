@@ -883,7 +883,8 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   }
 
   if (typeof attrValue === 'undefined' || (options.collapseBooleanAttributes &&
-      isBooleanAttribute(attrName.toLowerCase(), (attrValue || '').toLowerCase()))) {
+      isBooleanAttribute(attrName.toLowerCase(), (attrValue || '').toLowerCase())) ||
+      (options.collapseEmptyAttributes && attrValue === '' && (attr.customAssign ?? '=') === '=')) {
     attrFragment = attrName;
     if (!isLast) {
       attrFragment += ' ';
