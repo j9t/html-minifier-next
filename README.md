@@ -687,6 +687,12 @@ For partial HTML fragments (such as template includes, SSI fragments, or closing
 
 To validate complete HTML markup, use [the W3C validator](https://validator.w3.org/) or one of [several validator packages](https://meiert.com/blog/html-validator-packages/).
 
+### Doctypes and quirks mode
+
+Where browsers parse markup differently by document mode, HMN follows the doctype [as the HTML parser does](https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode): Under a doctype that sets quirks mode, like HTML 3.2 or HTML 4.01 Transitional without a system identifier, a `table` doesn’t close an open `p`, while under the HTML doctype and legacy doctypes that set no-quirks or limited-quirks mode, like XHTML 1.0 Strict or HTML 4.01 Strict, it does.
+
+Only the first doctype counts, and only ahead of any tag, as browsers ignore any other. Without one, the mode is unknown: The markup may be a fragment of a document in either mode, or a complete document, which renders in quirks mode. HMN then keeps what either mode needs where the two differ—a `</p>` before a `table`, or after a `table` inside a `p`—at the cost of a few bytes. `useShortDoctype` replaces the doctype with the HTML one, so markup is then read as no-quirks, which is how browsers will parse the output.
+
 ### Minifying server-side templates
 
 By default, `ignoreCustomFragments` preserves `<? … ?>` and `<% … %>` blocks, so PHP, ERB, JSP, and ASP templates can be minified as part of a build, with the markup, CSS, and JavaScript around those blocks being minified as usual. For includes and other partials, add `partialMarkup`.

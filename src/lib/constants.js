@@ -28,8 +28,11 @@ const RE_ESCAPE_LT_RAW_TEXT = /** @type {Record<string, RegExp>} */ (Object.assi
 // Encodings that make an `annotation-xml` element hold HTML rather than MathML
 // https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
 const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
-// The HTML doctype, which sets no-quirks mode; any other doctype may set quirks mode
-const RE_HTML_DOCTYPE = /^<!doctype\s+html\s*>$/i;
+// A doctype’s name, public identifier, and system identifier (quoted),
+// and what follows them, as the tokenizer reads them; unless a system
+// identifier precedes it, anything but `>` sets quirks mode
+// https://html.spec.whatwg.org/multipage/parsing.html#doctype-state
+const RE_DOCTYPE = /^<!doctype[ \n\r\t\f]*([^ \n\r\t\f>]+)[ \n\r\t\f]*(?:public[ \n\r\t\f]*("[^">]*"|'[^'>]*')[ \n\r\t\f]*("[^">]*"|'[^'>]*')?|system[ \n\r\t\f]*("[^">]*"|'[^'>]*'))?([^]*)$/i;
 const RE_ATTR_WS_CHECK = /[ \n\r\t\f]/;
 const RE_ATTR_WS_COLLAPSE = /[ \n\r\t\f]+/g;
 const RE_ATTR_WS_TRIM = /^[ \n\r\t\f]+|[ \n\r\t\f]+$/g;
@@ -208,6 +211,18 @@ const trailingElements = new Set(['dt', 'thead']);
 
 const htmlElements = new Set(['a', 'abbr', 'acronym', 'address', 'applet', 'area', 'article', 'aside', 'audio', 'b', 'base', 'basefont', 'bdi', 'bdo', 'bgsound', 'big', 'blink', 'blockquote', 'body', 'br', 'button', 'canvas', 'caption', 'center', 'cite', 'code', 'col', 'colgroup', 'command', 'content', 'data', 'datalist', 'dd', 'del', 'details', 'dfn', 'dialog', 'dir', 'div', 'dl', 'dt', 'element', 'em', 'embed', 'fieldset', 'figcaption', 'figure', 'font', 'footer', 'form', 'frame', 'frameset', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'i', 'iframe', 'image', 'img', 'input', 'ins', 'isindex', 'kbd', 'keygen', 'label', 'legend', 'li', 'link', 'listing', 'main', 'map', 'mark', 'marquee', 'menu', 'menuitem', 'meta', 'meter', 'multicol', 'nav', 'nobr', 'noembed', 'noframes', 'noscript', 'object', 'ol', 'optgroup', 'option', 'output', 'p', 'param', 'picture', 'plaintext', 'pre', 'progress', 'q', 'rb', 'rp', 'rt', 'rtc', 'ruby', 's', 'samp', 'script', 'search', 'section', 'select', 'selectedcontent', 'shadow', 'small', 'source', 'spacer', 'span', 'strike', 'strong', 'style', 'sub', 'summary', 'sup', 'table', 'tbody', 'td', 'template', 'textarea', 'tfoot', 'th', 'thead', 'time', 'title', 'tr', 'track', 'tt', 'u', 'ul', 'var', 'video', 'wbr', 'xmp']);
 
+// Doctype identifiers that set quirks mode, lowercase for their case-insensitive comparison
+// https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode
+
+const quirksPublicIds = new Set(['-//w3o//dtd w3 html strict 3.0//en//', '-/w3c/dtd html 4.0 transitional/en', 'html']);
+
+const quirksSystemIds = new Set(['http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd']);
+
+const quirksPublicIdPrefixes = ['+//silmaril//dtd html pro v0r11 19970101//', '-//as//dtd html 3.0 aswedit + extensions//', '-//advasoft ltd//dtd html 3.0 aswedit + extensions//', '-//ietf//dtd html 2.0 level 1//', '-//ietf//dtd html 2.0 level 2//', '-//ietf//dtd html 2.0 strict level 1//', '-//ietf//dtd html 2.0 strict level 2//', '-//ietf//dtd html 2.0 strict//', '-//ietf//dtd html 2.0//', '-//ietf//dtd html 2.1e//', '-//ietf//dtd html 3.0//', '-//ietf//dtd html 3.2 final//', '-//ietf//dtd html 3.2//', '-//ietf//dtd html 3//', '-//ietf//dtd html level 0//', '-//ietf//dtd html level 1//', '-//ietf//dtd html level 2//', '-//ietf//dtd html level 3//', '-//ietf//dtd html strict level 0//', '-//ietf//dtd html strict level 1//', '-//ietf//dtd html strict level 2//', '-//ietf//dtd html strict level 3//', '-//ietf//dtd html strict//', '-//ietf//dtd html//', '-//metrius//dtd metrius presentational//', '-//microsoft//dtd internet explorer 2.0 html strict//', '-//microsoft//dtd internet explorer 2.0 html//', '-//microsoft//dtd internet explorer 2.0 tables//', '-//microsoft//dtd internet explorer 3.0 html strict//', '-//microsoft//dtd internet explorer 3.0 html//', '-//microsoft//dtd internet explorer 3.0 tables//', '-//netscape comm. corp.//dtd html//', '-//netscape comm. corp.//dtd strict html//', '-//o\'reilly and associates//dtd html 2.0//', '-//o\'reilly and associates//dtd html extended 1.0//', '-//o\'reilly and associates//dtd html extended relaxed 1.0//', '-//sq//dtd html 2.0 hotmetal + extensions//', '-//softquad software//dtd hotmetal pro 6.0::19990601::extensions to html 4.0//', '-//softquad//dtd hotmetal pro 4.0::19971010::extensions to html 4.0//', '-//spyglass//dtd html 2.0 extended//', '-//sun microsystems corp.//dtd hotjava html//', '-//sun microsystems corp.//dtd hotjava strict html//', '-//w3c//dtd html 3 1995-03-24//', '-//w3c//dtd html 3.2 draft//', '-//w3c//dtd html 3.2 final//', '-//w3c//dtd html 3.2//', '-//w3c//dtd html 3.2s draft//', '-//w3c//dtd html 4.0 frameset//', '-//w3c//dtd html 4.0 transitional//', '-//w3c//dtd html experimental 19960712//', '-//w3c//dtd html experimental 970421//', '-//w3c//dtd w3 html//', '-//w3o//dtd w3 html 3.0//', '-//c.0//', '-//webtechs//dtd mozilla html//'];
+
+// Prefixes that set quirks mode only without a system identifier or with an empty one (else limited-quirks mode)
+const quirksPublicIdPrefixesNoSystemId = ['-//w3c//dtd html 4.01 frameset//', '-//w3c//dtd html 4.01 transitional//'];
+
 // Special content elements
 
 const specialContentElements = new Set(['script', 'style']);
@@ -302,7 +317,7 @@ export {
   RE_ESCAPE_LT,
   RE_ESCAPE_LT_RAW_TEXT,
   RE_HTML_ENCODING,
-  RE_HTML_DOCTYPE,
+  RE_DOCTYPE,
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
   RE_ATTR_WS_TRIM,
@@ -359,6 +374,12 @@ export {
   looseElements,
   trailingElements,
   htmlElements,
+
+  // Doctype identifiers
+  quirksPublicIds,
+  quirksSystemIds,
+  quirksPublicIdPrefixes,
+  quirksPublicIdPrefixesNoSystemId,
 
   // Special content elements
   specialContentElements,

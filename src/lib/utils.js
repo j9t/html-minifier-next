@@ -2,6 +2,8 @@
  * General utility functions
  */
 
+import { quirksPublicIdPrefixes, quirksPublicIdPrefixesNoSystemId, quirksPublicIds, quirksSystemIds, RE_DOCTYPE } from './constants.js';
+
 // Functions and other non-plain objects have no structure to compare (closures with the
 // same source can behave differently), so they are told apart by identity
 /** @type {WeakMap<object, number>} */
@@ -884,6 +886,27 @@ function describeDependencyFailure(label, specifier, cause) {
     (cause instanceof Error ? cause.message : String(cause));
 }
 
+// Whether a doctype sets quirks mode, per the HTML parser
+// (limited-quirks mode counts as no-quirks,
+// as it only differs in line height calculation)
+// https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode
+/** @param {string} doctype */
+function isQuirksDoctype(doctype) {
+  const match = RE_DOCTYPE.exec(doctype);
+  if (!match) return true;
+  const [, name = '', publicQuoted, systemQuoted, systemOnlyQuoted, rest] = match;
+  const systemId = (systemQuoted ?? systemOnlyQuoted)?.slice(1, -1).toLowerCase();
+  // The force-quirks flag
+  if (systemId === undefined && rest !== '>') return true;
+  if (name.toLowerCase() !== 'html') return true;
+  if (systemId !== undefined && quirksSystemIds.has(systemId)) return true;
+  if (publicQuoted === undefined) return false;
+  const publicId = publicQuoted.slice(1, -1).toLowerCase();
+  return quirksPublicIds.has(publicId) ||
+    quirksPublicIdPrefixes.some(prefix => publicId.startsWith(prefix)) ||
+    (!systemId && quirksPublicIdPrefixesNoSystemId.some(prefix => publicId.startsWith(prefix)));
+}
+
 // Exports
 
 export {
@@ -894,6 +917,7 @@ export {
   hashContent,
   uniqueId,
   identity,
+  isQuirksDoctype,
   isThenable,
   lowercase,
   paramCase,

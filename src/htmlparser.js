@@ -5,8 +5,8 @@
  * http://erik.eae.net/simplehtmlparser/simplehtmlparser.js
  */
 
-import { isThenable, embedSource, findTagEnd } from './lib/utils.js';
-import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_DOCTYPE, RE_HTML_ENCODING } from './lib/constants.js';
+import { isThenable, isQuirksDoctype, embedSource, findTagEnd } from './lib/utils.js';
+import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -22,6 +22,7 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
  *   strayEnd?: Function,
  *   continueOnParseError?: boolean | undefined,
  *   partialMarkup?: boolean | undefined,
+ *   noQuirksMode?: boolean | undefined,
  *   wantsNextTag?: boolean | undefined,
  *   selfClosingSlash?: boolean | undefined,
  *   customAttrSurround?: RegExp[][] | undefined,
@@ -270,9 +271,18 @@ export class HTMLParser {
     const stack = [];
     /** @type {string} */
     let lastTag = '';
-    // Whether a doctype other than the HTML one may set quirks mode
-    // (where `table` doesn’t close a `p`)
-    let legacyDoctype = false;
+    // The document mode, which only a doctype ahead of any tag sets (with
+    // `noQuirksMode`, to no-quirks, as the doctype gets replaced by the HTML
+    // one): `table` closes an open `p` in no-quirks mode but not in quirks
+    // mode; without a doctype (as in a fragment) the mode is unknown, so the
+    // `p` stays open as in quirks mode, and its end tag, which no-quirks mode
+    // reads as stray, has to stay, too
+    /** @type {'' | 'quirks' | 'no-quirks'} */
+    let docMode = '';
+    let docModeSettable = true;
+    // Open `p` elements a `table` started in while the mode was unknown
+    /** @type {WeakSet<object>} */
+    const pHoldingTable = new WeakSet();
     // Lowercase counterpart of `lastTag`, kept in sync to avoid per-iteration lowercasing
     /** @type {string} */
     let lastTagLower = '';
@@ -467,9 +477,12 @@ export class HTMLParser {
             doctypeY.lastIndex = pos;
             const doctypeMatch = doctypeY.exec(fullHtml);
             if (doctypeMatch) {
-              legacyDoctype = !RE_HTML_DOCTYPE.test(doctypeMatch[0]);
+              if (docModeSettable) {
+                docMode = handler.noQuirksMode || !isQuirksDoctype(doctypeMatch[0]) ? 'no-quirks' : 'quirks';
+                docModeSettable = false;
+              }
               if (handler.doctype) {
-                handler.doctype(doctypeMatch[0]);
+                handler.doctype(doctypeMatch[0], docMode === 'no-quirks');
               }
               advance(doctypeMatch[0].length);
               prevTag = '';
@@ -895,9 +908,14 @@ export class HTMLParser {
       const lowerTagName = tagName.toLowerCase();
       let unarySlash = match.unarySlash;
 
+      docModeSettable = false;
       const pIndex = stack.length ? (stack[stack.length - 1]?.pScope ?? -1) : -1;
-      if (pIndex >= 0 && closesP.has(lowerTagName) && !(legacyDoctype && lowerTagName === 'table')) {
-        await parseEndTag('', stack[pIndex]?.tag ?? 'p');
+      if (pIndex >= 0 && closesP.has(lowerTagName)) {
+        if (lowerTagName !== 'table' || docMode === 'no-quirks') {
+          await parseEndTag('', stack[pIndex]?.tag ?? 'p');
+        } else if (!docMode) {
+          pHoldingTable.add(/** @type {object} */ (stack[pIndex]));
+        }
       }
       // A row or cell start tag closes the row or cell still open in the same table,
       // which may sit deeper down the stack than the element that was opened last
@@ -1050,6 +1068,7 @@ export class HTMLParser {
     }
 
     async function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
+      docModeSettable = false;
       let stackIndex;
       const lowerTagName = tagName ? tagName.toLowerCase() : '';
 
@@ -1067,7 +1086,8 @@ export class HTMLParser {
         // Close all the open elements, up the stack
         for (let i = stack.length - 1; i >= stackIndex; i--) {
           if (handler.end) {
-            handler.end(stack[i]?.tag, stack[i]?.attrs, i > stackIndex || !tag, i === stackIndex ? rest : '');
+            const entry = stack[i];
+            handler.end(entry?.tag, entry?.attrs, i > stackIndex || !tag, i === stackIndex ? rest : '', entry?.lowerTag === 'p' && pHoldingTable.has(entry));
           }
         }
 
