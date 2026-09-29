@@ -28,6 +28,8 @@ const RE_ESCAPE_LT_RAW_TEXT = /** @type {Record<string, RegExp>} */ (Object.assi
 // Encodings that make an `annotation-xml` element hold HTML rather than MathML
 // https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
 const RE_HTML_ENCODING = /^(text\/html|application\/xhtml\+xml)$/i;
+// The HTML doctype, which sets no-quirks mode; any other doctype may set quirks mode
+const RE_HTML_DOCTYPE = /^<!doctype\s+html\s*>$/i;
 const RE_ATTR_WS_CHECK = /[ \n\r\t\f]/;
 const RE_ATTR_WS_COLLAPSE = /[ \n\r\t\f]+/g;
 const RE_ATTR_WS_TRIM = /^[ \n\r\t\f]+|[ \n\r\t\f]+$/g;
@@ -300,6 +302,7 @@ export {
   RE_ESCAPE_LT,
   RE_ESCAPE_LT_RAW_TEXT,
   RE_HTML_ENCODING,
+  RE_HTML_DOCTYPE,
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
   RE_ATTR_WS_TRIM,

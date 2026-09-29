@@ -4387,6 +4387,11 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true, useShortDoctype: true }), '<!doctype html><p>a<table><tr><td>b</table>');
     assert.strictEqual(await minify('<!doctype html><p>a</p><table><tr><td>b</table>', { removeOptionalTags: true }), '<!doctype html><p>a<table><tr><td>b</table>');
 
+    // There, a `table` in a `span` in a `p` leaves both open, whereas otherwise it closes both, and `</span>` is stray
+    const body = '<p><span>a<table><tr><td>x</td></tr></table>b</span>c</p>';
+    assert.strictEqual(await minify('<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">' + body), '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">' + body);
+    assert.strictEqual(await minify('<!doctype html>' + body), '<!doctype html><p><span>a<table><tr><td>x</td></tr></table>bc</p>');
+
     // A `p` beyond a scope boundary stays open
     assert.strictEqual(await minify('<p><button>a<div>b</div></button>c</p><p>d</p>', { removeOptionalTags: true }), '<p><button>a<div>b</div></button>c<p>d');
 

@@ -10,6 +10,7 @@ import {
   RE_ESCAPE_LT,
   RE_ESCAPE_LT_RAW_TEXT,
   RE_HTML_ENCODING,
+  RE_HTML_DOCTYPE,
   RE_WS_START,
   RE_WS_END,
   RE_WS_ONLY,
@@ -2383,7 +2384,7 @@ async function minifyHTML(value, options, partialMarkup) {
       removed = true;
     },
     doctype: function (/** @type {string} */ doctype) {
-      hasLegacyDoctype = !options.useShortDoctype && !/^<!doctype\s+html\s*>$/i.test(doctype);
+      hasLegacyDoctype = !options.useShortDoctype && !RE_HTML_DOCTYPE.test(doctype);
       bufferPush(options.useShortDoctype
         ? '<!doctype' +
         (options.removeTagWhitespace ? '' : ' ') + 'html>'

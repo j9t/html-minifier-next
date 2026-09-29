@@ -6,7 +6,7 @@
  */
 
 import { isThenable, embedSource, findTagEnd } from './lib/utils.js';
-import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
+import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_DOCTYPE, RE_HTML_ENCODING } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -270,6 +270,9 @@ export class HTMLParser {
     const stack = [];
     /** @type {string} */
     let lastTag = '';
+    // Whether a doctype other than the HTML one may set quirks mode
+    // (where `table` doesn’t close a `p`)
+    let legacyDoctype = false;
     // Lowercase counterpart of `lastTag`, kept in sync to avoid per-iteration lowercasing
     /** @type {string} */
     let lastTagLower = '';
@@ -464,6 +467,7 @@ export class HTMLParser {
             doctypeY.lastIndex = pos;
             const doctypeMatch = doctypeY.exec(fullHtml);
             if (doctypeMatch) {
+              legacyDoctype = !RE_HTML_DOCTYPE.test(doctypeMatch[0]);
               if (handler.doctype) {
                 handler.doctype(doctypeMatch[0]);
               }
@@ -892,7 +896,7 @@ export class HTMLParser {
       let unarySlash = match.unarySlash;
 
       const pIndex = stack.length ? (stack[stack.length - 1]?.pScope ?? -1) : -1;
-      if (pIndex >= 0 && closesP.has(lowerTagName)) {
+      if (pIndex >= 0 && closesP.has(lowerTagName) && !(legacyDoctype && lowerTagName === 'table')) {
         await parseEndTag('', stack[pIndex]?.tag ?? 'p');
       }
       // A row or cell start tag closes the row or cell still open in the same table,
@@ -1016,7 +1020,6 @@ export class HTMLParser {
       return lowerTagName;
     }
 
-    // `needle` must already be lowercase.
     // Pushes an open element, noting the `p` in scope from within it: its own index
     // for a `p`, none past a scope boundary, foreign element, or `noscript` (which
     // holds text with scripting), and otherwise its parent’s
@@ -1035,6 +1038,7 @@ export class HTMLParser {
       stack.push({ tag, lowerTag, attrs, namespace, pScope });
     }
 
+    // `needle` must already be lowercase
     function findTag(/** @type {string} */ needle) {
       let stackIndex;
       for (stackIndex = stack.length - 1; stackIndex >= 0; stackIndex--) {
