@@ -3949,6 +3949,38 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/folder/' }), input);
   });
 
+  test('An attribute value that needs asynchronous work', async () => {
+    // With `decodeEntities`, a value holding a character reference is decoded through a
+    // lazily imported module, which makes normalizing it—and so writing out the start
+    // tag—asynchronous. What the parse loop then decides about the whitespace behind the
+    // tag depends on the tag name reaching it, which the deferred path has to hand back
+    // just as the immediate one does.
+    const markup = [
+      '<div class="a&amp;b"> x</div>',
+      '<section id="a&amp;b"> <span>x</span></section>',
+      '<p class="a&amp;b">\n  text\n</p>',
+      '<a href="a&amp;b">link</a> <span><img src="c&amp;d"></span>',
+      '<span class="a&amp;b"> x</span>'
+    ];
+    const expected = [
+      '<div class="a&b">x</div>',
+      '<section id="a&b"><span>x</span></section>',
+      '<p class="a&b">text</p>',
+      '<a href="a&b">link</a> <span><img src="c&d"></span>',
+      '<span class="a&b">x</span>'
+    ];
+
+    for (const decodeEntities of ['strict', true]) {
+      for (let i = 0; i < markup.length; i++) {
+        const options = { collapseWhitespace: true, decodeEntities };
+        assert.strictEqual(await minify(markup[i], options), expected[i]);
+        // The same markup, decoded as text rather than as an attribute: The whitespace
+        // around the tags has to end up in the same place either way
+        assert.strictEqual(await minify(markup[i].replaceAll('&amp;', '&'), options), expected[i]);
+      }
+    }
+  });
+
   test('`srcset` attribute minification', async () => {
     let output;
     const input = '<source srcset="https://example.com/foo.gif ,https://example.com/bar.jpg 1x, baz moo 42w,' +
