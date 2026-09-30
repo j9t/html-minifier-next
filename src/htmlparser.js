@@ -923,9 +923,9 @@ export class HTMLParser {
       return false;
     }
 
-    // Reads the lowercase name for the parse loop, or a Promise of it: of the three
-    // `handler.start` calls here, only the one carrying attributes can have had to await
-    async function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
+    // Returns the lowercase name for the parse loop, or a Promise of it
+    // when `handler.start` awaits (which only happens with attributes)
+    function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
       const tagName = match.tagName;
       const lowerTagName = tagName.toLowerCase();
       let unarySlash = match.unarySlash;
@@ -1053,11 +1053,8 @@ export class HTMLParser {
       // Store attributes for `prevAttrs` tracking (used in whitespace collapsing)
       prevAttrs = attrs;
 
-      // `handler.start` is synchronous unless normalizing an attribute value had to
-      // await, which is the one call here that can return a promise
+      // The name is returned so the parse loop can skip lowercasing it again
       const started = handler.start?.(tagName, attrs, unary, unarySlash);
-      // Returned (resolved, if it took a promise) so the parse loop can skip lowercasing
-      // the name again
       return isThenable(started) ? started.then(() => lowerTagName) : lowerTagName;
     }
 

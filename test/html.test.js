@@ -3960,14 +3960,19 @@ describe('HTML', () => {
       '<section id="a&amp;b"> <span>x</span></section>',
       '<p class="a&amp;b">\n  text\n</p>',
       '<a href="a&amp;b">link</a> <span><img src="c&amp;d"></span>',
-      '<span class="a&amp;b"> x</span>'
+      '<span class="a&amp;b"> x</span>',
+      // A unary tag that opened a foreign or HTML context has to leave it once written
+      '<p><svg class="a&amp;b"/><img src="x"/> y</p>',
+      '<p><svg><foreignObject class="a&amp;b"/><rect/></svg><img src="x"/></p>'
     ];
     const expected = [
       '<div class="a&b">x</div>',
       '<section id="a&b"><span>x</span></section>',
       '<p class="a&b">text</p>',
       '<a href="a&b">link</a> <span><img src="c&d"></span>',
-      '<span class="a&b">x</span>'
+      '<span class="a&b">x</span>',
+      '<p><svg class="a&b"/><img src="x"> y</p>',
+      '<p><svg><foreignObject class="a&b"/><rect/></svg><img src="x"></p>'
     ];
 
     for (const decodeEntities of ['strict', true]) {
