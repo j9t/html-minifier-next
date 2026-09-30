@@ -16,7 +16,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@eslint/js": "^10.0.1",
-    "@swc/core": "^1.16.2",
+    "@swc/core": "^1.16.13",
     "@types/node": "^26.6.3",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
@@ -95,5 +95,5 @@
   },
   "type": "module",
   "types": "dist/types/htmlminifier.d.ts",
-  "version": "8.8.0"
+  "version": "8.8.1"
 }

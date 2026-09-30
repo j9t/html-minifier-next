@@ -13,6 +13,11 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
 // Type definitions
 
 /**
+ * `start`, `chars`, and `comment` return `undefined` when their work needs no `await`
+ * and a Promise when it does; the parse loop awaits only what it gets back.
+ * `end`, `doctype`, and `strayEnd` never suspend. `start` is synchronous
+ * wherever it is passed no attributes, which is what keeps the calls inside
+ * `parseEndTag` synchronous.
  * @typedef {{
  *   start?: Function,
  *   end?: Function,
@@ -416,7 +421,10 @@ export class HTMLParser {
             cachedNextStartTag = null;
             cachedNextEndTag = null;
             advance(startTagMatch.advance);
-            prevTag = await handleStartTag(startTagMatch);
+            // Awaited only when the handler has reason to, which is what keeps a plain
+            // document off the microtask queue once per tag
+            const started = handleStartTag(startTagMatch);
+            prevTag = isThenable(started) ? await started : started;
             continue;
           }
           if (cachedNextEndTag && cachedNextEndTag.pos === pos) {
@@ -424,7 +432,7 @@ export class HTMLParser {
             cachedNextStartTag = null;
             cachedNextEndTag = null;
             advance(endTagMatch.text.length);
-            prevTag = '/' + await parseEndTag(endTagMatch.text, endTagMatch.name);
+            prevTag = '/' + parseEndTag(endTagMatch.text, endTagMatch.name);
             prevAttrs = [];
             continue;
           }
@@ -496,7 +504,7 @@ export class HTMLParser {
               const endTagMatch = matchEndTag(pos);
               if (endTagMatch) {
                 advance(endTagMatch.text.length);
-                prevTag = '/' + await parseEndTag(endTagMatch.text, endTagMatch.name);
+                prevTag = '/' + parseEndTag(endTagMatch.text, endTagMatch.name);
                 prevAttrs = [];
                 continue;
               }
@@ -506,7 +514,8 @@ export class HTMLParser {
             const startTagMatch = parseStartTag(pos);
             if (startTagMatch) {
               advance(startTagMatch.advance);
-              prevTag = await handleStartTag(startTagMatch);
+              const started = handleStartTag(startTagMatch);
+              prevTag = isThenable(started) ? await started : started;
               continue;
             }
           }
@@ -593,7 +602,7 @@ export class HTMLParser {
           }
           // Advance HTML past the matched special tag content and its closing tag
           advance(rawText.length);
-          await parseEndTag('</' + stackedTag + '>', stackedTag);
+          parseEndTag('</' + stackedTag + '>', stackedTag);
           // What follows stands after that end tag, not after the start tag still named here—
           // whitespace next to `textarea` stays verbatim only while the element is open
           prevTag = '/' + stackedTag;
@@ -641,7 +650,7 @@ export class HTMLParser {
 
     if (!handler.partialMarkup) {
       // Clean up any remaining tags
-      await parseEndTag('', '');
+      parseEndTag('', '');
     }
 
     // Helper to extract minimal attribute info (name/value pairs) from raw attribute matches
@@ -914,7 +923,9 @@ export class HTMLParser {
       return false;
     }
 
-    async function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
+    // Returns the lowercase name for the parse loop, or a Promise of it
+    // when `handler.start` awaits (which only happens with attributes)
+    function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
       const tagName = match.tagName;
       const lowerTagName = tagName.toLowerCase();
       let unarySlash = match.unarySlash;
@@ -923,7 +934,7 @@ export class HTMLParser {
       const pIndex = stack.length ? (stack[stack.length - 1]?.pScope ?? -1) : -1;
       if (pIndex >= 0 && closesP.has(lowerTagName)) {
         if (lowerTagName !== 'table' || docMode === 'no-quirks') {
-          await parseEndTag('', stack[pIndex]?.tag ?? 'p');
+          parseEndTag('', stack[pIndex]?.tag ?? 'p');
         } else if (!docMode) {
           pHoldingTable.add(/** @type {object} */ (stack[pIndex]));
         }
@@ -956,20 +967,20 @@ export class HTMLParser {
         lastTagLower = 'colgroup';
         pushOpenElement(lastTag, 'colgroup', []);
         if (handler.start) {
-          await handler.start(lastTag, [], false, '', true);
+          handler.start(lastTag, [], false, '', true);
         }
       } else if (lowerTagName !== 'col' && lastTagLower === 'colgroup') {
         // Auto-close synthetic `<colgroup>` when a non-`col` element starts
-        await parseEndTag('', 'colgroup');
+        parseEndTag('', 'colgroup');
       }
 
       if (closeSelf.has(lowerTagName) && lastTagLower === lowerTagName) {
-        await parseEndTag('', tagName);
+        parseEndTag('', tagName);
       }
 
       // Handle `dt`/`dd` cross-closing: `dt` followed by `dd`, or `dd` followed by `dt`
       if ((lowerTagName === 'dt' || lowerTagName === 'dd') && (lastTagLower === 'dt' || lastTagLower === 'dd')) {
-        await parseEndTag('', lastTag);
+        parseEndTag('', lastTag);
       }
 
       // HTML ignores the slash on a start tag—only in SVG and MathML does it close the
@@ -1042,11 +1053,9 @@ export class HTMLParser {
       // Store attributes for `prevAttrs` tracking (used in whitespace collapsing)
       prevAttrs = attrs;
 
-      if (handler.start) {
-        await handler.start(tagName, attrs, unary, unarySlash);
-      }
-      // Returned so the parse loop can skip lowercasing the name again
-      return lowerTagName;
+      // The name is returned so the parse loop can skip lowercasing it again
+      const started = handler.start?.(tagName, attrs, unary, unarySlash);
+      return isThenable(started) ? started.then(() => lowerTagName) : lowerTagName;
     }
 
     // Pushes an open element, noting the `p` in scope from within it: its own index
@@ -1078,7 +1087,7 @@ export class HTMLParser {
       return stackIndex;
     }
 
-    async function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
+    function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
       docModeSettable = false;
       let stackIndex;
       const lowerTagName = tagName ? tagName.toLowerCase() : '';
@@ -1113,11 +1122,11 @@ export class HTMLParser {
         }
       } else if (lowerTagName === 'br') {
         if (handler.start) {
-          await handler.start(tagName, [], true, '');
+          handler.start(tagName, [], true, '');
         }
       } else if (lowerTagName === 'p') {
         if (handler.start) {
-          await handler.start(tagName, [], false, '', true);
+          handler.start(tagName, [], false, '', true);
         }
         if (handler.end) {
           handler.end(tagName, []);

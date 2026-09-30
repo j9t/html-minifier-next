@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.8.1] - 2026-09-30
+
+### Changed
+
+* Improved performance, as the parser now only awaits a start tag when an attribute value needed asynchronous work
+
 ## [8.8.0] - 2026-09-30
 
 ### Fixed
@@ -52,7 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Improved whitespace-collapse performance (~5% faster overall on reference corpus, the whitespace pass itself ~25% faster, output unchanged)
+* Improved whitespace-collapse performance (~5% faster overall on reference corpus, the whitespace pass itself ~25% faster)
 
 ## [8.5.2] - 2026-09-18
 
@@ -125,7 +131,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Improved whitespace-collapse performance (~10% faster overall on reference corpus, output unchanged)
+* Improved whitespace-collapse performance (~10% faster overall on reference corpus)
 
 ## [8.4.1] - 2026-09-08
 
@@ -178,7 +184,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Improved parsing and whitespace-collapse performance (~6% faster overall on reference corpus, output unchanged)
+* Improved parsing and whitespace-collapse performance (~6% faster overall on reference corpus)
 
 ## [8.2.1] - 2026-08-26
 
