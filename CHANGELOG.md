@@ -27,9 +27,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Changed `removeEmptyElements` to also remove elements left empty by the removal (e.g., `<span class="field"><span class="content"></span></span>` now goes entirely)
+* Changed `removeEmptyElements` also to remove elements left empty by the removal (e.g., `<span class="field"><span class="content"></span></span>` now goes entirely)
 * Changed `removeEmptyElements` to keep elements with a `role`, `tabindex`, or ARIA attribute, unless the value is empty, as well as custom elements and `canvas`, as such elements serve a purpose while empty (e.g., `<span role="img" aria-label="Logo"></span>`, `<div aria-live="polite"></div>`, or `<my-player></my-player>`)
-* Updated the measured effects in the README’s “Optimizing for compression” section
+* Updated measured effects in the README’s “Optimizing for compression” section
 
 ## [8.7.0] - 2026-09-28
 
