@@ -4,6 +4,33 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.8.0] - 2026-09-30
+
+### Fixed
+
+* Fixed `collapseInlineTagWhitespace` removing whitespace next to text and between text-level elements, which ran words together (e.g., `The <code>this</code> Keyword` became `The<code>this</code>Keyword`, and `<code>a</code> <code>b</code>` became `<code>a</code><code>b</code>`); the option now only removes whitespace between tags, and keeps it around `a`, `code`, `dfn`, `cite`, `q`, `label`, `math`, and other text-level elements
+* Fixed `collapseWhitespace` removing whitespace around `data` elements (e.g., `Price <data value="1">10</data> EUR` became `Price<data value="1">10</data>EUR`), and likewise around `audio`, `canvas`, `embed`, `iframe`, `map`, `picture`, `slot`, and `video`
+* Fixed `collapseWhitespace` removing whitespace next to text around elements that don’t render, which ran the text on either side together (e.g., `a <script></script> b` became `a<script></script>b`); this applies to `area`, `datalist`, `link`, `meta`, `noscript`, `script`, `style`, and `template`
+* Fixed `collapseWhitespace` removing whitespace between two elements that don’t render, which ran the text on either side together (e.g., `a<script></script> <script></script>b` became `a<script></script><script></script>b`)
+* Fixed `mergeScripts` dropping whitespace between the scripts it merges, which ran the text on either side together (e.g., `a<script>x()</script> <script>y()</script>b` became `a<script>x();y()</script>b`); the whitespace now follows the merged script
+* Fixed the parser closing an open `p` at start tags that don’t close it in browsers, like `meta`, `style`, `title`, `option`, or `source`; only the start tags the HTML parsing algorithm names close it now, so that, for example, microdata in paragraphs no longer loses the whitespace around it
+* Fixed the parser leaving a `p` open when a block or another `p` starts inside an element within it (e.g., the `div` in `<p><span>a<div>b</div></span></p>`, or the second `p` in `<p><span>a<p>b</p></span></p>`), which browsers close the `p` at
+* Fixed `removeOptionalTags` omitting a stray `</p>`, which browsers read as an empty `p` (e.g., the last `</p>` in `<p>a<div>b</div></p>` or `<p>a<p>b</p></p>`), as well as the end tag before it
+* Fixed `removeOptionalTags` omitting `</p>` before end tags that don’t close it in browsers, like `</span>`, `</label>`, `</foreignObject>`, or `</title>` in SVG, which pulled the rest of the page into the `p`: `</p>` is now only omitted before end tags like `</div>`, `</li>`, or `</td>`
+* Fixed the parser closing an open `p` at `table`, and `removeOptionalTags` omitting `</p>` before it, under doctypes that trigger quirks mode (like HTML 3.2), where `table` doesn’t close a `p`; which doctypes do follows the HTML parser (so that, for example, XHTML 1.0 Strict, HTML 4.01 Strict, and `<!doctype html system "about:legacy-compat">` don’t), markup whose doctype `useShortDoctype` replaces is read as no-quirks, and without a doctype that counts (the first one, after nothing but comments and whitespace), what either mode needs stays
+* Fixed a doctype without a name (`<!DOCTYPE>`) causing a parse error; it now sets quirks mode, as in browsers
+* Fixed end tags of formatting elements like `a`, `em`, or `strong` being dropped where the parser found them stray, although browsers still act on them, and `removeEmptyElements` removing such an element where a block closed it, although browsers reopen it after the block
+
+### Added
+
+* Added `collapseEmptyAttributes` option to omit empty attribute values (e.g., `alt=""` becomes `alt`), which the HTML parser reads the same way; the option is part of the “comprehensive” preset
+
+### Changed
+
+* Changed `removeEmptyElements` also to remove elements left empty by the removal (e.g., `<span class="field"><span class="content"></span></span>` now goes entirely)
+* Changed `removeEmptyElements` to keep elements with a `role`, `tabindex`, or ARIA attribute, unless the value is empty, as well as custom elements and `canvas`, as such elements serve a purpose while empty (e.g., `<span role="img" aria-label="Logo"></span>`, `<div aria-live="polite"></div>`, or `<my-player></my-player>`)
+* Updated measured effects in the README’s “Optimizing for compression” section
+
 ## [8.7.0] - 2026-09-28
 
 ### Fixed

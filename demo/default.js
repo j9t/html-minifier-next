@@ -32,6 +32,10 @@ const demoConfig = {
     label: 'Collapse boolean attributes',
     checked: true
   },
+  collapseEmptyAttributes: {
+    label: 'Collapse empty attributes',
+    checked: true
+  },
   collapseInlineTagWhitespace: {
     label: 'Collapse inline tag whitespace',
     unsafe: true

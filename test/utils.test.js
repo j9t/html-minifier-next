@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { LRU, describeDependencyFailure, describeQuantifierRisk, embedSource, stableStringify } from '../src/lib/utils.js';
+import { LRU, describeDependencyFailure, describeQuantifierRisk, embedSource, isQuirksDoctype, stableStringify } from '../src/lib/utils.js';
 
 /** @param {string} source */
 const hasRiskyQuantifiers = source => describeQuantifierRisk(source) !== null;
@@ -384,6 +384,83 @@ describe('Utils', () => {
 
     test('Risk nested deeper in a group still surfaces', () => {
       assert.strictEqual(hasRiskyQuantifiers(/<%(?:x(a+)+y)?%>/.source), true);
+    });
+  });
+
+  describe('`isQuirksDoctype`', () => {
+    test('The HTML doctype and its legacy-compat form set no-quirks mode', () => {
+      for (const doctype of [
+        '<!doctype html>',
+        '<!DOCTYPE HTML>',
+        '<!doctype html >',
+        '<!DOCTYPEhtml>',
+        '<!DOCTYPE html SYSTEM "about:legacy-compat">',
+        "<!doctype html system 'about:legacy-compat'>"
+      ]) {
+        assert.strictEqual(isQuirksDoctype(doctype), false, doctype);
+      }
+    });
+
+    test('Strict legacy doctypes set no-quirks mode', () => {
+      for (const doctype of [
+        '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+        '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">',
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">',
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">',
+        // Trailing characters after the system identifier don’t force quirks mode,
+        // nor does missing whitespace before either identifier
+        '<!DOCTYPE html SYSTEM "about:legacy-compat" x>',
+        '<!DOCTYPE html PUBLIC"-//W3C//DTD XHTML 1.0 Strict//EN""http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+        '<!DOCTYPE html SYSTEM\'about:legacy-compat\'>'
+      ]) {
+        assert.strictEqual(isQuirksDoctype(doctype), false, doctype);
+      }
+    });
+
+    test('Doctypes that set limited-quirks mode count as no-quirks', () => {
+      for (const doctype of [
+        '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">',
+        '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Frameset//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd">',
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">',
+        '<!doctype html public "-//w3c//dtd html 4.01 frameset//en" "http://www.w3.org/TR/html4/frameset.dtd">'
+      ]) {
+        assert.strictEqual(isQuirksDoctype(doctype), false, doctype);
+      }
+    });
+
+    test('Doctypes the HTML parser names set quirks mode, regardless of case', () => {
+      for (const doctype of [
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">',
+        '<!doctype html public "-//w3c//dtd html 3.2 final//en">',
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">',
+        '<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">',
+        '<!DOCTYPE HTML PUBLIC "HTML">',
+        '<!DOCTYPE HTML PUBLIC "-//W3O//DTD W3 HTML Strict 3.0//EN//">',
+        '<!DOCTYPE html SYSTEM "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd">',
+        // HTML 4.01 Transitional and Frameset without (or with an empty) system identifier
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">',
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Frameset//EN" "">'
+      ]) {
+        assert.strictEqual(isQuirksDoctype(doctype), true, doctype);
+      }
+    });
+
+    test('Doctypes named other than `html` or malformed set quirks mode', () => {
+      for (const doctype of [
+        '<!DOCTYPE>',
+        '<!DOCTYPE >',
+        '<!DOCTYPE html5>',
+        '<!DOCTYPE svg>',
+        '<!DOCTYPE html PUBLIC>',
+        '<!DOCTYPE html SYSTEM>',
+        '<!DOCTYPE html foo>',
+        '<!DOCTYPE html PUBLIC -//W3C//DTD HTML 4.01//EN>',
+        '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" x>',
+        '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN>',
+        '<!DOCTYPE html SYSTEM "about:legacy-compat>'
+      ]) {
+        assert.strictEqual(isQuirksDoctype(doctype), true, doctype);
+      }
     });
   });
 

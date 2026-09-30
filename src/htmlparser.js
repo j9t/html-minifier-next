@@ -5,8 +5,8 @@
  * http://erik.eae.net/simplehtmlparser/simplehtmlparser.js
  */
 
-import { isThenable, embedSource, findTagEnd } from './lib/utils.js';
-import { endlessRawTextElements, escapableRawTextElements, genericRawTextElements, RE_HTML_ENCODING } from './lib/constants.js';
+import { isThenable, isQuirksDoctype, embedSource, findTagEnd } from './lib/utils.js';
+import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_ENCODING, RE_WS_ONLY } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -22,6 +22,7 @@ import { endlessRawTextElements, escapableRawTextElements, genericRawTextElement
  *   strayEnd?: Function,
  *   continueOnParseError?: boolean | undefined,
  *   partialMarkup?: boolean | undefined,
+ *   noQuirksMode?: boolean | undefined,
  *   wantsNextTag?: boolean | undefined,
  *   selfClosingSlash?: boolean | undefined,
  *   customAttrSurround?: RegExp[][] | undefined,
@@ -95,8 +96,11 @@ const svgIntegrationPoints = new Set(['foreignobject', 'desc', 'title']);
 const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
 
 // HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
-// Phrasing content, https://html.spec.whatwg.org/multipage/dom.html#phrasing-content
-const nonPhrasing = new Set(['address', 'article', 'aside', 'base', 'blockquote', 'body', 'caption', 'center', 'col', 'colgroup', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'header', 'hgroup', 'hr', 'html', 'legend', 'li', 'listing', 'main', 'menu', 'menuitem', 'meta', 'nav', 'ol', 'optgroup', 'option', 'param', 'plaintext', 'pre', 'rp', 'rt', 'search', 'section', 'source', 'style', 'summary', 'table', 'tbody', 'td', 'tfoot', 'th', 'thead', 'title', 'tr', 'track', 'ul', 'xmp']);
+// Start tags that close an open `p`, https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inbody
+// (other start tags, like `meta` or `style`, go in it, or are ignored, like `td` outside a table)
+// Elements that end the scope the `p` is looked for in, https://html.spec.whatwg.org/multipage/parsing.html#has-an-element-in-button-scope
+const buttonScopeBoundaries = new Set(['applet', 'button', 'caption', 'html', 'marquee', 'object', 'table', 'td', 'template', 'th']);
+const closesP = new Set(['address', 'article', 'aside', 'blockquote', 'center', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'li', 'listing', 'main', 'menu', 'nav', 'ol', 'p', 'plaintext', 'pre', 'search', 'section', 'summary', 'table', 'ul', 'xmp']);
 
 // A tag name ends at whitespace, a slash, or the closing bracket, so `</scriptx>` names a
 // different element and does not end this one
@@ -262,10 +266,23 @@ export class HTMLParser {
     const fullHtml = this.html;
     const fullLength = fullHtml.length;
 
-    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[], namespace: string}>} */
+    // `pScope` is the index of the `p` a start tag would close from within the entry, or -1
+    /** @type {Array<{tag: string, lowerTag: string, attrs: HTMLAttribute[], namespace: string, pScope: number}>} */
     const stack = [];
     /** @type {string} */
     let lastTag = '';
+    // The document mode, which only the first doctype sets, and only after
+    // nothing but comments and whitespace (with `noQuirksMode`, to no-quirks,
+    // as the doctype gets replaced by the HTML one): `table` closes an open `p`
+    // in no-quirks mode but not in quirks mode; without such a doctype (as in a
+    // fragment) the mode is unknown, so the `p` stays open as in quirks mode,
+    // and its end tag, which no-quirks mode reads as stray, has to stay, too
+    /** @type {'' | 'quirks' | 'no-quirks'} */
+    let docMode = '';
+    let docModeSettable = true;
+    // Open `p` elements a `table` started in while the mode was unknown
+    /** @type {WeakSet<object>} */
+    const pHoldingTable = new WeakSet();
     // Lowercase counterpart of `lastTag`, kept in sync to avoid per-iteration lowercasing
     /** @type {string} */
     let lastTagLower = '';
@@ -284,7 +301,7 @@ export class HTMLParser {
     // Sticky regex versions for position-based matching (avoids string slicing)
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
     const endTagOpenY = new RegExp(endTagOpen.source.slice(1), 'y');
-    const doctypeY = /<!DOCTYPE[^<>]+>/iy;
+    const doctypeY = /<!DOCTYPE[^<>]*>/iy;
     const commentTestY = /<!--/y;
     const conditionalTestY = /<!\[/y;
 
@@ -460,8 +477,12 @@ export class HTMLParser {
             doctypeY.lastIndex = pos;
             const doctypeMatch = doctypeY.exec(fullHtml);
             if (doctypeMatch) {
+              if (docModeSettable) {
+                docMode = handler.noQuirksMode || !isQuirksDoctype(doctypeMatch[0]) ? 'no-quirks' : 'quirks';
+                docModeSettable = false;
+              }
               if (handler.doctype) {
-                handler.doctype(doctypeMatch[0]);
+                handler.doctype(doctypeMatch[0], docMode === 'no-quirks');
               }
               advance(doctypeMatch[0].length);
               prevTag = '';
@@ -503,6 +524,16 @@ export class HTMLParser {
         } else {
           text = fullHtml.substring(pos);
           advance(fullLength - pos);
+        }
+        // Text keeps a later doctype from setting the mode (template code may render to text
+        // or to nothing), except for whitespace and a byte order mark at the start, which
+        // browsers strip (as it runs before the first tag only, this costs next to nothing)
+        if (docModeSettable) {
+          const bom = pos === text.length && text.charCodeAt(0) === 0xFEFF;
+          const rest = bom ? text.slice(1) : text;
+          if (rest && !RE_WS_ONLY.test(rest)) {
+            docModeSettable = false;
+          }
         }
 
         // Next tag for whitespace processing context
@@ -589,6 +620,7 @@ export class HTMLParser {
       if (pos === lastPos) {
         if (handler.continueOnParseError) {
           // Skip the problematic character and continue
+          docModeSettable = false;
           if (handler.chars) {
             const result = handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
             if (isThenable(result)) await result;
@@ -887,8 +919,14 @@ export class HTMLParser {
       const lowerTagName = tagName.toLowerCase();
       let unarySlash = match.unarySlash;
 
-      if (lastTagLower === 'p' && nonPhrasing.has(lowerTagName)) {
-        await parseEndTag('', lastTag);
+      docModeSettable = false;
+      const pIndex = stack.length ? (stack[stack.length - 1]?.pScope ?? -1) : -1;
+      if (pIndex >= 0 && closesP.has(lowerTagName)) {
+        if (lowerTagName !== 'table' || docMode === 'no-quirks') {
+          await parseEndTag('', stack[pIndex]?.tag ?? 'p');
+        } else if (!docMode) {
+          pHoldingTable.add(/** @type {object} */ (stack[pIndex]));
+        }
       }
       // A row or cell start tag closes the row or cell still open in the same table,
       // which may sit deeper down the stack than the element that was opened last
@@ -916,7 +954,7 @@ export class HTMLParser {
       if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
         lastTag = 'colgroup';
         lastTagLower = 'colgroup';
-        stack.push({ tag: lastTag, lowerTag: 'colgroup', attrs: [], namespace: namespaceInside(stack[stack.length - 1]) });
+        pushOpenElement(lastTag, 'colgroup', []);
         if (handler.start) {
           await handler.start(lastTag, [], false, '', true);
         }
@@ -995,7 +1033,7 @@ export class HTMLParser {
       }));
 
       if (!unary) {
-        stack.push({ tag: tagName, lowerTag: lowerTagName, attrs, namespace: namespaceInside(stack[stack.length - 1]) });
+        pushOpenElement(tagName, lowerTagName, attrs);
         lastTag = tagName;
         lastTagLower = lowerTagName;
         unarySlash = '';
@@ -1011,6 +1049,24 @@ export class HTMLParser {
       return lowerTagName;
     }
 
+    // Pushes an open element, noting the `p` in scope from within it: its own index
+    // for a `p`, none past a scope boundary, foreign element, or `noscript` (which
+    // holds text with scripting), and otherwise its parent’s
+    function pushOpenElement(/** @type {string} */ tag, /** @type {string} */ lowerTag, /** @type {HTMLAttribute[]} */ attrs) {
+      const parent = stack.length ? stack[stack.length - 1] : undefined;
+      const namespace = namespaceInside(parent);
+      let pScope = -1;
+      if (!namespace) {
+        if (lowerTag === 'p') {
+          pScope = stack.length;
+        } else if (parent && parent.pScope !== -1 && !buttonScopeBoundaries.has(lowerTag) && lowerTag !== 'svg' && lowerTag !== 'math' && lowerTag !== 'noscript') {
+          // Most elements sit outside any `p`, so the boundary checks only run inside one
+          pScope = parent.pScope;
+        }
+      }
+      stack.push({ tag, lowerTag, attrs, namespace, pScope });
+    }
+
     // `needle` must already be lowercase
     function findTag(/** @type {string} */ needle) {
       let stackIndex;
@@ -1023,6 +1079,7 @@ export class HTMLParser {
     }
 
     async function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
+      docModeSettable = false;
       let stackIndex;
       const lowerTagName = tagName ? tagName.toLowerCase() : '';
 
@@ -1040,7 +1097,8 @@ export class HTMLParser {
         // Close all the open elements, up the stack
         for (let i = stack.length - 1; i >= stackIndex; i--) {
           if (handler.end) {
-            handler.end(stack[i]?.tag, stack[i]?.attrs, i > stackIndex || !tag, i === stackIndex ? rest : '');
+            const entry = stack[i];
+            handler.end(entry?.tag, entry?.attrs, i > stackIndex || !tag, i === stackIndex ? rest : '', entry?.lowerTag === 'p' && pHoldingTable.has(entry));
           }
         }
 
@@ -1048,8 +1106,8 @@ export class HTMLParser {
         stack.length = stackIndex;
         lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
         lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
-      } else if (handler.partialMarkup && tagName) {
-        // In partial markup mode, preserve stray end tags
+      } else if ((handler.partialMarkup || formattingElements.has(lowerTagName)) && tagName) {
+        // In partial markup mode, preserve stray end tags, and those of formatting elements always
         if (handler.end) {
           handler.end(tagName, [], false, rest);
         }

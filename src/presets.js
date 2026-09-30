@@ -20,6 +20,7 @@ export const presets = {
   comprehensive: {
     collapseAttributeWhitespace: true,
     collapseBooleanAttributes: true,
+    collapseEmptyAttributes: true,
     collapseWhitespace: true,
     decodeEntities: true,
     mergeScripts: true,

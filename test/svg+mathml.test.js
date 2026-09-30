@@ -195,6 +195,18 @@ describe('SVG and MathML', () => {
       '<svg><foreignObject><input type="checkbox" checked></foreignObject></svg>'
     );
 
+    // The same goes for empty values
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><img src="a.png" alt=""></foreignObject></svg>',
+        { minifySVG: true, collapseEmptyAttributes: true }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><img src="a.png"/></foreignObject></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg><foreignObject><img src="a.png" alt=""></foreignObject></svg>',
+        { collapseEmptyAttributes: true }),
+      '<svg><foreignObject><img src="a.png" alt></foreignObject></svg>'
+    );
+
     // MathML never reaches SVGO, so nothing is held back there
     assert.strictEqual(
       await minify('<math><annotation-xml encoding="text/html"><input type="checkbox" checked="checked"><p>a</p><p>b</p></annotation-xml></math>',
@@ -612,7 +624,7 @@ describe('SVG and MathML', () => {
         removeOptionalTags: true,
         collapseWhitespace: true
       }),
-      '<svg><foreignObject width="100" height="100"><p>Text<p>More</foreignObject></svg>'
+      '<svg><foreignObject width="100" height="100"><p>Text<p>More</p></foreignObject></svg>'
     );
   });
 
@@ -947,12 +959,12 @@ describe('SVG and MathML', () => {
     let input;
 
     // Ordinary elements here, so an optional end tag inside them is one
-    assert.strictEqual(await minify('<svg><title><p>a</p></title></svg>', options), '<svg><title><p>a</title></svg>');
-    assert.strictEqual(await minify('<svg><desc><p>a</p></desc></svg>', options), '<svg><desc><p>a</desc></svg>');
-    assert.strictEqual(await minify('<math><title><p>a</p></title></math>', options), '<math><title><p>a</title></math>');
+    assert.strictEqual(await minify('<svg><title><div><p>a</p></div></title></svg>', options), '<svg><title><div><p>a</div></title></svg>');
+    assert.strictEqual(await minify('<svg><desc><div><p>a</p></div></desc></svg>', options), '<svg><desc><div><p>a</div></desc></svg>');
+    assert.strictEqual(await minify('<math><title><div><p>a</p></div></title></math>', options), '<math><title><div><p>a</div></title></math>');
 
     // An element that is no integration point keeps its content foreign
-    assert.strictEqual(await minify('<svg><g><textarea><p>a</p></textarea></g></svg>', options), '<svg><g><textarea><p>a</textarea></g></svg>');
+    assert.strictEqual(await minify('<svg><g><textarea><div><p>a</p></div></textarea></g></svg>', options), '<svg><g><textarea><div><p>a</div></textarea></g></svg>');
 
     // What an integration point holds is HTML again, so raw text inside one is raw text—note
     // that the element itself does not decide this: `<svg><title>` is SVG, its content is not
@@ -963,13 +975,13 @@ describe('SVG and MathML', () => {
       ['<math><mtext>', '</mtext></math>'],
       ['<math><mi>', '</mi></math>']
     ]) {
-      input = `${open}<textarea><p>a</p></textarea>${close}`;
+      input = `${open}<textarea><div><p>a</p></div></textarea>${close}`;
       assert.strictEqual(await minify(input, options), input, open);
     }
 
     // `annotation-xml` is one only where its `encoding` says it holds HTML
     for (const encoding of ['text/html', 'application/xhtml+xml', 'TEXT/HTML']) {
-      input = `<math><annotation-xml encoding="${encoding}"><title><p>a</p></title></annotation-xml></math>`;
+      input = `<math><annotation-xml encoding="${encoding}"><title><div><p>a</p></div></title></annotation-xml></math>`;
       assert.strictEqual(await minify(input, options), input, encoding);
     }
 
@@ -983,26 +995,26 @@ describe('SVG and MathML', () => {
       ['<svg><annotation-xml encoding="text/html">', '</annotation-xml></svg>']
     ]) {
       assert.strictEqual(
-        await minify(`${open}<textarea><p>a</p></textarea>${close}`, options),
-        `${open}<textarea><p>a</textarea>${close}`,
+        await minify(`${open}<textarea><div><p>a</p></div></textarea>${close}`, options),
+        `${open}<textarea><div><p>a</div></textarea>${close}`,
         open
       );
     }
 
     // Leaving an integration point enters the namespace around it again
-    input = '<svg><foreignObject><math><title><textarea><p>a</p></textarea></title></math></foreignObject></svg>';
-    assert.strictEqual(await minify(input, options), '<svg><foreignObject><math><title><textarea><p>a</textarea></title></math></foreignObject></svg>');
-    input = '<svg><foreignObject><svg><title><p>a</p></title></svg></foreignObject></svg>';
-    assert.strictEqual(await minify(input, options), '<svg><foreignObject><svg><title><p>a</title></svg></foreignObject></svg>');
+    input = '<svg><foreignObject><math><title><textarea><div><p>a</p></div></textarea></title></math></foreignObject></svg>';
+    assert.strictEqual(await minify(input, options), '<svg><foreignObject><math><title><textarea><div><p>a</div></textarea></title></math></foreignObject></svg>');
+    input = '<svg><foreignObject><svg><title><div><p>a</p></div></title></svg></foreignObject></svg>';
+    assert.strictEqual(await minify(input, options), '<svg><foreignObject><svg><title><div><p>a</div></title></svg></foreignObject></svg>');
 
     // With any other encoding, and with none, its content stays MathML, where `title` holds markup
     assert.strictEqual(
-      await minify('<math><annotation-xml><title><p>a</p></title></annotation-xml></math>', options),
-      '<math><annotation-xml><title><p>a</title></annotation-xml></math>'
+      await minify('<math><annotation-xml><title><div><p>a</p></div></title></annotation-xml></math>', options),
+      '<math><annotation-xml><title><div><p>a</div></title></annotation-xml></math>'
     );
     assert.strictEqual(
-      await minify('<math><annotation-xml encoding="text/plain"><title><p>a</p></title></annotation-xml></math>', options),
-      '<math><annotation-xml encoding="text/plain"><title><p>a</title></annotation-xml></math>'
+      await minify('<math><annotation-xml encoding="text/plain"><title><div><p>a</p></div></title></annotation-xml></math>', options),
+      '<math><annotation-xml encoding="text/plain"><title><div><p>a</div></title></annotation-xml></math>'
     );
   });
 
@@ -1013,16 +1025,16 @@ describe('SVG and MathML', () => {
 
     for (const tag of ['iframe', 'xmp']) {
       // Foreign content here, so an optional end tag inside them is one
-      assert.strictEqual(await minify(`<svg><${tag}><p>a</p></${tag}></svg>`, options), `<svg><${tag}><p>a</${tag}></svg>`, tag);
-      assert.strictEqual(await minify(`<math><${tag}><p>a</p></${tag}></math>`, options), `<math><${tag}><p>a</${tag}></math>`, tag);
+      assert.strictEqual(await minify(`<svg><${tag}><div><p>a</p></div></${tag}></svg>`, options), `<svg><${tag}><div><p>a</div></${tag}></svg>`, tag);
+      assert.strictEqual(await minify(`<math><${tag}><div><p>a</p></div></${tag}></math>`, options), `<math><${tag}><div><p>a</div></${tag}></math>`, tag);
 
       // What an integration point holds is HTML again, so the same element holds text there
-      input = `<svg><foreignObject><${tag}><p>a</p></${tag}></foreignObject></svg>`;
+      input = `<svg><foreignObject><${tag}><div><p>a</p></div></${tag}></foreignObject></svg>`;
       assert.strictEqual(await minify(input, options), input, tag);
     }
 
     // `script` and `style` are the exception: They hold text wherever they sit
-    for (const held of ['<svg><script><p>a</p></script></svg>', '<svg><style><p>a</p></style></svg>', '<math><script><p>a</p></script></math>']) {
+    for (const held of ['<svg><script><div><p>a</p></div></script></svg>', '<svg><style><div><p>a</p></div></style></svg>', '<math><script><div><p>a</p></div></script></math>']) {
       assert.strictEqual(await minify(held, options), held, held);
     }
   });

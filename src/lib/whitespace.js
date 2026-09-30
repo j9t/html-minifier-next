@@ -11,7 +11,10 @@ import {
   inlineElementsToKeepWhitespace,
   inlineElementsToKeepWhitespaceAround,
   inlineElementsToKeepWhitespaceWithin,
-  inlineElementsToKeepWhitespaceWithinEither,
+  inlineElementsToKeepWhitespaceBetween,
+  inlineElementsToKeepWhitespaceBetweenEnd,
+  inlineElementsTransparent,
+  inlineElementsTransparentAfter,
   formControlElementsEither,
   toEndTags
 } from './constants.js';
@@ -315,14 +318,18 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
     return str;
   }
 
-  const inlineOption = Boolean(options.collapseInlineTagWhitespace);
-
   let trimLeft = Boolean(prevTag) && !inlineElementsToKeepWhitespace.has(prevTag);
   let trimRight = Boolean(nextTag) && !inlineElementsToKeepWhitespace.has(nextTag);
 
-  // Every branch below that consults the text’s content needs a side left untrimmed,
-  // so the scan for a non-whitespace character is only worth making then
-  const isPureWhitespace = (!trimLeft || !trimRight) && !RE_NON_WS.test(str);
+  const prevTransparent = inlineElementsTransparentAfter.has(prevTag);
+  const nextTransparent = inlineElementsTransparent.has(nextTag);
+
+  // Every branch below that consults the text’s content needs a side left untrimmed, an element that
+  // doesn’t render, or `collapseInlineTagWhitespace`, so the scan for a non-whitespace character is only worth making then
+  const isPureWhitespace = (!trimLeft || !trimRight || prevTransparent || nextTransparent || Boolean(options.collapseInlineTagWhitespace)) && !RE_NON_WS.test(str);
+
+  // Next to text, spacing is part of the text, so aggressive collapsing only applies between tags
+  const inlineOption = Boolean(options.collapseInlineTagWhitespace) && isPureWhitespace;
 
   if (isPureWhitespace) {
     // Smart default behavior: Collapse space around non-rendering elements
@@ -341,25 +348,22 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
     }
   }
 
+  // Aggressive mode keeps whitespace around standard text-level elements only, not around all inline elements
   if (trimLeft) {
-    if (inlineOption) {
-      // Still preserve whitespace around inline text elements
-      if (inlineElementsToKeepWhitespaceWithinEither.has(prevTag)) {
-        trimLeft = false;
-      }
-    } else {
-      trimLeft = prevTag.charCodeAt(0) === 47 /* / */ ? !inlineSets.aroundEnd.has(prevTag) : !inlineSets.within.has(prevTag);
-    }
+    trimLeft = prevTag.charCodeAt(0) === 47 /* / */ ? !(inlineOption ? inlineElementsToKeepWhitespaceBetweenEnd : inlineSets.aroundEnd).has(prevTag) : !inlineSets.within.has(prevTag);
   }
 
   if (trimRight) {
-    if (inlineOption) {
-      if (inlineElementsToKeepWhitespaceWithinEither.has(nextTag)) {
-        trimRight = false;
-      }
-    } else {
-      trimRight = nextTag.charCodeAt(0) === 47 /* / */ ? !inlineSets.withinEnd.has(nextTag) : !inlineSets.around.has(nextTag);
-    }
+    trimRight = nextTag.charCodeAt(0) === 47 /* / */ ? !inlineSets.withinEnd.has(nextTag) : !(inlineOption ? inlineElementsToKeepWhitespaceBetween : inlineSets.around).has(nextTag);
+  }
+
+  // Next to an element that doesn’t render, whitespace may separate what lies beyond it, so the
+  // element leaves the decision to the text or to a tag on the other side that renders
+  if (prevTransparent && (!isPureWhitespace || (Boolean(nextTag) && !nextTransparent))) {
+    trimLeft = false;
+  }
+  if (nextTransparent && (!isPureWhitespace || (Boolean(prevTag) && !prevTransparent))) {
+    trimRight = false;
   }
 
   const collapseAll = Boolean(prevTag && nextTag);
