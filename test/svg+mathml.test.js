@@ -195,16 +195,41 @@ describe('SVG and MathML', () => {
       '<svg><foreignObject><input type="checkbox" checked></foreignObject></svg>'
     );
 
-    // The same goes for empty values
+    // The same goes for empty values, which SVGO keeps (`alt=""` marks an image as decorative),
+    // and which are collapsed once SVGO is done
+    assert.strictEqual(
+      await minify('<svg><rect width="10" height="10"/><foreignObject><img src="a.png" alt=""></foreignObject></svg>',
+        { minifySVG: true }),
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><img alt="" src="a.png"/></foreignObject></svg>'
+    );
     assert.strictEqual(
       await minify('<svg><rect width="10" height="10"/><foreignObject><img src="a.png" alt=""></foreignObject></svg>',
         { minifySVG: true, collapseEmptyAttributes: true }),
-      '<svg><path d="M0 0h10v10H0z"/><foreignObject><img src="a.png"/></foreignObject></svg>'
+      '<svg><path d="M0 0h10v10H0z"/><foreignObject><img alt src="a.png"/></foreignObject></svg>'
+    );
+    // SVGO escapes the quotes in text, so text that looks like an empty attribute stays
+    assert.strictEqual(
+      await minify('<svg><text x="1"> a=""</text></svg>', { minifySVG: true, collapseEmptyAttributes: true }),
+      '<svg><text x="1"> a=&quot;&quot;</text></svg>'
     );
     assert.strictEqual(
       await minify('<svg><foreignObject><img src="a.png" alt=""></foreignObject></svg>',
         { collapseEmptyAttributes: true }),
       '<svg><foreignObject><img src="a.png" alt></foreignObject></svg>'
+    );
+
+    // A valueless attribute from the source (as in Vue’s scoped-style markers) gets an empty value
+    assert.strictEqual(
+      await minify('<svg data-v-14fe2051 viewBox="0 0 10 10"><rect data-v-14fe2051 width="10" height="10"/></svg>', { minifySVG: true }),
+      '<svg data-v-14fe2051="" viewBox="0 0 10 10"><path d="M0 0h10v10H0z" data-v-14fe2051=""/></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg data-v-14fe2051 viewBox="0 0 10 10"><rect data-v-14fe2051 width="10" height="10"/></svg>', { minifySVG: true, collapseEmptyAttributes: true }),
+      '<svg data-v-14fe2051 viewBox="0 0 10 10"><path d="M0 0h10v10H0z" data-v-14fe2051/></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg data-v-14fe2051><rect width="10" height="10"/></svg>'),
+      '<svg data-v-14fe2051><rect width="10" height="10"/></svg>'
     );
 
     // MathML never reaches SVGO, so nothing is held back there

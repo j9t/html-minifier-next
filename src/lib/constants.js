@@ -56,8 +56,12 @@ const inlineElementsToKeepWhitespaceBetween = new Set([...inlineElementsToKeepWh
 const inlineElementsTransparent = new Set(['area', 'datalist', 'link', 'meta', 'noscript', 'script', 'style', 'template']);
 const inlineElementsTransparentVoid = new Set(['area', 'link', 'meta']);
 
+// What the parser reports as the tag next to text that borders a processing instruction—
+// no tag name can be `?`, and content may be inserted there, so whitespace around it stays
+const processingInstructionTag = '?';
+
 // Elements that will always maintain whitespace around them
-const inlineElementsToKeepWhitespace = new Set(['comment', 'embed', 'img', 'input', 'wbr']);
+const inlineElementsToKeepWhitespace = new Set(['comment', 'embed', 'img', 'input', 'wbr', processingInstructionTag]);
 
 // Formatting elements, which browsers reopen after a block that closed them, so their end tags
 // count even when stray, https://html.spec.whatwg.org/multipage/parsing.html#formatting
@@ -253,9 +257,10 @@ const rawTextElements = new Set([...specialContentElements, ...genericRawTextEle
 // configuration error, and so not one that `continueOnMinifyError` waves through
 const MISSING_DEPENDENCY = 'HMN_MISSING_DEPENDENCY';
 
-// SVGO’s `preset-default` treats an SVG as a file of its own, but an inline SVG’s IDs, `style`
-// rules, and hidden sprites reach into the rest of the document, so the plugins that assume
-// otherwise stay off, and `minifyStyles` keeps the rules the SVG itself does not use
+// SVGO’s `preset-default` treats an SVG as a file of its own, but an inline SVG’s
+// IDs, `style` rules, hidden sprites, and empty attributes (`[data-v-…]` hooks, `alt=""`)
+// reach into the rest of the document, so the plugins that assume otherwise stay off,
+// and `minifyStyles` keeps the rules the SVG itself does not use
 const svgoPluginsInline = [{
   name: 'preset-default',
   params: {
@@ -263,6 +268,7 @@ const svgoPluginsInline = [{
       cleanupIds: false,
       inlineStyles: false,
       minifyStyles: { usage: false },
+      removeEmptyAttrs: false,
       removeHiddenElems: false,
       removeUnknownsAndDefaults: { keepRoleAttr: true }
     }
@@ -333,6 +339,7 @@ export {
   inlineElementsTransparent,
   inlineElementsTransparentAfter,
   inlineElementsToKeepWhitespace,
+  processingInstructionTag,
   formControlElementsEither,
   toEndTags,
 

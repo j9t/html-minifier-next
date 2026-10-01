@@ -22,7 +22,7 @@ import {
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
-import { collectUsedSymbols } from './unused-css.js';
+import { collectUsage } from './unused-css.js';
 import { identity, isThenable } from './utils.js';
 
 /** @import { ProcessedOptions } from './options.js' */
@@ -242,18 +242,26 @@ function isBooleanAttribute(attrName, attrValue) {
 const uriTypeAttributes = new Map([
   ['a', new Set(['href'])],
   ['area', new Set(['href'])],
-  ['link', new Set(['href'])],
+  ['audio', new Set(['src'])],
   ['base', new Set(['href'])],
-  ['img', new Set(['src', 'longdesc', 'usemap'])],
+  ['blockquote', new Set(['cite'])],
+  ['button', new Set(['formaction'])],
+  ['del', new Set(['cite'])],
+  ['embed', new Set(['src'])],
+  ['form', new Set(['action'])],
+  ['frame', new Set(['longdesc', 'src'])],
+  ['head', new Set(['profile'])],
+  ['iframe', new Set(['src'])],
+  ['img', new Set(['longdesc', 'src', 'usemap'])],
+  ['input', new Set(['formaction', 'src', 'usemap'])],
+  ['ins', new Set(['cite'])],
+  ['link', new Set(['href'])],
   ['object', new Set(['classid', 'codebase', 'data', 'usemap'])],
   ['q', new Set(['cite'])],
-  ['blockquote', new Set(['cite'])],
-  ['ins', new Set(['cite'])],
-  ['del', new Set(['cite'])],
-  ['form', new Set(['action'])],
-  ['input', new Set(['src', 'usemap'])],
-  ['head', new Set(['profile'])],
-  ['script', new Set(['src', 'for'])]
+  ['script', new Set(['src'])],
+  ['source', new Set(['src'])],
+  ['track', new Set(['src'])],
+  ['video', new Set(['poster', 'src'])]
 ]);
 
 /**
@@ -268,15 +276,15 @@ function isUriTypeAttribute(attrName, tag) {
 const numberTypeAttributes = new Map([
   ['a', new Set(['tabindex'])],
   ['area', new Set(['tabindex'])],
-  ['object', new Set(['tabindex'])],
   ['button', new Set(['tabindex'])],
-  ['input', new Set(['maxlength', 'tabindex'])],
-  ['select', new Set(['size', 'tabindex'])],
-  ['textarea', new Set(['rows', 'cols', 'tabindex'])],
-  ['colgroup', new Set(['span'])],
   ['col', new Set(['span'])],
-  ['th', new Set(['rowspan', 'colspan'])],
-  ['td', new Set(['rowspan', 'colspan'])]
+  ['colgroup', new Set(['span'])],
+  ['input', new Set(['maxlength', 'tabindex'])],
+  ['object', new Set(['tabindex'])],
+  ['select', new Set(['size', 'tabindex'])],
+  ['td', new Set(['colspan', 'rowspan'])],
+  ['textarea', new Set(['cols', 'rows', 'tabindex'])],
+  ['th', new Set(['colspan', 'rowspan'])]
 ]);
 
 /**
@@ -391,6 +399,20 @@ const collapseAttributeWhitespaceExempt = new Set(['pattern', 'placeholder', 'ti
 // `value` whitespace matters only on form-submission and machine-readable elements
 const valueWhitespaceExemptElements = new Set(['button', 'data', 'input', 'option', 'param']);
 
+/**
+ * Drop repeated names from a space-separated class list, keeping the first of each.
+ * @param {string} value
+ * @returns {string}
+ */
+function dedupeClassNames(value) {
+  const names = value.split(' ');
+  if (names.length < 2) {
+    return value;
+  }
+  const unique = [...new Set(names)];
+  return unique.length === names.length ? value : unique.join(' ');
+}
+
 // Returns the cleaned attribute value directly (sync) or as a Promise (async);
 // callers must handle both cases—use `isThenable()` to distinguish
 /**
@@ -448,13 +470,16 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
 
   if (attrName === 'class') {
     attrValue = trimWhitespace(attrValue);
+    // Fragment placeholders arrive tab-wrapped (`ignoreCustomFragments`) or as comments
+    // (`htmlmin:ignore`), and names around them may not repeat once a template renders
+    const holdsFragment = attrValue.indexOf('\t') !== -1 || attrValue.indexOf('<!--') !== -1;
     if (options.sortClassNames) {
       // By the time attributes are processed, `createSortFns` has replaced any truthy non-function value
       attrValue = /** @type {(value: string) => string} */ (options.sortClassNames)(attrValue);
     } else {
       attrValue = collapseWhitespaceAll(attrValue);
     }
-    return attrValue;
+    return holdsFragment ? attrValue : dedupeClassNames(attrValue);
   }
 
   if (isUriTypeAttribute(attrName, tag)) {
@@ -650,7 +675,7 @@ async function minifySrcdoc(attrValue, options, minifyHTMLSelf) {
       ...options,
       cssContext: {
         warned: options.cssContext ? options.cssContext.warned : new Set(),
-        usedSymbols: collectUsedSymbols(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
+        ...collectUsage(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
       }
     };
   }
@@ -778,6 +803,12 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   let attrQuote = attr.quote;
   let attrFragment;
   let emittedAttrValue;
+  const readAsXML = Boolean(options.insideSVG) && Boolean(options.minifySVG);
+
+  // SVGO reads the whole SVG block as XML, where every attribute carries a value
+  if (readAsXML && typeof attrValue === 'undefined') {
+    attrValue = '';
+  }
 
   // Determine if need to add/keep quotes
   const shouldAddQuotes = typeof attrValue !== 'undefined' && (
@@ -785,8 +816,8 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     (options.removeAttributeQuotes && ((uidAttr ? attrValue.indexOf(uidAttr) !== -1 : false) || !canRemoveAttributeQuotes(attrValue))) ||
     // If `removeAttributeQuotes` is not enabled, preserve original quote style or add quotes if value requires them
     (!options.removeAttributeQuotes && (attrQuote !== '' || !canRemoveAttributeQuotes(attrValue) ||
-      // SVGO reads the whole SVG block as XML, where every attribute value carries quotes
-      (Boolean(options.insideSVG) && Boolean(options.minifySVG)) ||
+      // XML quotes every attribute value
+      readAsXML ||
       // Special case: With `removeTagWhitespace`, unquoted values that aren’t last will have space added,
       // which can create ambiguous/invalid HTML—add quotes to be safe
       (options.removeTagWhitespace && attrQuote === '' && !isLast)))

@@ -21,7 +21,7 @@
     "eslint": "^10.11.0",
     "globals": "^17.13.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "vite": "^8.3.2"
   },
   "engines": {
     "node": ">=22.13"
@@ -95,5 +95,5 @@
   },
   "type": "module",
   "types": "dist/types/htmlminifier.d.ts",
-  "version": "8.9.0"
+  "version": "8.10.0"
 }

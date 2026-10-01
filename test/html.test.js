@@ -245,6 +245,33 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p>a</', { continueOnParseError: true, decodeEntities: true }), '<p>a&lt;/');
   });
 
+  test('Parse error recovery: `<?` without a processing instruction', async () => {
+    const options = { continueOnParseError: true, ignoreCustomFragments: [] };
+
+    // Without the flag, must throw
+    for (const input of ['<p>a<? x>b</p>', '<?xml version="1.0">', '<p>a<?marker']) {
+      await assert.rejects(() => minify(input, { ignoreCustomFragments: [] }), { name: 'Error' }, input);
+    }
+
+    // `xml`, `xml-stylesheet`, and invalid targets open a bogus comment, which ends at the next `>`
+    // (or the end of the input) and is kept as written
+    for (const input of ['<p>a<? x>b</p>', '<p>a<?1>b</p>', '<p>a<?>b</p>', '<p>a<?a.b c>b</p>', '<?xml version="1.0"?><p>a</p>', '<?XML-STYLESHEET href="a.xsl"><p>a</p>', '<p>a<? x']) {
+      assert.strictEqual(await minify(input, options), input);
+    }
+    assert.strictEqual(await minify('<p>a <? x> b</p>', { ...options, collapseWhitespace: true }), '<p>a<? x> b</p>');
+    assert.strictEqual(await minify('<p>a<? x>b</p>', { ...options, removeComments: true }), '<p>ab</p>');
+    assert.strictEqual(await minify('<?xml version="1.0"?><p>a</p>', { ...options, removeComments: true }), '<p>a</p>');
+    assert.strictEqual(await minify('<p>a<? x', { ...options, removeComments: true }), '<p>a');
+
+    // A processing instruction without a `>` is dropped, as in browsers
+    assert.strictEqual(await minify('<p>a<?marker name="x"', options), '<p>a');
+    assert.strictEqual(await minify('<p>a<?', options), '<p>a');
+
+    // Neither keeps a following doctype from setting the mode
+    const tableAfterP = '<!doctype html><p>a</p><table><tr><td>b</table>';
+    assert.strictEqual(await minify('<? x>' + tableAfterP, { ...options, removeOptionalTags: true, removeComments: true }), '<!doctype html><p>a<table><tr><td>b</table>');
+  });
+
   test('Parse error recovery: reported through `log`', async () => {
     const parseErrors = async (input, options = {}) => {
       const messages = [];
@@ -263,6 +290,11 @@ describe('HTML', () => {
     ]);
     assert.deepStrictEqual(await parseErrors('<a href=?b=c>d</a>', { customAttrSurround: [[/\{\{#if\s+\w+\}\}/, /\{\{\/if\}\}/]] }), [
       'Warning: Parse error at line 1, column 11: Kept `=` in unquoted attribute value'
+    ]);
+    assert.deepStrictEqual(await parseErrors('<p>a<? x>\n<?xml version="1.0"?>\n<?marker', { ignoreCustomFragments: [] }), [
+      'Warning: Parse error at line 1, column 5: Read `<?` without a processing instruction target as comment',
+      'Warning: Parse error at line 2, column 1: Read `<?` without a processing instruction target as comment',
+      'Warning: Parse error at line 3, column 1: Dropped processing instruction without `>`'
     ]);
     assert.deepStrictEqual(await parseErrors('<p>a<\n</>\n<p>b</p>'), [
       'Warning: Parse error at line 1, column 5: Kept `<` as text',
@@ -766,6 +798,61 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeComments: true }), '<link href="non-ie.css" rel="stylesheet">');
   });
 
+  // https://html.spec.whatwg.org/multipage/syntax.html#processing-instructions
+  test('Keeps processing instructions', async () => {
+    const feed = '<div><?start name="feed"><p>a</p><?end></div><p>b<?marker name="x">c</p>';
+
+    // Parsed without a parse error, and kept as written
+    for (const input of [
+      feed,
+      '<p><?_x><?a-b_1 data><?MARKER Name="X"><?marker a?b><?marker?></p>',
+      '<table><?marker name="row"><tr><td>a</td></tr></table>',
+      '<svg><?marker name="x"><circle r="1"/></svg>'
+    ]) {
+      assert.strictEqual(await minify(input), input);
+      assert.strictEqual(await minify(input, { ignoreCustomFragments: [] }), input);
+    }
+    const messages = [];
+    await minify(feed, { continueOnParseError: true, log: (message) => messages.push(message) });
+    assert.deepStrictEqual(messages.filter((message) => String(message).startsWith('Warning: Parse error')), []);
+
+    // They are not comments, so `removeComments` keeps them
+    assert.strictEqual(await minify('<!-- c -->' + feed + '<!-- c -->', { removeComments: true }), feed);
+
+    // Content may be inserted at them, so whitespace next to them collapses, but stays next to text
+    const options = { collapseWhitespace: true };
+    assert.strictEqual(await minify('<div>\n  <?start name="feed">\n  <p>a</p>\n  <?end>\n</div>', options), '<div><?start name="feed"><p>a</p><?end></div>');
+    assert.strictEqual(await minify('<p>a  <?marker name="x">\n b</p>', options), '<p>a <?marker name="x"> b</p>');
+    assert.strictEqual(await minify('<p>a <?marker name="x"> b</p>', { ...options, removeComments: true }), '<p>a <?marker name="x"> b</p>');
+    assert.strictEqual(await minify('<p>a <?marker name="x"></p>', options), '<p>a <?marker name="x"></p>');
+    assert.strictEqual(await minify('<p>a<?marker name="x">b</p>', options), '<p>a<?marker name="x">b</p>');
+    assert.strictEqual(await minify('<div>\n<?start name="feed">\n<p>a</p>\n</div>', { ...options, conservativeCollapse: true }), '<div> <?start name="feed"> <p>a</p> </div>');
+
+    // An element holding one is not empty
+    for (const input of ['<p><?marker name="x"></p>', '<div><?start name="feed"><?end></div>']) {
+      assert.strictEqual(await minify(input, { removeEmptyElements: true }), input);
+    }
+
+    // Like a comment, one keeps the tags next to it
+    assert.strictEqual(await minify('<html><?marker name="x"><body><div><p>a</p><?end></div></body></html>', { removeOptionalTags: true }), '<html><?marker name="x"><div><p>a</p><?end></div>');
+
+    // Custom fragments take precedence
+    const php = '<p><?php if ($a) { ?><?marker name="x"><?php } ?></p>';
+    assert.strictEqual(await minify(php, { collapseWhitespace: true }), php);
+
+    // …but the default one for template code doesn’t reach from one to the next `?>`
+    for (const input of ['<?start name="a"><div>x <?php echo 1 ?></div><?end>', '<?start name="a"><div>x <?= $a ?></div><?end>', '<?start name="a"><div>x <? echo 1 ?></div><?end>']) {
+      assert.strictEqual(await minify(input), input);
+    }
+    assert.strictEqual(await minify('<div>\n<?start name="a">\n<p>x</p>\n<?php echo 1 ?>\n</div>', { collapseWhitespace: true }), '<div><?start name="a"><p>x</p> <?php echo 1 ?> </div>');
+    assert.strictEqual(await minify('<p><?marker name="x"></p>', { ignoreCustomFragments: [/<\?marker[^>]*>/] }), '<p><?marker name="x"></p>');
+
+    // `xml` and `xml-stylesheet` are no processing instruction targets, nor is a target that isn’t a name
+    for (const input of ['<?xml version="1.0">', '<?XML-Stylesheet href="a.xsl">', '<? x>', '<?1>', '<?a.b>', '<?marker']) {
+      await assert.rejects(() => minify(input, { ignoreCustomFragments: [] }), { name: 'Error' }, input);
+    }
+  });
+
 
   test('Removes comments from scripts', async () => {
     let input, output;
@@ -1170,6 +1257,19 @@ describe('HTML', () => {
     input = '<p class="\n  \n foo   \n\n\t  \t\n  class1 class-23 ">foo bar baz</p>';
     output = '<p class="foo class1 class-23">foo bar baz</p>';
     assert.strictEqual(await minify(input), output);
+
+    // A class list is a set, so repeated names go, keeping the first of each
+    input = '<p class="a b a  c b">x</p>';
+    assert.strictEqual(await minify(input), '<p class="a b c">x</p>');
+    assert.strictEqual(await minify(input, { removeAttributeQuotes: true, sortClassNames: true }), '<p class="a b c">x</p>');
+    assert.strictEqual(await minify('<p class="e-user-code e-user-code">x</p>', { removeAttributeQuotes: true }), '<p class=e-user-code>x</p>');
+    assert.strictEqual(await minify('<p class="A a">x</p>'), '<p class="A a">x</p>');
+
+    // Names around template fragments may not be repeats once the template renders
+    input = '<p class="{% if x %} a {% endif %} a">x</p>';
+    assert.strictEqual(await minify(input, { ignoreCustomFragments: [/{%[\s\S]*?%}/] }), input);
+    input = '<p class="a <!-- htmlmin:ignore -->b<!-- htmlmin:ignore --> a">x</p>';
+    assert.strictEqual(await minify(input), '<p class="a b a">x</p>');
 
     input = '<p style="    color: red; background-color: rgb(100, 75, 200);  "></p>';
     output = '<p style="color: red; background-color: rgb(100, 75, 200);"></p>';
@@ -2002,7 +2102,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div>x<table><tbody><tr><td></td></tr></tbody></table></div>', options), '<div>x</div>');
   });
 
-  test('Keeps empty elements with accessibility semantics or focus, custom elements, and `canvas`', async () => {
+  test('Keeps empty elements with accessibility semantics, focus, or a control association, custom elements, and `canvas`', async () => {
     const options = { removeEmptyElements: true };
 
     for (const input of [
@@ -2010,7 +2110,12 @@ describe('HTML', () => {
       '<div aria-live="polite"></div>',
       '<span aria-describedby="hint"></span>',
       '<span class="icon" aria-hidden="true"></span>',
-      '<div tabindex="0"></div>'
+      '<div tabindex="0"></div>',
+      // A label activates its control (a CSS-styled menu toggle), and `output` is there for scripts to fill
+      '<input id="nav-toggle" type="checkbox"><label class="nav-toggle-label" for="nav-toggle"></label>',
+      '<output for="a b" name="sum"></output>',
+      // A `template` with `for` replaces the content it targets, so an empty one clears it
+      '<template for="feed"></template>'
     ]) {
       assert.strictEqual(await minify(input, options), input);
     }
@@ -2027,6 +2132,9 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p>a<a name="top"></a></p>', options), '<p>a</p>');
     assert.strictEqual(await minify('<p>a<span class="icon" title="Icon"></span></p>', options), '<p>a</p>');
     assert.strictEqual(await minify('<p>a<span aria-hidden="" role=" "></span></p>', options), '<p>a</p>');
+    assert.strictEqual(await minify('<p>a<label for=""></label></p>', options), '<p>a</p>');
+    assert.strictEqual(await minify('<p>a<span for="x"></span><script for="window" event="onload"></script></p>', options), '<p>a</p>');
+    assert.strictEqual(await minify('<p>a<LABEL FOR="x"></LABEL></p>', options), '<p>a<label for="x"></label></p>');
     assert.strictEqual(await minify('<div role=""><span></span></div>', options), '');
   });
 
@@ -2864,6 +2972,12 @@ describe('HTML', () => {
   // https://github.com/kangax/html-minifier/issues/10
   test('Ignores custom fragments', async () => {
     let input, output;
+
+    // By default, PHP (including short tags), ASP, ERB, and JSP code, and XML declarations
+    for (const template of ['<p><?php if ($a > 1) { ?>a<?php } ?></p>', '<p><?PHP if ($a > 1) { ?>a<?php } ?></p>', '<p><?= $a > 1 ?></p>', '<p><? if ($a > 1) { ?>a<? } ?></p>', '<p><?\nif ($a > 1) { ?>a<? } ?></p>', '<?xml version="1.0" encoding="UTF-8"?><p>a</p>', '<?xml-stylesheet href="a.xsl" type="text/xsl"?><p>a</p>', '<p><% if (a > 1) { %>a<% } %></p>']) {
+      assert.strictEqual(await minify(template, { collapseWhitespace: true }), template);
+    }
+
     const reFragments = [/<\?[^?]+\?>/, /<%[^%]+%>/, /\{\{[^}]*\}\}/];
 
     input = 'This is the start. <% … %>\r\n<%= … %>\r\n<? … ?>\r\n<!-- This is the middle, and a comment. -->\r\nNo comment, but middle.\r\n{{ … }}\r\n<?php … ?>\r\n<?xml … ?>\r\nHello, this is the end!';
@@ -2993,8 +3107,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), input);
 
     // Optional end tags before custom fragments should still be removed
-    input = '<head><title>T</title></head><?foo?><body><p>hi</p>';
-    output = '<title>T</title><?foo?><p>hi';
+    input = '<head><title>T</title></head><?=foo?><body><p>hi</p>';
+    output = '<title>T</title><?=foo?><p>hi';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
 
     input = '<head><title>T</title></head>{{expr}}<body><p>hi</p>';
@@ -3780,7 +3894,7 @@ describe('HTML', () => {
     let input, output;
 
     // Lightning CSS with `errorRecovery` removes invalid CSS fragments and returns empty or partial CSS
-    input = '<style><?foo?></style>';
+    input = '<style><?=foo?></style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // Template syntax preserved
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
@@ -3789,7 +3903,7 @@ describe('HTML', () => {
       { message: /Unexpected end of input/ }
     );
 
-    input = '<style>\t<?foo?>\t</style>';
+    input = '<style>\t<?=foo?>\t</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // Template syntax preserved
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
@@ -3798,19 +3912,19 @@ describe('HTML', () => {
       { message: /Unexpected end of input/ }
     );
 
-    input = '<style><?foo?>{color:red}</style>';
+    input = '<style><?=foo?>{color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
-    input = '<style>\t<?foo?>\t{color:red}</style>';
+    input = '<style>\t<?=foo?>\t{color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
-    input = '<style>body{<?foo?>}</style>';
+    input = '<style>body{<?=foo?>}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
@@ -3821,7 +3935,7 @@ describe('HTML', () => {
       { message: /Unexpected end of input/ }
     );
 
-    input = '<style>body{\t<?foo?>\t}</style>';
+    input = '<style>body{\t<?=foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
@@ -3832,25 +3946,25 @@ describe('HTML', () => {
       { message: /Unexpected end of input/ }
     );
 
-    input = '<style><?foo?>body{color:red}</style>';
+    input = '<style><?=foo?>body{color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
-    input = '<style>\t<?foo?>\tbody{color:red}</style>';
+    input = '<style>\t<?=foo?>\tbody{color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
-    input = '<style>body{<?foo?>color:red}</style>';
+    input = '<style>body{<?=foo?>color:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
-    input = '<style>body{\t<?foo?>\tcolor:red}</style>';
+    input = '<style>body{\t<?=foo?>\tcolor:red}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
@@ -3861,19 +3975,19 @@ describe('HTML', () => {
       { message: /Unexpected token/ }
     );
 
-    input = '<style>body{color:red<?foo?>}</style>';
+    input = '<style>body{color:red<?=foo?>}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
-    input = '<style>body{color:red\t<?foo?>\t}</style>';
+    input = '<style>body{color:red\t<?=foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
-    input = '<style>body{color:red;<?foo?>}</style>';
+    input = '<style>body{color:red;<?=foo?>}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
@@ -3884,7 +3998,7 @@ describe('HTML', () => {
       { message: /Unexpected end of input/ }
     );
 
-    input = '<style>body{color:red;\t<?foo?>\t}</style>';
+    input = '<style>body{color:red;\t<?=foo?>\t}</style>';
     assert.strictEqual(await minify(input), input);
     assert.strictEqual(await minify(input, { minifyCSS: true }), input); // ReDoS protection skips minification
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false }));
@@ -3895,7 +4009,7 @@ describe('HTML', () => {
       { message: /Unexpected end of input/ }
     );
 
-    input = '<style>body{color:red}<?foo?></style>';
+    input = '<style>body{color:red}<?=foo?></style>';
     assert.strictEqual(await minify(input), input);
     output = '<style>body{color:red}</style>'; // Lightning CSS keeps valid CSS, removes custom fragment
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
@@ -3905,7 +4019,7 @@ describe('HTML', () => {
       { message: /Unexpected end of input/ }
     );
 
-    input = '<style>body{color:red}\t<?foo?>\t</style>';
+    input = '<style>body{color:red}\t<?=foo?>\t</style>';
     assert.strictEqual(await minify(input), input);
     output = '<style>body{color:red}</style>'; // Lightning CSS keeps valid CSS, removes custom fragment
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
@@ -3962,6 +4076,21 @@ describe('HTML', () => {
     input = '<img src="http://cdn.example.com/foo.png">';
     output = '<img src="//cdn.example.com/foo.png">';
     assert.strictEqual(await minify(input, { minifyURLs: { site: 'http://example.com/' } }), output);
+
+    // Embedded content, media, and form submission URLs
+    input = '<iframe src="https://example.com/a/frame.html"></iframe><embed src="https://example.com/a/e.swf">' +
+      '<video src="https://example.com/a/v.mp4" poster="https://example.com/a/p.jpg"><source src="https://example.com/a/v.webm"><track src="https://example.com/a/v.vtt"></video>' +
+      '<audio src="https://example.com/a/s.mp3"></audio>' +
+      '<form><button formaction="https://example.com/a/send">Send</button><input type="submit" formaction="https://example.com/a/send"></form>';
+    output = '<iframe src="frame.html"></iframe><embed src="e.swf">' +
+      '<video src="v.mp4" poster="p.jpg"><source src="v.webm"><track src="v.vtt"></video>' +
+      '<audio src="s.mp3"></audio>' +
+      '<form><button formaction="send">Send</button><input type="submit" formaction="send"></form>';
+    assert.strictEqual(await minify(input, { minifyURLs: 'https://example.com/a/' }), output);
+
+    // A legacy `script for` names an element, not a URL
+    input = '<script for="window" event="onload">init()</script>';
+    assert.strictEqual(await minify(input, { minifyURLs: () => 'URL' }), input);
 
     // Directory index removal for index.htm
     input = '<a href="https://example.com/folder/index.htm">link</a>';
@@ -5264,7 +5393,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input.join(''), options), input.join('\n'));
 
     input = [
-      '<div><div><?foo?><div',
+      '<div><div><?=foo?><div',
       '><div><div><?bar?><div',
       '><div><div',
       '>i\'m 9 levels deep</div',
@@ -6080,6 +6209,16 @@ describe('HTML', () => {
     // Test without `inlineCustomElements`—spacing should collapse for custom elements
     output = '<custom-element>A</custom-element><custom-element>B</custom-element>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // Custom elements count as blocks, so whitespace next to text goes, too, unless they’re listed
+    input = '<p>The value is <custom-element>true</custom-element> if it holds.</p>';
+    output = '<p>The value is<custom-element>true</custom-element>if it holds.</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, inlineCustomElements: ['custom-element'] }), input);
+
+    // A no-break space isn’t collapsible whitespace, so it stays either way
+    input = '<p>Let x be ? <custom-element>Call</custom-element>(F).</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
 
     // Test multiple custom elements
     input = '<tag-a>X</tag-a> <tag-b>Y</tag-b>';

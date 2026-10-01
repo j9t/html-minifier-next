@@ -1247,7 +1247,7 @@ describe('CSS and JS', () => {
         ['#ic{fill:red}', '<svg><use xlink:href="#ic"/></svg>', '#ic'],
         ['#m{color:red}', '<img usemap="#m">', '#m'],
         // Presentation attributes reach a paint server the same way `style` does
-        ['#grad stop{stop-color:red}', '<svg><rect fill="url(#grad)"/></svg>', '#grad'],
+        ['#grad>*{stop-color:red}', '<svg><rect fill="url(#grad)"/></svg>', '#grad'],
         ['#blur{flood-color:red}', '<p style="filter:url(#blur)"></p>', '#blur']
       ];
 
@@ -1323,6 +1323,91 @@ describe('CSS and JS', () => {
           `${JSON.stringify(config)} should be reported (got ${JSON.stringify(logs)})`
         );
       }
+    });
+
+    test('Recognizes classes and IDs that follow an element name', async () => {
+      const input = style('p.unused{color:red}ul#gone li{color:red}body.used p.used{color:blue}') + '<p class="used"></p>';
+      assert.strictEqual(
+        styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: true })),
+        'body.used p.used{color:#00f}'
+      );
+    });
+
+    test('Removes unused selectors from a list and keeps the rule for the rest', async () => {
+      const options = { minifyCSS: true, removeUnusedCSS: true };
+
+      assert.strictEqual(
+        styleOf(await minify(style('.used,.unused,#gone .used{color:red}') + '<p class="used"></p>', options)),
+        '.used{color:red}'
+      );
+      assert.strictEqual(
+        styleOf(await minify(style('@media print{.used,.unused{margin:0}}.a{&.unused,&.used{color:red}}') + '<p class="a used"></p>', options)),
+        '@media print{.used{margin:0}}.a{&.used{color:red}}'
+      );
+      assert.strictEqual(
+        styleOf(await minify(style('.used,.js-late{color:red}') + '<p class="used"></p>', { minifyCSS: true, removeUnusedCSS: { safelist: [/^js-/] } })),
+        '.used,.js-late{color:red}'
+      );
+    });
+
+    test('Leaves names inside pseudo-class and pseudo-element arguments alone', async () => {
+      // `:not(.unused)` matches everything, and the others are not this document’s to judge
+      const sheet = '.used:not(.unused){color:red}:is(.unused,.used){color:red}.used:has(.unused){color:red}:host(.unused){color:red}::slotted(.unused){color:red}';
+      const output = styleOf(await minify(style(sheet) + '<p class="used"></p>', { minifyCSS: true, removeUnusedCSS: true }));
+
+      for (const selector of ['.used:not(.unused)', ':is(.unused,.used)', '.used:has(.unused)', ':host(.unused)', '::slotted(.unused)']) {
+        assert.ok(output.includes(selector), `${selector} should be kept (got ${output})`);
+      }
+    });
+
+    test('Removes selectors for elements the document does not contain', async () => {
+      const options = { minifyCSS: true, removeUnusedCSS: true };
+
+      assert.strictEqual(
+        styleOf(await minify(style('p,dialog{color:red}h6{color:red}') + '<p></p>', options)),
+        'p{color:red}'
+      );
+
+      // Elements the parser supplies count, whether or not the markup spells them out
+      const implied = 'html{font-size:62.5%}head{display:none}body{margin:0}table tbody tr td{padding:0}colgroup{width:1px}';
+      assert.strictEqual(
+        styleOf(await minify(`<style>${implied}</style><table><col><td>x</table>`, options)),
+        implied
+      );
+
+      // Element names are compared case-insensitively, and SVG’s mixed-case ones keep their rules
+      assert.strictEqual(
+        styleOf(await minify(style('P{color:red}linearGradient{color:red}') + '<p></p><svg><linearGradient/></svg>', options)),
+        'P,linearGradient{color:red}'
+      );
+    });
+
+    test('Keeps selectors for elements named in inline scripts unless `scripts` is disabled', async () => {
+      const input = style('dialog{color:red}') + '<p></p><script>document.body.append(document.createElement("dialog"))</script>';
+
+      assert.strictEqual(styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: true })), 'dialog{color:red}');
+      assert.strictEqual(styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: { scripts: false } })), '');
+    });
+
+    test('Does not count an element as evidence for a class of the same name, or vice versa', async () => {
+      const output = styleOf(await minify(style('.header{color:red}header{color:blue}') + '<header></header>', { minifyCSS: true, removeUnusedCSS: true }));
+      assert.strictEqual(output, 'header{color:#00f}');
+    });
+
+    test('Leaves selector lists in `@scope` style sheets alone', async () => {
+      // Dropping a scope limit would widen the scope, not narrow it
+      const sheet = '@scope (.used) to (.unused){p{color:red}}.used,.other{color:red}';
+      const output = styleOf(await minify(style(sheet) + '<div class="used"><p></p></div>', { minifyCSS: true, removeUnusedCSS: true }));
+
+      assert.ok(output.includes('to (.unused)'), `The scope limit should be kept (got ${output})`);
+    });
+
+    test('Does not leak one document’s elements into another through the CSS cache', async () => {
+      const sheet = 'p{color:red}dialog{color:red}';
+      const options = { minifyCSS: true, removeUnusedCSS: true };
+
+      assert.strictEqual(styleOf(await minify(style(sheet) + '<p></p>', options)), 'p{color:red}');
+      assert.strictEqual(styleOf(await minify(style(sheet) + '<p></p><dialog></dialog>', options)), 'p,dialog{color:red}');
     });
 
     test('Keeps what an `iframe srcdoc` document references', async () => {

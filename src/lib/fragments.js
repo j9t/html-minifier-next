@@ -25,8 +25,9 @@ const RE_LITERAL_FLAGS = /^[gds]*$/;
  *  Literal delimiters around a body, found by scanning; `excluded` holds the
  *  characters a negated-class body cannot cross, null when the body spans every
  *  character
- * @typedef {{search: RegExp, anchored: RegExp}} PatternFragment
- *  Everything else, found by running the pattern itself
+ * @typedef {{search: RegExp, anchored: RegExp, close: string | null}} PatternFragment
+ *  Everything else, found by running the pattern itself; `close` holds the literal
+ *  every match ends with, where one follows an unbounded any-character body
  */
 
 /**
@@ -92,6 +93,50 @@ function toDelimitedFragment(pattern) {
 }
 
 /**
+ * Whether a regex source has a `|` outside groups and classes, which lets a match skip the rest
+ * @param {string} source
+ * @returns {boolean}
+ */
+function hasTopLevelAlternation(source) {
+  let depth = 0;
+  let inClass = false;
+
+  for (let i = 0; i < source.length; i++) {
+    const char = source[i];
+    if (char === '\\') i++;
+    else if (inClass) inClass = char !== ']';
+    else if (char === '[') inClass = true;
+    else if (char === '(') depth++;
+    else if (char === ')') depth--;
+    else if (char === '|' && depth === 0) return true;
+  }
+
+  return false;
+}
+
+/**
+ * The literal all matches of a pattern end with, where an unbounded any-character body leads
+ * up to it: Without that literal ahead, each opener runs the body to the end of the input
+ * only to fail, which costs O(n²) on input that opens fragments it never closes
+ * @param {RegExp} pattern
+ * @returns {string | null}
+ */
+function toClosingLiteral(pattern) {
+  const match = RE_DELIMITED.exec(pattern.source);
+  if (!match) return null;
+
+  const [, rawOpen, dot, negated, simple, , , rawClose] = match;
+  if (!simple || negated !== undefined || (dot && !pattern.flags.includes('s'))) return null;
+  if (hasTopLevelAlternation(rawOpen ?? '')) return null;
+
+  const close = toLiteral(rawClose ?? '');
+  // `indexOf` can stand in for the pattern only where case folding leaves the literal alone
+  if (!close || (pattern.flags.includes('i') && close.toLowerCase() !== close.toUpperCase())) return null;
+
+  return close;
+}
+
+/**
  * Prepare a fragment pattern for matching, by scanning where the shape allows it
  * @param {RegExp} pattern
  * @returns {DelimitedFragment | PatternFragment}
@@ -102,7 +147,11 @@ function toFragment(pattern) {
 
   // `g` and `y` are ours to set, the rest belong to the pattern
   const flags = pattern.flags.replace(/[gy]/g, '');
-  return { search: new RegExp(pattern.source, flags + 'g'), anchored: new RegExp(pattern.source, flags + 'y') };
+  return {
+    search: new RegExp(pattern.source, flags + 'g'),
+    anchored: new RegExp(pattern.source, flags + 'y'),
+    close: toClosingLiteral(pattern)
+  };
 }
 
 /**
@@ -183,11 +232,21 @@ function replaceCustomFragments(value, fragments, replacer) {
   /**
    * Earliest match of one regex fragment at or after `from`
    * @param {PatternFragment} fragment
+   * @param {number} index - Which fragment, for the forward-only bookkeeping
    * @param {number} from
    * @param {boolean} anchored
    * @returns {{start: number, end: number} | null}
    */
-  const run = (fragment, from, anchored) => {
+  const run = (fragment, index, from, anchored) => {
+    if (fragment.close !== null) {
+      // `Infinity` marks a closing literal that is nowhere ahead, so the search is not repeated
+      if (/** @type {number} */ (closesAt[index]) < from) {
+        const close = value.indexOf(fragment.close, from);
+        closesAt[index] = close === -1 ? Infinity : close;
+      }
+      if (closesAt[index] === Infinity) return null;
+    }
+
     const pattern = anchored ? fragment.anchored : fragment.search;
     pattern.lastIndex = from;
 
@@ -217,13 +276,13 @@ function replaceCustomFragments(value, fragments, replacer) {
       /** @type {{start: number, end: number} | null} */
       let match;
       if (anchored) {
-        match = 'open' in fragment ? scan(fragment, i, from, true) : run(fragment, from, true);
+        match = 'open' in fragment ? scan(fragment, i, from, true) : run(fragment, i, from, true);
       } else {
         // Matches only ever move forward, so the last one found still stands
         const previous = found[i];
         match = previous && previous.start >= from
           ? previous
-          : ('open' in fragment ? scan(fragment, i, from, false) : run(fragment, from, false));
+          : ('open' in fragment ? scan(fragment, i, from, false) : run(fragment, i, from, false));
         found[i] = match;
         // Nothing ahead now means nothing ahead later, either
         if (!match) exhausted[i] = true;
