@@ -74,7 +74,7 @@ describe('Fragments', () => {
       [/<(WC@[\s\S]*?)>/, /<%[\s\S]*?%>/],
       // …among them ones that end in a closing literal, which is looked for first (without
       // flags, which the joined oracle would drop)
-      [/<\?(?:php|=|xml|\s)[\s\S]*?\?>/, /<%[\s\S]*?%>/],
+      [/<\?(?:php|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/, /<%[\s\S]*?%>/],
       [/a|<%[\s\S]*?%>/],
       [/(?:<%|\{\{)[\s\S]*?%>/]
     ];
@@ -134,7 +134,7 @@ describe('Fragments', () => {
     });
 
     test('A pattern run as a regex gives up where its closing literal is nowhere ahead', () => {
-      assert.strictEqual(toFragment(/<\?(?:php|=|xml|\s)[\s\S]*?\?>/i).close, '?>');
+      assert.strictEqual(toFragment(/<\?(?:php|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i).close, '?>');
       assert.strictEqual(toFragment(/a|<%[\s\S]*?%>/).close, null, 'A match of `a` ends anywhere');
       assert.strictEqual(toFragment(/(<%|\{\{)[\s\S]*?%>/).close, '%>');
       assert.strictEqual(toFragment(/<a%[\s\S]*?%a>/i).close, null, 'Case folding moves the literal');
@@ -143,7 +143,7 @@ describe('Fragments', () => {
       // Each opener would otherwise run to the end of the input, which costs O(n²)
       const input = '<?php '.repeat(50000);
       const start = Date.now();
-      assert.strictEqual(replaceCustomFragments(input, prepare([/<\?(?:php|=|xml|\s)[\s\S]*?\?>/i]), marker), input);
+      assert.strictEqual(replaceCustomFragments(input, prepare([/<\?(?:php|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i]), marker), input);
       assert.ok(Date.now() - start < 200, 'should fail in linear time');
     });
 

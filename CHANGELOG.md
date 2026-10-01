@@ -23,7 +23,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Changed the default `ignoreCustomFragments` pattern for `<? … ?>` to `/<\?(?:php|=|xml|\s)[\s\S]*?\?>/i`, which covers PHP (including short tags) and XML declarations but not processing instructions: The previous pattern reached from a processing instruction to the next `?>`, and could break markup in between (e.g., dropping `</div>` from `<?start name="a"><div><?php echo 1 ?></div>`)
+* Changed the default `ignoreCustomFragments` pattern for `<? … ?>` to `/<\?(?:php|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i`, which covers PHP (including short tags) and XML declarations but not processing instructions: The previous pattern reached from a processing instruction to the next `?>`, and could break markup in between (e.g., dropping `</div>` from `<?start name="a"><div><?php echo 1 ?></div>`)
 * Implemented removal of repeated class names from `class` attributes (e.g., `class="a b a"` becomes `class="a b"`)
 
 ## [8.9.0] - 2026-10-01

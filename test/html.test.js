@@ -844,6 +844,10 @@ describe('HTML', () => {
     for (const input of ['<?start name="a"><div>x <?php echo 1 ?></div><?end>', '<?start name="a"><div>x <?= $a ?></div><?end>', '<?start name="a"><div>x <? echo 1 ?></div><?end>']) {
       assert.strictEqual(await minify(input), input);
     }
+    // …nor from one whose target merely starts like `xml`
+    for (const target of ['xmlfoo', 'xml-model', 'XML_a']) {
+      assert.strictEqual(await minify(`<?${target} a><div>\n<p>x</p>\n<?php echo 1 ?>\n</div>`, { collapseWhitespace: true }), `<?${target} a><div><p>x</p> <?php echo 1 ?> </div>`);
+    }
     assert.strictEqual(await minify('<div>\n<?start name="a">\n<p>x</p>\n<?php echo 1 ?>\n</div>', { collapseWhitespace: true }), '<div><?start name="a"><p>x</p> <?php echo 1 ?> </div>');
     assert.strictEqual(await minify('<p><?marker name="x"></p>', { ignoreCustomFragments: [/<\?marker[^>]*>/] }), '<p><?marker name="x"></p>');
 
@@ -2975,8 +2979,13 @@ describe('HTML', () => {
     let input, output;
 
     // By default, PHP (including short tags), ASP, ERB, and JSP code, and XML declarations
-    for (const template of ['<p><?php if ($a > 1) { ?>a<?php } ?></p>', '<p><?PHP if ($a > 1) { ?>a<?php } ?></p>', '<p><?= $a > 1 ?></p>', '<p><? if ($a > 1) { ?>a<? } ?></p>', '<p><?\nif ($a > 1) { ?>a<? } ?></p>', '<?xml version="1.0" encoding="UTF-8"?><p>a</p>', '<?xml-stylesheet href="a.xsl" type="text/xsl"?><p>a</p>', '<p><% if (a > 1) { %>a<% } %></p>']) {
+    for (const template of ['<p><?php if ($a > 1) { ?>a<?php } ?></p>', '<p><?PHP if ($a > 1) { ?>a<?php } ?></p>', '<p><?= $a > 1 ?></p>', '<p><? if ($a > 1) { ?>a<? } ?></p>', '<p><?\nif ($a > 1) { ?>a<? } ?></p>', '<p><?$a = 1 ?></p>', '<div><?$a?><b>x</b></div>', '<?xml version="1.0" encoding="UTF-8"?><p>a</p>', '<?xml-stylesheet href="a.xsl" type="text/xsl"?><p>a</p>', '<p><% if (a > 1) { %>a<% } %></p>']) {
       assert.strictEqual(await minify(template, { collapseWhitespace: true }), template);
+    }
+    // A short tag opening on `$` isn’t read as a bogus comment, which `removeComments` would drop
+    for (const template of ['<p><?$a = 1 ?></p>', '<div><?$a?><b>x</b></div>']) {
+      assert.strictEqual(await minify(template), template);
+      assert.strictEqual(await minify(template, { collapseWhitespace: true, continueOnParseError: true, removeComments: true }), template);
     }
 
     const reFragments = [/<\?[^?]+\?>/, /<%[^%]+%>/, /\{\{[^}]*\}\}/];
