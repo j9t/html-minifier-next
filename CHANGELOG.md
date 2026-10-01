@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Added
 
 * Added the removal of individual selectors to `removeUnusedCSS`: Selectors naming an unused class or ID now go from their list, and the rule stays for the rest (e.g., `.used, .unused {…}` becomes `.used {…}`), where previously the rule was kept whole unless all its selectors were unused
-* Added the removal of selectors for elements a document doesn’t contain to `removeUnusedCSS` (e.g., `dialog {…}` on a page without `dialog`); elements the parser supplies (like `html`, `body`, or `tbody`) and element names in inline scripts count as used
+* Added the removal of selectors for elements a document doesn’t contain to `removeUnusedCSS` (e.g., `dialog {…}` on a page without `dialog`); elements the parser supplies (like `html`, `body`, or `tbody`) and element names in inline scripts count as used, and `safelist` keeps those only external scripts create
 * Added `<audio src>`, `<button formaction>`, `<embed src>`, `<frame longdesc>`, `<frame src>`, `<iframe src>`, `<input formaction>`, `<source src>`, `<track src>`, `<video poster>`, and `<video src>` to the attributes `minifyURLs` processes
 * Added support for [processing instructions](https://html.spec.whatwg.org/multipage/syntax.html#processing-instructions) (e.g., `<?start name="feed">`, `<?end>`, and `<?marker name="feed">` for `<template for>`), which the parser now reads without a parse error and HMN keeps as written: `removeComments` leaves them alone, `removeEmptyElements` keeps elements holding them, and `collapseWhitespace` keeps whitespace between them and text; with `continueOnParseError`, what starts like one but isn’t (e.g., `<?xml …>` or `<? …>`) is now read as a bogus comment, as in browsers, and kept as written unless `removeComments` removes it
 
@@ -326,7 +326,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `removeUnusedCSS` option to enable removing rules from `style` elements whose class or ID selectors the document never references (requires `minifyCSS`, since removal runs through Lightning CSS)
+* Added `removeUnusedCSS` option to enable removing rules from `style` elements whose class or ID selectors the document doesn’t reference (requires `minifyCSS`, since removal runs through Lightning CSS)
 * Added minifier diagnostics to `--verbose` (and `--dry`, which implies it)
 * Added reporting for invalid CSS under `errorRecovery`—with `continueOnMinifyError` enabled (the default), Lightning CSS reports invalid rules instead of throwing, which is done through the `log` hook
 

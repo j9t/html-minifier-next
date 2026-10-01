@@ -283,7 +283,7 @@ function collectUsedSymbols(html, includeScripts, decode, elements) {
 }
 
 /**
- * Determine which class/ID symbols a style sheet defines but the document never references.
+ * Determine which class/ID symbols a style sheet defines but the document doesn’t reference.
  * @param {string} css - Style sheet contents
  * @param {Set<string>} used - Symbols the document references
  * @param {Array<string | RegExp>} safelist - Symbols to keep regardless

@@ -940,7 +940,7 @@ describe('CSS and JS', () => {
     const style = css => `<!doctype html><html><head><style>${css}</style></head><body>`;
     const styleOf = html => (html.match(/<style>([\s\S]*?)<\/style>/) ?? ['', ''])[1];
 
-    test('Removes rules the document never references', async () => {
+    test('Removes rules the document doesn’t reference', async () => {
       const input = style('.used{color:red}.unused{color:red}#gone{color:red}#kept{color:red}') +
         '<p id="kept" class="used"></p>';
       const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });

@@ -179,7 +179,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
-| `removeUnusedCSS`<br>`--remove-unused-css` | [Remove unused CSS rules](#unused-css-removal) from `style` elements—use with `minifyCSS`; **note that this can change how a document renders** | `false` (could be `true`, `{ safelist, scripts }`) |
+| `removeUnusedCSS`<br>`--remove-unused-css` | [Remove CSS from `style` elements](#unused-css-removal) that name an element, class, or ID the document doesn’t reference—use with `minifyCSS`, and `safelist` for names only external scripts use | `false` (could be `true`, `{ safelist, scripts }`) |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `strictCustomFragments`<br>`--strict-custom-fragments` | [Reject `ignoreCustomFragments` patterns that risk catastrophic backtracking](#redos-protection) (rather than warning about them) | `false` |
@@ -346,7 +346,7 @@ const result = await minify(html, {
 
 ### Unused CSS removal
 
-`removeUnusedCSS` removes selectors from `style` elements that name a class, ID, or element a document doesn’t reference, as well as rules that are left without selectors. In `.used, .unused { … }`, only `.unused` goes. It needs to be used with `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It does not touch `style` or `media` attributes.
+`removeUnusedCSS` removes selectors from `style` elements that name an element, class, or ID the document doesn’t reference, as well as rules that are left without selectors. In `.used, .unused { … }`, only `.unused` goes. It needs to be used with `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It doesn’t touch `style` or `media` attributes.
 
 ```js
 const result = await minify(html, {
@@ -355,7 +355,9 @@ const result = await minify(html, {
 });
 ```
 
-Symbols are considered used when they appear
+Elements are considered used when the markup contains them (`html`, `head`, and `body` always count, as do `tbody` and `tr` in tables, and `colgroup` with `col`) or when their name appears inside an inline `script` element, unless `scripts` is set to `false`. An element doesn’t count as a reference to a class of the same name, nor the other way around.
+
+Classes and IDs are considered used when they appear
 
 * in a `class` or `id` attribute,
 * in an attribute that references an ID (`for`, `headers`, `list`, `popovertarget`, `aria-controls`, and similar),
@@ -363,19 +365,17 @@ Symbols are considered used when they appear
 * anywhere in a `data-*` attribute value, or
 * anywhere inside an inline `script` element, unless `scripts` is set to `false`.
 
-Elements are considered used when the markup contains them (`html`, `head`, and `body` always count, as do `tbody` and `tr` in tables, and `colgroup` with `col`) or when their name appears inside an inline `script` element, unless `scripts` is set to `false`. An element doesn’t count as a reference to a class of the same name, nor the other way around.
-
 Only a selector’s own compounds are judged: Names inside pseudo-classes and pseudo-elements, as in `:not(.unused)`, `:has(.unused)`, or `:host(.unused)`, keep their selector. Style sheets containing `@scope`—and all of them when [`minifyCSS` carries a Lightning CSS `visitor`](#css-minification) of your own—keep their selector lists whole and only lose rules whose selectors all go.
 
 Names carrying characters that end a CSS identifier—`md:flex`, `w-1/2`, `p-[3px]`—are matched as whole tokens, so utility-CSS class names survive whether they come from markup, a `data-*` value, or a string in an inline script.
 
-**Class names that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a class added by bundle.js looks exactly like a class nobody uses. List those under `safelist`, as strings or regular expressions:
+**Elements, classes, and IDs that only appear in external scripts cannot be detected.** A minifier sees one document, not the DOM that scripts later build from it, so a `dialog` that, say, a bundle.js creates, or a class it adds, looks exactly like one nobody uses. List those under `safelist`, as strings or regular expressions:
 
 ```js
 const result = await minify(html, {
   minifyCSS: true,
   removeUnusedCSS: {
-    safelist: ['is-open', /^js-/],
+    safelist: ['is-open', /^js-/, 'dialog'],
     // Set to `false` to also drop rules only referenced from inline scripts
     scripts: true
   }

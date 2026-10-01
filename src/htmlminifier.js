@@ -507,16 +507,16 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  Default: `false`
  *
  * @prop {boolean | {safelist?: Array<string | RegExp>, scripts?: boolean}} [removeUnusedCSS]
- *  **Note that this can change how a document renders!**
+ *  Remove selectors from `style` elements that name an element, class, or ID the
+ *  document doesn’t reference, as well as rules that are left without selectors.
+ *  Requires `minifyCSS` (removal runs through Lightning CSS) and has no effect on
+ *  `style` or `media` attributes.
  *
- *  Remove rules from `style` elements whose class or ID selectors the document
- *  never references. Requires `minifyCSS` (removal runs through Lightning CSS)
- *  and has no effect on `style` or `media` attributes.
- *
- *  Class names and IDs are collected from the markup, from `data-*` attributes,
- *  and—unless `scripts` is set to `false`—from inline `script` elements. Names
- *  that only ever appear in external scripts cannot be detected; list those
- *  under `safelist` (strings or regular expressions) to keep them.
+ *  Element, class, and ID names are collected from the markup and—unless `scripts`
+ *  is set to `false`—from inline `script` elements; class names and IDs also from
+ *  `data-*` attributes. Names that only ever appear in external scripts cannot
+ *  be detected; list those under `safelist` (strings or regular expressions) to
+ *  keep them.
  *
  *  Default: `false`
  *

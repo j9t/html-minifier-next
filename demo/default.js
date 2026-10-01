@@ -175,7 +175,7 @@ const demoConfig = {
     checked: false,
     disabled: true,
     unsafe: true,
-    helpText: 'Remove rules from <code>style</code> elements whose class or ID selectors the document never references (if CSS is to be minified; disabled in web demo because it requires Node.js)'
+    helpText: 'Remove CSS from <code>style</code> elements that name an element, class, or ID the document doesn’t reference (if CSS is to be minified; disabled in web demo because it requires Node.js)'
   },
   sortAttributes: {
     label: 'Sort attributes',
