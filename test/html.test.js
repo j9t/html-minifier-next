@@ -845,7 +845,7 @@ describe('HTML', () => {
       assert.strictEqual(await minify(input), input);
     }
     // …nor from one whose target merely starts like `xml`
-    for (const target of ['xmlfoo', 'xml-model', 'XML_a']) {
+    for (const target of ['xmlfoo', 'xml-model', 'XML_a', 'php-feed', 'phpx']) {
       assert.strictEqual(await minify(`<?${target} a><div>\n<p>x</p>\n<?php echo 1 ?>\n</div>`, { collapseWhitespace: true }), `<?${target} a><div><p>x</p> <?php echo 1 ?> </div>`);
     }
     assert.strictEqual(await minify('<div>\n<?start name="a">\n<p>x</p>\n<?php echo 1 ?>\n</div>', { collapseWhitespace: true }), '<div><?start name="a"><p>x</p> <?php echo 1 ?> </div>');

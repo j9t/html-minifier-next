@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed `minifySVG` skipping SVGO for an SVG with an attribute without a value (e.g., Vue’s `data-v-…` markers), which isn’t valid XML; such attributes now get an empty value for SVGO, which `collapseEmptyAttributes` removes again afterwards
 * Fixed `minifyURLs` treating `<script for>` as a URL
 * Fixed `removeUnusedCSS` overlooking classes and IDs that follow another name in a selector (e.g., `p.note`, `ul#menu`, or the second class in `.a.b`), whose rules it never removed
+* Fixed cache keys for large CSS, JavaScript, and SVG inputs, whose 32-bit hash could, if rarely, hand one input another’s minified result; they now use a 53-bit hash
 
 ### Added
 
@@ -23,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-* Changed the default `ignoreCustomFragments` pattern for `<? … ?>` to `/<\?(?:php|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i`, which covers PHP (including short tags) and XML declarations but not processing instructions: The previous pattern reached from a processing instruction to the next `?>`, and could break markup in between (e.g., dropping `</div>` from `<?start name="a"><div><?php echo 1 ?></div>`)
+* Changed the default `ignoreCustomFragments` pattern for `<? … ?>` to `/<\?(?:php[\t\n\r ]|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i`, which covers PHP (including short tags) and XML declarations but not processing instructions: The previous pattern reached from a processing instruction to the next `?>`, and could break markup in between (e.g., dropping `</div>` from `<?start name="a"><div><?php echo 1 ?></div>`)
 * Implemented removal of repeated class names from `class` attributes (e.g., `class="a b a"` becomes `class="a b"`)
 
 ## [8.9.0] - 2026-10-01

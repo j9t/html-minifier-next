@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import { spawnSync } from 'node:child_process';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 import { collectUsedSymbols } from '../src/lib/unused-css.js';
+import { hashContent } from '../src/lib/utils.js';
 import { extractScriptBodies } from '../src/lib/content.js';
 
 describe('CSS and JS', () => {
@@ -1382,6 +1383,12 @@ describe('CSS and JS', () => {
       );
     });
 
+    test('Keys cached results to the elements the document contains', async () => {
+      const sheet = style('p,dialog{color:red}');
+      assert.strictEqual(styleOf(await minify(sheet + '<p></p>', { minifyCSS: true, removeUnusedCSS: true })), 'p{color:red}');
+      assert.strictEqual(styleOf(await minify(sheet + '<p></p><dialog></dialog>', { minifyCSS: true, removeUnusedCSS: true })), 'p,dialog{color:red}');
+    });
+
     test('Keeps selectors for safelisted elements, after the same sheet was minified without them', async () => {
       // The CSS cache outlives a `minify()` call, so the safelist has to tell results apart
       const input = style('p,dialog{color:red}') + '<p></p>';
@@ -1478,6 +1485,14 @@ describe('CSS and JS', () => {
 
   // Cache configuration tests
   describe('Caches', () => {
+    test('Hashes keys of large inputs without the collisions a 32-bit hash has', () => {
+      // FNV-1a 32-bit collisions
+      for (const [a, b] of [['costarring', 'liquid'], ['declinate', 'macallums'], ['altarage', 'zinke']]) {
+        assert.notStrictEqual(hashContent(a), hashContent(b), `${a} and ${b}`);
+      }
+      assert.strictEqual(hashContent('a'), hashContent('a'));
+    });
+
     test('Default sizes work', async () => {
       // Test that caches work without explicit configuration
       const input = `
