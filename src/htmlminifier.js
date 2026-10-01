@@ -2012,6 +2012,11 @@ async function minifyHTML(value, options, partialMarkup) {
     // The short doctype makes the output no-quirks, so the input is read as such
     noQuirksMode: options.useShortDoctype,
     continueOnParseError: options.continueOnParseError,
+    // Recovered errors would have aborted without the option,
+    // so they are worth knowing about
+    parseError: options.continueOnParseError && options.log !== identity
+      ? (/** @type {string} */ message) => options.log('Warning: ' + message)
+      : undefined,
     customAttrAssign: options.customAttrAssign,
     customAttrSurround: options.customAttrSurround,
     // Compute `nextTag` only when whitespace collapse features require it

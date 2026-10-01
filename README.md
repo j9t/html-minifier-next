@@ -197,7 +197,7 @@ A few options take functions and are therefore only available programmatically, 
 | `canMinifyJS` | Synchronous `Function(text, inline)` that determines whether `minifyJS` may process a given piece of JavaScript—returning `false` [leaves it unminified](#javascript-minification) | All JavaScript is minified |
 | `canMinifySVG` | Synchronous `Function(text)` that determines whether `minifySVG` may pass a given outermost `svg` element to SVGO—returning `false` [skips SVGO for it](#svg-minification) | All SVG is minified |
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
-| `log` | `Function(message)` called with warnings and errors, including minification errors swallowed by `continueOnMinifyError` (e.g., pass `console.error` to surface them); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
+| `log` | `Function(message)` called with warnings and errors, including minification errors (`continueOnMinifyError`) and parse errors (`continueOnParseError`); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
 
 ### Options that rely on another option
 
@@ -684,6 +684,8 @@ By default, HMN parses markup into a complete tree structure, then modifies it (
 _Input markup (e.g., `<p id="">foo`) → Internal representation of markup in a form of tree (e.g., `{ tag: "p", attr: "id", children: ["foo"] }`) → Transformation of internal representation (e.g., removal of `id` attribute) → Output of resulting markup (e.g., `<p>foo</p>`)_
 
 For partial HTML fragments (such as template includes, SSI fragments, or closing tags without opening tags), use the `partialMarkup: true` option. This preserves stray end tags (closing tags without corresponding opening tags) and prevents auto-closing of unclosed tags at the end of input. Note that normal HTML auto-closing rules still apply during parsing—for example, a closing parent tag will still auto-close its unclosed child elements. Whitespace at the start and end of a fragment stays, too, as it may separate the fragment from what surrounds it (unless `collapseWhitespace` removes it).
+
+Markup with [parse errors](https://html.spec.whatwg.org/multipage/parsing.html#parse-errors) that HMN cannot read, like a stray `</>` or an `=` in an unquoted attribute value, makes it abort with the line and column of the error, so that the error can be fixed. With `continueOnParseError`, HMN handles such errors the way browsers do instead.
 
 To validate complete HTML markup, use [the W3C validator](https://validator.w3.org/) or one of [several validator packages](https://meiert.com/blog/html-validator-packages/).
 

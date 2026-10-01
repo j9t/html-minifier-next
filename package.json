@@ -19,7 +19,7 @@
     "@swc/core": "^1.16.13",
     "@types/node": "^26.6.3",
     "eslint": "^10.11.0",
-    "globals": "^17.12.0",
+    "globals": "^17.13.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1"
   },
@@ -95,5 +95,5 @@
   },
   "type": "module",
   "types": "dist/types/htmlminifier.d.ts",
-  "version": "8.8.1"
+  "version": "8.9.0"
 }
