@@ -283,7 +283,7 @@
       "type": "boolean"
     },
     "removeUnusedCSS": {
-      "description": "Remove rules from `style` elements whose class or ID selectors the document never references—use with `--minify-css`; note that class names only applied by external scripts cannot be detected—use `{\"safelist\": […]}` for those",
+      "description": "Remove CSS from `style` elements that name an element, class, or ID the document doesn’t reference—use with `--minify-css`, and `{\"safelist\": […]}` for names only external scripts use",
       "type": [
         "boolean",
         "object"

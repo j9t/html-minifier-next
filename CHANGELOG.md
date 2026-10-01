@@ -4,6 +4,29 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.10.0] - 2026-10-01
+
+### Fixed
+
+* Fixed `removeEmptyElements` removing `label`, `output`, and `template` elements with a `for` attribute, like a `label` styled as a menu toggle, an `output` for scripts to fill, or a `template` that clears the content it targets
+* Fixed `minifySVG` removing empty attributes, which may serve as CSS hooks (e.g., `[data-v-…]` selectors) or carry meaning (`alt=""` in `foreignObject`); SVGO’s `removeEmptyAttrs` plugin is now off for inline SVG
+* Fixed `minifySVG` skipping SVGO for an SVG with an attribute without a value (e.g., Vue’s `data-v-…` markers), which isn’t valid XML; such attributes now get an empty value for SVGO, which `collapseEmptyAttributes` removes again afterwards
+* Fixed `minifyURLs` treating `<script for>` as a URL
+* Fixed `removeUnusedCSS` overlooking classes and IDs that follow another name in a selector (e.g., `p.note`, `ul#menu`, or the second class in `.a.b`), whose rules it never removed
+* Fixed cache keys for large CSS, JavaScript, and SVG inputs, whose 32-bit hash could, if rarely, hand one input another’s minified result; they now use a 53-bit hash
+
+### Added
+
+* Added the removal of individual selectors to `removeUnusedCSS`: Selectors naming an unused class or ID now go from their list, and the rule stays for the rest (e.g., `.used, .unused {…}` becomes `.used {…}`), where previously the rule was kept whole unless all its selectors were unused
+* Added the removal of selectors for elements a document doesn’t contain to `removeUnusedCSS` (e.g., `dialog {…}` on a page without `dialog`); elements the parser supplies (like `html`, `body`, or `tbody`) and element names in inline scripts count as used, and `safelist` keeps those only external scripts create
+* Added `<audio src>`, `<button formaction>`, `<embed src>`, `<frame longdesc>`, `<frame src>`, `<iframe src>`, `<input formaction>`, `<source src>`, `<track src>`, `<video poster>`, and `<video src>` to the attributes `minifyURLs` processes
+* Added support for [processing instructions](https://html.spec.whatwg.org/multipage/syntax.html#processing-instructions) (e.g., `<?start name="feed">`, `<?end>`, and `<?marker name="feed">` for `<template for>`), which the parser now reads without a parse error and HMN keeps as written: `removeComments` leaves them alone, `removeEmptyElements` keeps elements holding them, and `collapseWhitespace` keeps whitespace between them and text; with `continueOnParseError`, what starts like one but isn’t (e.g., `<?xml …>` or `<? …>`) is now read as a bogus comment, as in browsers, and kept as written unless `removeComments` removes it
+
+### Changed
+
+* Changed the default `ignoreCustomFragments` pattern for `<? … ?>` to `/<\?(?:php[\t\n\r ]|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i`, which covers PHP (including short tags) and XML declarations but not processing instructions: The previous pattern reached from a processing instruction to the next `?>`, and could break markup in between (e.g., dropping `</div>` from `<?start name="a"><div><?php echo 1 ?></div>`)
+* Implemented removal of repeated class names from `class` attributes (e.g., `class="a b a"` becomes `class="a b"`)
+
 ## [8.9.0] - 2026-10-01
 
 ### Fixed
@@ -304,7 +327,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
-* Added `removeUnusedCSS` option to enable removing rules from `style` elements whose class or ID selectors the document never references (requires `minifyCSS`, since removal runs through Lightning CSS)
+* Added `removeUnusedCSS` option to enable removing rules from `style` elements whose class or ID selectors the document doesn’t reference (requires `minifyCSS`, since removal runs through Lightning CSS)
 * Added minifier diagnostics to `--verbose` (and `--dry`, which implies it)
 * Added reporting for invalid CSS under `errorRecovery`—with `continueOnMinifyError` enabled (the default), Lightning CSS reports invalid rules instead of throwing, which is done through the `log` hook
 

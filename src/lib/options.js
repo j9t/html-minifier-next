@@ -7,7 +7,7 @@ import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, isTh
 import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY, svgoPluginsInline } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
-import { findUnusedSymbols, normalizeUnusedCSSOptions } from './unused-css.js';
+import { createSelectorPruner, findUnusedSymbols, normalizeUnusedCSSOptions } from './unused-css.js';
 import { getPreset, getPresetNames } from '../presets.js';
 import { optionDefinitions, optionDefaults } from './option-definitions.js';
 
@@ -20,7 +20,7 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  * options object that every `minify()` call with those options shares, so state
  * belonging to one document has to be passed in rather than captured.
  *
- * @typedef {{usedSymbols?: Set<string>, warned: Set<string>}} CSSContext
+ * @typedef {{usedSymbols?: Set<string>, usedElements?: Set<string>, usedElementsKey?: string, warned: Set<string>}} CSSContext
  */
 
 /**
@@ -60,6 +60,11 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   insideForeignContent?: boolean
  * }} ProcessedOptions
  */
+
+// Patterns
+
+const RE_SCOPE_AT_RULE = /@scope\b/i;
+const RE_SVGO_EMPTY_ATTRIBUTE = / ([^\s"'<>/=]+)=""/g;
 
 // Helper functions
 
@@ -407,16 +412,25 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         const unusedSymbols = (unusedCSSConfig && context?.usedSymbols)
           ? findUnusedSymbols(text, context.usedSymbols, unusedCSSConfig.safelist)
           : undefined;
+        // Selectors are pruned one by one, too—unless a `visitor` of the caller’s own is
+        // set, or the sheet uses `@scope`, whose preludes the visitor reaches as well and
+        // where a dropped limit would widen the scope
+        const pruneSelectors = Boolean(unusedSymbols && context?.usedElements) &&
+          !('visitor' in lightningCssOptions) && !RE_SCOPE_AT_RULE.test(text);
 
-        // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys.
-        // The symbol list belongs in the signature: The cache outlives a single `minify()` call, so
-        // identical style sheets in differently marked-up documents must not share an entry.
+        // Cache key: Content + type + options signature; large inputs are hashed to avoid
+        // huge Map keys. The symbol list belongs in the signature: The cache outlives a
+        // single `minify()` call, so identical style sheets in differently marked-up
+        // documents must not share an entry; so do the element set and the safelist
+        // where the selector visitor reads them.
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({
           type,
           opts: lightningCssOptions,
           cont: !!options.continueOnMinifyError,
-          unused: unusedSymbols && unusedSymbols.length ? unusedSymbols.slice().sort() : undefined
+          unused: unusedSymbols && unusedSymbols.length ? unusedSymbols.slice().sort() : undefined,
+          elements: pruneSelectors ? context?.usedElementsKey : undefined,
+          safelist: pruneSelectors ? unusedCSSConfig?.safelist : undefined
         });
         const isCacheable = inputCSS.length <= MAX_CACHE_ENTRY_SIZE;
         const cssKey = isCacheable
@@ -450,6 +464,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
               // Union, so that a manually supplied `unusedSymbols` list survives
               ...(unusedSymbols && unusedSymbols.length
                 ? { unusedSymbols: lightningCssOptions.unusedSymbols ? [...new Set([...lightningCssOptions.unusedSymbols, ...unusedSymbols])] : unusedSymbols }
+                : {}),
+              ...(pruneSelectors && unusedCSSConfig && context?.usedElements
+                ? { visitor: { Selector: createSelectorPruner(unusedSymbols ?? [], context.usedElements, unusedCSSConfig.safelist) } }
                 : {})
             });
 
@@ -697,11 +714,16 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return svgContent;
         }
 
+        // SVGO needs every attribute to carry a value, but its output is HTML again,
+        // where an empty value can go; it escapes quotes in values and text, so `=""`
+        // is always one. Read here, as options are processed in the order they are given.
+        const collapseEmpty = Boolean(options.collapseEmptyAttributes);
+
         const isCacheable = svgContent.length <= MAX_CACHE_ENTRY_SIZE;
         const svgKey = isCacheable
           ? (svgContent.length > 2048
             ? (hashContent(svgContent) + '|' + svgSig)
-            : (svgContent + '|' + svgSig))
+            : (svgContent + '|' + svgSig)) + (collapseEmpty ? '|c' : '')
           : undefined;
 
         try {
@@ -715,7 +737,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           const inFlight = (async () => {
             const optimize = await loadSvgo();
             const result = optimize(svgContent, svgoOptions);
-            return result.data;
+            return collapseEmpty ? result.data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : result.data;
           })();
 
           if (svgKey !== undefined) svgCache.set(svgKey, inFlight);

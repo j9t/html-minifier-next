@@ -6,7 +6,7 @@
  */
 
 import { isThenable, isQuirksDoctype, embedSource, findTagEnd } from './lib/utils.js';
-import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, RE_HTML_ENCODING, RE_WS_ONLY } from './lib/constants.js';
+import { endlessRawTextElements, escapableRawTextElements, formattingElements, genericRawTextElements, processingInstructionTag, RE_HTML_ENCODING, RE_WS_ONLY } from './lib/constants.js';
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
@@ -15,7 +15,7 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
 /**
  * `start`, `chars`, and `comment` return `undefined` when their work needs no `await`
  * and a Promise when it does; the parse loop awaits only what it gets back.
- * `end`, `doctype`, and `strayEnd` never suspend. `start` is synchronous
+ * `end`, `processingInstruction`, `doctype`, and `strayEnd` never suspend. `start` is synchronous
  * wherever it is passed no attributes, which is what keeps the calls inside
  * `parseEndTag` synchronous.
  * @typedef {{
@@ -23,6 +23,7 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
  *   end?: Function,
  *   chars?: Function,
  *   comment?: Function,
+ *   processingInstruction?: Function,
  *   doctype?: Function,
  *   strayEnd?: Function,
  *   parseError?: Function | undefined,
@@ -312,6 +313,7 @@ export class HTMLParser {
     const doctypeY = /<!DOCTYPE[^<>]*>/iy;
     const commentTestY = /<!--/y;
     const conditionalTestY = /<!\[/y;
+    const processingInstructionY = /<\?([A-Za-z_][\w-]*)[\t\n\f\r ?>]/y;
 
     // Cached next-tag from lookahead (avoids re-parsing the same tag)
     let cachedNextStartTag = null;
@@ -340,6 +342,33 @@ export class HTMLParser {
     // O(n), where searching again at every opener rescans the rest of the input each time.
     let commentEndAhead = true;
     let conditionalEndAhead = true;
+
+    // The end of the processing instruction at `p`, or -1 where there is none: `xml` and
+    // `xml-stylesheet` open a bogus comment instead, and one without a `>` is dropped
+    // https://html.spec.whatwg.org/multipage/parsing.html#processing-instruction-open-state
+    const matchProcessingInstruction = (/** @type {number} */ p) => {
+      if (!hasCloseAtOrAfter(p)) return -1;
+      processingInstructionY.lastIndex = p;
+      const match = processingInstructionY.exec(fullHtml);
+      if (!match) return -1;
+      const target = (match[1] ?? '').toLowerCase();
+      return target === 'xml' || target === 'xml-stylesheet' ? -1 : nextGtPos + 1;
+    };
+
+    // Where what `<?` at `p` opens ends, when it is not a processing instruction: A valid target
+    // without a `>` is dropped (`dropped`), anything else is a bogus comment up to the next `>`
+    const matchBogusProcessingInstruction = (/** @type {number} */ p) => {
+      let i = p + 2;
+      const nameCode = fullHtml.charCodeAt(i) | 32;
+      let dropped = i >= fullLength;
+      if (nameCode >= 97 && nameCode <= 122 || fullHtml[i] === '_') {
+        while (i < fullLength && /[\w-]/.test(fullHtml[i] ?? '')) i++;
+        const target = fullHtml.substring(p + 2, i).toLowerCase();
+        dropped = i >= fullLength || (/[\t\n\f\r ?>]/.test(fullHtml[i] ?? '') && target !== 'xml' && target !== 'xml-stylesheet');
+      }
+      if (dropped) return { end: fullLength, dropped };
+      return { end: hasCloseAtOrAfter(p + 2) ? nextGtPos + 1 : fullLength, dropped };
+    };
 
     // Helper to advance position
     const advance = (/** @type {number} */ n) => { pos += n; };
@@ -523,6 +552,32 @@ export class HTMLParser {
               prevAttrs = [];
               continue;
             }
+          } else if (nextCode === 63) { // `?`
+            // Processing instruction
+            const processingInstructionEnd = matchProcessingInstruction(pos);
+            if (processingInstructionEnd !== -1) {
+              if (handler.processingInstruction) {
+                handler.processingInstruction(fullHtml.substring(pos, processingInstructionEnd));
+              }
+              advance(processingInstructionEnd - pos);
+              prevTag = processingInstructionTag;
+              prevAttrs = [];
+              continue;
+            }
+            if (handler.continueOnParseError) {
+              const { end, dropped } = matchBogusProcessingInstruction(pos);
+              reportParseError(pos, dropped ? 'Dropped processing instruction without `>`' : 'Read `<?` without a processing instruction target as comment');
+              if (!dropped && handler.comment) {
+                // The data starts with the `?`, and the markup stays as written
+                const data = fullHtml.substring(pos + 1, fullHtml[end - 1] === '>' ? end - 1 : end);
+                const result = handler.comment(data, false, fullHtml.substring(pos, end));
+                if (isThenable(result)) await result;
+              }
+              advance(end - pos);
+              prevTag = '';
+              prevAttrs = [];
+              continue;
+            }
           } else if (nextCode === 47) { // `/`
             // End tag—skip when no `>` lies ahead: The tag cannot be complete, and matching
             // its name at every position would cost O(n²) on a long unclosed name
@@ -591,7 +646,10 @@ export class HTMLParser {
           // Same dispatch as above: A start tag cannot follow `<` + `/` or `!`,
           // an end tag requires `/`—the other matcher never runs
           const nextCode = fullHtml.charCodeAt(pos + 1);
-          if (nextCode !== 47 && nextCode !== 33) {
+          if (nextCode === 63) {
+            nextTag = matchProcessingInstruction(pos) !== -1 ? processingInstructionTag : '';
+            nextAttrs = [];
+          } else if (nextCode !== 47 && nextCode !== 33) {
             const nextStartTagMatch = parseStartTag(pos);
             if (nextStartTagMatch) {
               nextTag = nextStartTagMatch.tagName;

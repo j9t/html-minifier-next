@@ -2,7 +2,7 @@
  * Unused-CSS removal
  */
 
-import { findTagEnd } from './utils.js';
+import { findTagEnd, hashContent } from './utils.js';
 
 // Attributes whose values name elements by ID or hold space-separated ID lists
 const idReferenceAttributes = new Set([
@@ -50,12 +50,16 @@ const fragmentURLPattern = /url\(\s*['"]?#([^)'"\s]+)/gi;
 const stringLiteralPattern = /'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"|`((?:[^`\\]|\\.)*)`/g;
 
 // CSS identifiers may contain escapes (`.md\:flex`, `.w-1\/2`), which have to be
-// resolved before comparing them against the plain tokens found in the markup
-const cssIdentifierPattern = /(?<![\w\\-])[.#]((?:[-_a-zA-Z]|\\[0-9a-fA-F]{1,6}[ \t\n]?|\\[^\n0-9a-fA-F])(?:[-\w]|\\[0-9a-fA-F]{1,6}[ \t\n]?|\\[^\n0-9a-fA-F])*)/g;
+// resolved before comparing them against the plain tokens found in the markup. A
+// symbol may follow another name (`p.note`, `.a.b`); matches outside selectors
+// (`#fff`, `a.png`) are harmless, as only selectors are checked against the list.
+const cssIdentifierPattern = /(?<!\\)[.#]((?:[-_a-zA-Z]|\\[0-9a-fA-F]{1,6}[ \t\n]?|\\[^\n0-9a-fA-F])(?:[-\w]|\\[0-9a-fA-F]{1,6}[ \t\n]?|\\[^\n0-9a-fA-F])*)/g;
 // `unusedSymbols` also drops `@keyframes` and `@counter-style` rules by name, so any
 // name used there is off limits even when no element carries it as a class or ID
 const reservedAtRulePattern = /@(?:-\w+-)?(?:keyframes|counter-style)\s+(-?[_a-zA-Z][\w-]*)/gi;
 const escapePattern = /\\(?:([0-9a-fA-F]{1,6})[ \t\n]?|(.))/g;
+// Run over case-folded markup; matches inside comments and scripts only add names
+const startTagPattern = /<([a-z][^\s/>]*)/g;
 
 /**
  * Resolve CSS escape sequences in an identifier.
@@ -180,9 +184,10 @@ function findRawTextElements(haystack, tagName) {
  * @param {string} html - Raw document markup
  * @param {boolean} includeScripts - Also treat identifiers inside inline `script` elements as used
  * @param {((text: string) => string)} [decode] - Resolves character references in attribute values
+ * @param {Set<string>} [elements] - Receives the element names the markup uses, lowercased, and the identifiers found in scripts, as possible element names
  * @returns {Set<string>} Symbols to keep
  */
-function collectUsedSymbols(html, includeScripts, decode) {
+function collectUsedSymbols(html, includeScripts, decode, elements) {
   const used = new Set();
   const haystack = foldCase(html);
 
@@ -196,11 +201,16 @@ function collectUsedSymbols(html, includeScripts, decode) {
     .filter(element => element.closed)
     .map(element => ({ start: element.bodyStart, end: element.bodyEnd }));
 
-  const addIdentifiers = (/** @type {string} */ text) => {
+  if (elements) {
+    collectUsedElements(haystack, skipped, elements);
+  }
+
+  const addIdentifiers = (/** @type {string} */ text, /** @type {Set<string> | undefined} */ names = undefined) => {
     identifierPattern.lastIndex = 0;
     let identifier;
     while ((identifier = identifierPattern.exec(text))) {
       used.add(identifier[0]);
+      names?.add(identifier[0].toLowerCase());
     }
   };
 
@@ -260,7 +270,7 @@ function collectUsedSymbols(html, includeScripts, decode) {
         continue;
       }
       const body = html.slice(element.bodyStart, element.bodyEnd);
-      addIdentifiers(body);
+      addIdentifiers(body, elements);
       stringLiteralPattern.lastIndex = 0;
       let literal;
       while ((literal = stringLiteralPattern.exec(body))) {
@@ -273,7 +283,7 @@ function collectUsedSymbols(html, includeScripts, decode) {
 }
 
 /**
- * Determine which class/ID symbols a style sheet defines but the document never references.
+ * Determine which class/ID symbols a style sheet defines but the document doesn’t reference.
  * @param {string} css - Style sheet contents
  * @param {Set<string>} used - Symbols the document references
  * @param {Array<string | RegExp>} safelist - Symbols to keep regardless
@@ -298,24 +308,125 @@ function findUnusedSymbols(css, used, safelist) {
       continue;
     }
     seen.add(symbol);
-    if (used.has(symbol) || reserved.has(symbol)) {
-      continue;
-    }
-    if (safelist.some(entry => {
-      if (!(entry instanceof RegExp)) {
-        return entry === symbol;
-      }
-      // `test()` advances `lastIndex` on global and sticky patterns, which would
-      // make a safelist entry match only every other symbol
-      entry.lastIndex = 0;
-      return entry.test(symbol);
-    })) {
+    if (used.has(symbol) || reserved.has(symbol) || isSafelisted(symbol, safelist)) {
       continue;
     }
     unused.push(symbol);
   }
 
   return unused;
+}
+
+/**
+ * @param {string} symbol
+ * @param {Array<string | RegExp>} safelist
+ * @returns {boolean}
+ */
+function isSafelisted(symbol, safelist) {
+  return safelist.some(entry => {
+    if (!(entry instanceof RegExp)) {
+      return entry === symbol;
+    }
+    // `test()` advances `lastIndex` on global and sticky patterns, which would
+    // make a safelist entry match only every other symbol
+    entry.lastIndex = 0;
+    return entry.test(symbol);
+  });
+}
+
+/**
+ * Collect the element names a document contains, including those the parser
+ * supplies when the markup leaves them out.
+ * @param {string} haystack - Case-folded markup, as returned by `foldCase`
+ * @param {Array<{start: number, end: number}>} skipped - Style sheet bodies, in document order
+ * @param {Set<string>} elements - Lowercase element names, added to
+ */
+function collectUsedElements(haystack, skipped, elements) {
+  elements.add('html');
+  elements.add('head');
+  elements.add('body');
+
+  let skipIndex = 0;
+  startTagPattern.lastIndex = 0;
+  let match;
+  while ((match = startTagPattern.exec(haystack))) {
+    while (skipIndex < skipped.length && (skipped[skipIndex]?.end ?? 0) <= match.index) {
+      skipIndex++;
+    }
+    const element = skipped[skipIndex];
+    if (element && match.index >= element.start) {
+      continue;
+    }
+    elements.add(match[1] ?? '');
+  }
+}
+
+/**
+ * Build the unused-CSS context for a document.
+ * @param {string} html - Raw document markup
+ * @param {boolean} includeScripts - Also treat identifiers inside inline `script` elements as used
+ * @param {((text: string) => string)} [decode] - Resolves character references in attribute values
+ * @returns {{usedSymbols: Set<string>, usedElements: Set<string>, usedElementsKey: string}}
+ */
+function collectUsage(html, includeScripts, decode) {
+  // A script may create the elements a rule is for, so its identifiers count as names, too
+  const usedElements = new Set();
+  const usedSymbols = collectUsedSymbols(html, includeScripts, decode, usedElements);
+  // Elements the parser supplies inside others, added once scripts are in, as one may create a `table`, too
+  if (usedElements.has('table')) {
+    usedElements.add('tbody');
+    usedElements.add('tr');
+  }
+  if (usedElements.has('col')) {
+    usedElements.add('colgroup');
+  }
+  return {
+    usedSymbols,
+    usedElements,
+    // The CSS cache outlives a document, so its keys tell element sets apart
+    usedElementsKey: String(hashContent([...usedElements].sort().join(' ')))
+  };
+}
+
+/**
+ * Create a Lightning CSS `Selector` visitor that drops selectors naming an unused
+ * class, ID, or element from their list, so the rule stays for the selectors that
+ * remain (`unusedSymbols` alone only removes rules whose selectors are all unused).
+ *
+ * Only a selector’s own compounds are judged: Names inside pseudo-class and
+ * pseudo-element arguments (`:not(.x)`, `:host(.x)`) are left alone.
+ *
+ * @param {string[]} unusedSymbols - Class/ID symbols safe to remove, from `findUnusedSymbols`
+ * @param {Set<string>} usedElements - Lowercase element names the document contains or its scripts name
+ * @param {Array<string | RegExp>} safelist - Symbols to keep regardless
+ * @returns {(selector: Array<{type: string, name?: string}>) => [] | undefined}
+ */
+function createSelectorPruner(unusedSymbols, usedElements, safelist) {
+  const unused = new Set(unusedSymbols);
+  /** @type {Map<string, boolean>} */
+  const unusedElements = new Map();
+  const isUnusedElement = (/** @type {string} */ name) => {
+    let result = unusedElements.get(name);
+    if (result === undefined) {
+      result = !usedElements.has(name.toLowerCase()) && !isSafelisted(name, safelist);
+      unusedElements.set(name, result);
+    }
+    return result;
+  };
+
+  return selector => {
+    for (const component of selector) {
+      const name = component.name;
+      if (name === undefined) {
+        continue;
+      }
+      if (((component.type === 'class' || component.type === 'id') && unused.has(name)) ||
+          (component.type === 'type' && isUnusedElement(name))) {
+        return [];
+      }
+    }
+    return undefined;
+  };
 }
 
 const unusedCSSKeys = new Set(['safelist', 'scripts']);
@@ -373,7 +484,9 @@ function normalizeUnusedCSSOptions(option, warn) {
 }
 
 export {
+  collectUsage,
   collectUsedSymbols,
+  createSelectorPruner,
   findUnusedSymbols,
   normalizeUnusedCSSOptions
 };

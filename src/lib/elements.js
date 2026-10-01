@@ -111,10 +111,13 @@ function canRemoveElement(tag, attrs) {
     return false;
   }
 
-  // Nor must elements that carry accessibility semantics or take focus—unless the value is empty
+  // Nor must elements that carry accessibility semantics, take focus, or point elsewhere
+  // with `for` (a `label` activates a control, an `output` shows its result, a `template`
+  // replaces content, even with nothing), unless the value is empty
+  const takesFor = tag === 'label' || tag === 'output' || tag === 'template';
   for (const attr of attrs) {
     const name = attr.name.toLowerCase();
-    if ((name === 'role' || name === 'tabindex' || name.startsWith('aria-')) && attr.value?.trim()) {
+    if ((name === 'role' || name === 'tabindex' || name.startsWith('aria-') || (takesFor && name === 'for')) && attr.value?.trim()) {
       return false;
     }
   }

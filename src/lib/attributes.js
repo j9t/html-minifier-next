@@ -22,7 +22,7 @@ import {
 } from './constants.js';
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
-import { collectUsedSymbols } from './unused-css.js';
+import { collectUsage } from './unused-css.js';
 import { identity, isThenable } from './utils.js';
 
 /** @import { ProcessedOptions } from './options.js' */
@@ -143,19 +143,20 @@ function deduplicateAttributes(attrs, caseSensitive) {
  */
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   // Fast-path: Check if this element–attribute combination can possibly be redundant
-  // before doing expensive string operations
-
-  // Check if attribute name is in general defaults
-  const hasGeneralDefault = attrName in generalDefaults;
-
-  // Check if element has any default attributes
-  const tagHasDefaults = tag in tagDefaults;
+  // before normalizing the value; own properties only, so `constructor` has no default
+  const generalDefault = Object.hasOwn(generalDefaults, attrName)
+    ? /** @type {Record<string, string>} */ (generalDefaults)[attrName]
+    : undefined;
+  const tagAttrDefaults = Object.hasOwn(tagDefaults, tag)
+    ? /** @type {Record<string, string>} */ (/** @type {Record<string, unknown>} */ (tagDefaults)[tag])
+    : undefined;
+  const tagDefault = tagAttrDefaults && Object.hasOwn(tagAttrDefaults, attrName) ? tagAttrDefaults[attrName] : undefined;
 
   // Check for legacy attribute rules (element- and attribute-specific)
   const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) || (tag === 'a' && attrName === 'name');
 
-  // If none of these conditions apply, attribute cannot be redundant
-  if (!hasGeneralDefault && !tagHasDefaults && !isLegacyAttr) {
+  // Without a default for this very attribute, nor a legacy rule, the value cannot be redundant
+  if (generalDefault === undefined && tagDefault === undefined && !isLegacyAttr) {
     return false;
   }
 
@@ -173,13 +174,7 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
     return true;
   }
 
-  // Check general defaults
-  if (hasGeneralDefault && /** @type {Record<string, string>} */ (generalDefaults)[attrName] === attrValue) {
-    return true;
-  }
-
-  // Check tag-specific defaults
-  return tagHasDefaults && /** @type {Record<string, string>} */ (/** @type {Record<string, unknown>} */ (tagDefaults)[tag])[attrName] === attrValue;
+  return attrValue === generalDefault || attrValue === tagDefault;
 }
 
 function isScriptTypeAttribute(attrValue = '') {
@@ -242,18 +237,26 @@ function isBooleanAttribute(attrName, attrValue) {
 const uriTypeAttributes = new Map([
   ['a', new Set(['href'])],
   ['area', new Set(['href'])],
-  ['link', new Set(['href'])],
+  ['audio', new Set(['src'])],
   ['base', new Set(['href'])],
-  ['img', new Set(['src', 'longdesc', 'usemap'])],
+  ['blockquote', new Set(['cite'])],
+  ['button', new Set(['formaction'])],
+  ['del', new Set(['cite'])],
+  ['embed', new Set(['src'])],
+  ['form', new Set(['action'])],
+  ['frame', new Set(['longdesc', 'src'])],
+  ['head', new Set(['profile'])],
+  ['iframe', new Set(['src'])],
+  ['img', new Set(['longdesc', 'src', 'usemap'])],
+  ['input', new Set(['formaction', 'src', 'usemap'])],
+  ['ins', new Set(['cite'])],
+  ['link', new Set(['href'])],
   ['object', new Set(['classid', 'codebase', 'data', 'usemap'])],
   ['q', new Set(['cite'])],
-  ['blockquote', new Set(['cite'])],
-  ['ins', new Set(['cite'])],
-  ['del', new Set(['cite'])],
-  ['form', new Set(['action'])],
-  ['input', new Set(['src', 'usemap'])],
-  ['head', new Set(['profile'])],
-  ['script', new Set(['src', 'for'])]
+  ['script', new Set(['src'])],
+  ['source', new Set(['src'])],
+  ['track', new Set(['src'])],
+  ['video', new Set(['poster', 'src'])]
 ]);
 
 /**
@@ -268,15 +271,15 @@ function isUriTypeAttribute(attrName, tag) {
 const numberTypeAttributes = new Map([
   ['a', new Set(['tabindex'])],
   ['area', new Set(['tabindex'])],
-  ['object', new Set(['tabindex'])],
   ['button', new Set(['tabindex'])],
-  ['input', new Set(['maxlength', 'tabindex'])],
-  ['select', new Set(['size', 'tabindex'])],
-  ['textarea', new Set(['rows', 'cols', 'tabindex'])],
-  ['colgroup', new Set(['span'])],
   ['col', new Set(['span'])],
-  ['th', new Set(['rowspan', 'colspan'])],
-  ['td', new Set(['rowspan', 'colspan'])]
+  ['colgroup', new Set(['span'])],
+  ['input', new Set(['maxlength', 'tabindex'])],
+  ['object', new Set(['tabindex'])],
+  ['select', new Set(['size', 'tabindex'])],
+  ['td', new Set(['colspan', 'rowspan'])],
+  ['textarea', new Set(['cols', 'rows', 'tabindex'])],
+  ['th', new Set(['colspan', 'rowspan'])]
 ]);
 
 /**
@@ -391,6 +394,20 @@ const collapseAttributeWhitespaceExempt = new Set(['pattern', 'placeholder', 'ti
 // `value` whitespace matters only on form-submission and machine-readable elements
 const valueWhitespaceExemptElements = new Set(['button', 'data', 'input', 'option', 'param']);
 
+/**
+ * Drop repeated names from a whitespace-separated class list, keeping the first of each.
+ * @param {string} value
+ * @returns {string}
+ */
+function dedupeClassNames(value) {
+  if (!RE_ATTR_WS_CHECK.test(value)) {
+    return value;
+  }
+  const names = value.split(RE_ATTR_WS_COLLAPSE);
+  const unique = new Set(names);
+  return unique.size === names.length ? value : [...unique].join(' ');
+}
+
 // Returns the cleaned attribute value directly (sync) or as a Promise (async);
 // callers must handle both cases—use `isThenable()` to distinguish
 /**
@@ -400,8 +417,9 @@ const valueWhitespaceExemptElements = new Set(['button', 'data', 'input', 'optio
  * @param {ProcessedOptions} options
  * @param {HTMLAttribute[]} attrs
  * @param {Function} minifyHTMLSelf
+ * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
  */
-function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
+function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf, markers = []) {
   const isEventAttr = isEventAttribute(attrName, options);
 
   // Apply early whitespace normalization if enabled
@@ -448,13 +466,16 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
 
   if (attrName === 'class') {
     attrValue = trimWhitespace(attrValue);
+    // Names around a fragment placeholder (`ignoreCustomFragments`, `htmlmin:ignore`)
+    // may not repeat once a template renders
+    const holdsFragment = markers.some(marker => attrValue.indexOf(marker) !== -1);
     if (options.sortClassNames) {
       // By the time attributes are processed, `createSortFns` has replaced any truthy non-function value
       attrValue = /** @type {(value: string) => string} */ (options.sortClassNames)(attrValue);
     } else {
       attrValue = collapseWhitespaceAll(attrValue);
     }
-    return attrValue;
+    return holdsFragment ? attrValue : dedupeClassNames(attrValue);
   }
 
   if (isUriTypeAttribute(attrName, tag)) {
@@ -650,7 +671,7 @@ async function minifySrcdoc(attrValue, options, minifyHTMLSelf) {
       ...options,
       cssContext: {
         warned: options.cssContext ? options.cssContext.warned : new Set(),
-        usedSymbols: collectUsedSymbols(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
+        ...collectUsage(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
       }
     };
   }
@@ -693,19 +714,20 @@ function chooseAttributeQuote(attrValue, options) {
  * @param {string} tag
  * @param {ProcessedOptions} options
  * @param {Function} minifyHTML
+ * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
  */
-function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
+function normalizeAttr(attr, attrs, tag, options, minifyHTML, markers) {
   const attrName = options.name(attr.name);
   const attrValue = attr.value;
 
   // Entity decoding requires a lazy import—async only when `&` is present
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
     return getDecodeHTMLStrict().then(decode => {
-      return normalizeAttrContinue(attrName, decode(attrValue), attr, attrs, tag, options, minifyHTML);
+      return normalizeAttrContinue(attrName, decode(attrValue), attr, attrs, tag, options, minifyHTML, markers);
     });
   }
 
-  return normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML);
+  return normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML, markers);
 }
 
 // Internal: Handles attribute normalization after entity decoding (if any)
@@ -717,8 +739,9 @@ function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
  * @param {string} tag
  * @param {ProcessedOptions} options
  * @param {Function} minifyHTML
+ * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
  */
-function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML) {
+function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML, markers) {
   if ((options.removeRedundantAttributes &&
        isAttributeRedundant(tag, attrName, attrValue ?? '', attrs)) ||
       (options.removeDefaultTypeAttributes && attrName === 'type' && (
@@ -729,7 +752,7 @@ function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, m
   }
 
   if (attrValue) {
-    const cleaned = cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML);
+    const cleaned = cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML, markers);
     if (isThenable(cleaned)) {
       return cleaned.then((/** @type {string | undefined} */ v) => normalizeAttrFinish(attrName, v, attr, tag, options));
     }
@@ -778,6 +801,12 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   let attrQuote = attr.quote;
   let attrFragment;
   let emittedAttrValue;
+  const readAsXML = Boolean(options.insideSVG) && Boolean(options.minifySVG);
+
+  // SVGO reads the whole SVG block as XML, where every attribute carries a value
+  if (readAsXML && typeof attrValue === 'undefined') {
+    attrValue = '';
+  }
 
   // Determine if need to add/keep quotes
   const shouldAddQuotes = typeof attrValue !== 'undefined' && (
@@ -785,8 +814,8 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     (options.removeAttributeQuotes && ((uidAttr ? attrValue.indexOf(uidAttr) !== -1 : false) || !canRemoveAttributeQuotes(attrValue))) ||
     // If `removeAttributeQuotes` is not enabled, preserve original quote style or add quotes if value requires them
     (!options.removeAttributeQuotes && (attrQuote !== '' || !canRemoveAttributeQuotes(attrValue) ||
-      // SVGO reads the whole SVG block as XML, where every attribute value carries quotes
-      (Boolean(options.insideSVG) && Boolean(options.minifySVG)) ||
+      // XML quotes every attribute value
+      readAsXML ||
       // Special case: With `removeTagWhitespace`, unquoted values that aren’t last will have space added,
       // which can create ambiguous/invalid HTML—add quotes to be safe
       (options.removeTagWhitespace && attrQuote === '' && !isLast)))

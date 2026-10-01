@@ -71,7 +71,12 @@ describe('Fragments', () => {
       [/a[^x]*?a/],
       // Shapes that fall back to running the pattern, on their own and mixed in
       [/<%[\s\S]*%>/],
-      [/<(WC@[\s\S]*?)>/, /<%[\s\S]*?%>/]
+      [/<(WC@[\s\S]*?)>/, /<%[\s\S]*?%>/],
+      // …among them ones that end in a closing literal, which is looked for first (without
+      // flags, which the joined oracle would drop)
+      [/<\?(?:php[\t\n\r ]|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/, /<%[\s\S]*?%>/],
+      [/a|<%[\s\S]*?%>/],
+      [/(?:<%|\{\{)[\s\S]*?%>/]
     ];
 
     test('Matches what the equivalent regex would match, across random inputs', () => {
@@ -81,7 +86,7 @@ describe('Fragments', () => {
         return input.replace(new RegExp('\\s*(?:' + sources.join('|') + ')+\\s*', 'g'), marker);
       };
 
-      const alphabet = ['<', '>', '%', '?', '{', '}', 'a', ' ', '  ', '\n', '\t', '<%', '%>', '<%%', '%%>', '{{', '}}', '<% x %>', 'aa', '<%a%>', '<WC@x>'];
+      const alphabet = ['<', '>', '%', '?', '{', '}', 'a', ' ', '  ', '\n', '\t', '<%', '%>', '<%%', '%%>', '{{', '}}', '<% x %>', 'aa', '<%a%>', '<WC@x>', '<?', '?>', '<?php', '<?PHP', '<?=', '<?x'];
       // Seeded, so a failure is reproducible
       let seed = 42;
       const random = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
@@ -126,6 +131,20 @@ describe('Fragments', () => {
       // The whitespace before the match joins it, as it would for any other fragment
       assert.strictEqual(replaceCustomFragments('<%x%> <A%x%a>', prepare([/<a%[\s\S]*?%a>/i]), marker), '<%x%>[" <A%x%a>"]');
       assert.strictEqual(replaceCustomFragments('<%x%> <A%x%a>', prepare([/<a%[\s\S]*?%a>/]), marker), '<%x%> <A%x%a>');
+    });
+
+    test('A pattern run as a regex gives up where its closing literal is nowhere ahead', () => {
+      assert.strictEqual(toFragment(/<\?(?:php[\t\n\r ]|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i).close, '?>');
+      assert.strictEqual(toFragment(/a|<%[\s\S]*?%>/).close, null, 'A match of `a` ends anywhere');
+      assert.strictEqual(toFragment(/(<%|\{\{)[\s\S]*?%>/).close, '%>');
+      assert.strictEqual(toFragment(/<a%[\s\S]*?%a>/i).close, null, 'Case folding moves the literal');
+      assert.strictEqual(toFragment(/(<%).*?%>/).close, null, 'The body stops at line terminators');
+
+      // Each opener would otherwise run to the end of the input, which costs O(n²)
+      const input = '<?php '.repeat(50000);
+      const start = Date.now();
+      assert.strictEqual(replaceCustomFragments(input, prepare([/<\?(?:php[\t\n\r ]|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i]), marker), input);
+      assert.ok(Date.now() - start < 200, 'should fail in linear time');
     });
 
     test('A pattern that matches nothing cannot stall the scan', () => {
