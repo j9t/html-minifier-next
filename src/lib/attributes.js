@@ -405,12 +405,17 @@ const valueWhitespaceExemptElements = new Set(['button', 'data', 'input', 'optio
  * @returns {string}
  */
 function dedupeClassNames(value) {
-  const names = value.split(' ');
-  if (names.length < 2) {
+  if (value.indexOf(' ') === -1) {
     return value;
   }
-  const unique = [...new Set(names)];
-  return unique.length === names.length ? value : unique.join(' ');
+  // Most lists hold no repeats, so a `Set` is only built once one turns up
+  const names = value.split(' ');
+  for (let i = 1; i < names.length; i++) {
+    if (names.lastIndexOf(/** @type {string} */ (names[i]), i - 1) !== -1) {
+      return [...new Set(names)].join(' ');
+    }
+  }
+  return value;
 }
 
 // Returns the cleaned attribute value directly (sync) or as a Promise (async);

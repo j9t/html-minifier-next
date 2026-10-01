@@ -184,10 +184,10 @@ function findRawTextElements(haystack, tagName) {
  * @param {string} html - Raw document markup
  * @param {boolean} includeScripts - Also treat identifiers inside inline `script` elements as used
  * @param {((text: string) => string)} [decode] - Resolves character references in attribute values
- * @param {Set<string>} [scriptNames] - Receives the identifiers found in scripts, lowercased, as possible element names
+ * @param {Set<string>} [elements] - Receives the element names the markup uses, lowercased, and the identifiers found in scripts, as possible element names
  * @returns {Set<string>} Symbols to keep
  */
-function collectUsedSymbols(html, includeScripts, decode, scriptNames) {
+function collectUsedSymbols(html, includeScripts, decode, elements) {
   const used = new Set();
   const haystack = foldCase(html);
 
@@ -200,6 +200,10 @@ function collectUsedSymbols(html, includeScripts, decode, scriptNames) {
   const skipped = findRawTextElements(haystack, 'style')
     .filter(element => element.closed)
     .map(element => ({ start: element.bodyStart, end: element.bodyEnd }));
+
+  if (elements) {
+    collectUsedElements(haystack, skipped, elements);
+  }
 
   const addIdentifiers = (/** @type {string} */ text, /** @type {Set<string> | undefined} */ names = undefined) => {
     identifierPattern.lastIndex = 0;
@@ -266,7 +270,7 @@ function collectUsedSymbols(html, includeScripts, decode, scriptNames) {
         continue;
       }
       const body = html.slice(element.bodyStart, element.bodyEnd);
-      addIdentifiers(body, scriptNames);
+      addIdentifiers(body, elements);
       stringLiteralPattern.lastIndex = 0;
       let literal;
       while ((literal = stringLiteralPattern.exec(body))) {
@@ -333,39 +337,28 @@ function isSafelisted(symbol, safelist) {
 /**
  * Collect the element names a document contains, including those the parser
  * supplies when the markup leaves them out.
- * @param {string} html - Raw document markup
+ * @param {string} haystack - Case-folded markup, as returned by `foldCase`
+ * @param {Array<{start: number, end: number}>} skipped - Style sheet bodies, in document order
  * @param {Set<string>} elements - Lowercase element names, added to
- * @returns {Set<string>} `elements`
  */
-function collectUsedElements(html, elements) {
+function collectUsedElements(haystack, skipped, elements) {
   elements.add('html');
   elements.add('head');
   elements.add('body');
-  const haystack = foldCase(html);
-  const skipped = findRawTextElements(haystack, 'style').filter(element => element.closed);
 
   let skipIndex = 0;
   startTagPattern.lastIndex = 0;
   let match;
   while ((match = startTagPattern.exec(haystack))) {
-    while (skipIndex < skipped.length && (skipped[skipIndex]?.bodyEnd ?? 0) <= match.index) {
+    while (skipIndex < skipped.length && (skipped[skipIndex]?.end ?? 0) <= match.index) {
       skipIndex++;
     }
     const element = skipped[skipIndex];
-    if (element && match.index >= element.bodyStart) {
+    if (element && match.index >= element.start) {
       continue;
     }
     elements.add(match[1] ?? '');
   }
-
-  if (elements.has('table')) {
-    elements.add('tbody');
-    elements.add('tr');
-  }
-  if (elements.has('col')) {
-    elements.add('colgroup');
-  }
-  return elements;
 }
 
 /**
@@ -379,7 +372,14 @@ function collectUsage(html, includeScripts, decode) {
   // A script may create the elements a rule is for, so its identifiers count as names, too
   const usedElements = new Set();
   const usedSymbols = collectUsedSymbols(html, includeScripts, decode, usedElements);
-  collectUsedElements(html, usedElements);
+  // Elements the parser supplies inside others, added once scripts are in, as one may create a `table`, too
+  if (usedElements.has('table')) {
+    usedElements.add('tbody');
+    usedElements.add('tr');
+  }
+  if (usedElements.has('col')) {
+    usedElements.add('colgroup');
+  }
   return {
     usedSymbols,
     usedElements,

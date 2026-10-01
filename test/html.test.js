@@ -1264,6 +1264,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeAttributeQuotes: true, sortClassNames: true }), '<p class="a b c">x</p>');
     assert.strictEqual(await minify('<p class="e-user-code e-user-code">x</p>', { removeAttributeQuotes: true }), '<p class=e-user-code>x</p>');
     assert.strictEqual(await minify('<p class="A a">x</p>'), '<p class="A a">x</p>');
+    assert.strictEqual(await minify('<p class="a b c c">x</p>'), '<p class="a b c">x</p>');
 
     // Names around template fragments may not be repeats once the template renders
     input = '<p class="{% if x %} a {% endif %} a">x</p>';
