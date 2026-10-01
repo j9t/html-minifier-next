@@ -26,6 +26,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
 import path from 'path';
 import { performance } from 'perf_hooks';
 import { fileURLToPath, pathToFileURL } from 'url';
+import { padDisplay } from './benchmark.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIR_REPO = path.resolve(__dirname, '..');
@@ -197,7 +198,7 @@ async function main() {
         .sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta))
         .slice(0, args.top);
       for (const row of rows) {
-        console.log(`  ${row.name.padEnd(28)} ${(row.delta >= 0 ? '+' : '') + row.delta.toFixed(2)} ms${row.bytes ? `, ${row.bytes.toLocaleString('en-US')} bytes` : ''}`);
+        console.log(`  ${padDisplay(row.name, 28)} ${(row.delta >= 0 ? '+' : '') + row.delta.toFixed(2)} ms${row.bytes ? `, ${row.bytes.toLocaleString('en-US')} bytes` : ''}`);
       }
     }
   } finally {

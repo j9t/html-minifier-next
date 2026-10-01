@@ -144,6 +144,15 @@ function formatBytes(n) {
   return n.toLocaleString('en-US');
 }
 
+// East Asian wide characters (CJK, Hangul, full-width forms) take two terminal columns
+const WIDE_CHARS = /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/g;
+
+// Like `padEnd`, but by display width so that columns stay aligned for wide characters
+function padDisplay(str, width) {
+  const widthDisplay = str.length + (str.match(WIDE_CHARS)?.length ?? 0);
+  return str + ' '.repeat(Math.max(0, width - widthDisplay));
+}
+
 // Render a “(±N%)” suffix comparing a current value to its baseline
 function formatDelta(curr, prev) {
   if (prev == null || prev === 0) {
@@ -382,7 +391,7 @@ async function main() {
     const gzipStr = `Gzip ${formatBytes(gzip)}${prevCompressed ? formatDelta(gzip, prevCompressed.gzip) : ''}`;
     const brotliStr = `Brotli ${formatBytes(brotli)}${prevCompressed ? formatDelta(brotli, prevCompressed.brotli) : ''}`;
     const timeStr = `${time.toFixed(1)} ms${prev ? formatTimeDelta(time, prev.time, band) : ''}${noise === null ? '' : ` ±${noise.toFixed(0)}%`}`;
-    console.log(`${fileName.padEnd(24)} ${sizeStr.padEnd(26)} ${gzipStr.padEnd(26)} ${brotliStr.padEnd(28)} @ ${timeStr}`);
+    console.log(`${padDisplay(fileName, 24)} ${sizeStr.padEnd(26)} ${gzipStr.padEnd(26)} ${brotliStr.padEnd(28)} @ ${timeStr}`);
   }
 
   if (!processed) {
@@ -463,6 +472,7 @@ export {
   formatTimeDelta,
   median,
   optionsForSite,
+  padDisplay,
   parseArgs,
   reproducibility,
   resolvePreset,
