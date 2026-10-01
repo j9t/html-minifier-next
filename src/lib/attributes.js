@@ -143,19 +143,20 @@ function deduplicateAttributes(attrs, caseSensitive) {
  */
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   // Fast-path: Check if this element–attribute combination can possibly be redundant
-  // before doing expensive string operations
-
-  // Check if attribute name is in general defaults
-  const hasGeneralDefault = attrName in generalDefaults;
-
-  // Check if element has any default attributes
-  const tagHasDefaults = tag in tagDefaults;
+  // before normalizing the value; own properties only, so `constructor` has no default
+  const generalDefault = Object.hasOwn(generalDefaults, attrName)
+    ? /** @type {Record<string, string>} */ (generalDefaults)[attrName]
+    : undefined;
+  const tagAttrDefaults = Object.hasOwn(tagDefaults, tag)
+    ? /** @type {Record<string, string>} */ (/** @type {Record<string, unknown>} */ (tagDefaults)[tag])
+    : undefined;
+  const tagDefault = tagAttrDefaults && Object.hasOwn(tagAttrDefaults, attrName) ? tagAttrDefaults[attrName] : undefined;
 
   // Check for legacy attribute rules (element- and attribute-specific)
   const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) || (tag === 'a' && attrName === 'name');
 
-  // If none of these conditions apply, attribute cannot be redundant
-  if (!hasGeneralDefault && !tagHasDefaults && !isLegacyAttr) {
+  // Without a default for this very attribute, nor a legacy rule, the value cannot be redundant
+  if (generalDefault === undefined && tagDefault === undefined && !isLegacyAttr) {
     return false;
   }
 
@@ -173,13 +174,7 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
     return true;
   }
 
-  // Check general defaults
-  if (hasGeneralDefault && /** @type {Record<string, string>} */ (generalDefaults)[attrName] === attrValue) {
-    return true;
-  }
-
-  // Check tag-specific defaults
-  return tagHasDefaults && /** @type {Record<string, string>} */ (/** @type {Record<string, unknown>} */ (tagDefaults)[tag])[attrName] === attrValue;
+  return attrValue === generalDefault || attrValue === tagDefault;
 }
 
 function isScriptTypeAttribute(attrValue = '') {
