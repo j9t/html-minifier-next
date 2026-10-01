@@ -15,6 +15,7 @@ import {
   formatTimeDelta,
   median,
   optionsForSite,
+  padDisplay,
   parseArgs,
   reproducibility,
   resolvePreset,
@@ -188,6 +189,18 @@ describe('Benchmark', () => {
       const values = [10, 10, 100, 10];
       assert.strictEqual(reproducibility(values), 0);
       assert.strictEqual(spread(values), 900);
+    });
+  });
+
+  describe('`padDisplay`', () => {
+    test('Pads by display width, counting wide characters as two columns', () => {
+      assert.strictEqual(padDisplay('BBC', 6), 'BBC   ');
+      assert.strictEqual(padDisplay('博客园', 8), '博客园  ');
+      assert.strictEqual(padDisplay('Médecins', 10), 'Médecins  ');
+    });
+
+    test('Leaves strings at or beyond the width unchanged', () => {
+      assert.strictEqual(padDisplay('稀土掘金', 6), '稀土掘金');
     });
   });
 });
