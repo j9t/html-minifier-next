@@ -1261,6 +1261,9 @@ async function minifyHTML(value, options, partialMarkup) {
     value = replaceCustomFragments(value, customFragments, replaceFragment);
   }
 
+  // Custom fragment and `htmlmin:ignore` placeholders hold these
+  const markers = [uidAttr, uidIgnore].filter(marker => marker !== undefined);
+
   // Record the custom fragments in (part of) a tag
   function markTagFragments(/** @type {string} */ str) {
     for (const uidMatch of str.matchAll(/** @type {RegExp} */ (uidPattern))) {
@@ -2193,7 +2196,7 @@ async function minifyHTML(value, options, partialMarkup) {
         const attr = /** @type {HTMLAttribute} */ (attrs[i]);
         const result = opaqueAttrs.has(attr)
           ? { name: attr.name, value: undefined, attr }
-          : normalizeAttr(attr, attrs, tag, options, minifyHTML);
+          : normalizeAttr(attr, attrs, tag, options, minifyHTML, markers);
         if (!anyThenable && isThenable(result)) {
           anyThenable = true;
         }
@@ -2465,7 +2468,7 @@ async function minifyHTML(value, options, partialMarkup) {
   }
   trimOutputWhitespace();
 
-  return joinResultSegments(buffer, bufferTags ?? [], [uidAttr, uidIgnore].filter(marker => marker !== undefined), options, uidPattern
+  return joinResultSegments(buffer, bufferTags ?? [], markers, options, uidPattern
     ? function (/** @type {string} */ str) {
       return str.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ prefix, /** @type {string} */ index, /** @type {string} */ suffix, /** @type {number} */ offset, /** @type {string} */ string) {
         const chunks = ignoredCustomMarkupChunks[+index];

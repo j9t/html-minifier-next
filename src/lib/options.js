@@ -418,16 +418,19 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         const pruneSelectors = Boolean(unusedSymbols && context?.usedElements) &&
           !('visitor' in lightningCssOptions) && !RE_SCOPE_AT_RULE.test(text);
 
-        // Cache key: Content + type + options signature; large inputs are hashed to avoid huge Map keys.
-        // The symbol list belongs in the signature: The cache outlives a single `minify()` call, so
-        // identical style sheets in differently marked-up documents must not share an entry.
+        // Cache key: Content + type + options signature; large inputs are hashed to avoid
+        // huge Map keys. The symbol list belongs in the signature: The cache outlives a
+        // single `minify()` call, so identical style sheets in differently marked-up
+        // documents must not share an entry; so do the element set and the safelist
+        // where the selector visitor reads them.
         const inputCSS = wrapCSS(text, type);
         const cssSig = stableStringify({
           type,
           opts: lightningCssOptions,
           cont: !!options.continueOnMinifyError,
           unused: unusedSymbols && unusedSymbols.length ? unusedSymbols.slice().sort() : undefined,
-          elements: pruneSelectors ? context?.usedElementsKey : undefined
+          elements: pruneSelectors ? context?.usedElementsKey : undefined,
+          safelist: pruneSelectors ? unusedCSSConfig?.safelist : undefined
         });
         const isCacheable = inputCSS.length <= MAX_CACHE_ENTRY_SIZE;
         const cssKey = isCacheable

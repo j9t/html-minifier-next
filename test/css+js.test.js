@@ -1382,6 +1382,15 @@ describe('CSS and JS', () => {
       );
     });
 
+    test('Keeps selectors for safelisted elements, after the same sheet was minified without them', async () => {
+      // The CSS cache outlives a `minify()` call, so the safelist has to tell results apart
+      const input = style('p,dialog{color:red}') + '<p></p>';
+
+      assert.strictEqual(styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: true })), 'p{color:red}');
+      assert.strictEqual(styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: { safelist: ['dialog'] } })), 'p,dialog{color:red}');
+      assert.strictEqual(styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: { safelist: [/^dia/] } })), 'p,dialog{color:red}');
+    });
+
     test('Keeps selectors for elements named in inline scripts unless `scripts` is disabled', async () => {
       const input = style('dialog{color:red}') + '<p></p><script>document.body.append(document.createElement("dialog"))</script>';
 

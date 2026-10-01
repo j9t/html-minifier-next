@@ -1269,6 +1269,14 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p class="e-user-code e-user-code">x</p>', { removeAttributeQuotes: true }), '<p class=e-user-code>x</p>');
     assert.strictEqual(await minify('<p class="A a">x</p>'), '<p class="A a">x</p>');
     assert.strictEqual(await minify('<p class="a b c c">x</p>'), '<p class="a b c">x</p>');
+    // Any ASCII whitespace separates names, tabs included
+    assert.strictEqual(await minify('<p class="a\ta">x</p>'), '<p class="a">x</p>');
+    assert.strictEqual(await minify('<p class="a\nb\ta">x</p>'), '<p class="a b">x</p>');
+    // In linear time, also for a long list without repeats
+    const names = Array.from({ length: 50000 }, (_, i) => 'c' + i).join(' ');
+    const start = Date.now();
+    assert.strictEqual(await minify(`<p class="${names}">x</p>`), `<p class="${names}">x</p>`);
+    assert.ok(Date.now() - start < 500, 'should deduplicate in linear time');
 
     // Names around template fragments may not be repeats once the template renders
     input = '<p class="{% if x %} a {% endif %} a">x</p>';

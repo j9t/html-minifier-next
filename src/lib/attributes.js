@@ -395,22 +395,17 @@ const collapseAttributeWhitespaceExempt = new Set(['pattern', 'placeholder', 'ti
 const valueWhitespaceExemptElements = new Set(['button', 'data', 'input', 'option', 'param']);
 
 /**
- * Drop repeated names from a space-separated class list, keeping the first of each.
+ * Drop repeated names from a whitespace-separated class list, keeping the first of each.
  * @param {string} value
  * @returns {string}
  */
 function dedupeClassNames(value) {
-  if (value.indexOf(' ') === -1) {
+  if (!RE_ATTR_WS_CHECK.test(value)) {
     return value;
   }
-  // Most lists hold no repeats, so a `Set` is only built once one turns up
-  const names = value.split(' ');
-  for (let i = 1; i < names.length; i++) {
-    if (names.lastIndexOf(/** @type {string} */ (names[i]), i - 1) !== -1) {
-      return [...new Set(names)].join(' ');
-    }
-  }
-  return value;
+  const names = value.split(RE_ATTR_WS_COLLAPSE);
+  const unique = new Set(names);
+  return unique.size === names.length ? value : [...unique].join(' ');
 }
 
 // Returns the cleaned attribute value directly (sync) or as a Promise (async);
@@ -422,8 +417,9 @@ function dedupeClassNames(value) {
  * @param {ProcessedOptions} options
  * @param {HTMLAttribute[]} attrs
  * @param {Function} minifyHTMLSelf
+ * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
  */
-function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf) {
+function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf, markers = []) {
   const isEventAttr = isEventAttribute(attrName, options);
 
   // Apply early whitespace normalization if enabled
@@ -470,9 +466,9 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
 
   if (attrName === 'class') {
     attrValue = trimWhitespace(attrValue);
-    // Fragment placeholders arrive tab-wrapped (`ignoreCustomFragments`) or as comments
-    // (`htmlmin:ignore`), and names around them may not repeat once a template renders
-    const holdsFragment = attrValue.indexOf('\t') !== -1 || attrValue.indexOf('<!--') !== -1;
+    // Names around a fragment placeholder (`ignoreCustomFragments`, `htmlmin:ignore`)
+    // may not repeat once a template renders
+    const holdsFragment = markers.some(marker => attrValue.indexOf(marker) !== -1);
     if (options.sortClassNames) {
       // By the time attributes are processed, `createSortFns` has replaced any truthy non-function value
       attrValue = /** @type {(value: string) => string} */ (options.sortClassNames)(attrValue);
@@ -718,19 +714,20 @@ function chooseAttributeQuote(attrValue, options) {
  * @param {string} tag
  * @param {ProcessedOptions} options
  * @param {Function} minifyHTML
+ * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
  */
-function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
+function normalizeAttr(attr, attrs, tag, options, minifyHTML, markers) {
   const attrName = options.name(attr.name);
   const attrValue = attr.value;
 
   // Entity decoding requires a lazy import—async only when `&` is present
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
     return getDecodeHTMLStrict().then(decode => {
-      return normalizeAttrContinue(attrName, decode(attrValue), attr, attrs, tag, options, minifyHTML);
+      return normalizeAttrContinue(attrName, decode(attrValue), attr, attrs, tag, options, minifyHTML, markers);
     });
   }
 
-  return normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML);
+  return normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML, markers);
 }
 
 // Internal: Handles attribute normalization after entity decoding (if any)
@@ -742,8 +739,9 @@ function normalizeAttr(attr, attrs, tag, options, minifyHTML) {
  * @param {string} tag
  * @param {ProcessedOptions} options
  * @param {Function} minifyHTML
+ * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
  */
-function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML) {
+function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML, markers) {
   if ((options.removeRedundantAttributes &&
        isAttributeRedundant(tag, attrName, attrValue ?? '', attrs)) ||
       (options.removeDefaultTypeAttributes && attrName === 'type' && (
@@ -754,7 +752,7 @@ function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, m
   }
 
   if (attrValue) {
-    const cleaned = cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML);
+    const cleaned = cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML, markers);
     if (isThenable(cleaned)) {
       return cleaned.then((/** @type {string | undefined} */ v) => normalizeAttrFinish(attrName, v, attr, tag, options));
     }
