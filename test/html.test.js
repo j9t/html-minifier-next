@@ -233,6 +233,13 @@ describe('HTML', () => {
     // …or at the end of the input
     assert.strictEqual(await minify('<p>a</ x', { continueOnParseError: true }), '<p>a<!-- x-->');
 
+    // Neither keeps a following doctype from setting the mode, so `</p>` can go before `table` in no-quirks mode
+    const tableAfterP = '<!doctype html><p>a</p><table><tr><td>b</table>';
+    const tableAfterPMinified = '<!doctype html><p>a<table><tr><td>b</table>';
+    assert.strictEqual(await minify('</>' + tableAfterP, { continueOnParseError: true, removeOptionalTags: true }), tableAfterPMinified);
+    assert.strictEqual(await minify('</ x>' + tableAfterP, { continueOnParseError: true, removeOptionalTags: true }), '<!-- x-->' + tableAfterPMinified);
+    assert.strictEqual(await minify('</ x>' + tableAfterP, { continueOnParseError: true, removeOptionalTags: true, removeComments: true }), tableAfterPMinified);
+
     // `</` at the end of the input stays text
     assert.strictEqual(await minify('<p>a</', { continueOnParseError: true }), '<p>a</');
     assert.strictEqual(await minify('<p>a</', { continueOnParseError: true, decodeEntities: true }), '<p>a&lt;/');

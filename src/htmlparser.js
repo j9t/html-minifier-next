@@ -539,7 +539,6 @@ export class HTMLParser {
             // the next `>` (or the end of the input) as a bogus comment, never as text
             const nameCode = fullHtml.charCodeAt(pos + 2) | 32;
             if (handler.continueOnParseError && pos + 2 < fullLength && !(nameCode >= 97 && nameCode <= 122)) {
-              docModeSettable = false;
               const bogusEnd = hasCloseAtOrAfter(pos + 2) ? nextGtPos : fullLength;
               reportParseError(pos, bogusEnd === pos + 2 ? 'Dropped end tag without a name' : 'Read end tag without a name as comment');
               if (bogusEnd > pos + 2 && handler.comment) {
@@ -966,11 +965,8 @@ export class HTMLParser {
       return false;
     }
 
-    // Returns the lowercase name for the parse loop, or a Promise of it
-    // when `handler.start` awaits (which only happens with attributes).
-    // The lenient attribute pattern takes characters into unquoted values
-    // that the strict one rejects; the start tag has just been consumed,
-    // so it ends right before `pos`.
+    // The lenient attribute pattern takes characters into unquoted values that the strict
+    // one rejects; the start tag has just been consumed, so it ends right before `pos`
     function reportUnquotedValueErrors(/** @type {{attrs: Array<Array<string | undefined>>, advance: number}} */ match) {
       let attrPos = pos - match.advance;
       for (const attr of match.attrs) {
@@ -989,6 +985,8 @@ export class HTMLParser {
       }
     }
 
+    // Returns the lowercase name for the parse loop, or a Promise of it
+    // when `handler.start` awaits (which only happens with attributes)
     function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
       const tagName = match.tagName;
       const lowerTagName = tagName.toLowerCase();
