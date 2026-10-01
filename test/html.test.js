@@ -210,6 +210,65 @@ describe('HTML', () => {
     );
   });
 
+  test('Parse error recovery: end tag without a name', async () => {
+    // Without the flag, must throw
+    for (const input of ['<p>a</>b</p>', '<p>a</ x>b</p>', '<p>a</3>b</p>']) {
+      await assert.rejects(() => minify(input), { name: 'Error' }, input);
+    }
+
+    // `</>` is dropped, as in browsers, not kept as text
+    assert.strictEqual(await minify('<p>a</>b</p>', { continueOnParseError: true }), '<p>ab</p>');
+    assert.strictEqual(await minify('<p>a</>b</p>', { continueOnParseError: true, decodeEntities: true }), '<p>ab</p>');
+    assert.strictEqual(
+      await minify('<div>a</div> </> <div>b</div>', { continueOnParseError: true, collapseWhitespace: true }),
+      '<div>a</div><div>b</div>'
+    );
+
+    // `</` before anything but a letter opens a bogus comment, which ends at the next `>`
+    assert.strictEqual(await minify('<p>a</ x>b</p>', { continueOnParseError: true }), '<p>a<!-- x-->b</p>');
+    assert.strictEqual(await minify('<p>a</3>b</p>', { continueOnParseError: true }), '<p>a<!--3-->b</p>');
+    assert.strictEqual(await minify('<p>a</-->b</p>', { continueOnParseError: true }), '<p>a<!------>b</p>');
+    assert.strictEqual(await minify('<p>a</ x>b</p>', { continueOnParseError: true, removeComments: true }), '<p>ab</p>');
+
+    // …or at the end of the input
+    assert.strictEqual(await minify('<p>a</ x', { continueOnParseError: true }), '<p>a<!-- x-->');
+
+    // `</` at the end of the input stays text
+    assert.strictEqual(await minify('<p>a</', { continueOnParseError: true }), '<p>a</');
+    assert.strictEqual(await minify('<p>a</', { continueOnParseError: true, decodeEntities: true }), '<p>a&lt;/');
+  });
+
+  test('Parse error recovery: reported through `log`', async () => {
+    const parseErrors = async (input, options = {}) => {
+      const messages = [];
+      await minify(input, { continueOnParseError: true, log: (message) => messages.push(message), ...options });
+      return messages.filter((message) => String(message).startsWith('Warning: Parse error'));
+    };
+
+    assert.deepStrictEqual(await parseErrors('<p>a</>b</p>'), [
+      'Warning: Parse error at line 1, column 5: Dropped end tag without a name'
+    ]);
+    assert.deepStrictEqual(await parseErrors('<p>a\n</ x>b</p>'), [
+      'Warning: Parse error at line 2, column 1: Read end tag without a name as comment'
+    ]);
+    assert.deepStrictEqual(await parseErrors('<a href=?b=c>d</a>'), [
+      'Warning: Parse error at line 1, column 11: Kept `=` in unquoted attribute value'
+    ]);
+    assert.deepStrictEqual(await parseErrors('<a href=?b=c>d</a>', { customAttrSurround: [[/\{\{#if\s+\w+\}\}/, /\{\{\/if\}\}/]] }), [
+      'Warning: Parse error at line 1, column 11: Kept `=` in unquoted attribute value'
+    ]);
+    assert.deepStrictEqual(await parseErrors('<p>a<\n</>\n<p>b</p>'), [
+      'Warning: Parse error at line 1, column 5: Kept `<` as text',
+      'Warning: Parse error at line 2, column 1: Dropped end tag without a name'
+    ]);
+
+    // Reported once, although attribute and class sorting parse the input more than once
+    assert.strictEqual((await parseErrors('<p>a</>b</p>', { sortAttributes: true, sortClassNames: true })).length, 1);
+
+    // Nothing to report on valid input
+    assert.deepStrictEqual(await parseErrors('<p>a &lt; b</p><a href=x>y</a><!-- c -->'), []);
+  });
+
   // https://github.com/j9t/html-minifier-next/issues/257
   test('Parse error recovery: `<` in unquoted attribute value', async () => {
     // Without the flag, must throw

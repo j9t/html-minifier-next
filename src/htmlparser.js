@@ -25,6 +25,7 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
  *   comment?: Function,
  *   doctype?: Function,
  *   strayEnd?: Function,
+ *   parseError?: Function | undefined,
  *   continueOnParseError?: boolean | undefined,
  *   partialMarkup?: boolean | undefined,
  *   noQuirksMode?: boolean | undefined,
@@ -58,10 +59,12 @@ const singleAttrValues = [
   /([^ \t\n\f\r"'`=<>]+)/.source
 ];
 // Lenient unquoted value pattern for `continueOnParseError`:
-// allows `<`, `=`, and ``` per HTML error-recovery rules
-// (all are parse errors in unquoted-attribute-value state but appended to the value)
+// allows `<`, `=`, and backticks per HTML error-recovery rules
+// (all are parse errors in unquoted-attribute-value state but appended to the value);
 // `"` and `'` remain excluded—permitting them requires broader test coverage
 const singleAttrValueLenientUnquoted = /([^ \t\n\f\r"'>]+)/.source;
+// The characters the lenient pattern takes in beyond the strict one, each a parse error
+const RE_UNQUOTED_VALUE_ERROR = /[<=`]/;
 // https://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-QName
 const qnameCapture = (function () {
   // https://www.npmjs.com/package/ncname
@@ -356,6 +359,29 @@ export class HTMLParser {
       return { line, column };
     };
 
+    // Recoveries are reported in document order, so each picks up where the last left off
+    let reportedPos = 0;
+    let reportedLoc = { line: 1, column: 1 };
+    const reportParseError = (/** @type {number} */ position, /** @type {string} */ recovery) => {
+      if (!handler.parseError) return;
+      if (position < reportedPos) {
+        reportedPos = 0;
+        reportedLoc = { line: 1, column: 1 };
+      }
+      let { line, column } = reportedLoc;
+      for (let i = reportedPos; i < position; i++) {
+        if (fullHtml.charCodeAt(i) === 10) {
+          line++;
+          column = 1;
+        } else {
+          column++;
+        }
+      }
+      reportedPos = position;
+      reportedLoc = { line, column };
+      handler.parseError(`Parse error at line ${line}, column ${column}: ${recovery}`);
+    };
+
     // Helper to safely extract substring when needed for stacked tag content
     const sliceFromPos = (/** @type {number} */ startPos) => {
       return fullHtml.slice(startPos);
@@ -509,6 +535,22 @@ export class HTMLParser {
                 continue;
               }
             }
+            // Without a letter for a name, browsers drop `</>` and read anything else up to
+            // the next `>` (or the end of the input) as a bogus comment, never as text
+            const nameCode = fullHtml.charCodeAt(pos + 2) | 32;
+            if (handler.continueOnParseError && pos + 2 < fullLength && !(nameCode >= 97 && nameCode <= 122)) {
+              docModeSettable = false;
+              const bogusEnd = hasCloseAtOrAfter(pos + 2) ? nextGtPos : fullLength;
+              reportParseError(pos, bogusEnd === pos + 2 ? 'Dropped end tag without a name' : 'Read end tag without a name as comment');
+              if (bogusEnd > pos + 2 && handler.comment) {
+                const result = handler.comment(fullHtml.substring(pos + 2, bogusEnd));
+                if (isThenable(result)) await result;
+              }
+              advance(Math.min(bogusEnd + 1, fullLength) - pos);
+              prevTag = '';
+              prevAttrs = [];
+              continue;
+            }
           } else {
             // Start tag
             const startTagMatch = parseStartTag(pos);
@@ -630,6 +672,7 @@ export class HTMLParser {
         if (handler.continueOnParseError) {
           // Skip the problematic character and continue
           docModeSettable = false;
+          reportParseError(pos, `Kept \`${fullHtml[pos]}\` as text`);
           if (handler.chars) {
             const result = handler.chars(fullHtml[pos], prevTag, '', prevAttrs, []);
             if (isThenable(result)) await result;
@@ -924,13 +967,35 @@ export class HTMLParser {
     }
 
     // Returns the lowercase name for the parse loop, or a Promise of it
-    // when `handler.start` awaits (which only happens with attributes)
+    // when `handler.start` awaits (which only happens with attributes).
+    // The lenient attribute pattern takes characters into unquoted values
+    // that the strict one rejects; the start tag has just been consumed,
+    // so it ends right before `pos`.
+    function reportUnquotedValueErrors(/** @type {{attrs: Array<Array<string | undefined>>, advance: number}} */ match) {
+      let attrPos = pos - match.advance;
+      for (const attr of match.attrs) {
+        const text = attr[0] ?? '';
+        attrPos = fullHtml.indexOf(text, attrPos);
+        const surroundCount = handler.customAttrSurround ? handler.customAttrSurround.length : 0;
+        for (let i = 0; i <= surroundCount; i++) {
+          // Unquoted values sit at index 5 of each surround block, and 4 behind the plain name
+          const value = i < surroundCount ? attr[1 + i * NCP + 5] : attr[1 + surroundCount * NCP + 4];
+          const errorIndex = value ? value.search(RE_UNQUOTED_VALUE_ERROR) : -1;
+          if (value && errorIndex !== -1) {
+            reportParseError(attrPos + text.lastIndexOf(value) + errorIndex, `Kept \`${value[errorIndex]}\` in unquoted attribute value`);
+          }
+        }
+        attrPos += text.length;
+      }
+    }
+
     function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
       const tagName = match.tagName;
       const lowerTagName = tagName.toLowerCase();
       let unarySlash = match.unarySlash;
 
       docModeSettable = false;
+      if (handler.parseError) reportUnquotedValueErrors(match);
       const pIndex = stack.length ? (stack[stack.length - 1]?.pScope ?? -1) : -1;
       if (pIndex >= 0 && closesP.has(lowerTagName)) {
         if (lowerTagName !== 'table' || docMode === 'no-quirks') {

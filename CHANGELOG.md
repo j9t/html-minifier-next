@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.9.0] - 2026-10-01
+
+### Fixed
+
+* Fixed `continueOnParseError` keeping an end tag without a name as text, which made it show; like browsers, HMN now drops `</>`, and reads `</` followed by anything but a letter (e.g., `</ x>` or `</3>`) as a comment up to the next `>`
+
+### Added
+
+* Added reporting of the parse errors `continueOnParseError` handles: Each now reaches `log` (and the CLI’s `--verbose` and `--dry` output) with its line and column and how it was handled (e.g., `Warning: Parse error at line 1487, column 21: Dropped end tag without a name`)
+
 ## [8.8.1] - 2026-09-30
 
 ### Changed
