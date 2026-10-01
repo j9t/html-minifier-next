@@ -198,6 +198,15 @@ function replaceCustomFragments(value, fragments, replacer) {
    * @returns {{start: number, end: number} | null}
    */
   const scan = (fragment, index, from, anchored) => {
+    // The closing delimiter first: An opener starting with `<` is slow to find in markup
+    if (/** @type {number} */ (closesAt[index]) < from) {
+      closesAt[index] = value.indexOf(fragment.close, from);
+      if (closesAt[index] === -1) {
+        exhausted[index] = true;
+        return null;
+      }
+    }
+
     let openFrom = from;
 
     for (;;) {
