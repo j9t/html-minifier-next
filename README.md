@@ -264,9 +264,9 @@ Most HTML is served compressed, so the Gzip or Brotli size is often what counts�
 
 | Added to `comprehensive` | Raw | Gzip (level 6) | Brotli (quality 6) | Brotli (quality 11) |
 | --- | --- | --- | --- | --- |
-| `sortAttributes` | ±0% | −0.19% | −0.22% | −0.10% |
-| `sortAttributes`, `removeAttributeQuotes: false`, `quoteCharacter: '"'` | +1.71% | +0.08% | −0.17% | −0.38% |
-| `removeEmptyElements` | −1.12% | −0.62% | −0.54% | −0.54% |
+| `sortAttributes` | ±0% | −0.10% | −0.11% | −0.07% |
+| `sortAttributes`, `removeAttributeQuotes: false`, `quoteCharacter: '"'` | +1.68% | +0.20% | −0.02% | −0.30% |
+| `removeEmptyElements` | −1.37% | −0.76% | −0.65% | −0.66% |
 
 * **Gzip or on-the-fly Brotli:** Add `sortAttributes`. The gain is small and uneven, however, and sorting can double minification time for very large documents.
 * **Brotli precompressed at quality 11** (as for static files compressed at build time): Add `sortAttributes`, don’t remove attribute quotes, and make the quotes double quotes. Raw and Gzip output grow, so this only pays off when clients receive the precompressed Brotli files.
@@ -280,7 +280,7 @@ npx html-minifier-next --preset comprehensive --sort-attributes input.html
 npx html-minifier-next --preset comprehensive --sort-attributes --no-remove-attribute-quotes --quote-character='"' input.html
 ```
 
-These figures were measured in September 2026 with HMN 8.8.0 on 31 pages of the [backtest corpus](#regression-tests) (retrieved February 2026). They are indications, not guarantees, as they depend on the markup and will shift as HMN and the minifiers it bundles change. The [benchmark](#working-tree-benchmarks) reports Gzip and Brotli (quality 6) sizes to re-check them.
+These figures were measured in October 2026 with HMN 8.8.1 on 61 pages of the [backtest corpus](#regression-tests) (retrieved February and September 2026). They are indications, not guarantees, as they depend on the markup and will shift as HMN and the minifiers it bundles change. The [benchmark](#working-tree-benchmarks) reports Gzip and Brotli (quality 6) sizes to re-check them.
 
 ### Removing empty elements
 
@@ -294,7 +294,7 @@ These figures were measured in September 2026 with HMN 8.8.0 on 31 pages of the 
 
 Everything else goes, including elements that are empty on purpose: icons and other elements styled with CSS (e.g., `<i class="test"></i>` or `<span style="width:50%"></span>`), named anchors (`<a name="top"></a>`), other elements that scripts fill, empty `option` elements, and empty table cells (which shifts the cells that follow). Keep such elements with `removeEmptyElementsExcept`, for example `["td", "<i class='test'>"]`. A parent that is left empty by the removal goes, too, unless the above keeps it.
 
-Where the markup allows it, the option is effective: On a test corpus, it reduced output by 1.12% raw and 0.62% with Gzip on average (see [“Optimizing for compression”](#optimizing-for-compression)).
+Where the markup allows it, the option is effective: On a test corpus, it reduced output by 1.37% raw and 0.76% with Gzip on average (see [“Optimizing for compression”](#optimizing-for-compression)).
 
 ### CSS minification
 
