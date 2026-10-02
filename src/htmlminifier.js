@@ -662,6 +662,7 @@ const RE_BLANKS_ONLY = /^[ \t\f]+$/;
 // Pre-compiled patterns for `htmlmin:ignore` block content analysis
 const RE_HTML_COMMENT_START = /^\s*<!--/;
 const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
+const RE_FIRST_HTML_TAG = /^\s*<([a-zA-Z][\w:-]*)/;
 const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
 
 
@@ -1103,9 +1104,12 @@ async function minifyHTML(value, options, partialMarkup) {
   let impliedStartTag = '';
   // Whether the parser found the document to be in no-quirks mode, where `table` closes a `p`
   let tableClosesP = false;
-  // Under `collapseWhitespace`, where a space sits between elements that don’t render, kept until
-  // what follows them shows whether it separates anything, and how deep inside such elements parsing is
+  // Under `collapseWhitespace`, the text whose trailing whitespace sits before or
+  // between elements that don’t render, kept until what follows them shows whether
+  // it separates anything; whether the text being processed is such text; and how
+  // deep inside such elements parsing is
   let transparentGapIndex = -1;
+  let transparentGapPending = false;
   let transparentDepth = 0;
   let currentTag = '';
   /** @type {Array<{name: string, value?: string, quote?: string, customAssign?: string, customOpen?: string, customClose?: string}>} */
@@ -1544,8 +1548,7 @@ async function minifyHTML(value, options, partialMarkup) {
   // element which has now been removed
   function squashTrailingWhitespace(/** @type {string} */ nextTag) {
     if (transparentGapIndex !== -1 && !transparentDepth && !inlineElementsTransparentAfter.has(nextTag) && !inlineElementsTransparent.has(nextTag)) {
-      buffer[transparentGapIndex] = collapseWhitespaceSmart(' ', '', nextTag, emptyAttrs, emptyAttrs, options, inlineSets);
-      transparentGapIndex = -1;
+      settleTransparentGap(collapseWhitespaceSmart(' ', '', nextTag, emptyAttrs, emptyAttrs, options, inlineSets) !== '');
     }
     let charsIndex = buffer.length - 1;
     // Step back over every trailing comment and empty entry, not just one—a single step
@@ -1567,13 +1570,49 @@ async function minifyHTML(value, options, partialMarkup) {
     trimTrailingWhitespace(charsIndex, nextTag);
   }
 
-  // Whether what comes before the elements that don’t render at the end of `buffer` would run into what follows them
-  function precedesTransparentRun() {
+  // Keep or trim the whitespace pending before or between elements that don’t render
+  function settleTransparentGap(/** @type {boolean} */ keep) {
+    if (!keep) {
+      buffer[transparentGapIndex] = collapseWhitespace(buffer[transparentGapIndex] ?? '', options, false, true);
+    }
+    transparentGapIndex = -1;
+  }
+
+  // The index of the start tag whose attributes, which follow it as entries
+  // of their own, end at `index`, or -1 for text
+  function findAttributesStartTag(/** @type {number} */ index) {
+    if ((buffer[index] ?? '').charCodeAt((buffer[index] ?? '').length - 1) !== 62 /* > */) return -1;
+    for (let tagIndex = index - 1; tagIndex >= 0; tagIndex--) {
+      const str = buffer[tagIndex] ?? '';
+      if (str.charCodeAt(0) === 60 /* < */) {
+        return RE_START_TAG.test(str) && str.charCodeAt(str.length - 1) !== 62 /* > */ ? tagIndex : -1;
+      }
+      if (!str || str.charCodeAt(str.length - 1) === 62 /* > */) return -1;
+    }
+    return -1;
+  }
+
+  // Whether what comes before the elements that don’t render at the end of `buffer`
+  // would run into what follows them; without `skipAttributes`, the scan stops at
+  // a start tag’s attributes and says yes, as stepping over them on every
+  // call makes the scan quadratic over long runs
+  function precedesTransparentRun(/** @type {boolean} */ skipAttributes = false) {
     for (let index = buffer.length - 1; index >= 0; index--) {
-      const str = buffer[index] ?? '';
+      let str = buffer[index] ?? '';
       if (!str) continue;
       if (str.charCodeAt(0) !== 60 /* < */) {
-        return !endsWithWhitespace(str);
+        const tagIndex = skipAttributes ? findAttributesStartTag(index) : -1;
+        if (tagIndex === -1) {
+          return !endsWithWhitespace(str);
+        }
+        index = tagIndex;
+        str = buffer[index] ?? '';
+      }
+      // Comments don’t render, whereas what an `htmlmin:ignore` block
+      // or a processing instruction stands for may
+      if (str.charCodeAt(1) === 33 /* ! */ || str.charCodeAt(1) === 63 /* ? */) {
+        if (str.charCodeAt(1) === 63 || (uidIgnore && str.indexOf(uidIgnore) !== -1)) return true;
+        continue;
       }
       const endTagName = matchPlainEndTag(str);
       const tag = endTagName === null ? (RE_START_TAG_NAME.exec(str)?.[1] ?? '') : '/' + endTagName;
@@ -1583,7 +1622,9 @@ async function minifyHTML(value, options, partialMarkup) {
       // Skip what an element that doesn’t render holds
       if (endTagName !== null) {
         const startTag = '<' + endTagName.toLowerCase();
-        while (index > 0 && !(buffer[index - 1] ?? '').toLowerCase().startsWith(startTag)) {
+        // Only the start of each entry is compared,
+        // as what such an element holds can be large
+        while (index > 0 && (buffer[index - 1] ?? '').slice(0, startTag.length).toLowerCase() !== startTag) {
           index--;
         }
         index--;
@@ -1676,28 +1717,35 @@ async function minifyHTML(value, options, partialMarkup) {
           }
         }
         if (textPrevTag || textNextTag) {
-          const collapsed = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineSets);
+          let collapsed = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineSets);
           if (!transparentDepth && inlineElementsTransparentAfter.has(textPrevTag)) {
             // Between elements that don’t render, whitespace stays pending when it may separate text, and one space does
             if (!collapsed && text && inlineElementsTransparent.has(textNextTag)) {
               if (transparentGapIndex === -1 && precedesTransparentRun()) {
-                transparentGapIndex = buffer.length;
+                transparentGapPending = true;
                 text = ' ';
               } else {
                 text = '';
               }
             } else {
               // Text that follows decides, while a tag that follows does so in `squashTrailingWhitespace`
-              if (transparentGapIndex !== -1 && collapsed) {
-                if (RE_LEADING_WHITESPACE.test(collapsed)) {
-                  buffer[transparentGapIndex] = '';
+              if (RE_LEADING_WHITESPACE.test(collapsed)) {
+                if (transparentGapIndex !== -1) settleTransparentGap(false);
+                // Where nothing before the elements renders a space, the text’s own goes, too
+                if (!options.conservativeCollapse && !precedesTransparentRun(true)) {
+                  collapsed = collapseWhitespace(collapsed, options, true, false);
                 }
-                transparentGapIndex = -1;
+              } else if (transparentGapIndex !== -1 && collapsed) {
+                settleTransparentGap(true);
               }
               text = collapsed;
             }
           } else {
             text = collapsed;
+            // Whitespace before an element that doesn’t render waits for what follows it, too
+            if (!transparentDepth && inlineElementsTransparent.has(textNextTag) && endsWithWhitespace(text)) {
+              transparentGapPending = true;
+            }
           }
         } else {
           text = collapseWhitespace(text, options, true, true);
@@ -1788,6 +1836,10 @@ async function minifyHTML(value, options, partialMarkup) {
       markOpenElementFilled();
     }
     const followsRemoval = removed && Boolean(text) && !options.collapseWhitespace && !stackNoTrimWhitespace.length;
+    if (transparentGapPending) {
+      transparentGapPending = false;
+      if (text) transparentGapIndex = buffer.length;
+    }
     bufferPush(text, false);
     if (followsRemoval) {
       removeWhitespaceLine(buffer.length - 1);
@@ -1822,6 +1874,24 @@ async function minifyHTML(value, options, partialMarkup) {
       optionalEndTagEmitted = false;
     }
 
+    // Whitespace between an element that doesn’t render and an `htmlmin:ignore` block
+    // that starts with one depends on what lies before both
+    if (options.collapseWhitespace && comment && uidIgnorePlaceholderPattern && !transparentDepth && !stackNoTrimWhitespace.length && buffer.length >= 2) {
+      const prevText = buffer[buffer.length - 1] ?? '';
+      const match = prevText && RE_WS_ONLY.test(prevText) && uidIgnorePlaceholderPattern.exec(comment);
+      const firstTag = match ? RE_FIRST_HTML_TAG.exec(ignoredMarkupChunks[+(match[1] ?? 0)] ?? '')?.[1] : undefined;
+      if (firstTag && inlineElementsTransparent.has(resolveName(firstTag)) && inlineElementsTransparentAfter.has(charsPrevTag)) {
+        // Emptied first, as `precedesTransparentRun` stops at text
+        buffer[buffer.length - 1] = '';
+        if (transparentGapIndex === buffer.length - 1) transparentGapIndex = -1;
+        buffer[buffer.length - 1] = options.conservativeCollapse || precedesTransparentRun(true) ? ' ' : '';
+      }
+    }
+    // What an `htmlmin:ignore` block holds is unknown, so whitespace pending before it stays
+    if (transparentGapIndex !== -1 && !transparentDepth && comment && uidIgnorePlaceholderPattern?.test(comment)) {
+      settleTransparentGap(true);
+    }
+
     // Optimize whitespace collapsing between consecutive `htmlmin:ignore` placeholder comments
     if (options.collapseWhitespace && comment && uidIgnorePlaceholderPattern) {
       if (uidIgnorePlaceholderPattern.test(comment)) {
@@ -1849,8 +1919,8 @@ async function minifyHTML(value, options, partialMarkup) {
                 // Don’t collapse if either contains plain text, as that would change meaning
                 if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
                   // Extract tag names from the HTML content
-                  const currentTagMatch = currentContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
-                  const prevTagMatch = prevContent.match(/^\s*<([a-zA-Z][\w:-]*)/);
+                  const currentTagMatch = currentContent.match(RE_FIRST_HTML_TAG);
+                  const prevTagMatch = prevContent.match(RE_FIRST_HTML_TAG);
                   // HTML comments are invisible (no block/inline nature), treat as non-inline
                   const prevIsHtmlComment = !prevTagMatch && RE_HTML_COMMENT_START.test(prevContent);
                   const currentIsHtmlComment = !currentTagMatch && RE_HTML_COMMENT_START.test(currentContent);
@@ -2431,6 +2501,12 @@ async function minifyHTML(value, options, partialMarkup) {
   });
 
   await parser.parse();
+
+  // Nothing follows at the end, so whitespace still pending goes
+  // (before SVG blocks shift the buffer)
+  if (transparentGapIndex !== -1) {
+    settleTransparentGap(Boolean(options.conservativeCollapse));
+  }
 
   // Post-processing: Optimize SVG blocks with SVGO
   // Run all SVGO calls in parallel, then splice results in reverse to preserve indices
