@@ -671,7 +671,8 @@ export class HTMLParser {
           } else if (nextCode !== 47 && nextCode !== 33) {
             const nextStartTagMatch = parseStartTag(pos);
             if (nextStartTagMatch) {
-              nextTag = nextStartTagMatch.tagName;
+              // Lowercase, as `prevTag` is, so `SPAN` reads as `span` to the whitespace logic
+              nextTag = nextStartTagMatch.lowerTagName;
               // Extract minimal attribute info for whitespace logic (just name/value pairs)—
               // only consulted next to an `input` (hidden inputs), so skip the extraction
               // for every other tag rather than allocating attribute objects for each
@@ -684,7 +685,7 @@ export class HTMLParser {
           } else if (nextCode === 47 && hasCloseAtOrAfter(pos)) {
             const nextEndTagMatch = matchEndTag(pos);
             if (nextEndTagMatch) {
-              nextTag = '/' + nextEndTagMatch.name;
+              nextTag = '/' + nextEndTagMatch.name.toLowerCase();
               nextAttrs = emptyAttrs;
               cachedNextEndTag = { match: nextEndTagMatch, pos };
             } else {
@@ -852,9 +853,11 @@ export class HTMLParser {
         tagName = start[1] ?? '';
         consumed = start[0].length;
       }
-      /** @type {{tagName: string, attrs: Array<Array<string|undefined>>, advance: number, unarySlash?: string}} */
+      /** @type {{tagName: string, lowerTagName: string, attrs: Array<Array<string|undefined>>, advance: number, unarySlash?: string}} */
       const match = {
         tagName,
+        // Once per tag, for the look-ahead as well as for the start tag itself
+        lowerTagName: tagName.toLowerCase(),
         attrs: [],
         advance: 0
       };
@@ -1068,9 +1071,9 @@ export class HTMLParser {
 
     // Returns the lowercase name for the parse loop, or a Promise of it
     // when `handler.start` awaits (which only happens with attributes)
-    function handleStartTag(/** @type {{tagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
+    function handleStartTag(/** @type {{tagName: string, lowerTagName: string, attrs: Array<Array<string | undefined>>, advance: number, unarySlash?: string}} */ match) {
       const tagName = match.tagName;
-      const lowerTagName = tagName.toLowerCase();
+      const lowerTagName = match.lowerTagName;
       let unarySlash = match.unarySlash;
 
       docModeSettable = false;
@@ -1175,8 +1178,12 @@ export class HTMLParser {
             quote = '\'';
           } else {
             value = args[assignIndex + 3];
-            if (typeof value === 'undefined' && fillAttrs.has(name.toLowerCase())) {
-              value = name;
+            if (typeof value === 'undefined') {
+              // The name is the canonical value, which HTML reads in lowercase
+              const nameLower = name.toLowerCase();
+              if (fillAttrs.has(nameLower)) {
+                value = nameLower;
+              }
             }
             quote = '';
           }

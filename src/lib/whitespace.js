@@ -312,8 +312,9 @@ const defaultInlineSets = buildInlineSets(inlineElementsToKeepWhitespaceAround, 
 function isHiddenInput(attrs) {
   if (!attrs || !attrs.length) return false;
   for (const attr of attrs) {
-    if (attr.name === 'type') {
-      return attr.value === 'hidden';
+    // Attribute names and the `type` keyword are both ASCII case-insensitive
+    if (attr.name.toLowerCase() === 'type') {
+      return attr.value?.toLowerCase() === 'hidden';
     }
   }
   return false;
@@ -327,8 +328,9 @@ function isHiddenInput(attrs) {
  * @param {Array<{name: string, value?: string}>} nextAttrs
  * @param {{preserveLineBreaks?: boolean, conservativeCollapse?: boolean, collapseInlineTagWhitespace?: boolean}} options
  * @param {InlineSets} inlineSets
+ * @param {boolean} [collapseInside] - False where `canCollapseWhitespace` keeps runs inside the text as they are
  */
-function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineSets) {
+function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineSets, collapseInside = true) {
   if (!str) return str;
 
   // Fast path: No whitespace at all—every decision below would leave `str`
@@ -385,7 +387,7 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
     trimRight = false;
   }
 
-  const collapseAll = Boolean(prevTag && nextTag);
+  const collapseAll = collapseInside && Boolean(prevTag && nextTag);
   if (!trimLeft && !trimRight && !collapseAll && !options.preserveLineBreaks) {
     return str;
   }

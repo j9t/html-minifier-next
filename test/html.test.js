@@ -621,6 +621,47 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
+  test('Space normalization around tags not written in lowercase', async () => {
+    let input, output;
+    // Inline elements keep the spaces around them, as in lowercase
+    input = '<p>a <SPAN>b</SPAN> c</p>';
+    output = '<p>a <span>b</span> c</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    input = '<P>a <B>b</B> c <A HREF=x>d</A> e</P>';
+    output = '<p>a <b>b</b> c <a href=x>d</a> e</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    input = '<svg> <foreignObject> <SPAN>a</SPAN> <B>b</B> </foreignObject> </svg>';
+    output = '<svg><foreignObject><span>a</span> <b>b</b></foreignObject></svg>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    // Hidden inputs, whose `type` name and keyword are case-insensitive, too
+    input = '<form><INPUT TYPE=HIDDEN name=a> <button>b</button></form>';
+    output = '<form><input type=HIDDEN name=a><button>b</button></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    input = '<form><input type=Hidden name=a> <button>b</button></form>';
+    output = '<form><input type=Hidden name=a><button>b</button></form>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+    // A single trailing line break in `pre` goes, as in lowercase
+    input = '<PRE>\nfoo\n</PRE>';
+    output = '<pre>\nfoo</pre>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // With `caseSensitive`, names stay as written, and whitespace is handled as in lowercase
+    input = '<p>a <SPAN>b</SPAN> c <A HREF=x>d</A> e</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, caseSensitive: true }), input);
+    input = '<PRE>\n a  b\n</PRE> <TEXTAREA> c  d </TEXTAREA> <P> x  y </P>';
+    output = '<PRE>\n a  b</PRE><TEXTAREA> c  d </TEXTAREA><P>x y</P>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, caseSensitive: true }), output);
+    input = '<PRE> a  b </pre> <p> x  y </p>';
+    output = '<PRE> a  b </PRE><p>x y</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, caseSensitive: true }), output);
+    input = '<p>a <INPUT TYPE=hidden> <BUTTON>b</BUTTON></p>';
+    output = '<p>a <INPUT TYPE=hidden><BUTTON>b</BUTTON></p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, caseSensitive: true }), output);
+    input = '<div> <SCRIPT></SCRIPT> a</div>';
+    output = '<div><SCRIPT></SCRIPT>a</div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, caseSensitive: true }), output);
+  });
+
   test('Types of whitespace that are always preserved', async () => {
     // Hair space
     let input = '<div>\u200afo\u200ao\u200a</div>';
@@ -1922,7 +1963,7 @@ describe('HTML', () => {
     input = '<div><pRe> $foo = "baz"; </pRe>    </div>';
     output = '<div><pre> $foo = "baz"; </pre></div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
-    output = '<div><pRe>$foo = "baz";</pRe></div>';
+    output = '<div><pRe> $foo = "baz"; </pRe></div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, caseSensitive: true }), output);
 
     input = '<script type="text/javascript">let = "hello";</script>\r\n\r\n\r\n' +
@@ -2228,14 +2269,10 @@ describe('HTML', () => {
     output = '<div><td></td></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['td'] }), output);
 
-    // Case sensitivity: Lowercase spec does not preserve uppercase element
+    // HTML names match in any case, with `caseSensitive`, too, which only keeps them as written
     input = '<div><TD></TD><td></td></div>';
-    output = '<div><td></td></div>';
+    output = '<div><TD></TD><td></td></div>';
     assert.strictEqual(await minify(input, { caseSensitive: true, removeEmptyElements: true, removeEmptyElementsExcept: ['td'] }), output);
-
-    // Case sensitivity: Exact-case spec preserves matching element
-    input = '<div><TD></TD><td></td></div>';
-    output = '<div><TD></TD></div>';
     assert.strictEqual(await minify(input, { caseSensitive: true, removeEmptyElements: true, removeEmptyElementsExcept: ['TD'] }), output);
 
     // Attribute order invariance
@@ -3462,6 +3499,31 @@ describe('HTML', () => {
     const caseInSensitiveOutput = '<div mixedcaseattribute="value"></div>';
     assert.strictEqual(await minify(input), caseInSensitiveOutput);
     assert.strictEqual(await minify(input, { caseSensitive: true }), caseSensitiveOutput);
+
+    // HTML names are read as in lowercase, so every option applies as without `caseSensitive`
+    // (and repeated attributes are one attribute); only the names are written as in the source
+    assert.strictEqual(await minify('<div class="a" CLASS="b"></div>', { caseSensitive: true }), '<div class="a"></div>');
+    assert.strictEqual(await minify('<SCRIPT>var a = 1 ;</SCRIPT><STYLE>p { color : red }</STYLE>', { caseSensitive: true, minifyJS: true, minifyCSS: true }), '<SCRIPT>var a=1</SCRIPT><STYLE>p{color:red}</STYLE>');
+    assert.strictEqual(await minify('<UL><LI>a</LI><LI>b</LI></UL>', { caseSensitive: true, removeOptionalTags: true }), '<UL><LI>a<LI>b</UL>');
+    assert.strictEqual(await minify('<DIV CLASS=" a  b a " DIR=ltr><P></P><SPAN>x</SPAN></DIV>', { caseSensitive: true, removeEmptyElements: true, removeRedundantAttributes: true }), '<DIV CLASS="a b" DIR=ltr><SPAN>x</SPAN></DIV>');
+    assert.strictEqual(await minify('<INPUT DISABLED="DISABLED" CHECKED>', { caseSensitive: true, collapseBooleanAttributes: true }), '<INPUT DISABLED CHECKED>');
+    assert.strictEqual(await minify('<A HREF="x" onClick="foo( 1 )">y</A>', { caseSensitive: true, removeAttributeQuotes: true, minifyJS: true }), '<A HREF=x onClick=foo(1)>y</A>');
+
+    // Hooks and patterns get names as written, and the defaults hooks may call take any spelling
+    const keepMyPre = (/** @type {string} */ tag, /** @type {any} */ _attrs, /** @type {(tag: string) => boolean} */ defaultFn) => tag !== 'MyPre' && defaultFn(tag);
+    assert.strictEqual(await minify('<div> <MyPre> a  b </MyPre> <PRE> c  d </PRE> </div>', { caseSensitive: true, collapseWhitespace: true, canTrimWhitespace: keepMyPre, canCollapseWhitespace: keepMyPre }), '<div><MyPre> a  b </MyPre><PRE> c  d </PRE></div>');
+    assert.strictEqual(await minify('<button onClick="foo( 1 )">x</button>', { caseSensitive: true, minifyJS: true, customEventAttributes: [/^onClick$/] }), '<button onClick="foo(1)">x</button>');
+    assert.strictEqual(await minify('<div ngClass="{a:\n b}">x</div>', { caseSensitive: true, customAttrCollapse: /ngClass/ }), '<div ngClass="{a:b}">x</div>');
+    assert.strictEqual(await minify('<MyEl dataFoo="" class="">x</MyEl>', { caseSensitive: true, removeEmptyAttributes: (/** @type {string} */ name, /** @type {string} */ tag) => tag === 'MyEl' && name === 'dataFoo' }), '<MyEl class="">x</MyEl>');
+    /** @type {string[]} */
+    const sortedTags = [];
+    await minify('<MyEl b a></MyEl><DIV></DIV>', { caseSensitive: true, sortAttributes: (/** @type {string} */ tag) => { sortedTags.push(tag); } });
+    assert.deepStrictEqual(sortedTags, ['MyEl', 'DIV']);
+    assert.strictEqual(await minify('<DIV b=1 a=1></DIV><div a=1 b=1></div><div a=1 b=1></div>', { caseSensitive: true, sortAttributes: true }), '<DIV a=1 b=1></DIV><div a=1 b=1></div><div a=1 b=1></div>');
+
+    // A boolean attribute without a value gets its name as the value, in lowercase
+    assert.strictEqual(await minify('<INPUT DISABLED>'), '<input disabled=disabled>');
+    assert.strictEqual(await minify('<INPUT DISABLED>', { caseSensitive: true }), '<INPUT DISABLED=disabled>');
   });
 
   test('`source` and `track`', async () => {
@@ -6195,6 +6257,15 @@ describe('HTML', () => {
     output = '<div class="leaveAlone"></div><div>foo bar</div>';
 
     assert.strictEqual(await minify(input, { collapseWhitespace: true, canTrimWhitespace: canCollapseAndTrimWhitespace, canCollapseWhitespace: canCollapseAndTrimWhitespace }), output);
+
+    // Each hook works on its own: `canCollapseWhitespace` keeps the runs inside,
+    // which may still be trimmed at the edges, and `canTrimWhitespace` keeps all
+    // whitespace as written, as in `pre`
+    input = '<div> <div class="leaveAlone"> foo  <b>bar</b>  baz </div> </div>';
+    output = '<div><div class="leaveAlone">foo  <b>bar</b>  baz</div></div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, canCollapseWhitespace: canCollapseAndTrimWhitespace }), output);
+    output = '<div><div class="leaveAlone"> foo  <b>bar</b>  baz </div></div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, canTrimWhitespace: canCollapseAndTrimWhitespace }), output);
   });
 
   test('Minifies `Content-Security-Policy`', async () => {
@@ -6275,6 +6346,13 @@ describe('HTML', () => {
     output = '<p>The value is<custom-element>true</custom-element>if it holds.</p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
     assert.strictEqual(await minify(input, { collapseWhitespace: true, inlineCustomElements: ['custom-element'] }), input);
+
+    // Names not written in lowercase keep the whitespace on both sides,
+    // with `caseSensitive`, too
+    input = '<p>a <myElement>b</myElement> c</p>';
+    output = '<p>a <myelement>b</myelement> c</p>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, inlineCustomElements: ['myElement'] }), output);
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, caseSensitive: true, inlineCustomElements: ['myElement'] }), input);
 
     // A no-break space isn’t collapsible whitespace, so it stays either way
     input = '<p>Let x be ? <custom-element>Call</custom-element>(F).</p>';

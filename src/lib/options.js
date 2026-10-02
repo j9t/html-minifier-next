@@ -54,7 +54,7 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   cssContext?: CSSContext,
  *   parallelJS?: boolean,
  *   nameParent?: (name: string) => string,
- *   nameHTML?: (name: string) => string,
+ *   namesAsWritten?: boolean,
  *   keepClosingSlashHTML?: boolean,
  *   insideSVG?: boolean,
  *   insideForeignContent?: boolean
@@ -234,6 +234,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   /** @type {ProcessedOptions} */
   const options = {
     name: lowercase,
+    namesAsWritten: false,
     canCollapseWhitespace,
     canTrimWhitespace,
     ...optionDefaults,
@@ -324,8 +325,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
 
     if (key === 'caseSensitive') {
+      // HTML names are read in lowercase, like browsers do,
+      // and only written as in the source
       if (option) {
-        options.name = identity;
+        options.namesAsWritten = true;
       }
     } else if (key === 'removeUnusedCSS') {
       optionsDynamic.removeUnusedCSS = normalizeUnusedCSSOptions(option, message => {

@@ -137,7 +137,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `cacheCSS`<br>`--cache-css` | Set CSS minification cache size; higher values improve performance for batch processing | `500` |
 | `cacheJS`<br>`--cache-js` | Set JavaScript minification cache size; higher values improve performance for batch processing | `500` |
 | `cacheSVG`<br>`--cache-svg` | Set SVG minification cache size; higher values improve performance for batch processing | `500` |
-| `caseSensitive`<br>`--case-sensitive` | Treat attributes in case-sensitive manner (useful for custom HTML elements) | `false` |
+| `caseSensitive`<br>`--case-sensitive` | Keep element and attribute names as written (e.g., for framework components like `<MyButton>`) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
 | `collapseEmptyAttributes`<br>`--collapse-empty-attributes` | Omit empty attribute values (e.g., `alt=""` → `alt`) | `false` |
@@ -192,11 +192,11 @@ A few options take functions and are therefore only available programmatically, 
 
 | Option | Description | Default |
 | --- | --- | --- |
-| `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element can be collapsed—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
+| `canCollapseWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether runs of whitespace inside an element can be collapsed (whether its content may be trimmed is up to `canTrimWhitespace`)—override to protect additional elements, delegating to `defaultFn` for the rest | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `canMinifyCSS` | Synchronous `Function(text, type)` that determines whether `minifyCSS` may process a given piece of CSS—returning `false` [leaves it as if `minifyCSS` were off](#css-minification) | All CSS is minified |
 | `canMinifyJS` | Synchronous `Function(text, inline)` that determines whether `minifyJS` may process a given piece of JavaScript—returning `false` [leaves it unminified](#javascript-minification) | All JavaScript is minified |
 | `canMinifySVG` | Synchronous `Function(text)` that determines whether `minifySVG` may pass a given outermost `svg` element to SVGO—returning `false` [skips SVGO for it](#svg-minification) | All SVG is minified |
-| `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether leading and trailing whitespace around an element may be trimmed | Built-in handling |
+| `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element may be trimmed; where not, it stays as written, as in `pre` | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `log` | `Function(message)` called with warnings and errors, including minification errors (`continueOnMinifyError`) and parse errors (`continueOnParseError`); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
 
 ### Options that rely on another option

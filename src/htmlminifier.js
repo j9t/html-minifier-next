@@ -97,8 +97,8 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  and usually default to a disabled/safe value unless noted.
  *
  * @prop {(tag: string, attrs: HTMLAttribute[], canCollapseWhitespace: (tag: string) => boolean) => boolean} [canCollapseWhitespace]
- *  Predicate that determines whether whitespace inside a given element
- *  can be collapsed.
+ *  Predicate that determines whether runs of whitespace inside a given element
+ *  can be collapsed (whether its content may be trimmed is up to `canTrimWhitespace`).
  *
  *  Default: Built-in `canCollapseWhitespace` function
  *
@@ -128,8 +128,8 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  Default: `null` (all SVG is minified)
  *
  * @prop {(tag: string | null, attrs: HTMLAttribute[] | undefined, canTrimWhitespace: (tag: string) => boolean) => boolean} [canTrimWhitespace]
- *  Predicate that determines whether leading/trailing whitespace around
- *  the element may be trimmed.
+ *  Predicate that determines whether whitespace inside the element may be
+ *  trimmed; where not, it stays as written, as in `pre`.
  *
  *  Default: Built-in `canTrimWhitespace` function
  *
@@ -161,9 +161,9 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  Default: `500`
  *
  * @prop {boolean} [caseSensitive]
- *  When true, tag and attribute names are treated as case-sensitive.
- *  Useful for custom HTML tags.
- *  If false (default) names are lower-cased via the `name` function.
+ *  When true, tag and attribute names are written as in the source rather than in lowercase.
+ *  Useful for framework components like `<MyButton>`. HTML names are still read in any case,
+ *  so every option applies to them as without it; hooks get names as written.
  *
  *  Default: `false`
  *
@@ -473,7 +473,7 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  * All specified attributes must be present and match (valued attributes must have exact values)
  *  * Additional attributes on the element are allowed
- *  * Attribute name matching respects the `caseSensitive` option
+ *  * Element and attribute names match in any case
  *  * Supports double quotes, single quotes, and unquoted attribute values in specifications
  *
  *  Limitations:
@@ -858,11 +858,13 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     const parser = new HTMLParser(input, {
       start: function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs, /** @type {boolean} */ unary) {
         if (attrChains) {
-          if (!attrChains[tag]) {
-            attrChains[tag] = new TokenChain();
+          // Lowercase, as the first pass writes names as in the source under `caseSensitive`
+          const tagKey = resolveName(tag);
+          if (!attrChains[tagKey]) {
+            attrChains[tagKey] = new TokenChain();
           }
           const attrNamesList = attrNames(attrs).filter(shouldKeepToken);
-          attrChains[tag].add(attrNamesList);
+          attrChains[tagKey].add(attrNamesList);
         }
         for (const attr of attrs) {
           if (classChain && attr.value && resolveName(attr.name) === 'class') {
@@ -980,7 +982,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     const attrOrderCache = new LRU(500);
 
     options.sortAttributes = function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
-      const sorter = attrSorters[tag];
+      // Called with the name as written, as any `sortAttributes` function is
+      const sorter = attrSorters[resolveName(tag)];
       if (sorter) {
         const names = attrNames(attrs);
 
@@ -1119,6 +1122,9 @@ async function minifyHTML(value, options, partialMarkup) {
   /** @type {string[]} */
   const stackNoCollapseWhitespace = [];
   let preTextareaDepth = 0; // Count of `pre`/`textarea` entries in `stackNoTrimWhitespace`
+  // Where the last element whose whitespace may not be trimmed ended in `buffer`; what lies up to
+  // there stays as written, also where `canTrimWhitespace` decides by attributes the trim walk lacks
+  let noTrimEndIndex = -1;
   let optionalStartTag = '';
   let optionalEndTag = '';
   let optionalEndTagEmitted = false;
@@ -1339,12 +1345,25 @@ async function minifyHTML(value, options, partialMarkup) {
     }, leading, !leading);
   }
 
-  function canCollapseWhitespace(/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
-    return options.canCollapseWhitespace(tag, attrs, defaultCanCollapseWhitespace);
+  // Under `caseSensitive`, names are read in lowercase all the same, while `buffer` and hooks
+  // get them as written, so the defaults a hook may call take any spelling then
+  const namesAsWritten = Boolean(options.namesAsWritten);
+  const defaultCanCollapse = namesAsWritten
+    ? (/** @type {string} */ tag) => defaultCanCollapseWhitespace(tag.toLowerCase())
+    : defaultCanCollapseWhitespace;
+  const defaultCanTrim = namesAsWritten
+    ? (/** @type {string} */ tag) => defaultCanTrimWhitespace(tag.toLowerCase())
+    : defaultCanTrimWhitespace;
+
+  // The defaults decide by `tag`, a hook gets `tagOut`; without a hook, the option holds the default itself
+  function canCollapseWhitespace(/** @type {string} */ tag, /** @type {string} */ tagOut, /** @type {HTMLAttribute[]} */ attrs) {
+    const hook = options.canCollapseWhitespace;
+    return hook === defaultCanCollapseWhitespace ? defaultCanCollapseWhitespace(tag) : hook(tagOut, attrs, defaultCanCollapse);
   }
 
-  function canTrimWhitespace(/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
-    return options.canTrimWhitespace(tag, attrs, defaultCanTrimWhitespace);
+  function canTrimWhitespace(/** @type {string} */ tag, /** @type {string} */ tagOut, /** @type {HTMLAttribute[]} */ attrs) {
+    const hook = options.canTrimWhitespace;
+    return hook === defaultCanTrimWhitespace ? defaultCanTrimWhitespace(tag) : hook(tagOut, attrs, defaultCanTrim);
   }
 
   function bufferPush(/** @type {string} */ entry, /** @type {boolean} */ isTag) {
@@ -1357,6 +1376,7 @@ async function minifyHTML(value, options, partialMarkup) {
     buffer.length = Math.max(0, length);
     if (bufferTags) bufferTags.length = buffer.length;
     if (transparentGapIndex >= buffer.length) transparentGapIndex = -1;
+    if (noTrimEndIndex >= buffer.length) noTrimEndIndex = -1;
     removed = true;
   }
 
@@ -1520,7 +1540,7 @@ async function minifyHTML(value, options, partialMarkup) {
     // Nothing to the left of the text is in play here, so only its trailing run can
     // change—unless preserved line breaks bring the leading run into play, too
     const trailingOnly = !options.preserveLineBreaks;
-    for (let prevTag = ''; index >= 0 && canTrimWhitespace(prevTag, emptyAttrs); index--) {
+    for (let prevTag = ''; index > noTrimEndIndex && canTrimWhitespace(namesAsWritten ? prevTag.toLowerCase() : prevTag, prevTag, emptyAttrs); index--) {
       const str = buffer[index] ?? '';
       const endTagName = matchPlainEndTag(str);
       if (endTagName !== null) {
@@ -1615,8 +1635,8 @@ async function minifyHTML(value, options, partialMarkup) {
         continue;
       }
       const endTagName = matchPlainEndTag(str);
-      const tag = endTagName === null ? (RE_START_TAG_NAME.exec(str)?.[1] ?? '') : '/' + endTagName;
-      if (!inlineElementsTransparentAfter.has(tag.toLowerCase())) {
+      const tag = (endTagName === null ? (RE_START_TAG_NAME.exec(str)?.[1] ?? '') : '/' + endTagName).toLowerCase();
+      if (!inlineElementsTransparentAfter.has(tag)) {
         return collapseWhitespaceSmart(' ', tag, '', emptyAttrs, emptyAttrs, options, inlineSets) !== '';
       }
       // Skip what an element that doesn’t render holds
@@ -1707,7 +1727,7 @@ async function minifyHTML(value, options, partialMarkup) {
           if (textPrevTag === '/nobr' || textPrevTag === 'wbr') {
             if (/^\s/.test(text)) {
               let tagIndex = buffer.length - 1;
-              while (tagIndex > 0 && (buffer[tagIndex] ?? '').lastIndexOf('<' + textPrevTag) !== 0) {
+              while (tagIndex > 0 && (namesAsWritten ? (buffer[tagIndex] ?? '').toLowerCase() : buffer[tagIndex] ?? '').lastIndexOf('<' + textPrevTag) !== 0) {
                 tagIndex--;
               }
               trimTrailingWhitespace(tagIndex - 1, 'br');
@@ -1717,7 +1737,7 @@ async function minifyHTML(value, options, partialMarkup) {
           }
         }
         if (textPrevTag || textNextTag) {
-          let collapsed = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineSets);
+          let collapsed = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineSets, !stackNoCollapseWhitespace.length);
           if (!transparentDepth && inlineElementsTransparentAfter.has(textPrevTag)) {
             // Between elements that don’t render, whitespace stays pending when it may separate text, and one space does
             if (!collapsed && text && inlineElementsTransparent.has(textNextTag)) {
@@ -1754,7 +1774,8 @@ async function minifyHTML(value, options, partialMarkup) {
           trimTrailingWhitespace(buffer.length - 1, textNextTag);
         }
       }
-      if (!stackNoCollapseWhitespace.length && textNextTag !== 'html' && !(textPrevTag && textNextTag)) {
+      // Whitespace that may not be trimmed stays verbatim, as in `pre`
+      if (!stackNoCollapseWhitespace.length && !stackNoTrimWhitespace.length && textNextTag !== 'html' && !(textPrevTag && textNextTag)) {
         text = collapseWhitespace(text, options, false, false, true);
       }
       if (options.collapseNoBreakSpaces && !stackNoCollapseWhitespace.length && !holdsRawText()) {
@@ -2108,10 +2129,8 @@ async function minifyHTML(value, options, partialMarkup) {
       if (hasForeignContext) {
         lowerTag = tag.toLowerCase();
         if (lowerTag === 'svg' || lowerTag === 'math') {
-          // Preserve the surrounding HTML context’s name function (e.g., `identity`
-          // under `caseSensitive`) and slash handling so `foreignObject`/`annotation-xml`
-          // can restore them
-          const nameHTML = options.name;
+          // Preserve the surrounding HTML context’s slash handling so `foreignObject`/`annotation-xml`
+          // can restore it
           const keepClosingSlashHTML = Boolean(options.keepClosingSlash);
           options = Object.create(options);
           // SVGO reads an SVG block whole, nested MathML included, so what the block is stays true inside it
@@ -2122,7 +2141,6 @@ async function minifyHTML(value, options, partialMarkup) {
           options.caseSensitive = !readBySVGO;
           options.keepClosingSlash = true;
           options.name = readBySVGO ? nameForeign : identity;
-          options.nameHTML = nameHTML;
           options.keepClosingSlashHTML = keepClosingSlashHTML;
           options.insideForeignContent = true;
           // Disable HTML-specific options that produce invalid XML:
@@ -2154,7 +2172,7 @@ async function minifyHTML(value, options, partialMarkup) {
           // What the parser read the slash as, so that the two agree here as they do in HTML
           options.keepClosingSlash = options.keepClosingSlashHTML ?? false;
           options.nameParent = nameParent; // Preserve for the element tag itself
-          options.name = options.nameHTML ?? lowercase;
+          options.name = lowercase;
           options.insideForeignContent = false;
           // Note: `removeAttributeQuotes`, `removeTagWhitespace`, and `decodeEntities`
           // stay disabled (inherited from SVG context) because the entire SVG block
@@ -2164,7 +2182,11 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
       // `nameParent` is always set when `useNameParentForTag` is true; the extra check only narrows the type
-      tag = (useNameParentForTag && options.nameParent ? options.nameParent : options.name)(tag);
+      const nameTag = useNameParentForTag && options.nameParent ? options.nameParent : options.name;
+      const tagSource = tag;
+      tag = nameTag(tag);
+      // HTML names are written as in the source under `caseSensitive`, foreign ones as named anyway
+      const tagOut = namesAsWritten && nameTag === lowercase ? tagSource : tag;
       currentTag = tag;
       charsPrevTag = tag;
       if (!inlineTextSet.has(tag)) {
@@ -2209,11 +2231,11 @@ async function minifyHTML(value, options, partialMarkup) {
         transparentDepth++;
       }
       if (!unary) {
-        if (!canTrimWhitespace(tag, attrs) || stackNoTrimWhitespace.length) {
+        if (!canTrimWhitespace(tag, tagOut, attrs) || stackNoTrimWhitespace.length) {
           stackNoTrimWhitespace.push(tag);
           if (tag === 'pre' || tag === 'textarea') preTextareaDepth++;
         }
-        if (options.collapseWhitespace && (!canCollapseWhitespace(tag, attrs) || stackNoCollapseWhitespace.length)) {
+        if (options.collapseWhitespace && (!canCollapseWhitespace(tag, tagOut, attrs) || stackNoCollapseWhitespace.length)) {
           stackNoCollapseWhitespace.push(tag);
         }
       }
@@ -2226,7 +2248,7 @@ async function minifyHTML(value, options, partialMarkup) {
         svgDepth++;
       }
 
-      const openTag = '<' + tag;
+      const openTag = '<' + tagOut;
       // SVGO reads the whole SVG block as XML, where an element closes itself or not, so
       // every unary element in there is written with a slash
       const needsXMLSlash = unary && Boolean(options.insideSVG) && Boolean(options.minifySVG);
@@ -2254,7 +2276,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
       if (options.sortAttributes) {
         // By the time tags are processed, `createSortFns` has replaced any truthy non-function value
-        /** @type {(tag: string, attrs: HTMLAttribute[]) => void} */ (options.sortAttributes)(tag, attrs);
+        /** @type {(tag: string, attrs: HTMLAttribute[]) => void} */ (options.sortAttributes)(tagOut, attrs);
       }
       if (tagFragment) {
         attrs.unshift(tagFragment);
@@ -2266,7 +2288,7 @@ async function minifyHTML(value, options, partialMarkup) {
         const attr = /** @type {HTMLAttribute} */ (attrs[i]);
         const result = opaqueAttrs.has(attr)
           ? { name: attr.name, value: undefined, attr }
-          : normalizeAttr(attr, attrs, tag, options, minifyHTML, markers);
+          : normalizeAttr(attr, attrs, tag, tagOut, options, minifyHTML, markers);
         if (!anyThenable && isThenable(result)) {
           anyThenable = true;
         }
@@ -2300,8 +2322,11 @@ async function minifyHTML(value, options, partialMarkup) {
           name = options.name;
         }
       }
+      const tagSource = tag;
       tag = name(tag);
-      let endTagText = '</' + tag + '>';
+      // As in `start`
+      const tagOut = namesAsWritten && name === lowercase ? tagSource : tag;
+      let endTagText = '</' + tagOut + '>';
       // Custom fragments after the name are kept, next to it if they were in the source
       if (rest && uidAttr && rest.includes(uidAttr)) {
         markTagFragments(rest);
@@ -2311,15 +2336,17 @@ async function minifyHTML(value, options, partialMarkup) {
         // Anything else an end tag holds is dropped, as without fragments
         const marker = uidAttr;
         const fragments = Array.from(rest.matchAll(/** @type {RegExp} */ (uidPattern)), uid => marker + (uid[2] ?? '') + marker);
-        endTagText = '</' + tag + (joinsTag ? '' : ' ') + fragments.join(' ') + '>';
+        endTagText = '</' + tagOut + (joinsTag ? '' : ' ') + fragments.join(' ') + '>';
       }
 
       // Check if current tag is in a whitespace stack
       const insideNoTrim = stackNoTrimWhitespace.length > 0;
+      let closesNoTrim = false;
       if (stackNoTrimWhitespace.length) {
         if (tag === stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1]) {
           if (tag === 'pre' || tag === 'textarea') preTextareaDepth--;
           stackNoTrimWhitespace.pop();
+          closesNoTrim = !stackNoTrimWhitespace.length;
         }
       } else if (options.collapseWhitespace) {
         squashTrailingWhitespace('/' + tag);
@@ -2412,6 +2439,10 @@ async function minifyHTML(value, options, partialMarkup) {
         } else if (isElementEmpty) {
           currentChars += '|';
         }
+      }
+
+      if (closesNoTrim && !isElementRemoved) {
+        noTrimEndIndex = buffer.length - 1;
       }
 
       // A kept element fills the one it sits in
