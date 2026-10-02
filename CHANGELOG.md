@@ -4,6 +4,21 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.10.2] - 2026-10-02
+
+### Fixed
+
+* Fixed `collapseWhitespace` removing whitespace before inline elements not written in lowercase (e.g., `a <SPAN>b</SPAN>` became `a<span>b</span>`), including custom elements from `inlineCustomElements` (e.g., `myElement`), and keeping a single trailing line break in a `pre` element closed by `</PRE>`
+* Fixed `collapseWhitespace` not removing whitespace next to hidden inputs whose `type` isn’t written in lowercase (e.g., `<input type=Hidden>`)
+* Fixed `caseSensitive` treating HTML elements and attributes not written in lowercase as unknown ones, which kept most options from applying to them (e.g., `minifyJS` to `<SCRIPT>`, `removeOptionalTags` to `<LI>`, or `removeRedundantAttributes` to `DIR=ltr`) and made `collapseWhitespace` collapse whitespace in `<PRE>` and `<TEXTAREA>` and remove it around inline elements like `<SPAN>`; HTML names are now read in any case, as browsers do, while the output and hooks get them as written (with `removeEmptyElementsExcept` and `inlineCustomElements` matching any case)
+* Fixed some boolean attributes without a value getting their name for a value (e.g., `<input disabled>` became `<input disabled=disabled>`, and `<input DISABLED>` `<input disabled=DISABLED>`), which `collapseBooleanAttributes` would only undo again
+* Fixed `canCollapseWhitespace` having no effect on its own, as trimming collapsed the whitespace between tags anyway; it now keeps the runs inside an element as written, which `canTrimWhitespace` may still trim at the edges
+* Fixed `canTrimWhitespace` not keeping whitespace as written in an element it decides on by attributes, where a later end tag could still trim the element’s trailing whitespace (e.g., the space before the first `</div>` in `<div><div class=keep>a </div></div>`), or in text next to only one tag
+
+### Changed
+
+* Improved parser performance, with fewer allocations per tag and text node and the raw-text check only rerun when open elements change
+
 ## [8.10.1] - 2026-10-02
 
 ### Fixed

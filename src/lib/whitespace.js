@@ -25,6 +25,8 @@ const RE_ASCII_WS_RUN = /[ \n\r\f]+/g;
 // Every reason `collapseWhitespaceAllKnown` has to do any work at all, in one scan
 const RE_COLLAPSIBLE = /[\t\xA0\n\r\f]| {2}/;
 const RE_NON_WS = /\S/;
+// Any no-break space character (the `collapseNoBreakSpaces` early-exit scan)
+const RE_NO_BREAK_SPACE_CHARS = /[\xA0\u202F\u2007]/;
 
 // Trim whitespace
 
@@ -119,7 +121,8 @@ function keepLineBreaks(_match, before, noBreakSpace, after) {
  */
 function collapseNoBreakSpaces(str, options) {
   const decoded = Boolean(options.decodeEntities);
-  if (!str || (str.indexOf('\xA0') === -1 && str.indexOf('\u202F') === -1 && str.indexOf('\u2007') === -1 && (decoded || str.indexOf('&') === -1))) {
+  // One scan for all three no-break space characters, rather than an `indexOf` per character
+  if (!str || (!RE_NO_BREAK_SPACE_CHARS.test(str) && (decoded || str.indexOf('&') === -1))) {
     return str;
   }
   const pattern = decoded ? RE_NO_BREAK_SPACE_CHAR_WS : RE_NO_BREAK_SPACE_WS;
@@ -137,12 +140,13 @@ function collapseNoBreakSpaces(str, options) {
  * @param {boolean} trimLeft
  * @param {boolean} trimRight
  * @param {boolean} [collapseAll]
+ * @param {boolean} [keepUntrimmed] - Whether a side not trimmed keeps its line breaks as written
  */
-function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = false) {
+function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = false, keepUntrimmed = false) {
   if (!str) return str;
 
   // Fast path: Nothing to do
-  if (!trimLeft && !trimRight && !collapseAll && !options.preserveLineBreaks) {
+  if (!trimLeft && !trimRight && !collapseAll && (!options.preserveLineBreaks || keepUntrimmed)) {
     return str;
   }
 
@@ -151,7 +155,7 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
     return str;
   }
 
-  return collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll);
+  return collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll, keepUntrimmed);
 }
 
 // As `collapseWhitespace`, for callers that already know `str` is non-empty, holds
@@ -162,31 +166,48 @@ function collapseWhitespace(str, options, trimLeft, trimRight, collapseAll = fal
  * @param {boolean} trimLeft
  * @param {boolean} trimRight
  * @param {boolean} collapseAll
+ * @param {boolean} [keepUntrimmed] - Whether a side not trimmed keeps its line breaks as written
  */
-function collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll) {
+function collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll, keepUntrimmed = false) {
   let lineBreakBefore = ''; let lineBreakAfter = '';
 
   if (options.preserveLineBreaks) {
     // Find leading/trailing whitespace containing line breaks manually
-    // (avoids polynomial backtracking with end-anchored lazy quantifiers)
+    // (avoids polynomial backtracking with end-anchored lazy quantifiers);
+    // the line-break check scans the run’s char codes directly rather than
+    // testing a sliced copy, so the common case allocates nothing
     let leadEnd = 0;
-    while (leadEnd < str.length && isAsciiWs(str.charCodeAt(leadEnd))) {
+    while ((trimLeft || !keepUntrimmed) && leadEnd < str.length && isAsciiWs(str.charCodeAt(leadEnd))) {
       leadEnd++;
     }
     if (leadEnd > 0) {
-      const leading = str.slice(0, leadEnd);
-      if (/[\n\r]/.test(leading)) {
+      let hasLineBreak = false;
+      for (let i = 0; i < leadEnd; i++) {
+        const code = str.charCodeAt(i);
+        if (code === 10 || code === 13) {
+          hasLineBreak = true;
+          break;
+        }
+      }
+      if (hasLineBreak) {
         lineBreakBefore = '\n';
         str = str.slice(leadEnd);
       }
     }
     let trailStart = str.length;
-    while (trailStart > 0 && isAsciiWs(str.charCodeAt(trailStart - 1))) {
+    while ((trimRight || !keepUntrimmed) && trailStart > 0 && isAsciiWs(str.charCodeAt(trailStart - 1))) {
       trailStart--;
     }
     if (trailStart < str.length) {
-      const trailing = str.slice(trailStart);
-      if (/[\n\r]/.test(trailing)) {
+      let hasLineBreak = false;
+      for (let i = trailStart; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        if (code === 10 || code === 13) {
+          hasLineBreak = true;
+          break;
+        }
+      }
+      if (hasLineBreak) {
         lineBreakAfter = '\n';
         str = str.slice(0, trailStart);
       }
@@ -293,8 +314,9 @@ const defaultInlineSets = buildInlineSets(inlineElementsToKeepWhitespaceAround, 
 function isHiddenInput(attrs) {
   if (!attrs || !attrs.length) return false;
   for (const attr of attrs) {
-    if (attr.name === 'type') {
-      return attr.value === 'hidden';
+    // Attribute names and the `type` keyword are both ASCII case-insensitive
+    if (attr.name.toLowerCase() === 'type') {
+      return attr.value?.toLowerCase() === 'hidden';
     }
   }
   return false;
@@ -308,8 +330,9 @@ function isHiddenInput(attrs) {
  * @param {Array<{name: string, value?: string}>} nextAttrs
  * @param {{preserveLineBreaks?: boolean, conservativeCollapse?: boolean, collapseInlineTagWhitespace?: boolean}} options
  * @param {InlineSets} inlineSets
+ * @param {boolean} [collapseInside] - False where `canCollapseWhitespace` keeps runs inside the text as they are
  */
-function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineSets) {
+function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, options, inlineSets, collapseInside = true) {
   if (!str) return str;
 
   // Fast path: No whitespace at all—every decision below would leave `str`
@@ -366,11 +389,11 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
     trimRight = false;
   }
 
-  const collapseAll = Boolean(prevTag && nextTag);
-  if (!trimLeft && !trimRight && !collapseAll && !options.preserveLineBreaks) {
+  const collapseAll = collapseInside && Boolean(prevTag && nextTag);
+  if (!trimLeft && !trimRight && !collapseAll && (!options.preserveLineBreaks || !collapseInside)) {
     return str;
   }
-  return collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll);
+  return collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll, !collapseInside);
 }
 
 // Collapse/trim whitespace for given tag

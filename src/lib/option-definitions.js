@@ -24,7 +24,7 @@ const optionDefinitions = {
     type: 'int'
   },
   caseSensitive: {
-    description: 'Treat attributes in case-sensitive manner (useful for custom HTML elements)',
+    description: 'Keep element and attribute names as written (e.g., for framework components like `<MyButton>`)',
     type: 'boolean'
   },
   collapseAttributeWhitespace: {

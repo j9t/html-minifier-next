@@ -23,7 +23,7 @@ import {
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
 import { collectUsage } from './unused-css.js';
-import { identity, isThenable } from './utils.js';
+import { identity, isThenable, lowercase } from './utils.js';
 
 /** @import { ProcessedOptions } from './options.js' */
 
@@ -73,12 +73,13 @@ function isIgnoredComment(text, options) {
 /**
  * @param {string} attrName
  * @param {{customEventAttributes?: RegExp[]}} options
+ * @param {string} [attrNameOut] - The name as written, for the patterns
  */
-function isEventAttribute(attrName, options) {
+function isEventAttribute(attrName, options, attrNameOut = attrName) {
   const patterns = options.customEventAttributes;
   if (patterns) {
     for (const pattern of patterns) {
-      if (pattern.test(attrName)) {
+      if (pattern.test(attrNameOut)) {
         return true;
       }
     }
@@ -363,14 +364,16 @@ function isContentSecurityPolicy(tag, attrs) {
  * @param {string} attrName
  * @param {string | undefined} attrValue
  * @param {{removeEmptyAttributes?: boolean | Function}} options
+ * @param {string} [tagOut] - The tag name as written, for the hook
+ * @param {string} [attrNameOut] - The attribute name as written, for the hook
  */
-function canDeleteEmptyAttribute(tag, attrName, attrValue, options) {
+function canDeleteEmptyAttribute(tag, attrName, attrValue, options, tagOut = tag, attrNameOut = attrName) {
   const isValueEmpty = !attrValue || attrValue.trim() === '';
   if (!isValueEmpty) {
     return false;
   }
   if (typeof options.removeEmptyAttributes === 'function') {
-    return options.removeEmptyAttributes(attrName, tag);
+    return options.removeEmptyAttributes(attrNameOut, tagOut);
   }
   return (tag === 'input' && attrName === 'value') || RE_EMPTY_ATTRIBUTE.test(attrName);
 }
@@ -418,9 +421,10 @@ function dedupeClassNames(value) {
  * @param {HTMLAttribute[]} attrs
  * @param {Function} minifyHTMLSelf
  * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
+ * @param {string} [attrNameOut] - The name as written, for the patterns
  */
-function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf, markers = []) {
-  const isEventAttr = isEventAttribute(attrName, options);
+function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf, markers = [], attrNameOut = attrName) {
+  const isEventAttr = isEventAttribute(attrName, options, attrNameOut);
 
   // Apply early whitespace normalization if enabled
   // Preserves special spaces (no-break space, hair space, etc.) for consistency with `collapseWhitespace`
@@ -602,7 +606,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     return collapseWhitespaceAll(attrValue);
   }
 
-  if (options.customAttrCollapse && options.customAttrCollapse.test(attrName)) {
+  if (options.customAttrCollapse && options.customAttrCollapse.test(attrNameOut)) {
     return trimWhitespace(attrValue.replace(/ ?[\n\r]+ ?/g, '').replace(/\s{2,}/g, options.conservativeCollapse ? ' ' : ''));
   }
 
@@ -712,36 +716,42 @@ function chooseAttributeQuote(attrValue, options) {
  * @param {HTMLAttribute} attr
  * @param {HTMLAttribute[]} attrs
  * @param {string} tag
+ * @param {string} tagOut - The tag name as written, for hooks
  * @param {ProcessedOptions} options
  * @param {Function} minifyHTML
  * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
  */
-function normalizeAttr(attr, attrs, tag, options, minifyHTML, markers) {
+function normalizeAttr(attr, attrs, tag, tagOut, options, minifyHTML, markers) {
   const attrName = options.name(attr.name);
+  // The name to write and to hand to hooks: as in the source for HTML names
+  // under `caseSensitive`, as named otherwise (foreign names are named as written anyway)
+  const attrNameOut = options.namesAsWritten && options.name === lowercase ? attr.name : attrName;
   const attrValue = attr.value;
 
   // Entity decoding requires a lazy import—async only when `&` is present
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
     return getDecodeHTMLStrict().then(decode => {
-      return normalizeAttrContinue(attrName, decode(attrValue), attr, attrs, tag, options, minifyHTML, markers);
+      return normalizeAttrContinue(attrName, attrNameOut, decode(attrValue), attr, attrs, tag, tagOut, options, minifyHTML, markers);
     });
   }
 
-  return normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML, markers);
+  return normalizeAttrContinue(attrName, attrNameOut, attrValue, attr, attrs, tag, tagOut, options, minifyHTML, markers);
 }
 
 // Internal: Handles attribute normalization after entity decoding (if any)
 /**
  * @param {string} attrName
+ * @param {string} attrNameOut
  * @param {string | undefined} attrValue
  * @param {HTMLAttribute} attr
  * @param {HTMLAttribute[]} attrs
  * @param {string} tag
+ * @param {string} tagOut
  * @param {ProcessedOptions} options
  * @param {Function} minifyHTML
  * @param {string[]} [markers] - What custom fragment and `htmlmin:ignore` placeholders hold
  */
-function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, minifyHTML, markers) {
+function normalizeAttrContinue(attrName, attrNameOut, attrValue, attr, attrs, tag, tagOut, options, minifyHTML, markers) {
   if ((options.removeRedundantAttributes &&
        isAttributeRedundant(tag, attrName, attrValue ?? '', attrs)) ||
       (options.removeDefaultTypeAttributes && attrName === 'type' && (
@@ -752,27 +762,29 @@ function normalizeAttrContinue(attrName, attrValue, attr, attrs, tag, options, m
   }
 
   if (attrValue) {
-    const cleaned = cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML, markers);
+    const cleaned = cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTML, markers, attrNameOut);
     if (isThenable(cleaned)) {
-      return cleaned.then((/** @type {string | undefined} */ v) => normalizeAttrFinish(attrName, v, attr, tag, options));
+      return cleaned.then((/** @type {string | undefined} */ v) => normalizeAttrFinish(attrName, attrNameOut, v, attr, tag, tagOut, options));
     }
-    return normalizeAttrFinish(attrName, cleaned, attr, tag, options);
+    return normalizeAttrFinish(attrName, attrNameOut, cleaned, attr, tag, tagOut, options);
   }
 
-  return normalizeAttrFinish(attrName, attrValue, attr, tag, options);
+  return normalizeAttrFinish(attrName, attrNameOut, attrValue, attr, tag, tagOut, options);
 }
 
 // Internal: Final checks and result assembly after value cleaning
 /**
  * @param {string} attrName
+ * @param {string} attrNameOut
  * @param {string | undefined} attrValue
  * @param {HTMLAttribute} attr
  * @param {string} tag
+ * @param {string} tagOut
  * @param {ProcessedOptions} options
  */
-function normalizeAttrFinish(attrName, attrValue, attr, tag, options) {
+function normalizeAttrFinish(attrName, attrNameOut, attrValue, attr, tag, tagOut, options) {
   if (options.removeEmptyAttributes &&
-      canDeleteEmptyAttribute(tag, attrName, attrValue, options)) {
+      canDeleteEmptyAttribute(tag, attrName, attrValue, options, tagOut, attrNameOut)) {
     return;
   }
 
@@ -782,7 +794,7 @@ function normalizeAttrFinish(attrName, attrValue, attr, tag, options) {
 
   return {
     attr,
-    name: attrName,
+    name: attrNameOut,
     value: attrValue
   };
 }
