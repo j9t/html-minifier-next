@@ -91,9 +91,6 @@ const empty = new Set(['area', 'base', 'basefont', 'br', 'col', 'embed', 'frame'
 // Elements that you can, intentionally, leave open (and which close themselves)
 const closeSelf = new Set(['colgroup', 'dd', 'dt', 'li', 'option', 'p', 'td', 'tfoot', 'th', 'thead', 'tr', 'source']);
 
-// Attributes that have their values filled in `disabled='disabled'`
-const fillAttrs = new Set(['checked', 'compact', 'declare', 'defer', 'disabled', 'ismap', 'multiple', 'nohref', 'noresize', 'noshade', 'nowrap', 'readonly', 'selected']);
-
 // Special elements (can contain anything)
 const special = new Set(['script', 'style']);
 
@@ -1178,13 +1175,6 @@ export class HTMLParser {
             quote = '\'';
           } else {
             value = args[assignIndex + 3];
-            if (typeof value === 'undefined') {
-              // The name is the canonical value, which HTML reads in lowercase
-              const nameLower = name.toLowerCase();
-              if (fillAttrs.has(nameLower)) {
-                value = nameLower;
-              }
-            }
             quote = '';
           }
         }

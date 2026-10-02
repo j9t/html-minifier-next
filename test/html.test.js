@@ -2297,7 +2297,7 @@ describe('HTML', () => {
 
     // Boolean attribute matching—element with boolean attribute is preserved
     input = '<div><button disabled></button><button></button></div>';
-    output = '<div><button disabled=disabled></button></div>';
+    output = '<div><button disabled></button></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<button disabled>'] }), output);
 
     // Boolean attribute matching—element without boolean attribute is removed
@@ -2307,12 +2307,12 @@ describe('HTML', () => {
 
     // Boolean attribute with valued attribute—both must match
     input = '<div><button type="button" disabled></button><button type="button"></button><button disabled></button></div>';
-    output = '<div><button type="button" disabled=disabled></button></div>';
+    output = '<div><button type="button" disabled></button></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<button type="button" disabled>'] }), output);
 
     // Multiple boolean attributes in spec
     input = '<div><button disabled hidden></button><button disabled></button><button></button></div>';
-    output = '<div><button disabled=disabled hidden></button></div>';
+    output = '<div><button disabled hidden></button></div>';
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<button disabled hidden>'] }), output);
 
     // Boolean attribute matches regardless of how it appears in HTML (preserves original format)
@@ -2358,6 +2358,11 @@ describe('HTML', () => {
       'Ismap Itemscope Loop Multiple Muted Nohref Noresize Noshade Novalidate Nowrap Open Pauseonexit Readonly ' +
       'Required Reversed Scoped Seamless Selected Sortable Truespeed Typemustmatch Visible></div>';
     assert.strictEqual(await minify(input, { collapseBooleanAttributes: true, caseSensitive: true }), output);
+
+    // Without the option, boolean attributes keep their values or lack thereof
+    assert.strictEqual(await minify('<input disabled="disabled">'), '<input disabled="disabled">');
+    assert.strictEqual(await minify('<input disabled checked readonly><script defer src="x.js"></script>'), '<input disabled checked readonly><script defer src="x.js"></script>');
+    assert.strictEqual(await minify('<select multiple><option selected>a</option></select>'), '<select multiple><option selected>a</option></select>');
   });
 
   test('Collapses enumerated attributes', async () => {
@@ -3521,9 +3526,9 @@ describe('HTML', () => {
     assert.deepStrictEqual(sortedTags, ['MyEl', 'DIV']);
     assert.strictEqual(await minify('<DIV b=1 a=1></DIV><div a=1 b=1></div><div a=1 b=1></div>', { caseSensitive: true, sortAttributes: true }), '<DIV a=1 b=1></DIV><div a=1 b=1></div><div a=1 b=1></div>');
 
-    // A boolean attribute without a value gets its name as the value, in lowercase
-    assert.strictEqual(await minify('<INPUT DISABLED>'), '<input disabled=disabled>');
-    assert.strictEqual(await minify('<INPUT DISABLED>', { caseSensitive: true }), '<INPUT DISABLED=disabled>');
+    // A boolean attribute without a value stays without one
+    assert.strictEqual(await minify('<INPUT DISABLED>'), '<input disabled>');
+    assert.strictEqual(await minify('<INPUT DISABLED>', { caseSensitive: true }), '<INPUT DISABLED>');
   });
 
   test('`source` and `track`', async () => {
@@ -3917,7 +3922,7 @@ describe('HTML', () => {
 
     // Do not merge if `defer` attribute differs
     input = '<script defer>let a=1</script><script>let b=2</script>';
-    output = '<script defer=defer>let a=1</script><script>let b=2</script>'; // Attribute normalized by parser
+    output = '<script defer>let a=1</script><script>let b=2</script>';
     assert.strictEqual(await minify(input, { mergeScripts: true }), output);
 
     // Do not merge if `nomodule` attribute differs
@@ -5228,7 +5233,7 @@ describe('HTML', () => {
     input = '<!-- htmlmin:ignore --><div class="blah" style="color: red">\n   test   <span> <input disabled/>  foo </span>\n\n   </div><!-- htmlmin:ignore -->' +
       '<div class="blah" style="color: red">\n   test   <span> <input disabled/>  foo </span>\n\n   </div>';
     output = '<div class="blah" style="color: red">\n   test   <span> <input disabled/>  foo </span>\n\n   </div>' +
-      '<div class="blah" style="color: red">test <span><input disabled=disabled> foo</span></div>';
+      '<div class="blah" style="color: red">test <span><input disabled> foo</span></div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
     input = '<!-- htmlmin:ignore --><!-- htmlmin:ignore -->';
