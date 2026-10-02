@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.10.2] - 2026-10-02
+
+### Changed
+
+* Improved parser performance, with fewer allocations per tag and text node and the raw-text check only rerun when open elements change
+
 ## [8.10.1] - 2026-10-02
 
 ### Fixed

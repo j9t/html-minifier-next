@@ -25,6 +25,8 @@ const RE_ASCII_WS_RUN = /[ \n\r\f]+/g;
 // Every reason `collapseWhitespaceAllKnown` has to do any work at all, in one scan
 const RE_COLLAPSIBLE = /[\t\xA0\n\r\f]| {2}/;
 const RE_NON_WS = /\S/;
+// Any no-break space character (the `collapseNoBreakSpaces` early-exit scan)
+const RE_NO_BREAK_SPACE_CHARS = /[\xA0\u202F\u2007]/;
 
 // Trim whitespace
 
@@ -119,7 +121,8 @@ function keepLineBreaks(_match, before, noBreakSpace, after) {
  */
 function collapseNoBreakSpaces(str, options) {
   const decoded = Boolean(options.decodeEntities);
-  if (!str || (str.indexOf('\xA0') === -1 && str.indexOf('\u202F') === -1 && str.indexOf('\u2007') === -1 && (decoded || str.indexOf('&') === -1))) {
+  // One scan for all three no-break space characters, rather than an `indexOf` per character
+  if (!str || (!RE_NO_BREAK_SPACE_CHARS.test(str) && (decoded || str.indexOf('&') === -1))) {
     return str;
   }
   const pattern = decoded ? RE_NO_BREAK_SPACE_CHAR_WS : RE_NO_BREAK_SPACE_WS;
@@ -168,14 +171,23 @@ function collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll)
 
   if (options.preserveLineBreaks) {
     // Find leading/trailing whitespace containing line breaks manually
-    // (avoids polynomial backtracking with end-anchored lazy quantifiers)
+    // (avoids polynomial backtracking with end-anchored lazy quantifiers);
+    // the line-break check scans the run’s char codes directly rather than
+    // testing a sliced copy, so the common case allocates nothing
     let leadEnd = 0;
     while (leadEnd < str.length && isAsciiWs(str.charCodeAt(leadEnd))) {
       leadEnd++;
     }
     if (leadEnd > 0) {
-      const leading = str.slice(0, leadEnd);
-      if (/[\n\r]/.test(leading)) {
+      let hasLineBreak = false;
+      for (let i = 0; i < leadEnd; i++) {
+        const code = str.charCodeAt(i);
+        if (code === 10 || code === 13) {
+          hasLineBreak = true;
+          break;
+        }
+      }
+      if (hasLineBreak) {
         lineBreakBefore = '\n';
         str = str.slice(leadEnd);
       }
@@ -185,8 +197,15 @@ function collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll)
       trailStart--;
     }
     if (trailStart < str.length) {
-      const trailing = str.slice(trailStart);
-      if (/[\n\r]/.test(trailing)) {
+      let hasLineBreak = false;
+      for (let i = trailStart; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        if (code === 10 || code === 13) {
+          hasLineBreak = true;
+          break;
+        }
+      }
+      if (hasLineBreak) {
         lineBreakAfter = '\n';
         str = str.slice(0, trailStart);
       }

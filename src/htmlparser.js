@@ -302,10 +302,13 @@ export class HTMLParser {
     let prevTag;
     /** @type {string | undefined} */
     let nextTag;
+    // One shared empty array for the resets—nothing ever writes to `prevAttrs`/`nextAttrs`
     /** @type {HTMLAttribute[]} */
-    let prevAttrs = [];
+    const emptyAttrs = [];
     /** @type {HTMLAttribute[]} */
-    let nextAttrs = [];
+    let prevAttrs = emptyAttrs;
+    /** @type {HTMLAttribute[]} */
+    let nextAttrs = emptyAttrs;
 
     // Sticky regex versions for position-based matching (avoids string slicing)
     const startTagOpenY = new RegExp(startTagOpen.source.slice(1), 'y');
@@ -460,11 +463,27 @@ export class HTMLParser {
       special.has(tag) ||
       ((genericRawTextElements.has(tag) || escapableRawTextElements.has(tag)) && !inForeignContent());
 
+    // The answer changes only when the top of the stack does, so it is recomputed per stack
+    // change rather than per loop iteration (`stackVersion` covers same-named tags whose
+    // namespace differs, as a name alone does not say which element sits on top)
+    let stackVersion = 0;
+    let rawTextVersion = -1;
+    let rawTextTag = '';
+    let rawTextResult = false;
+    const topHoldsRawText = () => {
+      if (stackVersion !== rawTextVersion || lastTagLower !== rawTextTag) {
+        rawTextResult = holdsRawText(lastTagLower);
+        rawTextVersion = stackVersion;
+        rawTextTag = lastTagLower;
+      }
+      return rawTextResult;
+    };
+
     while (pos < fullLength) {
       lastPos = pos;
 
       // Make sure not to be in an element whose content is text, not markup
-      if (!lastTagLower || !holdsRawText(lastTagLower)) {
+      if (!lastTagLower || !topHoldsRawText()) {
         const textEnd = fullHtml.indexOf('<', pos);
 
         if (textEnd === pos) {
@@ -488,7 +507,7 @@ export class HTMLParser {
             cachedNextEndTag = null;
             advance(endTagMatch.text.length);
             prevTag = '/' + parseEndTag(endTagMatch.text, endTagMatch.name);
-            prevAttrs = [];
+            prevAttrs = emptyAttrs;
             continue;
           }
           cachedNextStartTag = null;
@@ -513,7 +532,7 @@ export class HTMLParser {
                 }
                 advance(commentEnd + 3 - pos);
                 prevTag = '';
-                prevAttrs = [];
+                prevAttrs = emptyAttrs;
                 continue;
               }
             }
@@ -531,7 +550,7 @@ export class HTMLParser {
                 }
                 advance(conditionalEnd + 2 - pos);
                 prevTag = '';
-                prevAttrs = [];
+                prevAttrs = emptyAttrs;
                 continue;
               }
             }
@@ -549,7 +568,7 @@ export class HTMLParser {
               }
               advance(doctypeMatch[0].length);
               prevTag = '';
-              prevAttrs = [];
+              prevAttrs = emptyAttrs;
               continue;
             }
           } else if (nextCode === 63) { // `?`
@@ -561,7 +580,7 @@ export class HTMLParser {
               }
               advance(processingInstructionEnd - pos);
               prevTag = processingInstructionTag;
-              prevAttrs = [];
+              prevAttrs = emptyAttrs;
               continue;
             }
             if (handler.continueOnParseError) {
@@ -575,7 +594,7 @@ export class HTMLParser {
               }
               advance(end - pos);
               prevTag = '';
-              prevAttrs = [];
+              prevAttrs = emptyAttrs;
               continue;
             }
           } else if (nextCode === 47) { // `/`
@@ -586,7 +605,7 @@ export class HTMLParser {
               if (endTagMatch) {
                 advance(endTagMatch.text.length);
                 prevTag = '/' + parseEndTag(endTagMatch.text, endTagMatch.name);
-                prevAttrs = [];
+                prevAttrs = emptyAttrs;
                 continue;
               }
             }
@@ -602,7 +621,7 @@ export class HTMLParser {
               }
               advance(Math.min(bogusEnd + 1, fullLength) - pos);
               prevTag = '';
-              prevAttrs = [];
+              prevAttrs = emptyAttrs;
               continue;
             }
           } else {
@@ -648,31 +667,33 @@ export class HTMLParser {
           const nextCode = fullHtml.charCodeAt(pos + 1);
           if (nextCode === 63) {
             nextTag = matchProcessingInstruction(pos) !== -1 ? processingInstructionTag : '';
-            nextAttrs = [];
+            nextAttrs = emptyAttrs;
           } else if (nextCode !== 47 && nextCode !== 33) {
             const nextStartTagMatch = parseStartTag(pos);
             if (nextStartTagMatch) {
               nextTag = nextStartTagMatch.tagName;
-              // Extract minimal attribute info for whitespace logic (just name/value pairs)
-              nextAttrs = extractAttrInfo(nextStartTagMatch.attrs);
+              // Extract minimal attribute info for whitespace logic (just name/value pairs)—
+              // only consulted next to an `input` (hidden inputs), so skip the extraction
+              // for every other tag rather than allocating attribute objects for each
+              nextAttrs = nextTag === 'input' ? extractAttrInfo(nextStartTagMatch.attrs) : emptyAttrs;
               cachedNextStartTag = { match: nextStartTagMatch, pos };
             } else {
               nextTag = '';
-              nextAttrs = [];
+              nextAttrs = emptyAttrs;
             }
           } else if (nextCode === 47 && hasCloseAtOrAfter(pos)) {
             const nextEndTagMatch = matchEndTag(pos);
             if (nextEndTagMatch) {
               nextTag = '/' + nextEndTagMatch.name;
-              nextAttrs = [];
+              nextAttrs = emptyAttrs;
               cachedNextEndTag = { match: nextEndTagMatch, pos };
             } else {
               nextTag = '';
-              nextAttrs = [];
+              nextAttrs = emptyAttrs;
             }
           } else {
             nextTag = '';
-            nextAttrs = [];
+            nextAttrs = emptyAttrs;
           }
         }
 
@@ -681,7 +702,7 @@ export class HTMLParser {
           if (isThenable(result)) await result;
         }
         prevTag = '';
-        prevAttrs = [];
+        prevAttrs = emptyAttrs;
       } else {
         const stackedTag = lastTagLower;
         const isEscapableRawText = escapableRawTextElements.has(stackedTag);
@@ -705,7 +726,7 @@ export class HTMLParser {
           // What follows stands after that end tag, not after the start tag still named here—
           // whitespace next to `textarea` stays verbatim only while the element is open
           prevTag = '/' + stackedTag;
-          prevAttrs = [];
+          prevAttrs = emptyAttrs;
         } else {
           // Without an end tag of its own, the element holds the rest of the input as text
           if (handler.chars && remaining) {
@@ -719,6 +740,7 @@ export class HTMLParser {
             // Nothing that stands behind the start tag is markup, so no end tag may be
             // generated for the element, or for anything it stands in
             stack.length = 0;
+            stackVersion++;
             lastTag = '';
             lastTagLower = '';
           }
@@ -736,7 +758,7 @@ export class HTMLParser {
           }
           advance(1);
           prevTag = '';
-          prevAttrs = [];
+          prevAttrs = emptyAttrs;
           continue;
         }
         const loc = getLineColumn(pos);
@@ -1009,6 +1031,7 @@ export class HTMLParser {
         }
       }
       stack.length = stackIndex;
+      stackVersion++;
       lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
       lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
     }
@@ -1109,7 +1132,12 @@ export class HTMLParser {
       const selfClosed = !!unarySlash && (handler.selfClosingSlash || startsForeignContent(lowerTagName));
       const unary = empty.has(lowerTagName) || (lowerTagName === 'html' && lastTagLower === 'head') || selfClosed;
 
-      const attrs = /** @type {HTMLAttribute[]} */ (match.attrs.map(function (/** @type {Array<string | undefined>} */ args) {
+      // A plain loop, so a tag costs no closure allocation per attribute
+      const rawAttrs = match.attrs;
+      /** @type {HTMLAttribute[]} */
+      const attrs = [];
+      for (let i = 0; i < rawAttrs.length; i++) {
+        const args = /** @type {Array<string | undefined>} */ (rawAttrs[i]);
         /** @type {string | undefined} */
         let name, value, customOpen, customClose, customAssign, quote;
 
@@ -1120,29 +1148,14 @@ export class HTMLParser {
           if (args[5] === '') { delete args[5]; }
         }
 
-        function populate(/** @type {number} */ index) {
-          customAssign = args[index];
-          value = args[index + 1];
-          if (typeof value !== 'undefined') {
-            return '"';
-          }
-          value = args[index + 2];
-          if (typeof value !== 'undefined') {
-            return '\'';
-          }
-          value = args[index + 3];
-          if (typeof value === 'undefined' && name && fillAttrs.has(name.toLowerCase())) {
-            value = name;
-          }
-          return '';
-        }
-
+        // Where `customAssign` sits; the value is in one of the three slots after it
+        let assignIndex = -1;
         let j = 1;
         if (handler.customAttrSurround) {
-          for (let i = 0, l = handler.customAttrSurround.length; i < l; i++, j += NCP) {
+          for (let s = 0, l = handler.customAttrSurround.length; s < l; s++, j += NCP) {
             name = args[j + 1];
             if (name) {
-              quote = populate(j + 2);
+              assignIndex = j + 2;
               customOpen = args[j];
               customClose = args[j + 6];
               break;
@@ -1151,18 +1164,33 @@ export class HTMLParser {
         }
 
         if (!name && (name = args[j])) {
-          quote = populate(j + 1);
+          assignIndex = j + 1;
         }
 
-        return {
+        if (name) {
+          customAssign = args[assignIndex];
+          if (typeof (value = args[assignIndex + 1]) !== 'undefined') {
+            quote = '"';
+          } else if (typeof (value = args[assignIndex + 2]) !== 'undefined') {
+            quote = '\'';
+          } else {
+            value = args[assignIndex + 3];
+            if (typeof value === 'undefined' && fillAttrs.has(name.toLowerCase())) {
+              value = name;
+            }
+            quote = '';
+          }
+        }
+
+        attrs.push({
           name: name ?? '',
           value,
           customAssign: customAssign || '=',
           customOpen: customOpen || '',
           customClose: customClose || '',
           quote: quote || ''
-        };
-      }));
+        });
+      }
 
       if (!unary) {
         pushOpenElement(tagName, lowerTagName, attrs);
@@ -1195,6 +1223,7 @@ export class HTMLParser {
         }
       }
       stack.push({ tag, lowerTag, attrs, namespace, pScope });
+      stackVersion++;
     }
 
     // `needle` must already be lowercase
@@ -1234,6 +1263,7 @@ export class HTMLParser {
 
         // Remove the open elements from the stack
         stack.length = stackIndex;
+        stackVersion++;
         lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
         lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
       } else if ((handler.partialMarkup || formattingElements.has(lowerTagName)) && tagName) {
