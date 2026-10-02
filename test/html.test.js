@@ -4580,9 +4580,13 @@ describe('HTML', () => {
 
   test('Preserves whitespace next to text around elements that don’t render', async () => {
     for (const [element, end] of [['script', '</script>'], ['template', '</template>'], ['noscript', '</noscript>'], ['datalist', '</datalist>'], ['link rel="x"', ''], ['meta itemprop="x"', '']]) {
-      const input = `<div>a <${element}>${end} b</div>`;
+      const input = `<div>a <${element}>${end}b</div>`;
       assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
       assert.strictEqual(await minify(input, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), input);
+      // One space on either side is enough
+      const output = `<div>a<${element}>${end} b</div>`;
+      assert.strictEqual(await minify(`<div>a <${element}>${end} b</div>`, { collapseWhitespace: true }), output);
+      assert.strictEqual(await minify(`<div>a <${element}>${end} b</div>`, { collapseWhitespace: true, collapseInlineTagWhitespace: true }), output);
     }
 
     // Between tags, the element on the other side decides
@@ -4599,13 +4603,37 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p>a <script></script> <script></script>b</p>', { collapseWhitespace: true }), '<p>a <script></script><script></script>b</p>');
     assert.strictEqual(await minify('<div>a<script></script> <script></script></div>', { collapseWhitespace: true }), '<div>a<script></script><script></script></div>');
     assert.strictEqual(await minify('<div>a<script></script> <script></script><div>b</div></div>', { collapseWhitespace: true }), '<div>a<script></script><script></script><div>b</div></div>');
+
+    // Whitespace before such elements goes, too, where nothing beyond them renders it
+    assert.strictEqual(await minify('<div><img src="a">\n<script src="a.js"></script>\n</div>', { collapseWhitespace: true }), '<div><img src="a"><script src="a.js"></script></div>');
+    assert.strictEqual(await minify('<body><img src="a">\n<script src="a.js"></script>\n</body>', { collapseWhitespace: true }), '<body><img src="a"><script src="a.js"></script></body>');
+    assert.strictEqual(await minify('<body><img src="a">\n<script src="a.js"></script>', { collapseWhitespace: true }), '<body><img src="a"><script src="a.js"></script>');
+    assert.strictEqual(await minify('<p>a\n<script></script>\n</p>', { collapseWhitespace: true }), '<p>a<script></script></p>');
+    assert.strictEqual(await minify('<p>a <script></script><link rel="x"> </p>', { collapseWhitespace: true }), '<p>a<script></script><link rel="x"></p>');
+    assert.strictEqual(await minify('<div><img src="a"> <script></script><div>b</div></div>', { collapseWhitespace: true }), '<div><img src="a"><script></script><div>b</div></div>');
+    assert.strictEqual(await minify('<p><img src="a">\n<script></script>\nb</p>', { collapseWhitespace: true }), '<p><img src="a"><script></script> b</p>');
+    for (const input of ['<p><img src="a"> <script></script><img src="b"></p>', '<p>a <script></script>b</p>', '<p>a <script></script><b>b</b></p>']) {
+      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input);
+    }
+    assert.strictEqual(await minify('<div><img src="a">\n<script></script>\n</div>', { collapseWhitespace: true, conservativeCollapse: true }), '<div><img src="a"> <script></script> </div>');
+
+    // And whitespace after them goes where nothing before them renders it
+    assert.strictEqual(await minify('<p>\n<script></script>\nb</p>', { collapseWhitespace: true }), '<p><script></script>b</p>');
+    assert.strictEqual(await minify('<div><div>x</div>\n<script></script>\n<a>y</a></div>', { collapseWhitespace: true }), '<div><div>x</div><script></script><a>y</a></div>');
+    assert.strictEqual(await minify('<p><br>\n<link rel="x">\nb</p>', { collapseWhitespace: true }), '<p><br><link rel="x">b</p>');
+    assert.strictEqual(await minify('<p><!-- c -->\n<script></script>\nb</p>', { collapseWhitespace: true }), '<p><!-- c --><script></script>b</p>');
+    assert.strictEqual(await minify('<p>a<!-- c -->\n<script></script>\nb</p>', { collapseWhitespace: true }), '<p>a<!-- c --><script></script> b</p>');
+    for (const input of ['<p><?marker name="x"><script></script> b</p>', '<p><!-- htmlmin:ignore -->a<!-- htmlmin:ignore --><script></script> b</p>']) {
+      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input.replace(/<!-- htmlmin:ignore -->/g, ''));
+    }
+    assert.strictEqual(await minify('<p>\n<script></script>\nb</p>', { collapseWhitespace: true, conservativeCollapse: true }), '<p> <script></script> b</p>');
   });
 
   test('Keeps elements that don’t close `p` inside it', async () => {
     // Only flow elements like `div` close an open `p`; `meta`, `style`, and others go in it
-    assert.strictEqual(await minify('<p>a <meta itemprop="x" content="1"> b</p>', { collapseWhitespace: true }), '<p>a <meta itemprop="x" content="1"> b</p>');
-    assert.strictEqual(await minify('<p>a <style>x</style> b</p>', { collapseWhitespace: true }), '<p>a <style>x</style> b</p>');
-    assert.strictEqual(await minify('<div><p>a <meta itemprop="x" content="1"> b</p><p>c</p></div>', { collapseWhitespace: true, removeOptionalTags: true }), '<div><p>a <meta itemprop="x" content="1"> b<p>c</div>');
+    assert.strictEqual(await minify('<p>a <meta itemprop="x" content="1"> b</p>', { collapseWhitespace: true }), '<p>a<meta itemprop="x" content="1"> b</p>');
+    assert.strictEqual(await minify('<p>a <style>x</style> b</p>', { collapseWhitespace: true }), '<p>a<style>x</style> b</p>');
+    assert.strictEqual(await minify('<div><p>a <meta itemprop="x" content="1"> b</p><p>c</p></div>', { collapseWhitespace: true, removeOptionalTags: true }), '<div><p>a<meta itemprop="x" content="1"> b<p>c</div>');
     assert.strictEqual(await minify('<div><p>a <div>b</div></div>', { collapseWhitespace: true }), '<div><p>a<div>b</div></div>');
   });
 
@@ -5342,6 +5370,20 @@ describe('HTML', () => {
     input = '<!-- htmlmin:ignore --></div><!-- htmlmin:ignore -->\n<!-- htmlmin:ignore --></em><!-- htmlmin:ignore -->';
     output = '</div> </em>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+  });
+
+  test('Whitespace around elements that don’t render next to `htmlmin:ignore` blocks', async () => {
+    const ignore = '<!-- htmlmin:ignore -->';
+
+    // A block that starts with such an element counts as one
+    const input = `<head><title>T</title>\n<meta name="a" content="1">\n${ignore}<meta name="b" content="2">${ignore}\n${ignore}<meta name="c" content="3">${ignore}\n${ignore}<body>${ignore}\n<p>x</p>`;
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), '<head><title>T</title><meta name="a" content="1"><meta name="b" content="2"><meta name="c" content="3"><body><p>x</p>');
+    assert.strictEqual(await minify(`<p>a<script></script>\n${ignore}<script></script>${ignore}b</p>`, { collapseWhitespace: true }), '<p>a<script></script> <script></script>b</p>');
+
+    // Otherwise, what a block holds may render, so the whitespace before it stays
+    assert.strictEqual(await minify(`<p>a <script></script>${ignore}b${ignore}</p>`, { collapseWhitespace: true }), '<p>a <script></script>b</p>');
+    assert.strictEqual(await minify(`<p>a <script></script>\n${ignore}b${ignore}</p>`, { collapseWhitespace: true }), '<p>a<script></script> b</p>');
+    assert.strictEqual(await minify(`<p>a\n<script></script>${ignore}<span>b</span>${ignore}\n</p>`, { collapseWhitespace: true }), '<p>a <script></script><span>b</span></p>');
   });
 
   test('`meta` viewport', async () => {

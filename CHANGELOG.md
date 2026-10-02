@@ -4,6 +4,13 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.10.1] - 2026-10-02
+
+### Fixed
+
+* Fixed `collapseWhitespace` keeping whitespace before elements that don’t render, like `script`, `meta`, or `link`, where nothing after them renders it (e.g., the space in `<img src="a"> <script></script></body>`), and after them, where nothing before them renders it (e.g., in `<p><script></script> text`), as well as on both sides of such an element, where one space is enough (`a <script></script> b` now becomes `a<script></script> b`)
+* Fixed `collapseWhitespace` keeping whitespace between an element that doesn’t render and an `htmlmin:ignore` block that starts with one (e.g., between `meta` elements in `head`)
+
 ## [8.10.0] - 2026-10-01
 
 ### Fixed
