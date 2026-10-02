@@ -6271,6 +6271,11 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, canCollapseWhitespace: canCollapseAndTrimWhitespace }), output);
     output = '<div><div class="leaveAlone"> foo  <b>bar</b>  baz </div></div>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, canTrimWhitespace: canCollapseAndTrimWhitespace }), output);
+
+    // With `preserveLineBreaks`, `canCollapseWhitespace` still keeps the runs next to inline elements as written
+    input = '<div> <div class="leaveAlone">\n\n foo \n\n <b>bar</b> \n\n baz \n\n</div> </div>';
+    output = '<div><div class="leaveAlone">\nfoo \n\n <b>bar</b> \n\n baz\n</div></div>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true, preserveLineBreaks: true, canCollapseWhitespace: canCollapseAndTrimWhitespace }), output);
   });
 
   test('Minifies `Content-Security-Policy`', async () => {
