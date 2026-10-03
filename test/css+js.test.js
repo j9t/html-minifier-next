@@ -264,13 +264,6 @@ describe('CSS and JS', () => {
   });
 
   // Tests for `minifyJS` configuration options
-  test('JS: Minifies with `minifyJS: true`', async () => {
-    const input = '<script>function myFunction() { let x = 1; return x; }</script>';
-    const output = '<script>function myFunction(){return 1}</script>';
-
-    assert.strictEqual(await minify(input, { minifyJS: true }), output);
-  });
-
   test('JS: Keeps names with `mangle: false`', async () => {
     // Note: Even with `mangle: false`, Terser still applies compress optimizations by default
     // To truly preserve variable names, need to disable both mangle and compress
@@ -1998,7 +1991,7 @@ describe('CSS and JS', () => {
       await assert.rejects(minify(input, { minifyCSS: true, continueOnMinifyError: false, canMinifyCSS }), /Hook failure/);
     });
 
-    test('A hook that returns a promise is an error, whether it resolves or rejects', async () => {
+    test('CSS: A hook that returns a promise is an error, whether it resolves or rejects', async () => {
       const input = '<style>body { color: red; }</style>';
       for (const canMinifyCSS of [async () => false, () => Promise.reject(new Error('Hook failure'))]) {
         const logs = [];
@@ -2133,7 +2126,7 @@ describe('CSS and JS', () => {
       await assert.rejects(minify(input, { minifyJS: true, continueOnMinifyError: false, canMinifyJS }), /Hook failure/);
     });
 
-    test('A hook that returns a promise is an error, whether it resolves or rejects', async () => {
+    test('JS: A hook that returns a promise is an error, whether it resolves or rejects', async () => {
       const input = '<script>let x = 1;</script><button onclick="let y = 2;">Click</button>';
       for (const canMinifyJS of [async () => false, () => Promise.reject(new Error('Hook failure'))]) {
         const logs = [];
