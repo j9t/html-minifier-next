@@ -9,6 +9,7 @@ import {
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
   RE_ATTR_WS_TRIM,
+  RE_WS_CHAR,
   generalDefaults,
   tagDefaults,
   executableScriptsMimetypes,
@@ -226,13 +227,22 @@ function isStyleElement(tag, attrs) {
 }
 
 /**
+ * Whether an attribute collapses to its name; takes name and value as written, lower-casing
+ * the value only for the few names that depend on it
+ *
  * @param {string} attrName
  * @param {string} attrValue
  */
-function isBooleanAttribute(attrName, attrValue) {
-  return isSimpleBoolean.has(attrName) ||
-    (attrName === 'draggable' && !isBooleanValue.has(attrValue)) ||
-    (collapsibleValues.has(attrName) && collapsibleValues.get(attrName)?.has(attrValue));
+function collapsesToBooleanName(attrName, attrValue) {
+  const name = attrName.toLowerCase();
+  if (isSimpleBoolean.has(name)) {
+    return true;
+  }
+  const values = collapsibleValues.get(name);
+  if (values) {
+    return values.has(attrValue.toLowerCase());
+  }
+  return name === 'draggable' && !isBooleanValue.has(attrValue.toLowerCase());
 }
 
 const uriTypeAttributes = new Map([
@@ -325,6 +335,18 @@ function isMediaQuery(tag, attrs, attrName) {
 function isSrcset(attrName, tag) {
   return (attrName === 'srcset' && srcsetElements.has(tag)) ||
     (attrName === 'imagesrcset' && tag === 'link');
+}
+
+// Whitespace (as `\s`) and comma for the `srcset` parser, with ASCII checked by code first
+/** @param {number} code */
+function isWsChar(code) {
+  return code === 32 || (code >= 9 && code <= 13) ||
+    (code > 127 && RE_WS_CHAR.test(String.fromCharCode(code)));
+}
+
+/** @param {number} code */
+function isWsOrComma(code) {
+  return code === 44 /* , */ || isWsChar(code);
 }
 
 /**
@@ -543,11 +565,11 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     let pos = 0;
     while (pos < value.length) {
       // Skip whitespace and separator commas
-      while (pos < value.length && /[\s,]/.test(value.charAt(pos))) pos++;
+      while (pos < value.length && isWsOrComma(value.charCodeAt(pos))) pos++;
       if (pos >= value.length) break;
       const start = pos;
       // URL: a run of non-whitespace characters (which may contain commas)
-      while (pos < value.length && !/\s/.test(value.charAt(pos))) pos++;
+      while (pos < value.length && !isWsChar(value.charCodeAt(pos))) pos++;
       if (value.charAt(pos - 1) === ',') {
         // Trailing comma(s) end the candidate—a URL without descriptor
         candidates.push(value.slice(start, pos).replace(/,+$/, ''));
@@ -555,9 +577,11 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       }
       // Descriptor: everything up to the next comma outside parentheses
       let inParens = false;
-      while (pos < value.length && (inParens || value.charAt(pos) !== ',')) {
-        if (value.charAt(pos) === '(') inParens = true;
-        else if (value.charAt(pos) === ')') inParens = false;
+      while (pos < value.length) {
+        const code = value.charCodeAt(pos);
+        if (!inParens && code === 44 /* , */) break;
+        if (code === 40 /* ( */) inParens = true;
+        else if (code === 41 /* ) */) inParens = false;
         pos++;
       }
       candidates.push(trimWhitespace(value.slice(start, pos)));
@@ -811,13 +835,18 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
   let attrValue = normalized.value;
   const attr = normalized.attr;
   let attrQuote = attr.quote;
-  let attrFragment;
-  let emittedAttrValue;
   const readAsXML = Boolean(options.insideSVG) && Boolean(options.minifySVG);
 
   // SVGO reads the whole SVG block as XML, where every attribute carries a value
   if (readAsXML && typeof attrValue === 'undefined') {
     attrValue = '';
+  }
+
+  // An attribute written as its name alone skips the quoting work below
+  if (typeof attrValue === 'undefined' ||
+      (options.collapseBooleanAttributes && collapsesToBooleanName(attrName, attrValue ?? '')) ||
+      (options.collapseEmptyAttributes && attrValue === '' && (attr.customAssign ?? '=') === '=')) {
+    return attr.customOpen + attrName + (isLast ? '' : ' ') + attr.customClose;
   }
 
   // Determine if need to add/keep quotes
@@ -833,6 +862,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       (options.removeTagWhitespace && attrQuote === '' && !isLast)))
   );
 
+  let emittedAttrValue;
   if (shouldAddQuotes) {
     attrValue = attrValue ?? '';
     // Determine the appropriate quote character
@@ -845,9 +875,10 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
         attrQuote = chooseAttributeQuote(attrValue, options);
       }
 
+      // `indexOf` first, as values rarely hold the quote and as it’s cheaper than `replace`
       if (attrQuote === '"') {
-        attrValue = attrValue.replace(/"/g, '&#34;');
-      } else {
+        if (attrValue.indexOf('"') !== -1) attrValue = attrValue.replace(/"/g, '&#34;');
+      } else if (attrValue.indexOf("'") !== -1) {
         attrValue = attrValue.replace(/'/g, '&#39;');
       }
     } else {
@@ -923,18 +954,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     emittedAttrValue = attrValue + ' ';
   }
 
-  if (typeof attrValue === 'undefined' || (options.collapseBooleanAttributes &&
-      isBooleanAttribute(attrName.toLowerCase(), (attrValue || '').toLowerCase())) ||
-      (options.collapseEmptyAttributes && attrValue === '' && (attr.customAssign ?? '=') === '=')) {
-    attrFragment = attrName;
-    if (!isLast) {
-      attrFragment += ' ';
-    }
-  } else {
-    attrFragment = attrName + attr.customAssign + emittedAttrValue;
-  }
-
-  return attr.customOpen + attrFragment + attr.customClose;
+  return attr.customOpen + attrName + attr.customAssign + emittedAttrValue + attr.customClose;
 }
 
 // Exports
@@ -951,7 +971,6 @@ export {
   isExecutableScript,
   isStyleLinkTypeAttribute,
   isStyleElement,
-  isBooleanAttribute,
   isUriTypeAttribute,
   isNumberTypeAttribute,
   isLinkType,

@@ -7688,6 +7688,43 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<textarea>a</textarea foo="a<b>c">d'), '<textarea>a</textarea>c">d');
   });
 
+  test('An attribute reaching past the parser’s window is read whole', async () => {
+    // The parser reads attributes through a 20 KB window, so that a value no closing quote
+    // can end cannot take the whole document down with it; an attribute reaching past that
+    // window is read past it, which must make no difference to what comes out
+    const padding = `<i data-p="${'x'.repeat(21000)}"></i>`;
+    // Value lengths around where the window ends, where a match could have been cut short,
+    // and well past it
+    for (const length of [19900, 19989, 19995, 20000, 40000]) {
+      const value = 'a'.repeat(length);
+      const quoted = `href="${value}" id="q"`;
+      const assigned = `href#="${value}" id="q"`;
+      const unquoted = `href=${value} id="q"`;
+
+      assert.strictEqual(await minify(`${padding}<a ${quoted}>t</a>`), `${padding}<a ${quoted}>t</a>`, `length ${length}`);
+      // A custom assign takes the parser through its window as well, even where it need not
+      assert.strictEqual(
+        await minify(`${padding}<a ${assigned}>t</a>`, { customAttrAssign: [/#=/] }),
+        `${padding}<a ${assigned}>t</a>`,
+        `length ${length}`
+      );
+      // An unquoted value has no closing quote to look for, so it is read on to its end
+      assert.strictEqual(await minify(`${padding}<a ${unquoted}>t</a>`), `${padding}<a ${unquoted}>t</a>`, `length ${length}`);
+      assert.strictEqual(
+        await minify(`${padding}<a ${unquoted}>t</a>`, { continueOnParseError: true }),
+        `${padding}<a ${unquoted}>t</a>`,
+        `length ${length}`
+      );
+    }
+
+    // Where parse errors are tolerated, an unquoted value takes in `=` past the window, too
+    const lenient = `${'a'.repeat(20000)}=b`;
+    assert.strictEqual(
+      await minify(`${padding}<a href=${lenient} id="q">t</a>`, { continueOnParseError: true }),
+      `${padding}<a href="${lenient}" id="q">t</a>`
+    );
+  });
+
   test('A start tag that ends a paragraph ends it, whatever the element', async () => {
     // The spec names these alongside `div` and `ul`, and each closes an open `p` the same
     // way; leaving one out kept the paragraph open across it, which put the end tag
