@@ -4,6 +4,16 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.10.3] - 2026-10-03
+
+### Fixed
+
+* Fixed unquoted attribute values of about 20 KB or more being cut short, with the rest written out as an attribute of its own (e.g., a long `data:` URL in `<img src=…>`)
+
+### Changed
+
+* Improved attribute performance, with less work for attributes that collapse to their name as well as for `srcset` values
+
 ## [8.10.2] - 2026-10-02
 
 ### Fixed
