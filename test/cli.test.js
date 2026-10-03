@@ -914,8 +914,9 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
   });
 
   test('Handles EPIPE gracefully when piping to head', async () => {
-    const command = `node "${cliPath}" --collapse-whitespace < default.html | head -n1`;
-    const { status, stderr } = await spawnAsync('sh', ['-c', command]);
+    // The path goes in as `$1` rather than into the script, so the shell never parses it
+    const command = 'node "$1" --collapse-whitespace < default.html | head -n1';
+    const { status, stderr } = await spawnAsync('sh', ['-c', command, 'sh', cliPath]);
     // Exit code should be `0` and no noisy errors
     assert.strictEqual(status, 0);
     assert.strictEqual(stderr.toString().trim(), '');
