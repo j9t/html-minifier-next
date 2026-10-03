@@ -7,7 +7,7 @@ import { hashContent } from '../src/lib/utils.js';
 import { extractScriptBodies } from '../src/lib/content.js';
 
 describe('CSS and JS', () => {
-  test('CSS minification', async () => {
+  test('Minifies CSS', async () => {
     let input, output;
 
     input = '<style></style>div#foo { background-color: red; color: white }';
@@ -79,21 +79,21 @@ describe('CSS and JS', () => {
     }), output);
   });
 
-  test('Style attribute minification', async () => {
+  test('Minifies `style` attributes', async () => {
     const input = '<div style="color: red; background-color: yellow; font-family: Verdana, Arial, sans-serif;"></div>';
     const output = '<div style="color:red;background-color:#ff0;font-family:Verdana,Arial,sans-serif"></div>';
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
   // Tests for minifyCSS configuration options
-  test('CSS: Basic boolean true', async () => {
+  test('CSS: Minifies with `minifyCSS: true`', async () => {
     const input = '<style>body { color: red; font-size: 12px; }</style>';
     const output = '<style>body{color:red;font-size:12px}</style>';
 
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('CSS: Custom options', async () => {
+  test('CSS: Applies custom options', async () => {
     const input = '<style>.class1 { color: red; } .class2 { color: red; }</style>';
     const result = await minify(input, {
       minifyCSS: {}
@@ -104,7 +104,7 @@ describe('CSS and JS', () => {
     assert.ok(result.length < input.length, 'Output should be shorter');
   });
 
-  test('CSS: Inline `style` attribute', async () => {
+  test('CSS: Minifies an inline `style` attribute', async () => {
     const input = '<div style="  color: red;  margin: 10px;  "></div>';
     const output = '<div style="color:red;margin:10px"></div>';
 
@@ -119,7 +119,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('Important license'), 'Important comment should be preserved');
   });
 
-  test('CSS: Combined with `collapseWhitespace`', async () => {
+  test('CSS: Works with `collapseWhitespace`', async () => {
     const input = `
       <style>
         body {
@@ -137,7 +137,7 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('\n'), 'Whitespace should be collapsed');
   });
 
-  test('CSS: Media query minification', async () => {
+  test('CSS: Minifies media queries', async () => {
     const input = '<link rel="stylesheet" media="  screen  and  ( min-width: 768px )  " href="style.css">';
     const result = await minify(input, { minifyCSS: true });
 
@@ -146,7 +146,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('screen'), 'Media type should be preserved');
   });
 
-  test('Invalid/empty CSS in `style` attributes', async () => {
+  test('Removes invalid and empty CSS in `style` attributes', async () => {
     // Regression test for issue where invalid CSS like `color: ` was minified to `color:` instead of being removed
     let input, output;
 
@@ -180,7 +180,7 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyCSS: true }), output);
   });
 
-  test('CSS minification error handling', async () => {
+  test('Handles CSS minification errors', async () => {
     // Test invalid CSS syntax—should attempt to minify or preserve original
     let input = '<style>body { color: #invalid!!! }</style>';
     let result = await minify(input, { minifyCSS: true });
@@ -264,14 +264,14 @@ describe('CSS and JS', () => {
   });
 
   // Tests for `minifyJS` configuration options
-  test('JS: Basic boolean true', async () => {
+  test('JS: Minifies with `minifyJS: true`', async () => {
     const input = '<script>function myFunction() { let x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
   });
 
-  test('JS: Mangle disabled (`mangle: false`)', async () => {
+  test('JS: Keeps names with `mangle: false`', async () => {
     // Note: Even with `mangle: false`, Terser still applies compress optimizations by default
     // To truly preserve variable names, need to disable both mangle and compress
     const input = '<script>function myFunction(myParam) { let myVariable = myParam + 1; return myVariable; }</script>';
@@ -283,7 +283,7 @@ describe('CSS and JS', () => {
     // Note: `myVariable` may still be optimized away if compress is enabled
   });
 
-  test('JS: Top-level mangling (`mangle: { toplevel: true }`)', async () => {
+  test('JS: Mangles top-level names with `mangle: { toplevel: true }`', async () => {
     const input = '<script>function myFunction() { let myVariable = 123; return myVariable; }</script>';
     const result = await minify(input, { minifyJS: { mangle: { toplevel: true } } });
 
@@ -294,7 +294,7 @@ describe('CSS and JS', () => {
     assert.ok(result.length < input.length, 'Output should be shorter than input');
   });
 
-  test('JS: Reserved names (`mangle: { reserved: ["myFunction"] }`)', async () => {
+  test('JS: Keeps reserved names (`mangle: { reserved: ["myFunction"] }`)', async () => {
     const input = '<script>function myFunction() { let myVariable = 123; return myVariable; }</script>';
     const result = await minify(input, {
       minifyJS: {
@@ -321,7 +321,7 @@ describe('CSS and JS', () => {
     }), output);
   });
 
-  test('JS: Combined mangle and compress options', async () => {
+  test('JS: Combines mangle and compress options', async () => {
     const input = '<script>function calculate() { console.log("calculating"); let result = 10 + 20; return result; }</script>';
     const result = await minify(input, {
       minifyJS: {
@@ -336,7 +336,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('30'), 'Should optimize 10 + 20 to 30');
   });
 
-  test('JS: Event attribute with mangle disabled', async () => {
+  test('JS: Keeps names in event attributes with mangle disabled', async () => {
     const input = '<button onclick="let myVar = 42; alert(myVar);">Click</button>';
     const result = await minify(input, { minifyJS: { mangle: false } });
 
@@ -344,7 +344,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('alert'), 'Function call should be preserved');
   });
 
-  test('JS: Entity references in event handler attributes decoded before minification', async () => {
+  test('JS: Decodes entity references in event handler attributes before minification', async () => {
     let input, result;
 
     // `&quot;` → `"` enables bracket-to-dot notation optimization
@@ -360,7 +360,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('b()'), 'Function call after `&amp;&amp;` should be preserved');
   });
 
-  test('JS: MIME types that trigger minification', async () => {
+  test('JS: Minifies the MIME types that trigger minification', async () => {
     let input, output;
 
     input = '<script type="">function f(){  return 1  }</script>';
@@ -425,7 +425,7 @@ describe('CSS and JS', () => {
   });
 
   // Engine field tests
-  test('JS: Default engine (Terser)', async () => {
+  test('JS: Uses Terser by default', async () => {
     const input = '<script>function myFunction() { let x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
@@ -433,7 +433,7 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyJS: true }), output);
   });
 
-  test('JS: Explicit Terser engine', async () => {
+  test('JS: Uses Terser when set explicitly', async () => {
     const input = '<script>function myFunction() { let x = 1; return x; }</script>';
     const output = '<script>function myFunction(){return 1}</script>';
 
@@ -441,7 +441,7 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyJS: { engine: 'terser' } }), output);
   });
 
-  test('JS: SWC engine for script blocks', async () => {
+  test('JS: Uses SWC for script blocks', async () => {
     const input = '<script>function myFunction() { let x = 1; return x; }</script>';
 
     // SWC should minify the code (exact output may differ from Terser)
@@ -452,7 +452,7 @@ describe('CSS and JS', () => {
     assert.ok(!result.includes('let x'), 'Variable should be optimized away');
   });
 
-  test('JS: Hybrid behavior with Terser processing inline handlers', async () => {
+  test('JS: Uses Terser for inline handlers under SWC', async () => {
     const input = '<button onclick="return false;">Click</button>';
 
     // Even with SWC engine, inline handlers should use Terser
@@ -462,7 +462,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('return'), 'Return statement should work (via Terser)');
   });
 
-  test('JS: Hybrid behavior—complex example', async () => {
+  test('JS: Uses SWC for script blocks and Terser for inline handlers in one document', async () => {
     const input = `
       <script>function calculate() { let x = 10; let y = 20; return x + y; }</script>
       <button onclick="let result = calculate(); alert(result); return false;">Test</button>
@@ -490,7 +490,7 @@ describe('CSS and JS', () => {
     );
   });
 
-  test('JS: Engine-specific options for Terser', async () => {
+  test('JS: Applies engine-specific options for Terser', async () => {
     const input = '<script>function myFunction() { console.log("test"); let x = 1; return x; }</script>';
 
     const result = await minify(input, {
@@ -507,7 +507,7 @@ describe('CSS and JS', () => {
     assert.ok(result.includes('return'), '`return` statement should be present');
   });
 
-  test('JS: Engine-specific options for SWC', async () => {
+  test('JS: Applies engine-specific options for SWC', async () => {
     const input = '<script>function myFunction() { let unused = "test"; let x = 1; return x; }</script>';
 
     const result = await minify(input, {
@@ -524,7 +524,7 @@ describe('CSS and JS', () => {
     // Just check that it’s shorter (minified)
   });
 
-  test('JS: SWC case-insensitivity', async () => {
+  test('JS: Reads the SWC engine name case-insensitively', async () => {
     const input = '<script>function test() { return 42; }</script>';
 
     // Engine field should be case-insensitive
@@ -575,7 +575,7 @@ describe('CSS and JS', () => {
     }
   });
 
-  test('JavaScript minification error handling', async () => {
+  test('Handles JavaScript minification errors', async () => {
     // Test invalid JavaScript syntax
     let input = '<script>function foo( { syntax error</script>';
     let result = await minify(input, { minifyJS: true });
@@ -640,103 +640,103 @@ describe('CSS and JS', () => {
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
   });
 
-  test('`application/ld+json`', async () => {
+  test('Minifies `application/ld+json`', async () => {
     const input = '<script type="application/ld+json">{"foo":  "bar"}\n\n</script>';
     const output = '<script type="application/ld+json">{"foo":"bar"}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/ld+json` (invalid/malformed)', async () => {
+  test('Keeps invalid `application/ld+json` as is', async () => {
     const input = '<script type="application/ld+json">{"foo:  "bar"}\n\n</script>';
     const output = '<script type="application/ld+json">{"foo:  "bar"}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`importmap`', async () => {
+  test('Minifies `importmap`', async () => {
     const input = '<script type="importmap">\n{\n  "imports": {\n    "lodash": "/js/lodash.js",\n    "vue": "https://cdn.jsdelivr.net/npm/vue@3/dist/vue.esm-browser.js"\n  }\n}\n</script>';
     const output = '<script type="importmap">{"imports":{"lodash":"/js/lodash.js","vue":"https://cdn.jsdelivr.net/npm/vue@3/dist/vue.esm-browser.js"}}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/json`', async () => {
+  test('Minifies `application/json`', async () => {
     const input = '<script type="application/json">{\n  "data": {\n    "name": "test",\n    "value": 123\n  }\n}</script>';
     const output = '<script type="application/json">{"data":{"name":"test","value":123}}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`speculationrules`', async () => {
+  test('Minifies `speculationrules`', async () => {
     const input = '<script type="speculationrules">{\n  "prerender": [\n    {\n      "source": "list",\n      "urls": ["/page1", "/page2"]\n    }\n  ]\n}</script>';
     const output = '<script type="speculationrules">{"prerender":[{"source":"list","urls":["/page1","/page2"]}]}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/manifest+json`', async () => {
+  test('Minifies `application/manifest+json`', async () => {
     const input = '<script type="application/manifest+json">{\n  "name": "App",\n  "version": "1.0"\n}</script>';
     const output = '<script type="application/manifest+json">{"name":"App","version":"1.0"}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/manifest+json` (invalid/malformed)', async () => {
+  test('Keeps invalid `application/manifest+json` as is', async () => {
     const input = '<script type="application/manifest+json">{"name": invalid}\n</script>';
     const output = '<script type="application/manifest+json">{"name": invalid}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/vnd.geo+json`', async () => {
+  test('Minifies `application/vnd.geo+json`', async () => {
     const input = '<script type="application/vnd.geo+json">{\n  "type": "Point",\n  "coordinates": [100.0, 0.0]\n}</script>';
     const output = '<script type="application/vnd.geo+json">{"type":"Point","coordinates":[100,0]}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/vnd.geo+json` (invalid/malformed)', async () => {
+  test('Keeps invalid `application/vnd.geo+json` as is', async () => {
     const input = '<script type="application/vnd.geo+json">{"type": Point}\n</script>';
     const output = '<script type="application/vnd.geo+json">{"type": Point}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/problem+json`', async () => {
+  test('Minifies `application/problem+json`', async () => {
     const input = '<script type="application/problem+json">{\n  "type": "about:blank",\n  "status": 404\n}</script>';
     const output = '<script type="application/problem+json">{"type":"about:blank","status":404}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/merge-patch+json`', async () => {
+  test('Minifies `application/merge-patch+json`', async () => {
     const input = '<script type="application/merge-patch+json">{\n  "title": "New Title"\n}</script>';
     const output = '<script type="application/merge-patch+json">{"title":"New Title"}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/json-patch+json`', async () => {
+  test('Minifies `application/json-patch+json`', async () => {
     const input = '<script type="application/json-patch+json">[\n  {\n    "op": "replace",\n    "path": "/title",\n    "value": "New"\n  }\n]</script>';
     const output = '<script type="application/json-patch+json">[{"op":"replace","path":"/title","value":"New"}]</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`application/merge-patch+json` (invalid/malformed)', async () => {
+  test('Keeps invalid `application/merge-patch+json` as is', async () => {
     const input = '<script type="application/merge-patch+json">{"title": invalid value}\n</script>';
     const output = '<script type="application/merge-patch+json">{"title": invalid value}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('Case-insensitive `type` attribute', async () => {
+  test('Reads the `type` attribute case-insensitively', async () => {
     const input = '<script type="Application/JSON">{\n  "test": "value"\n}</script>';
     const output = '<script type="Application/JSON">{"test":"value"}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`type` attribute with whitespace', async () => {
+  test('Trims whitespace in the `type` attribute', async () => {
     const input = '<script type=" application/json ">{\n  "test": "value"\n}</script>';
     const output = '<script type="application/json">{"test":"value"}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('`type` attribute with `charset` parameter', async () => {
+  test('Handles a `type` attribute with a `charset` parameter', async () => {
     const input = '<script type="application/json; charset=utf-8">{\n  "test": "value"\n}</script>';
     const output = '<script type="application/json;charset=utf-8">{"test":"value"}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('Presets', async () => {
+  test('Applies presets', async () => {
     const { getPreset } = await import('../src/presets.js');
 
     // Test with conservative preset
@@ -810,7 +810,7 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
   });
 
-  test('JSON minification error handling', async () => {
+  test('Handles JSON minification errors', async () => {
     // Malformed JSON should be preserved with default `continueOnMinifyError: true`
     let input = '<script type="application/ld+json">{"foo:  "bar"}</script>';
     let result = await minify(input, { collapseWhitespace: true });
@@ -831,7 +831,7 @@ describe('CSS and JS', () => {
   });
 
   // Combined tests
-  test('`minifyJS` and `minifyCSS` together', async () => {
+  test('Applies `minifyJS` and `minifyCSS` together', async () => {
     const input = `
       <style>body { color: red; }</style>
       <script>function test() { console.log("test"); }</script>
@@ -1528,7 +1528,7 @@ describe('CSS and JS', () => {
       assert.ok(resultB.includes('/*keep-b*/') && !resultB.includes('/*keep-a*/'), resultB);
     });
 
-    test('Custom CSS cache size', async () => {
+    test('A custom CSS cache size works', async () => {
       const input = '<style>body { color: blue; padding: 0; }</style>';
 
       // Should work with custom CSS cache size
@@ -1543,7 +1543,7 @@ describe('CSS and JS', () => {
       assert.ok(result.includes('color:'), 'Should contain color property');
     });
 
-    test('Custom JS cache size', async () => {
+    test('A custom JS cache size works', async () => {
       const input = '<script>function test() { return 42; }</script>';
 
       // Should work with custom JS cache size
@@ -1556,7 +1556,7 @@ describe('CSS and JS', () => {
         'JS should be minified with custom cache');
     });
 
-    test('Both cache sizes', async () => {
+    test('Both cache sizes work together', async () => {
       const input = `
         <style>div { background: #fff; margin: 10px; }</style>
         <script>let data = { x: 1, y: 2 };</script>
@@ -1575,7 +1575,7 @@ describe('CSS and JS', () => {
       assert.ok(result.includes('x:1') && result.includes('y:2'), 'JS should be minified with custom cache sizes');
     });
 
-    test('Environment variables', async () => {
+    test('Environment variables set the cache size', async () => {
       const input = '<style>.test { color: purple; }</style>';
 
       // Test environment variable override
@@ -1612,7 +1612,7 @@ describe('CSS and JS', () => {
       }
     });
 
-    test('Very large cache sizes', async () => {
+    test('Very large cache sizes work', async () => {
       const input = '<script>function largeTest() { return "large"; }</script>';
 
       // Should handle large cache sizes without issues

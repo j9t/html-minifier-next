@@ -3,7 +3,7 @@ import {describe, test} from 'node:test';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 
 describe('SVG and MathML', () => {
-  test('SVGO basic optimization', async () => {
+  test('Optimizes path data and converts shapes to paths with SVGO', async () => {
     // Path data optimization (relative commands, space removal)
     const result = await minify('<svg><path d="M 10.500 20.300 L 30.400 40.500"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.startsWith('<svg>'), 'Should start with <svg>');
@@ -17,14 +17,14 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Numeric precision reduction', async () => {
+  test('Drops trailing zeros from numbers', async () => {
     // Coordinates are optimized
     const result = await minify('<svg><circle cx="283.500" cy="487.500" rx="259.000" ry="80.000"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('283.5'), 'Trailing zeros should be removed');
     assert.ok(!result.includes('283.500'), 'Original precision should not be preserved');
   });
 
-  test('Color optimization', async () => {
+  test('Shortens colors', async () => {
     // RGB to hex
     assert.strictEqual(
       await minify('<svg><rect width="10" height="10" fill="rgb(255,255,255)"/></svg>', { minifySVG: true, collapseWhitespace: true }),
@@ -36,7 +36,7 @@ describe('SVG and MathML', () => {
     assert.ok(!result.includes('#000000'), 'Long hex should be shortened or removed');
   });
 
-  test('Default attribute removal', async () => {
+  test('Removes default attributes', async () => {
     // SVGO removes default attributes
     assert.strictEqual(
       await minify('<svg><rect width="10" height="10" fill-opacity="1"/></svg>', { minifySVG: true, collapseWhitespace: true }),
@@ -302,7 +302,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Combined with other options', async () => {
+  test('Works with other options', async () => {
     // SVG minification with whitespace collapse
     const result = await minify('<svg>\n  <circle cx="50" cy="50" r="40"/>\n</svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(!result.includes('\n'), 'Whitespace should be collapsed');
@@ -313,7 +313,7 @@ describe('SVG and MathML', () => {
     assert.ok(!withComments.includes('comment'), 'Comments should be removed');
   });
 
-  test('Disabled', async () => {
+  test('Leaves SVG to HTML minification when `minifySVG` is disabled', async () => {
     // When `minifySVG` is false, no SVG-specific optimizations
     assert.strictEqual(
       await minify('<svg><rect width="100" height="100" fill="red"/></svg>', { minifySVG: false, collapseWhitespace: true }),
@@ -327,7 +327,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Complex real-world example', async () => {
+  test('Minifies a complex real-world SVG', async () => {
     const input = `<html><body>
     <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 65.326  612  502.174" class="logo">
       <ellipse class="ground" cx="283.500" cy="487.500" rx="259.000" ry="80.000" fill="#000000" fill-opacity="1" transform="scale(1)"/>
@@ -352,7 +352,7 @@ describe('SVG and MathML', () => {
     assert.ok(result.length < input.length, 'Output should be smaller');
   });
 
-  test('Custom SVGO options', async () => {
+  test('Applies custom SVGO options', async () => {
     // Disable shape-to-path conversion via plugin override
     assert.strictEqual(
       await minify('<svg><rect width="100" height="100" fill="red"/></svg>', {
@@ -381,7 +381,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Error recovery', async () => {
+  test('Keeps the unoptimized SVG when SVGO fails under `continueOnMinifyError`', async () => {
     // SVGO fails on the bare `&` the text carries; `continueOnMinifyError` keeps the unoptimized SVG
     assert.strictEqual(
       await minify('<svg><text>a & b</text><rect width="10" height="10"/></svg>', {
@@ -393,7 +393,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Mixed HTML and SVG', async () => {
+  test('Keeps the HTML around an SVG', async () => {
     // HTML elements before and after SVG
     const result = await minify('<p>Before</p><svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg><p>After</p>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.startsWith('<p>Before</p>'), 'HTML before SVG preserved');
@@ -401,14 +401,14 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('<svg'), 'SVG present in output');
   });
 
-  test('Multiple SVG elements', async () => {
+  test('Keeps multiple SVG elements', async () => {
     const result = await minify('<div><svg><circle cx="1" cy="1" r="1"/></svg><svg><rect width="2" height="2"/></svg></div>', { minifySVG: true, collapseWhitespace: true });
     // Both SVGs should be present
     const svgCount = (result.match(/<svg/g) || []).length;
     assert.strictEqual(svgCount, 2, 'Both SVG elements should be present');
   });
 
-  test('Nested SVG elements', async () => {
+  test('Handles nested SVG elements', async () => {
     const result = await minify('<div><svg><svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg></svg></div>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.startsWith('<div>'), 'Wrapper `div` preserved');
     assert.ok(result.includes('<svg'), 'SVG output present');
@@ -433,21 +433,21 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('style="fill:red;stroke-width:2px"'), result);
   });
 
-  test('Empty SVG', async () => {
+  test('Self-closes an empty SVG', async () => {
     assert.strictEqual(
       await minify('<svg></svg>', { minifySVG: true, collapseWhitespace: true }),
       '<svg/>'
     );
   });
 
-  test('SVG with `namespace` attributes', async () => {
+  test('Preserves namespaced attributes and their namespace declarations', async () => {
     // `xlink:href` should be preserved
     const result = await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#icon"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('xlink:href="#icon"'), '`xlink:href` should be preserved');
     assert.ok(result.includes('xmlns:xlink'), '`xlink` namespace declaration should be preserved');
   });
 
-  test('SVG with `defs` and `use`', async () => {
+  test('Preserves `defs` and `use` references', async () => {
     const result = await minify('<svg><defs><circle id="c" cx="5" cy="5" r="5"/></defs><use href="#c"/></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('<defs>'), '`defs` should be preserved');
     assert.ok(result.includes('id="c"'), 'ID should be preserved');
@@ -555,7 +555,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify('<MATH><MI>x</MI></MATH>'), '<MATH><MI>x</MI></MATH>');
   });
 
-  test('SVG with `foreignObject`', async () => {
+  test('Preserves `foreignObject` and its HTML content', async () => {
     // `foreignObject` with HTML content should be preserved
     const result = await minify('<svg><foreignObject width="100" height="100"><p>Hello</p></foreignObject></svg>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('foreignObject'), '`foreignObject` should be preserved');
@@ -625,7 +625,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('SVG with `foreignObject` and `removeOptionalTags`', async () => {
+  test('Keeps optional end tags in `foreignObject` where SVGO reads them', async () => {
     // An omitted `</p>` would leave the block invalid XML, which costs the whole graphic its
     // optimization, so the end tags stay wherever SVGO reads them
     assert.strictEqual(
@@ -721,7 +721,7 @@ describe('SVG and MathML', () => {
     assert.ok(mixed.includes('A & B'), 'Entities decoded in HTML after SVG');
   });
 
-  test('SVG inside template', async () => {
+  test('Optimizes SVG inside `template`', async () => {
     const result = await minify('<template><svg><rect width="10" height="10" fill="red"/></svg></template>', { minifySVG: true, collapseWhitespace: true });
     assert.ok(result.includes('<template>'), '`template` wrapper preserved');
     assert.ok(result.includes('<svg>'), 'SVG inside `template` is optimized');
@@ -757,7 +757,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(r1, r2, 'Cached result should match first result');
   });
 
-  test('Custom SVG cache size', async () => {
+  test('Minifies the same with a custom SVG cache size', async () => {
     const input = '<svg><circle cx="10" cy="10" r="5" fill="red"/></svg>';
     const result = await minify(input, { minifySVG: true, cacheSVG: 100 });
     assert.strictEqual(result, await minify(input, { minifySVG: true }), 'SVG should minify the same with a custom cache size');
@@ -922,7 +922,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('MathML `annotation-xml` with HTML content', async () => {
+  test('Treats HTML in MathML `annotation-xml` as HTML', async () => {
     // `annotation-xml` with `encoding="text/html"` contains HTML—empty elements should be removed
     assert.strictEqual(
       await minify('<math><annotation-xml encoding="text/html"><div></div></annotation-xml></math>', { removeEmptyElements: true }),
@@ -976,7 +976,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Escapable raw text in SVG and MathML', async () => {
+  test('Reads `textarea` and `title` as ordinary elements in SVG and MathML', async () => {
     // `textarea` and `title` hold text rather than markup, but that is an HTML rule: In SVG
     // and MathML they are ordinary elements, until an integration point leads back into HTML
     // https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
@@ -1043,7 +1043,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Raw text in SVG and MathML', async () => {
+  test('Reads `iframe` and `xmp` as ordinary elements in SVG and MathML', async () => {
     // `iframe` and `xmp` hold text as HTML elements, and are ordinary elements anywhere else
     const options = { removeOptionalTags: true };
     let input;
@@ -1121,7 +1121,7 @@ describe('SVG and MathML', () => {
     assert.ok(elapsed < Math.max(baseline * 20, 2000), `Expected the namespace to be kept, not walked, took ${elapsed}ms (${baseline}ms baseline)`);
   });
 
-  test('Preset normalization: `minifySVG` override', async () => {
+  test('Applies `minifySVG` from a preset, and lets `minifySVG: false` override it', async () => {
     // Regression: `minifySVG: true` from a preset was not normalized to a function
     // Verify that the option is actually applied (SVGO converts `rect` to `path`) and
     // that passing `minifySVG: false` overrides the preset, leaving the SVG unchanged
