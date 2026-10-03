@@ -36,6 +36,7 @@ const RE_DOCTYPE = /^<!doctype[ \n\r\t\f]*([^ \n\r\t\f>]+)[ \n\r\t\f]*(?:public[
 const RE_ATTR_WS_CHECK = /[ \n\r\t\f]/;
 const RE_ATTR_WS_COLLAPSE = /[ \n\r\t\f]+/g;
 const RE_ATTR_WS_TRIM = /^[ \n\r\t\f]+|[ \n\r\t\f]+$/g;
+const RE_WS_CHAR = /\s/;
 const RE_STYLE_ELEMENT = /<style[\s/>]/i;
 const RE_EMPTY_ATTRIBUTE = new RegExp(
   '^(?:class|id|style|title|lang|dir|on(?:focus|blur|change|click|dblclick|mouse(' +
@@ -327,6 +328,7 @@ export {
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
   RE_ATTR_WS_TRIM,
+  RE_WS_CHAR,
   RE_STYLE_ELEMENT,
   RE_EMPTY_ATTRIBUTE,
 

@@ -176,36 +176,27 @@ function collapseWhitespaceKnown(str, options, trimLeft, trimRight, collapseAll,
     // (avoids polynomial backtracking with end-anchored lazy quantifiers);
     // the line-break check scans the run’s char codes directly rather than
     // testing a sliced copy, so the common case allocates nothing
-    let leadEnd = 0;
-    while ((trimLeft || !keepUntrimmed) && leadEnd < str.length && isAsciiWs(str.charCodeAt(leadEnd))) {
-      leadEnd++;
-    }
-    if (leadEnd > 0) {
+    if (trimLeft || !keepUntrimmed) {
+      let leadEnd = 0;
       let hasLineBreak = false;
-      for (let i = 0; i < leadEnd; i++) {
-        const code = str.charCodeAt(i);
-        if (code === 10 || code === 13) {
-          hasLineBreak = true;
-          break;
-        }
+      for (; leadEnd < str.length; leadEnd++) {
+        const code = str.charCodeAt(leadEnd);
+        if (!isAsciiWs(code)) break;
+        // Settling the line break in the same pass keeps the run from being walked twice
+        if (code === 10 || code === 13) hasLineBreak = true;
       }
       if (hasLineBreak) {
         lineBreakBefore = '\n';
         str = str.slice(leadEnd);
       }
     }
-    let trailStart = str.length;
-    while ((trimRight || !keepUntrimmed) && trailStart > 0 && isAsciiWs(str.charCodeAt(trailStart - 1))) {
-      trailStart--;
-    }
-    if (trailStart < str.length) {
+    if (trimRight || !keepUntrimmed) {
+      let trailStart = str.length;
       let hasLineBreak = false;
-      for (let i = trailStart; i < str.length; i++) {
-        const code = str.charCodeAt(i);
-        if (code === 10 || code === 13) {
-          hasLineBreak = true;
-          break;
-        }
+      for (; trailStart > 0; trailStart--) {
+        const code = str.charCodeAt(trailStart - 1);
+        if (!isAsciiWs(code)) break;
+        if (code === 10 || code === 13) hasLineBreak = true;
       }
       if (hasLineBreak) {
         lineBreakAfter = '\n';

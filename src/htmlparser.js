@@ -66,6 +66,10 @@ const singleAttrValues = [
 const singleAttrValueLenientUnquoted = /([^ \t\n\f\r"'>]+)/.source;
 // The characters the lenient pattern takes in beyond the strict one, each a parse error
 const RE_UNQUOTED_VALUE_ERROR = /[<=`]/;
+// The rest of an unquoted value, strict and lenient, as one character class read in a single
+// pass from where the attribute window cut the value short
+const RE_UNQUOTED_VALUE_REST = new RegExp(/** @type {string} */ (singleAttrValues[2]).slice(1, -2) + '*', 'y');
+const RE_UNQUOTED_VALUE_REST_LENIENT = new RegExp(singleAttrValueLenientUnquoted.slice(1, -2) + '*', 'y');
 // https://www.w3.org/TR/1999/REC-xml-names-19990114/#NT-QName
 const qnameCapture = (function () {
   // https://www.npmjs.com/package/ncname
@@ -891,9 +895,21 @@ export class HTMLParser {
           if (attr) {
             // Check if the attribute value extends beyond our search window
             const attrEnd = attr[0].length;
-            // If the match ends near the limit, the value might be truncated
-            if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
-              // Manually extract this attribute to handle potentially huge value
+            const numCustomParts = handler.customAttrSurround
+              ? handler.customAttrSurround.length * NCP
+              : 0;
+            const baseIndex = 1 + numCustomParts;
+            const unquotedValue = attr[baseIndex + 4];
+            if (unquotedValue !== undefined && attrEnd === searchStr.length) {
+              // An unquoted value running into the window’s end is read on past it
+              const unquotedRest = handler.continueOnParseError ? RE_UNQUOTED_VALUE_REST_LENIENT : RE_UNQUOTED_VALUE_REST;
+              unquotedRest.lastIndex = currentPos + attrEnd;
+              const rest = unquotedRest.exec(fullHtml)?.[0] ?? '';
+              attr[0] += rest;
+              attr[baseIndex + 4] = unquotedValue + rest;
+            } else if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
+              // If the match ends near the limit, a quoted value might be truncated,
+              // so extract the attribute manually
               const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
               if (manualMatch) {
                 const quoteChar = searchStr[manualMatch[0].length];
@@ -901,10 +917,6 @@ export class HTMLParser {
                   const closeQuote = searchStr.indexOf(quoteChar, manualMatch[0].length + 1);
                   if (closeQuote !== -1) {
                     const fullAttrLen = closeQuote + 1;
-                    const numCustomParts = handler.customAttrSurround
-                      ? handler.customAttrSurround.length * NCP
-                      : 0;
-                    const baseIndex = 1 + numCustomParts;
 
                     attr = [];
                     attr[0] = searchStr.substring(0, fullAttrLen);
@@ -923,23 +935,13 @@ export class HTMLParser {
                     continue;
                   }
                 }
-                // Note: Unquoted attribute values are intentionally not handled here
-                // Per HTML spec, unquoted values cannot contain spaces or special chars,
-                // making a 20 KB+ unquoted value practically impossible; if encountered,
-                // it’s malformed HTML and using the truncated regex match is acceptable
               }
-            } else {
+            } else if (attr[baseIndex + 1] === undefined) {
               // If attr has no value assign but `=` follows in `fullHtml`,
               // the value would be cut off—reset to trigger manual extraction below
-              const numCustomParts = handler.customAttrSurround
-                ? handler.customAttrSurround.length * NCP
-                : 0;
-              const baseIndex = 1 + numCustomParts;
-              if (attr[baseIndex + 1] === undefined) {
-                const posAfterName = currentPos + attrEnd;
-                if (/^\s*=/.test(fullHtml.slice(posAfterName, posAfterName + 50))) {
-                  attr = null;
-                }
+              const posAfterName = currentPos + attrEnd;
+              if (/^\s*=/.test(fullHtml.slice(posAfterName, posAfterName + 50))) {
+                attr = null;
               }
             }
           }
