@@ -40,9 +40,11 @@ import { identity, isThenable, lowercase } from './utils.js';
 
 /** @type {Promise<Function> | undefined} */
 let decodeHTMLStrictPromise;
+/** @type {((text: string) => string) | undefined} The resolved `decodeHTMLStrict`, once the lazy import above has settled */
+let decodeHTMLStrictFn;
 async function getDecodeHTMLStrict() {
   if (!decodeHTMLStrictPromise) {
-    decodeHTMLStrictPromise = import('entities').then(m => m.decodeHTMLStrict);
+    decodeHTMLStrictPromise = import('entities').then(m => (decodeHTMLStrictFn = m.decodeHTMLStrict));
   }
   return decodeHTMLStrictPromise;
 }
@@ -752,8 +754,11 @@ function normalizeAttr(attr, attrs, tag, tagOut, options, minifyHTML, markers) {
   const attrNameOut = options.namesAsWritten && options.name === lowercase ? attr.name : attrName;
   const attrValue = attr.value;
 
-  // Entity decoding requires a lazy import—async only when `&` is present
+  // Entity decoding requires a lazy import—async only while that import is unresolved
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
+    if (decodeHTMLStrictFn) {
+      return normalizeAttrContinue(attrName, attrNameOut, decodeHTMLStrictFn(attrValue), attr, attrs, tag, tagOut, options, minifyHTML, markers);
+    }
     return getDecodeHTMLStrict().then(decode => {
       return normalizeAttrContinue(attrName, attrNameOut, decode(attrValue), attr, attrs, tag, tagOut, options, minifyHTML, markers);
     });
