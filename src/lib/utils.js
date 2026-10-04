@@ -134,7 +134,6 @@ function escapeXMLChar(char) {
  * @returns {string}
  */
 function escapeXML(value, decode) {
-  if (value.indexOf('&') === -1 && value.indexOf('<') === -1 && value.indexOf(']]>') === -1) return value;
   return value.replace(RE_XML_UNSAFE, match => {
     if (match === '<') return '&lt;';
     if (match === ']]>') return ']]&gt;';
