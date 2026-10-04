@@ -2003,6 +2003,12 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
 
   const OPTIONS_MINIFY = ['--collapse-whitespace', '--remove-comments', '--minify-css', '--minify-js', '--minify-svg'];
 
+  test('Files are handed to the pool largest first, ties in discovery order', async () => {
+    const { orderLargestFirst } = await import('../src/lib/file-pool.js');
+    assert.deepStrictEqual(orderLargestFirst(['a', 'b', 'c', 'd', 'e'], [10, 300, 0, 300, 20]), ['b', 'd', 'e', 'a', 'c']);
+    assert.deepStrictEqual(orderLargestFirst([], []), []);
+  });
+
   test('A worker names the step it failed at', async () => {
     const { createFilePool } = await import('../src/lib/file-pool.js');
     const dir = path.resolve(dirSandbox(), 'tmp', 'par-stage');

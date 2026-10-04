@@ -78,6 +78,21 @@ if (!isMainThread && parentPort) {
 const urlWorker = new URL(import.meta.url);
 
 /**
+ * The order to hand files to the pool in: Largest first, so the file that takes longest
+ * doesn’t start last and hold up the run on its own (ties keep their order)
+ * @template T
+ * @param {T[]} items - One per file
+ * @param {number[]} sizes - Byte size per file, in the order of `items`
+ * @returns {T[]}
+ */
+export function orderLargestFirst(items, sizes) {
+  return items
+    .map((item, index) => ({ item, size: sizes[index] ?? 0 }))
+    .sort((a, b) => b.size - a.size)
+    .map(entry => entry.item);
+}
+
+/**
  * @param {object} args
  * @param {import('../htmlminifier.js').MinifierOptions} args.options
  * @param {number} args.size

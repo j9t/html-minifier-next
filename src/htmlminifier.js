@@ -607,9 +607,11 @@ async function getSvgo() {
 
 /** @type {Promise<Function> | undefined} */
 let decodeHTMLPromise;
+/** @type {((text: string) => string) | undefined} The resolved `decodeHTML`, once the lazy import above has settled */
+let decodeHTMLFn;
 async function getDecodeHTML() {
   if (!decodeHTMLPromise) {
-    decodeHTMLPromise = import('entities').then(m => m.decodeHTML);
+    decodeHTMLPromise = import('entities').then(m => (decodeHTMLFn = m.decodeHTML));
   }
   return decodeHTMLPromise;
 }
@@ -2484,8 +2486,11 @@ async function minifyHTML(value, options, partialMarkup) {
       );
       const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
 
-      // Fast path: All work is sync—skip async machinery entirely
-      if (!needsDecode && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
+      // Fast path: All work is sync—skip async machinery entirely (decoding counts once `entities` has loaded)
+      if ((!needsDecode || decodeHTMLFn) && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
+        if (needsDecode && decodeHTMLFn) {
+          text = decodeHTMLFn(text);
+        }
         charsFinalize(charsCollapse(text));
         return;
       }
