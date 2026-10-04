@@ -2,7 +2,7 @@
  * General utility functions
  */
 
-import { quirksPublicIdPrefixes, quirksPublicIdPrefixesNoSystemId, quirksPublicIds, quirksSystemIds, RE_DOCTYPE } from './constants.js';
+import { quirksPublicIdPrefixes, quirksPublicIdPrefixesNoSystemId, quirksPublicIds, quirksSystemIds, RE_DOCTYPE, RE_XML_UNSAFE, RE_XML_UNSAFE_CHAR } from './constants.js';
 
 // Functions and other non-plain objects have no structure to compare (closures with the
 // same source can behave differently), so they are told apart by identity
@@ -115,6 +115,31 @@ function uniqueId(value) {
     id = 'u' + crypto.randomUUID().replace(/-/g, '');
   } while (~value.indexOf(id));
   return id;
+}
+
+// XML escaping
+
+/** @type {Record<string, string>} */
+const xmlEscapes = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' };
+
+/** @param {string} char */
+function escapeXMLChar(char) {
+  return xmlEscapes[char] ?? '&#' + char.charCodeAt(0) + ';';
+}
+
+/**
+ * Write text or an attribute value the way HTML reads it for an XML parser
+ * @param {string} value - Text or attribute value as HTML reads it
+ * @param {(text: string) => string} decode - `decodeHTML` for text, `decodeHTMLAttribute` for attribute values
+ * @returns {string}
+ */
+function escapeXML(value, decode) {
+  if (value.indexOf('&') === -1 && value.indexOf('<') === -1 && value.indexOf(']]>') === -1) return value;
+  return value.replace(RE_XML_UNSAFE, match => {
+    if (match === '<') return '&lt;';
+    if (match === ']]>') return ']]&gt;';
+    return decode(match).replace(RE_XML_UNSAFE_CHAR, escapeXMLChar);
+  });
 }
 
 // Identity and transform functions
@@ -921,6 +946,7 @@ export {
   MAX_CACHE_ENTRY_SIZE,
   hashContent,
   uniqueId,
+  escapeXML,
   identity,
   isQuirksDoctype,
   isThenable,

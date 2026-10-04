@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { LRU, describeDependencyFailure, describeQuantifierRisk, embedSource, isQuirksDoctype, stableStringify } from '../src/lib/utils.js';
+import { decodeHTML, decodeHTMLAttribute } from 'entities';
+import { LRU, describeDependencyFailure, describeQuantifierRisk, embedSource, escapeXML, isQuirksDoctype, stableStringify } from '../src/lib/utils.js';
 
 /** @param {string} source */
 const hasRiskyQuantifiers = source => describeQuantifierRisk(source) !== null;
@@ -460,6 +461,41 @@ describe('Utils', () => {
         '<!DOCTYPE html SYSTEM "about:legacy-compat>'
       ]) {
         assert.strictEqual(isQuirksDoctype(doctype), true, doctype);
+      }
+    });
+  });
+
+  describe('`escapeXML`', () => {
+    test('Returns a value without `&`, `<`, or `]]>` as is', () => {
+      const value = 'a > b "c" \'d\' ]]';
+      assert.strictEqual(escapeXML(value, decodeHTML), value);
+    });
+
+    test('Escapes `&` where it starts no character reference', () => {
+      for (const [value, expected] of [['a & b', 'a &amp; b'], ['&&', '&amp;&amp;'], ['a&', 'a&amp;'], ['&;', '&amp;;'], ['&#;', '&amp;#;'], ['&#x;', '&amp;#x;'], ['&foo;', '&amp;foo;'], ['&=', '&amp;=']]) {
+        assert.strictEqual(escapeXML(value, decodeHTML), expected, value);
+      }
+    });
+
+    test('Escapes `<` and `]]>`', () => {
+      assert.strictEqual(escapeXML('a<b ]]> c', decodeHTML), 'a&lt;b ]]&gt; c');
+    });
+
+    test('Resolves character references as HTML reads them in text', () => {
+      for (const [value, expected] of [['&copy', '©'], ['&copyright', '©right'], ['&#169', '©'], ['&#xA9;', '©'], ['&#128;', '€'], ['&#0;', '\uFFFD'], ['&NotEqualTilde;', '\u2242\u0338']]) {
+        assert.strictEqual(escapeXML(value, decodeHTML), expected, value);
+      }
+    });
+
+    test('Resolves character references as HTML reads them in attribute values', () => {
+      for (const [value, expected] of [['&copy', '©'], ['&copy=', '&amp;copy='], ['&copyright', '&amp;copyright'], ['&copy;=', '©='], ['&#169=', '©=']]) {
+        assert.strictEqual(escapeXML(value, decodeHTMLAttribute), expected, value);
+      }
+    });
+
+    test('Keeps references to what XML reads otherwise, cannot hold, or normalizes', () => {
+      for (const [value, expected] of [['&amp;', '&amp;'], ['&lt;', '&lt;'], ['&gt;', '&gt;'], ['&quot;', '&quot;'], ['&apos;', '&apos;'], ['&#34;', '&quot;'], ['&#9;', '&#9;'], ['&#10;', '&#10;'], ['&#13;', '&#13;'], ['&#1;', '&#1;'], ['&#xFFFF;', '&#65535;']]) {
+        assert.strictEqual(escapeXML(value, decodeHTMLAttribute), expected, value);
       }
     });
   });

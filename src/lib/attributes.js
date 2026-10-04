@@ -24,7 +24,7 @@ import {
 import { trimWhitespace, collapseWhitespaceAll } from './whitespace.js';
 import { shouldMinifyInnerHTML } from './options.js';
 import { collectUsage } from './unused-css.js';
-import { identity, isThenable, lowercase } from './utils.js';
+import { escapeXML, identity, isThenable, lowercase } from './utils.js';
 
 /** @import { ProcessedOptions } from './options.js' */
 
@@ -36,7 +36,7 @@ import { identity, isThenable, lowercase } from './utils.js';
  */
 
 // Lazy-load entities (used for `decodeEntities`, event-handler attribute
-// decoding before `minifyJS`, and `srcdoc` decoding/re-encoding)
+// decoding before `minifyJS`, `srcdoc` decoding/re-encoding, and values SVGO reads)
 
 /** @type {Promise<Function> | undefined} */
 let decodeHTMLStrictPromise;
@@ -47,6 +47,17 @@ async function getDecodeHTMLStrict() {
     decodeHTMLStrictPromise = import('entities').then(m => (decodeHTMLStrictFn = m.decodeHTMLStrict));
   }
   return decodeHTMLStrictPromise;
+}
+
+/** @type {Promise<Function> | undefined} */
+let decodeHTMLAttributePromise;
+/** @type {((text: string) => string) | undefined} The resolved `decodeHTMLAttribute`, once the lazy import above has settled */
+let decodeHTMLAttributeFn;
+async function getDecodeHTMLAttribute() {
+  if (!decodeHTMLAttributePromise) {
+    decodeHTMLAttributePromise = import('entities').then(m => (decodeHTMLAttributeFn = m.decodeHTMLAttribute));
+  }
+  return decodeHTMLAttributePromise;
 }
 
 /** @type {Promise<Function> | undefined} */
@@ -754,6 +765,14 @@ function normalizeAttr(attr, attrs, tag, tagOut, options, minifyHTML, markers) {
   const attrNameOut = options.namesAsWritten && options.name === lowercase ? attr.name : attrName;
   const attrValue = attr.value;
 
+  // SVGO reads the value as XML, which `normalizeAttrFinish` writes it for
+  // once the decoder has loaded (`decodeEntities` is off there)
+  if (!decodeHTMLAttributeFn && attrValue && options.insideSVG && options.minifySVG) {
+    return getDecodeHTMLAttribute().then(() => {
+      return normalizeAttrContinue(attrName, attrNameOut, attrValue, attr, attrs, tag, tagOut, options, minifyHTML, markers);
+    });
+  }
+
   // Entity decoding requires a lazy import—async only while that import is unresolved
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
     if (decodeHTMLStrictFn) {
@@ -819,6 +838,10 @@ function normalizeAttrFinish(attrName, attrNameOut, attrValue, attr, tag, tagOut
 
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
     attrValue = attrValue.replace(RE_AMP_ENTITY, '&amp;$1');
+  }
+
+  if (attrValue && decodeHTMLAttributeFn && options.insideSVG && options.minifySVG) {
+    attrValue = escapeXML(attrValue, decodeHTMLAttributeFn);
   }
 
   return {

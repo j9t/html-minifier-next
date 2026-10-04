@@ -2,7 +2,7 @@ import { HTMLParser } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, describeDependencyFailure, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
+import { LRU, describeDependencyFailure, escapeXML, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
 import { collectUsage } from './lib/unused-css.js';
 
 import {
@@ -1836,7 +1836,16 @@ async function minifyHTML(value, options, partialMarkup) {
     if (text) {
       textVerbatim = rawText || stackNoTrimWhitespace.length > 0;
     }
-    if (options.decodeEntities && text && !rawText) {
+    if (text && options.insideSVG && options.minifySVG) {
+      // In SVG, `script` and `style` hold markup, too
+      if (!rawText || options.insideForeignContent) {
+        text = escapeXML(text, /** @type {(text: string) => string} */ (decodeHTMLFn));
+      } else if (text.indexOf('&') !== -1 || text.indexOf('<') !== -1 || text.indexOf(']]>') !== -1) {
+        uidSVGRawText ||= uniqueId(value);
+        svgRawTexts.push(text);
+        text = '/*!' + uidSVGRawText + (svgRawTexts.length - 1) + '*/';
+      }
+    } else if (options.decodeEntities && text && !rawText) {
       // Escape any `&` symbols that start either:
       // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
       // 2. or any other character reference (i.e., one that does end with `;`)
@@ -2101,6 +2110,12 @@ async function minifyHTML(value, options, partialMarkup) {
   const svgBlocks = []; // Array of { start, end } buffer indices
   let svgBufferStartIndex = -1;
   let svgDepth = 0;
+  // HTML raw text in an SVG block, which XML cannot read as HTML does,
+  // passes SVGO as a placeholder—a comment, as SVGO minifies `style` elements
+  // wherever they are
+  /** @type {string[]} */
+  const svgRawTexts = [];
+  let uidSVGRawText = '';
 
   // One-time probe: If the input contains no SVG/MathML elements and the call
   // isn’t already inside foreign content (recursive calls inherit options),
@@ -2154,8 +2169,7 @@ async function minifyHTML(value, options, partialMarkup) {
           // MathML is never processed by SVGO, so these restrictions never apply to it
           if (lowerTag === 'svg' && options.minifySVG) {
             options.removeAttributeQuotes = false;
-            // @@ Encode a bare `&` for SVGO as well—it costs the block its optimization
-            // (though not its validity; early fix could encode `&` where it’s unambiguous)
+            // Text and attribute values are written for XML instead
             options.decodeEntities = false;
             // Omitting a start and end tag both would keep the block well-formed, which this misses
             options.removeOptionalTags = false;
@@ -2479,6 +2493,9 @@ async function minifyHTML(value, options, partialMarkup) {
 
       // Detect whether any async work is actually needed for this text node
       const needsDecode = options.decodeEntities && text && !holdsRawText() && text.indexOf('&') !== -1;
+      // SVGO reads the text as XML, which `charsFinalize` writes it for
+      // once the decoder has loaded
+      const needsXMLDecoder = !decodeHTMLFn && text && options.insideSVG && options.minifySVG;
       const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
       const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(
@@ -2487,7 +2504,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
 
       // Fast path: All work is sync—skip async machinery entirely (decoding counts once `entities` has loaded)
-      if ((!needsDecode || decodeHTMLFn) && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
+      if ((!needsDecode || decodeHTMLFn) && !needsXMLDecoder && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
         if (needsDecode && decodeHTMLFn) {
           text = decodeHTMLFn(text);
         }
@@ -2499,6 +2516,8 @@ async function minifyHTML(value, options, partialMarkup) {
       return (async () => {
         if (needsDecode) {
           text = (await getDecodeHTML())(text);
+        } else if (needsXMLDecoder) {
+          await getDecodeHTML();
         }
         text = charsCollapse(text);
         if (needsProcessScript) {
@@ -2567,6 +2586,16 @@ async function minifyHTML(value, options, partialMarkup) {
       if (block) {
         buffer.splice(block.start, block.end - block.start, optimized[i] ?? '');
         bufferTags?.splice(block.start, block.end - block.start, false);
+      }
+    }
+  }
+  // Also where an SVG left open never reached SVGO
+  if (svgRawTexts.length) {
+    const pattern = new RegExp('/\\*!' + uidSVGRawText + '([0-9]+)\\*/', 'g');
+    for (let i = 0; i < buffer.length; i++) {
+      const segment = /** @type {string} */ (buffer[i]);
+      if (segment.indexOf(uidSVGRawText) !== -1) {
+        buffer[i] = segment.replace(pattern, (/** @type {string} */ match, /** @type {string} */ index) => svgRawTexts[+index] ?? match);
       }
     }
   }
