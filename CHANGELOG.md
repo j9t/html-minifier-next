@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * Improved `decodeEntities` performance, with text and attribute values that contain entities decoded synchronously once the entity decoder has loaded
+* Improved CLI performance on worker threads, with the largest files handed out first so that a large file found late no longer holds up the run
 
 ## [8.10.3] - 2026-10-03
 

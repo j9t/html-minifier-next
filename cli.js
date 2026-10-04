@@ -573,6 +573,23 @@ program.helpOption('-h, --help', 'Display help for command');
   // Each worker warms up its own JIT, so the useful count tops out well short of the cores
   const WORKERS_MAX = 6;
 
+  /** @type {WeakMap<string[], Promise<number[]>>} */
+  const fileSizesByList = new WeakMap();
+
+  /**
+   * Byte size per file, read once per list whichever step asks first; a failed stat counts
+   * as 0, leaving normal file processing to report the read error with its usual wording
+   * @param {string[]} files
+   */
+  function getFileSizes(files) {
+    let sizes = fileSizesByList.get(files);
+    if (!sizes) {
+      sizes = Promise.all(files.map(file => fs.promises.stat(file).then(stat => stat.size, () => 0)));
+      fileSizesByList.set(files, sizes);
+    }
+    return sizes;
+  }
+
   /**
    * A pool for this run, or `null` where one wouldn’t pay or wouldn’t work—in which case
    * the caller minifies in-process exactly as before
@@ -602,10 +619,8 @@ program.helpOption('-h, --help', 'Display help for command');
     }
 
     if (isDefault && fileCount < FILES_PER_RUN_MIN) {
-      // `stat()` is cheaper than starting workers and is only needed for a run that
-      // would otherwise stay in-process. A failed stat leaves normal file processing
-      // to report the read error with its usual filename and wording.
-      const sizes = await Promise.all(files.map(file => fs.promises.stat(file).then(stat => stat.size, () => 0)));
+      // `stat()` is cheaper than starting workers, and a pooled run reuses the sizes
+      const sizes = await getFileSizes(files);
       // No single file is split across workers, so the largest one sets a floor no
       // pool can beat; what the rest carry is the work there is to share out
       const parallelBytes = sizes.reduce((sum, byteSize) => sum + byteSize, 0) - Math.max(0, ...sizes);
@@ -948,8 +963,13 @@ program.helpOption('-h, --help', 'Display help for command');
     const pool = await createPool(list);
     if (pool) {
       try {
-        await Promise.all(list.map(async (inputFile, idx) => {
-          const outFile = await prepareOutDir(inputFile);
+        const { orderLargestFirst } = await import('./src/lib/file-pool.js');
+        const [fileSizes, tasks] = await Promise.all([
+          getFileSizes(list),
+          Promise.all(list.map(async (inputFile, idx) => ({ inputFile, outFile: await prepareOutDir(inputFile), idx })))
+        ]);
+        // `run()` queues synchronously, so the files reach the pool in exactly this order
+        await Promise.all(orderLargestFirst(tasks, fileSizes).map(async ({ inputFile, outFile, idx }) => {
           const sizes = await pool.run({ inputFile, outputFile: outFile, dryRun: isDryRun })
             .catch(err => {
               // A worker names the step it failed at, so the wording matches what this
