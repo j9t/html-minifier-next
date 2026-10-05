@@ -479,6 +479,11 @@ export class HTMLParser {
     // there is the source of when it runs up to the element’s end tag
     let sourcePos = -1;
 
+    // Whether the text from `textStart` is all such an element holds; kept out of the parse
+    // loop, which slows down with every line it grows by
+    const isSource = (/** @type {number} */ textStart) =>
+      sourcePos === textStart && fullHtml.charCodeAt(pos + 1) === 47 && matchEndTag(pos)?.name.toLowerCase() === lastTagLower;
+
     // In foreign content, text runs through CDATA sections, and one without an end to the
     // end of the input (-1)
     const skipCDATA = (/** @type {number} */ textEnd) => {
@@ -670,7 +675,6 @@ export class HTMLParser {
           }
         }
 
-        const textStart = pos;
         let text;
         if (textEnd >= 0) {
           text = fullHtml.substring(pos, textEnd);
@@ -730,8 +734,7 @@ export class HTMLParser {
 
         if (handler.chars) {
           // An element whose end tag follows its start tag’s text alone has that text for content
-          const source = sourcePos === textStart && fullHtml.charCodeAt(pos + 1) === 47 && matchEndTag(pos)?.name.toLowerCase() === lastTagLower;
-          const result = handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs, source);
+          const result = handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs, sourcePos !== -1 && isSource(pos - text.length));
           if (isThenable(result)) await result;
         }
         prevTag = '';
@@ -1277,29 +1280,26 @@ export class HTMLParser {
       return stackIndex;
     }
 
-    // Closes the open elements from `stackIndex` up, the one there by `tag` unless that is
-    // empty, and all by their end tags as written where `written` says so
-    function closeOpenElements(/** @type {number} */ stackIndex, /** @type {string} */ tag, /** @type {string} */ rest, written = false) {
+    // Closes the foreign elements open down to the nearest HTML element or
+    // integration point, writing their end tags so that an SVG stays well-formed
+    // for SVGO (none of them is an HTML `p`, so none can hold a table). This
+    // repeats the closing loop of `parseEndTag`, as sharing it costs that
+    // hot function about 1%.
+    function closeForeignContent() {
+      let stackIndex = stack.length;
+      while (stackIndex && namespaceInside(stack[stackIndex - 1])) {
+        stackIndex--;
+      }
       for (let i = stack.length - 1; i >= stackIndex; i--) {
         if (handler.end) {
           const entry = stack[i];
-          handler.end(entry?.tag, entry?.attrs, !written && (i > stackIndex || !tag), i === stackIndex ? rest : '', entry?.lowerTag === 'p' && pHoldingTable.has(entry));
+          handler.end(entry?.tag, entry?.attrs, false, '', false);
         }
       }
       stack.length = stackIndex;
       stackVersion++;
       lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
       lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
-    }
-
-    // Closes the foreign elements open down to the nearest HTML element or integration point,
-    // writing their end tags so that an SVG stays well-formed for SVGO
-    function closeForeignContent() {
-      let stackIndex = stack.length;
-      while (stackIndex && namespaceInside(stack[stackIndex - 1])) {
-        stackIndex--;
-      }
-      closeOpenElements(stackIndex, '', '', true);
     }
 
     function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
@@ -1323,7 +1323,19 @@ export class HTMLParser {
       const rest = tag.length > tagName.length + 3 ? tag.slice(tagName.length + 2, -1) : '';
 
       if (stackIndex >= 0) {
-        closeOpenElements(stackIndex, tag, rest);
+        // Close all the open elements, up the stack
+        for (let i = stack.length - 1; i >= stackIndex; i--) {
+          if (handler.end) {
+            const entry = stack[i];
+            handler.end(entry?.tag, entry?.attrs, i > stackIndex || !tag, i === stackIndex ? rest : '', entry?.lowerTag === 'p' && pHoldingTable.has(entry));
+          }
+        }
+
+        // Remove the open elements from the stack
+        stack.length = stackIndex;
+        stackVersion++;
+        lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
+        lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
       } else if ((handler.partialMarkup || formattingElements.has(lowerTagName)) && tagName) {
         // In partial markup mode, preserve stray end tags, and those of formatting elements always
         if (handler.end) {
