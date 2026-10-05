@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * Fixed `minifySVG` leaving SVG unoptimized when it contains a bare `&` (e.g., `<text>A & B</text>`) or a character reference only HTML reads (e.g., `&copy` or `&NotEqualTilde;`)
 * Fixed `minifySVG` turning references HTML reads as Windows-1252 characters into control characters (e.g., `&#128;` into U+0080 rather than `€`)
-* Fixed `minifyCSS` and `minifyJS` reading character references in SVG as written under `minifySVG`, which removed `style` attributes and rules (e.g., `style="font-family: &quot;Fira Sans&quot;"`) and left scripts unminified
+* Fixed `minifyCSS` and `minifyJS` reading character references and CDATA sections in SVG as written under `minifySVG`, which removed `style` attributes and rules (e.g., `style="font-family: &quot;Fira Sans&quot;"`) and left scripts unminified
 
 ## [8.10.4] - 2026-10-04
 

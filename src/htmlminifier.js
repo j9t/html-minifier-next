@@ -2,7 +2,7 @@ import { HTMLParser } from './htmlparser.js';
 import TokenChain from './tokenchain.js';
 import { presets, getPreset, getPresetNames } from './presets.js';
 
-import { LRU, describeDependencyFailure, escapeXML, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
+import { LRU, decodeForeignText, describeDependencyFailure, escapeXML, findTagEnd, identity, isThenable, lowercase, uniqueId } from './lib/utils.js';
 import { collectUsage } from './lib/unused-css.js';
 
 import {
@@ -2493,9 +2493,12 @@ async function minifyHTML(value, options, partialMarkup) {
       textNextAttrs = nextAttrs || [];
 
       // Detect whether any async work is actually needed for this text node
-      // In SVG, which SVGO reads, `script` and `style` hold markup as well
-      const needsDecode = options.decodeEntities && text && text.indexOf('&') !== -1 &&
-        (!holdsRawText() || Boolean(options.insideSVG && options.minifySVG && options.insideForeignContent));
+      // In SVG, which SVGO reads, `script` and `style` hold markup as well,
+      // CDATA sections included
+      const readsForeignText = Boolean(options.insideSVG && options.minifySVG && options.insideForeignContent) && holdsRawText();
+      const needsDecode = options.decodeEntities && text && (readsForeignText
+        ? text.indexOf('&') !== -1 || text.indexOf('<![CDATA[') !== -1
+        : text.indexOf('&') !== -1 && !holdsRawText());
       const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
       const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(
@@ -2506,7 +2509,7 @@ async function minifyHTML(value, options, partialMarkup) {
       // Fast path: All work is sync—skip async machinery entirely (decoding counts once `entities` has loaded)
       if ((!needsDecode || decodeHTMLFn) && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
         if (needsDecode && decodeHTMLFn) {
-          text = decodeHTMLFn(text);
+          text = readsForeignText ? decodeForeignText(text, decodeHTMLFn) : decodeHTMLFn(text);
         }
         charsFinalize(charsCollapse(text));
         return;
@@ -2515,7 +2518,8 @@ async function minifyHTML(value, options, partialMarkup) {
       // Slow path: At least one async step required
       return (async () => {
         if (needsDecode) {
-          text = (await getDecodeHTML())(text);
+          const decode = /** @type {(text: string) => string} */ (await getDecodeHTML());
+          text = readsForeignText ? decodeForeignText(text, decode) : decode(text);
         }
         text = charsCollapse(text);
         if (needsProcessScript) {

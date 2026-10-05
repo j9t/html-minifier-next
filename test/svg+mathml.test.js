@@ -477,6 +477,40 @@ describe('SVG and MathML', () => {
     );
   });
 
+  test('Reads CDATA sections in SVG `script` and `style` elements as HTML does', async () => {
+    const rect = '<rect width="10" height="10"/>';
+    const path = '<path d="M0 0h10v10H0z"/>';
+    const script = '<script><![CDATA[if (a < b && c) d("&amp;")]]></script>';
+    // References stay as written within CDATA; SVGO writes quotes in text as references
+    assert.strictEqual(
+      await minify(`<svg>${script}${rect}</svg>`, { minifySVG: true }),
+      `<svg><script>if (a &lt; b &amp;&amp; c) d(&quot;&amp;amp;&quot;)</script>${path}</svg>`
+    );
+    assert.strictEqual(
+      await minify(`<svg>${script}${rect}</svg>`, { minifySVG: true, minifyJS: true }),
+      `<svg><script>a&lt;b&amp;&amp;c&amp;&amp;d(&quot;&amp;amp;&quot;)</script>${path}</svg>`
+    );
+    // What surrounds a CDATA section reads references
+    assert.strictEqual(
+      await minify(`<svg><script>x(&quot;a&quot;);<![CDATA[y("&amp;")]]></script>${rect}</svg>`, { minifySVG: true, minifyJS: true }),
+      `<svg><script>x(&quot;a&quot;),y(&quot;&amp;amp;&quot;)</script>${path}</svg>`
+    );
+    assert.strictEqual(
+      await minify(`<svg><script>// <![CDATA[\nif (a < b) c()\n// ]]></script>${rect}</svg>`, { minifySVG: true, minifyJS: true }),
+      `<svg><script>a&lt;b&amp;&amp;c()</script>${path}</svg>`
+    );
+
+    // SVGO writes minified CSS in a CDATA section again
+    const style = '<style><![CDATA[.a > .b { font-family: "&amp;" }]]></style>';
+    for (const options of [{ minifySVG: true }, { minifySVG: true, minifyCSS: true }]) {
+      assert.strictEqual(
+        await minify(`<svg>${style}<rect class="b" width="10" height="10"/></svg>`, options),
+        '<svg><style><![CDATA[.a>.b{font-family:"&amp;"}]]></style><path d="M0 0h10v10H0z" class="b"/></svg>',
+        JSON.stringify(options)
+      );
+    }
+  });
+
   test('Minifies SVG `style` attributes as HTML reads them', async () => {
     const result = await minify('<svg><text style="font-family: &quot;Fira Sans&#34;">c</text><rect width="10" height="10"/></svg>', { minifySVG: true, minifyCSS: true, continueOnMinifyError: false });
     assert.ok(result.includes('Fira Sans'), result);

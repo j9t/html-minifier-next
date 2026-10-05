@@ -1,6 +1,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
-import { LRU, describeDependencyFailure, describeQuantifierRisk, embedSource, escapeXML, isQuirksDoctype, stableStringify } from '../src/lib/utils.js';
+import { decodeHTML } from 'entities';
+import { LRU, decodeForeignText, describeDependencyFailure, describeQuantifierRisk, embedSource, escapeXML, isQuirksDoctype, stableStringify } from '../src/lib/utils.js';
 
 /** @param {string} source */
 const hasRiskyQuantifiers = source => describeQuantifierRisk(source) !== null;
@@ -480,6 +481,25 @@ describe('Utils', () => {
 
     test('Escapes tabs and line breaks in attribute values, which XML reads as spaces', () => {
       assert.strictEqual(escapeXML('a\tb\nc\rd & <e> ]]>', true), 'a&#9;b&#10;c&#13;d &amp; &lt;e> ]]>');
+    });
+  });
+
+  describe('`decodeForeignText`', () => {
+    test('Decodes text without CDATA sections', () => {
+      assert.strictEqual(decodeForeignText('a &amp; b &lt; c', decodeHTML), 'a & b < c');
+    });
+
+    test('Keeps CDATA content as written and drops the delimiters', () => {
+      assert.strictEqual(decodeForeignText('<![CDATA[a &amp; b < c]]>', decodeHTML), 'a &amp; b < c');
+      assert.strictEqual(decodeForeignText('<![CDATA[]]>', decodeHTML), '');
+    });
+
+    test('Decodes around CDATA sections', () => {
+      assert.strictEqual(decodeForeignText('&amp;<![CDATA[&amp;]]>&amp;<![CDATA[&lt;]]>&lt;', decodeHTML), '&&amp;&&lt;<');
+    });
+
+    test('Runs an unclosed CDATA section to the end', () => {
+      assert.strictEqual(decodeForeignText('&amp;<![CDATA[a &amp; b', decodeHTML), '&a &amp; b');
     });
   });
 
