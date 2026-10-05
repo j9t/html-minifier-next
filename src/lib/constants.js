@@ -17,11 +17,10 @@ const RE_TRAILING_SEMICOLON = /;$/;
 const RE_AMP_ENTITY = /&(#?[0-9a-zA-Z]+;)/g;
 const RE_LEGACY_ENTITIES = /&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt)(?!;)|(?:#?[0-9a-zA-Z]+;))/g;
 const RE_ESCAPE_LT = /</g;
-// What XML reads otherwise than HTML: a would-be character reference (with a following `=`,
-// which decides whether an attribute value reads a legacy one), `<`, and `]]>`
-const RE_XML_UNSAFE = /&[#0-9A-Za-z]*;?=?|<|]]>/g;
-// What a decoded character reference leaves that XML reads otherwise, cannot hold, or normalizes
-const RE_XML_UNSAFE_CHAR = /[&<>"'\p{Cc}\uFFFE\uFFFF]/gu;
+// What decoded text and attribute values hold that XML reads otherwise: markup, and
+// line breaks and tabs XML normalizes (quotes are left to attribute quoting)
+const RE_XML_ESCAPE_TEXT = /[&<\r]|]]>/g;
+const RE_XML_ESCAPE_ATTR = /[&<\t\n\r]/g;
 // In escapable raw text only the element’s own end tag ends the element, so nothing else
 // that `decodeEntities` decoded to a `<` needs escaping there
 // (the record has no prototype, so a tag named after an inherited property—`constructor`,
@@ -328,8 +327,8 @@ export {
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
   RE_ESCAPE_LT_RAW_TEXT,
-  RE_XML_UNSAFE,
-  RE_XML_UNSAFE_CHAR,
+  RE_XML_ESCAPE_TEXT,
+  RE_XML_ESCAPE_ATTR,
   RE_HTML_ENCODING,
   RE_DOCTYPE,
   RE_ATTR_WS_CHECK,

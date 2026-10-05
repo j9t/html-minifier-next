@@ -2,7 +2,7 @@
  * General utility functions
  */
 
-import { quirksPublicIdPrefixes, quirksPublicIdPrefixesNoSystemId, quirksPublicIds, quirksSystemIds, RE_DOCTYPE, RE_XML_UNSAFE, RE_XML_UNSAFE_CHAR } from './constants.js';
+import { quirksPublicIdPrefixes, quirksPublicIdPrefixesNoSystemId, quirksPublicIds, quirksSystemIds, RE_DOCTYPE, RE_XML_ESCAPE_ATTR, RE_XML_ESCAPE_TEXT } from './constants.js';
 
 // Functions and other non-plain objects have no structure to compare (closures with the
 // same source can behave differently), so they are told apart by identity
@@ -120,25 +120,21 @@ function uniqueId(value) {
 // XML escaping
 
 /** @type {Record<string, string>} */
-const xmlEscapes = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' };
+const xmlEscapes = { '&': '&amp;', '<': '&lt;', ']]>': ']]&gt;', '\t': '&#9;', '\n': '&#10;', '\r': '&#13;' };
 
-/** @param {string} char */
-function escapeXMLChar(char) {
-  return xmlEscapes[char] ?? '&#' + char.charCodeAt(0) + ';';
+/** @param {string} match */
+function escapeXMLMatch(match) {
+  return xmlEscapes[match] ?? match;
 }
 
 /**
- * Write text or an attribute value the way HTML reads it for an XML parser
- * @param {string} value - Text or attribute value as HTML reads it
- * @param {(text: string) => string} decode - `decodeHTML` for text, `decodeHTMLAttribute` for attribute values
+ * Write decoded text or an attribute value for an XML parser to read it the same
+ * @param {string} value - Text or attribute value, decoded
+ * @param {boolean} [attribute] - Whether the value is an attribute value
  * @returns {string}
  */
-function escapeXML(value, decode) {
-  return value.replace(RE_XML_UNSAFE, match => {
-    if (match === '<') return '&lt;';
-    if (match === ']]>') return ']]&gt;';
-    return decode(match).replace(RE_XML_UNSAFE_CHAR, escapeXMLChar);
-  });
+function escapeXML(value, attribute = false) {
+  return value.replace(attribute ? RE_XML_ESCAPE_ATTR : RE_XML_ESCAPE_TEXT, escapeXMLMatch);
 }
 
 // Identity and transform functions

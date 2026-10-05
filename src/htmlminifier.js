@@ -1839,7 +1839,7 @@ async function minifyHTML(value, options, partialMarkup) {
     if (text && options.insideSVG && options.minifySVG) {
       // In SVG, `script` and `style` hold markup, too
       if (!rawText || options.insideForeignContent) {
-        text = escapeXML(text, /** @type {(text: string) => string} */ (decodeHTMLFn));
+        text = escapeXML(text);
       } else if (text.indexOf('&') !== -1 || text.indexOf('<') !== -1 || text.indexOf(']]>') !== -1) {
         uidSVGRawText ||= uniqueId(value);
         svgRawTexts.push(text);
@@ -2169,8 +2169,9 @@ async function minifyHTML(value, options, partialMarkup) {
           // MathML is never processed by SVGO, so these restrictions never apply to it
           if (lowerTag === 'svg' && options.minifySVG) {
             options.removeAttributeQuotes = false;
-            // Text and attribute values are written for XML instead
-            options.decodeEntities = false;
+            // Text and attribute values are decoded as HTML reads them, for transforms to read
+            // them so, too, and then escaped for XML (see `escapeXML`) rather than for HTML
+            options.decodeEntities = true;
             // Omitting a start and end tag both would keep the block well-formed, which this misses
             options.removeOptionalTags = false;
             options.collapseBooleanAttributes = false;
@@ -2194,9 +2195,9 @@ async function minifyHTML(value, options, partialMarkup) {
           options.nameParent = nameParent; // Preserve for the element tag itself
           options.name = lowercase;
           options.insideForeignContent = false;
-          // Note: `removeAttributeQuotes`, `removeTagWhitespace`, and `decodeEntities`
-          // stay disabled (inherited from SVG context) because the entire SVG block
-          // must be valid XML for SVGO processing
+          // Note: `removeAttributeQuotes` and `removeTagWhitespace` stay disabled,
+          // and values stay escaped for XML (inherited from SVG context), because
+          // the entire SVG block must be valid XML for SVGO processing
           useNameParentForTag = true;
           pushedContext = true;
         }
@@ -2492,10 +2493,9 @@ async function minifyHTML(value, options, partialMarkup) {
       textNextAttrs = nextAttrs || [];
 
       // Detect whether any async work is actually needed for this text node
-      const needsDecode = options.decodeEntities && text && !holdsRawText() && text.indexOf('&') !== -1;
-      // SVGO reads the text as XML, which `charsFinalize` writes it for
-      // once the decoder has loaded
-      const needsXMLDecoder = !decodeHTMLFn && text && options.insideSVG && options.minifySVG;
+      // In SVG, which SVGO reads, `script` and `style` hold markup as well
+      const needsDecode = options.decodeEntities && text && text.indexOf('&') !== -1 &&
+        (!holdsRawText() || Boolean(options.insideSVG && options.minifySVG && options.insideForeignContent));
       const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
       const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(
@@ -2504,7 +2504,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
 
       // Fast path: All work is sync—skip async machinery entirely (decoding counts once `entities` has loaded)
-      if ((!needsDecode || decodeHTMLFn) && !needsXMLDecoder && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
+      if ((!needsDecode || decodeHTMLFn) && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
         if (needsDecode && decodeHTMLFn) {
           text = decodeHTMLFn(text);
         }
@@ -2516,8 +2516,6 @@ async function minifyHTML(value, options, partialMarkup) {
       return (async () => {
         if (needsDecode) {
           text = (await getDecodeHTML())(text);
-        } else if (needsXMLDecoder) {
-          await getDecodeHTML();
         }
         text = charsCollapse(text);
         if (needsProcessScript) {

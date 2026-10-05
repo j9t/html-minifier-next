@@ -2,6 +2,9 @@ import assert from 'node:assert';
 import {describe, test} from 'node:test';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 
+// Makes SVGO fail whatever it reads
+const failingSVGOPlugin = { name: 'fail', fn: () => { throw new Error('SVGO plugin failure'); } };
+
 describe('SVG and MathML', () => {
   test('Optimizes path data and converts shapes to paths with SVGO', async () => {
     // Path data optimization (relative commands, space removal)
@@ -382,14 +385,13 @@ describe('SVG and MathML', () => {
   });
 
   test('Keeps the unoptimized SVG when SVGO fails under `continueOnMinifyError`', async () => {
-    // SVGO fails on the control character, which XML cannot hold; `continueOnMinifyError` keeps the unoptimized SVG
     assert.strictEqual(
-      await minify('<svg><text>a&#1;b</text><rect width="10" height="10"/></svg>', {
-        minifySVG: true,
+      await minify('<svg><text>a &amp; b</text><rect width="10" height="10"/></svg>', {
+        minifySVG: { plugins: [failingSVGOPlugin] },
         collapseWhitespace: true,
         continueOnMinifyError: true
       }),
-      '<svg><text>a&#1;b</text><rect width="10" height="10"/></svg>'
+      '<svg><text>a &amp; b</text><rect width="10" height="10"/></svg>'
     );
   });
 
@@ -459,6 +461,39 @@ describe('SVG and MathML', () => {
     assert.strictEqual(
       await minify('<svg><script>if (a &amp;&amp; b) c()</script><rect width="10" height="10"/></svg>', options),
       '<svg><script>if (a &amp;&amp; b) c()</script><path d="M0 0h10v10H0z"/></svg>'
+    );
+  });
+
+  test('Minifies SVG `script` and `style` content as HTML reads it', async () => {
+    // SVGO writes quotes in text as references
+    assert.strictEqual(
+      await minify('<svg><script>const x = &quot;a&quot;; if (a &amp;&amp; b) c(x)</script><rect width="10" height="10"/></svg>', { minifySVG: true, minifyJS: true }),
+      '<svg><script>const x=&quot;a&quot;;a&amp;&amp;b&amp;&amp;c(x)</script><path d="M0 0h10v10H0z"/></svg>'
+    );
+
+    assert.strictEqual(
+      await minify('<svg><style>.a::after { content: &quot;x&quot; }</style><rect class="a" width="10" height="10"/></svg>', { minifySVG: true, minifyCSS: true }),
+      '<svg><style>.a:after{content:&quot;x&quot;}</style><path d="M0 0h10v10H0z" class="a"/></svg>'
+    );
+  });
+
+  test('Minifies SVG `style` attributes as HTML reads them', async () => {
+    const result = await minify('<svg><text style="font-family: &quot;Fira Sans&#34;">c</text><rect width="10" height="10"/></svg>', { minifySVG: true, minifyCSS: true, continueOnMinifyError: false });
+    assert.ok(result.includes('Fira Sans'), result);
+    assert.ok(result.includes('<path d="M0 0h10v10H0z"/>'), result);
+  });
+
+  test('Decodes SVG event handler attributes once', async () => {
+    // The script reads the string `&amp;`
+    const result = await minify('<svg><rect onclick="x(\'&amp;amp;\')" width="10" height="10"/></svg>', { minifySVG: true, minifyJS: true });
+    assert.ok(result.includes('&amp;amp;'), result);
+    assert.ok(result.includes('d="M0 0h10v10H0z"'), result);
+  });
+
+  test('Keeps whitespace around an encoded `&nbsp;` in SVG text', async () => {
+    assert.strictEqual(
+      await minify('<svg><text>a &amp;nbsp; b</text><rect width="10" height="10"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><text>a &amp;nbsp; b</text><path d="M0 0h10v10H0z"/></svg>'
     );
   });
 
@@ -763,7 +798,7 @@ describe('SVG and MathML', () => {
   });
 
   test('HTML-only options are disabled inside SVG for XML compatibility', async () => {
-    // `decodeEntities` must not decode inside SVG (bare `&` is invalid XML)
+    // `decodeEntities` keeps `&` encoded inside SVG (bare `&` is invalid XML)
     assert.strictEqual(
       await minify('<svg><text>A &amp; B</text></svg>', { minifySVG: true, decodeEntities: true, collapseWhitespace: true }),
       '<svg><text>A &amp; B</text></svg>'
@@ -838,15 +873,13 @@ describe('SVG and MathML', () => {
   });
 
   test('`continueOnMinifyError: false` throws on SVGO error', async () => {
-    // When `continueOnMinifyError` is false and SVGO encounters invalid XML
-    // (here a control character), it should throw
     await assert.rejects(
-      () => minify('<svg><text>a&#1;b</text><rect width="10" height="10"/></svg>', {
-        minifySVG: true,
+      () => minify('<svg><text>a &amp; b</text><rect width="10" height="10"/></svg>', {
+        minifySVG: { plugins: [failingSVGOPlugin] },
         collapseWhitespace: true,
         continueOnMinifyError: false
       }),
-      /Invalid character entity/
+      /SVGO plugin failure/
     );
 
     // Valid SVG should not throw even with `continueOnMinifyError: false`

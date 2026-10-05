@@ -765,16 +765,17 @@ function normalizeAttr(attr, attrs, tag, tagOut, options, minifyHTML, markers) {
   const attrNameOut = options.namesAsWritten && options.name === lowercase ? attr.name : attrName;
   const attrValue = attr.value;
 
-  // SVGO reads the value as XML, which `normalizeAttrFinish` writes it for
-  // once the decoder has loaded (`decodeEntities` is off there)
-  if (!decodeHTMLAttributeFn && attrValue && options.insideSVG && options.minifySVG) {
-    return getDecodeHTMLAttribute().then(() => {
-      return normalizeAttrContinue(attrName, attrNameOut, attrValue, attr, attrs, tag, tagOut, options, minifyHTML, markers);
-    });
-  }
-
   // Entity decoding requires a lazy import—async only while that import is unresolved
   if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
+    // What SVGO reads is written for XML, which takes a value decoded fully, as HTML reads it
+    if (options.insideSVG && options.minifySVG) {
+      if (decodeHTMLAttributeFn) {
+        return normalizeAttrContinue(attrName, attrNameOut, decodeHTMLAttributeFn(attrValue), attr, attrs, tag, tagOut, options, minifyHTML, markers);
+      }
+      return getDecodeHTMLAttribute().then(decode => {
+        return normalizeAttrContinue(attrName, attrNameOut, decode(attrValue), attr, attrs, tag, tagOut, options, minifyHTML, markers);
+      });
+    }
     if (decodeHTMLStrictFn) {
       return normalizeAttrContinue(attrName, attrNameOut, decodeHTMLStrictFn(attrValue), attr, attrs, tag, tagOut, options, minifyHTML, markers);
     }
@@ -836,12 +837,10 @@ function normalizeAttrFinish(attrName, attrNameOut, attrValue, attr, tag, tagOut
     return;
   }
 
-  if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
+  if (attrValue && options.insideSVG && options.minifySVG) {
+    attrValue = escapeXML(attrValue, true);
+  } else if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
     attrValue = attrValue.replace(RE_AMP_ENTITY, '&amp;$1');
-  }
-
-  if (attrValue && decodeHTMLAttributeFn && options.insideSVG && options.minifySVG) {
-    attrValue = escapeXML(attrValue, decodeHTMLAttributeFn);
   }
 
   return {
