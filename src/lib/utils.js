@@ -2,7 +2,7 @@
  * General utility functions
  */
 
-import { quirksPublicIdPrefixes, quirksPublicIdPrefixesNoSystemId, quirksPublicIds, quirksSystemIds, RE_DOCTYPE } from './constants.js';
+import { quirksPublicIdPrefixes, quirksPublicIdPrefixesNoSystemId, quirksPublicIds, quirksSystemIds, RE_DOCTYPE, RE_XML_ESCAPE_ATTR, RE_XML_ESCAPE_TEXT } from './constants.js';
 
 // Functions and other non-plain objects have no structure to compare (closures with the
 // same source can behave differently), so they are told apart by identity
@@ -115,6 +115,49 @@ function uniqueId(value) {
     id = 'u' + crypto.randomUUID().replace(/-/g, '');
   } while (~value.indexOf(id));
   return id;
+}
+
+// XML escaping
+
+/** @type {Record<string, string>} */
+const xmlEscapes = { '&': '&amp;', '<': '&lt;', ']]>': ']]&gt;', '\t': '&#9;', '\n': '&#10;', '\r': '&#13;' };
+
+/** @param {string} match */
+function escapeXMLMatch(match) {
+  return xmlEscapes[match] ?? match;
+}
+
+/**
+ * Write decoded text or an attribute value for an XML parser to read it the same
+ * @param {string} value - Text or attribute value, decoded
+ * @param {boolean} [attribute] - Whether the value is an attribute value
+ * @returns {string}
+ */
+function escapeXML(value, attribute = false) {
+  return value.replace(attribute ? RE_XML_ESCAPE_ATTR : RE_XML_ESCAPE_TEXT, escapeXMLMatch);
+}
+
+/**
+ * Read text in foreign content as HTML does: CDATA sections hold text as written,
+ * while what surrounds them reads character references
+ * @param {string} text
+ * @param {(text: string) => string} decode - `decodeHTML`
+ * @returns {string}
+ */
+function decodeForeignText(text, decode) {
+  let out = '';
+  let pos = 0;
+  while (pos < text.length) {
+    const start = text.indexOf('<![CDATA[', pos);
+    if (start === -1) return out + decode(text.slice(pos));
+    out += decode(text.slice(pos, start));
+    // An unclosed section runs to the end
+    const end = text.indexOf(']]>', start + 9);
+    if (end === -1) return out + text.slice(start + 9);
+    out += text.slice(start + 9, end);
+    pos = end + 3;
+  }
+  return out;
 }
 
 // Identity and transform functions
@@ -921,6 +964,8 @@ export {
   MAX_CACHE_ENTRY_SIZE,
   hashContent,
   uniqueId,
+  escapeXML,
+  decodeForeignText,
   identity,
   isQuirksDoctype,
   isThenable,

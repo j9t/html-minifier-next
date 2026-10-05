@@ -2,6 +2,9 @@ import assert from 'node:assert';
 import {describe, test} from 'node:test';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 
+// Makes SVGO fail whatever it reads
+const failingSVGOPlugin = { name: 'fail', fn: () => { throw new Error('SVGO plugin failure'); } };
+
 describe('SVG and MathML', () => {
   test('Optimizes path data and converts shapes to paths with SVGO', async () => {
     // Path data optimization (relative commands, space removal)
@@ -382,14 +385,189 @@ describe('SVG and MathML', () => {
   });
 
   test('Keeps the unoptimized SVG when SVGO fails under `continueOnMinifyError`', async () => {
-    // SVGO fails on the bare `&` the text carries; `continueOnMinifyError` keeps the unoptimized SVG
     assert.strictEqual(
-      await minify('<svg><text>a & b</text><rect width="10" height="10"/></svg>', {
-        minifySVG: true,
+      await minify('<svg><text>a &amp; b</text><rect width="10" height="10"/></svg>', {
+        minifySVG: { plugins: [failingSVGOPlugin] },
         collapseWhitespace: true,
         continueOnMinifyError: true
       }),
-      '<svg><text>a & b</text><rect width="10" height="10"/></svg>'
+      '<svg><text>a &amp; b</text><rect width="10" height="10"/></svg>'
+    );
+  });
+
+  test('Escapes a bare `&` in text so that SVGO optimizes the SVG', async () => {
+    const options = { minifySVG: true, collapseWhitespace: true };
+    const rect = '<rect width="10" height="10"/>';
+    const path = '<path d="M0 0h10v10H0z"/>';
+    for (const [text, expected] of [
+      ['A & B', 'A &amp; B'],
+      ['A && B', 'A &amp;&amp; B'],
+      ['A &', 'A &amp;'],
+      ['A &;', 'A &amp;;'],
+      ['A &# B', 'A &amp;# B'],
+      // Not a character reference, as HTML knows no such name
+      ['A &foo; B', 'A &amp;foo; B']
+    ]) {
+      assert.strictEqual(await minify(`<svg><text>${text}</text>${rect}</svg>`, options), `<svg><text>${expected}</text>${path}</svg>`, text);
+    }
+  });
+
+  test('Reads character references in SVG text as HTML does', async () => {
+    const options = { minifySVG: true, collapseWhitespace: true };
+    const rect = '<rect width="10" height="10"/>';
+    const path = '<path d="M0 0h10v10H0z"/>';
+    for (const [text, expected] of [
+      // Legacy references need no semicolon in text
+      ['&copy 2026', '© 2026'],
+      ['&notit;', '¬it;'],
+      ['&#169', '©'],
+      // XML knows no such names
+      ['&NotEqualTilde;', '≂̸'],
+      // HTML reads these code points as Windows-1252 characters
+      ['&#128;', '€'],
+      ['&#0;', '�'],
+      // XML’s own references stay as they are
+      ['&amp; &lt; &gt;', '&amp; &lt; &gt;']
+    ]) {
+      assert.strictEqual(await minify(`<svg><text>${text}</text>${rect}</svg>`, options), `<svg><text>${expected}</text>${path}</svg>`, text);
+    }
+  });
+
+  test('Reads character references in SVG attribute values as HTML does', async () => {
+    const options = { minifySVG: true, collapseWhitespace: true };
+    const rect = '<rect width="10" height="10"/>';
+    const path = '<path d="M0 0h10v10H0z"/>';
+    for (const [value, expected] of [
+      ['?a=1&b=2', '?a=1&amp;b=2'],
+      ['?a=1&&b', '?a=1&amp;&amp;b'],
+      // Legacy references are not read in attribute values when `=` or an alphanumeric follows
+      ['?a=1&copy=2', '?a=1&amp;copy=2'],
+      ['&copyright', '&amp;copyright'],
+      ['&copy 2026', '© 2026'],
+      ['&#128;', '€'],
+      ['a<b', 'a&lt;b']
+    ]) {
+      assert.strictEqual(await minify(`<svg><text data-x="${value}">c</text>${rect}</svg>`, options), `<svg><text data-x="${expected}">c</text>${path}</svg>`, value);
+    }
+  });
+
+  test('Escapes a bare `&` in SVG `script` and `style` elements so that SVGO optimizes the SVG', async () => {
+    const options = { minifySVG: true, collapseWhitespace: true };
+    assert.strictEqual(
+      await minify('<svg><script>if (a && b) c()</script><rect width="10" height="10"/></svg>', options),
+      '<svg><script>if (a &amp;&amp; b) c()</script><path d="M0 0h10v10H0z"/></svg>'
+    );
+    // Within the SVG, HTML reads references here, too
+    assert.strictEqual(
+      await minify('<svg><script>if (a &amp;&amp; b) c()</script><rect width="10" height="10"/></svg>', options),
+      '<svg><script>if (a &amp;&amp; b) c()</script><path d="M0 0h10v10H0z"/></svg>'
+    );
+  });
+
+  test('Minifies SVG `script` and `style` content as HTML reads it', async () => {
+    // SVGO writes quotes in text as references
+    assert.strictEqual(
+      await minify('<svg><script>const x = &quot;a&quot;; if (a &amp;&amp; b) c(x)</script><rect width="10" height="10"/></svg>', { minifySVG: true, minifyJS: true }),
+      '<svg><script>const x=&quot;a&quot;;a&amp;&amp;b&amp;&amp;c(x)</script><path d="M0 0h10v10H0z"/></svg>'
+    );
+
+    assert.strictEqual(
+      await minify('<svg><style>.a::after { content: &quot;x&quot; }</style><rect class="a" width="10" height="10"/></svg>', { minifySVG: true, minifyCSS: true }),
+      '<svg><style>.a:after{content:&quot;x&quot;}</style><path d="M0 0h10v10H0z" class="a"/></svg>'
+    );
+  });
+
+  test('Reads CDATA sections in SVG `script` and `style` elements as HTML does', async () => {
+    const rect = '<rect width="10" height="10"/>';
+    const path = '<path d="M0 0h10v10H0z"/>';
+    const script = '<script><![CDATA[if (a < b && c) d("&amp;")]]></script>';
+    // References stay as written within CDATA; SVGO writes quotes in text as references
+    assert.strictEqual(
+      await minify(`<svg>${script}${rect}</svg>`, { minifySVG: true }),
+      `<svg><script>if (a &lt; b &amp;&amp; c) d(&quot;&amp;amp;&quot;)</script>${path}</svg>`
+    );
+    assert.strictEqual(
+      await minify(`<svg>${script}${rect}</svg>`, { minifySVG: true, minifyJS: true }),
+      `<svg><script>a&lt;b&amp;&amp;c&amp;&amp;d(&quot;&amp;amp;&quot;)</script>${path}</svg>`
+    );
+    // What surrounds a CDATA section reads references
+    assert.strictEqual(
+      await minify(`<svg><script>x(&quot;a&quot;);<![CDATA[y("&amp;")]]></script>${rect}</svg>`, { minifySVG: true, minifyJS: true }),
+      `<svg><script>x(&quot;a&quot;),y(&quot;&amp;amp;&quot;)</script>${path}</svg>`
+    );
+    assert.strictEqual(
+      await minify(`<svg><script>// <![CDATA[\nif (a < b) c()\n// ]]></script>${rect}</svg>`, { minifySVG: true, minifyJS: true }),
+      `<svg><script>a&lt;b&amp;&amp;c()</script>${path}</svg>`
+    );
+
+    // SVGO writes minified CSS in a CDATA section again
+    const style = '<style><![CDATA[.a > .b { font-family: "&amp;" }]]></style>';
+    for (const options of [{ minifySVG: true }, { minifySVG: true, minifyCSS: true }]) {
+      assert.strictEqual(
+        await minify(`<svg>${style}<rect class="b" width="10" height="10"/></svg>`, options),
+        '<svg><style><![CDATA[.a>.b{font-family:"&amp;"}]]></style><path d="M0 0h10v10H0z" class="b"/></svg>',
+        JSON.stringify(options)
+      );
+    }
+  });
+
+  test('Minifies SVG `style` attributes as HTML reads them', async () => {
+    const result = await minify('<svg><text style="font-family: &quot;Fira Sans&#34;">c</text><rect width="10" height="10"/></svg>', { minifySVG: true, minifyCSS: true, continueOnMinifyError: false });
+    assert.ok(result.includes('Fira Sans'), result);
+    assert.ok(result.includes('<path d="M0 0h10v10H0z"/>'), result);
+  });
+
+  test('Decodes SVG event handler attributes once', async () => {
+    // The script reads the string `&amp;`
+    const result = await minify('<svg><rect onclick="x(\'&amp;amp;\')" width="10" height="10"/></svg>', { minifySVG: true, minifyJS: true });
+    assert.ok(result.includes('&amp;amp;'), result);
+    assert.ok(result.includes('d="M0 0h10v10H0z"'), result);
+  });
+
+  test('Keeps whitespace around an encoded `&nbsp;` in SVG text', async () => {
+    assert.strictEqual(
+      await minify('<svg><text>a &amp;nbsp; b</text><rect width="10" height="10"/></svg>', { minifySVG: true, collapseWhitespace: true }),
+      '<svg><text>a &amp;nbsp; b</text><path d="M0 0h10v10H0z"/></svg>'
+    );
+  });
+
+  test('Keeps HTML raw text in `foreignObject` as written while SVGO optimizes the SVG', async () => {
+    const options = { minifySVG: true, collapseWhitespace: true };
+    for (const content of [
+      '<script>if (a && b < c) d("&amp;")</script>',
+      '<style>.a > .b::after { content: "&" }</style>',
+      '<xmp>a & b &amp; c</xmp>'
+    ]) {
+      assert.strictEqual(
+        await minify(`<svg><foreignObject width="100" height="100">${content}</foreignObject><rect width="10" height="10"/></svg>`, options),
+        `<svg><foreignObject width="100" height="100">${content}</foreignObject><path d="M0 0h10v10H0z"/></svg>`,
+        content
+      );
+    }
+    // An SVG left open is never handed to SVGO, and its raw text stays as written all the same
+    assert.strictEqual(
+      await minify('<svg><foreignObject><script>a && b</script>', options),
+      '<svg><foreignObject><script>a && b</script></foreignObject>'
+    );
+  });
+
+  test('Escapes a bare `&` in `foreignObject` text so that SVGO optimizes the SVG', async () => {
+    const options = { minifySVG: true, collapseWhitespace: true };
+    assert.strictEqual(
+      await minify('<svg><foreignObject width="100" height="100"><p>A & B</p></foreignObject><rect width="10" height="10"/></svg>', options),
+      '<svg><foreignObject width="100" height="100"><p>A &amp; B</p></foreignObject><path d="M0 0h10v10H0z"/></svg>'
+    );
+    // HTML reads references in escapable raw text
+    assert.strictEqual(
+      await minify('<svg><foreignObject width="100" height="100"><textarea>A & B &amp; C</textarea></foreignObject><rect width="10" height="10"/></svg>', options),
+      '<svg><foreignObject width="100" height="100"><textarea>A &amp; B &amp; C</textarea></foreignObject><path d="M0 0h10v10H0z"/></svg>'
+    );
+  });
+
+  test('Leaves a bare `&` in SVG as written without `minifySVG`', async () => {
+    assert.strictEqual(
+      await minify('<svg><text>A & B &copy</text><a href="?a&b"></a></svg>', { collapseWhitespace: true }),
+      '<svg><text>A & B &copy</text><a href="?a&b"></a></svg>'
     );
   });
 
@@ -654,7 +832,7 @@ describe('SVG and MathML', () => {
   });
 
   test('HTML-only options are disabled inside SVG for XML compatibility', async () => {
-    // `decodeEntities` must not decode inside SVG (bare `&` is invalid XML)
+    // `decodeEntities` keeps `&` encoded inside SVG (bare `&` is invalid XML)
     assert.strictEqual(
       await minify('<svg><text>A &amp; B</text></svg>', { minifySVG: true, decodeEntities: true, collapseWhitespace: true }),
       '<svg><text>A &amp; B</text></svg>'
@@ -729,15 +907,13 @@ describe('SVG and MathML', () => {
   });
 
   test('`continueOnMinifyError: false` throws on SVGO error', async () => {
-    // When `continueOnMinifyError` is false and SVGO encounters invalid XML
-    // (here a bare `&`), it should throw
     await assert.rejects(
-      () => minify('<svg><text>a & b</text><rect width="10" height="10"/></svg>', {
-        minifySVG: true,
+      () => minify('<svg><text>a &amp; b</text><rect width="10" height="10"/></svg>', {
+        minifySVG: { plugins: [failingSVGOPlugin] },
         collapseWhitespace: true,
         continueOnMinifyError: false
       }),
-      /Invalid character in entity name/
+      /SVGO plugin failure/
     );
 
     // Valid SVG should not throw even with `continueOnMinifyError: false`
