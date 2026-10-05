@@ -1015,6 +1015,14 @@ describe('CSS and JS', () => {
       assert.ok(!styleOf(unguarded).includes('.js-only'), '`scripts: false` should drop the guard');
     });
 
+    test('Keeps symbols named in foreign scripts as HTML reads them', async () => {
+      // In SVG and MathML, `script` content resolves character references
+      const input = style('.js-only{color:red}') +
+        '<p></p><svg><script>document.body.classList.add("js-&#111;nly")</script></svg>';
+      const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+      assert.ok(styleOf(output).includes('.js-only'), 'Decoded foreign script references should be kept');
+    });
+
     test('Keeps hyphen-leading class names found in scripts and `data-*` values', async () => {
       // `.-mt-4` and the like are ordinary CSS identifiers a script hands to `classList`
       const cases = [

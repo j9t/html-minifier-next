@@ -14,10 +14,11 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
 
 /**
  * `start`, `chars`, and `comment` return `undefined` when their work needs no `await`
- * and a Promise when it does; the parse loop awaits only what it gets back.
- * `end`, `processingInstruction`, `doctype`, and `strayEnd` never suspend. `start` is synchronous
- * wherever it is passed no attributes, which is what keeps the calls inside
- * `parseEndTag` synchronous.
+ * and a Promise when it does; the parse loop awaits only what it gets back. `end`,
+ * `processingInstruction`, `doctype`, and `strayEnd` never suspend. `start` is
+ * synchronous wherever it is passed no attributes, which is what keeps the calls
+ * inside `parseEndTag` synchronous. `chars` is told by its sixth argument when
+ * the text is all an SVG `script` or `style` element holds, and so its source.
  * @typedef {{
  *   start?: Function,
  *   end?: Function,
@@ -97,6 +98,10 @@ const closeSelf = new Set(['colgroup', 'dd', 'dt', 'li', 'option', 'p', 'td', 't
 
 // Special elements (can contain anything)
 const special = new Set(['script', 'style']);
+
+// Where a CDATA section starts and ends, which holds text in foreign content
+const cdataOpen = '<![CDATA[';
+const cdataClose = ']]>';
 
 // Elements whose children are HTML rather than foreign content, each only in
 // the namespace it belongs to (`annotation-xml` is one, too, but only for some
@@ -458,11 +463,25 @@ export class HTMLParser {
     const startsForeignContent = (/** @type {string} */ lowerTag) =>
       Boolean(namespaceInside(stack[stack.length - 1])) || lowerTag === 'svg' || lowerTag === 'math';
 
-    // Whether the content of the element being parsed is read as text rather than markup
-    // (`script` and `style` hold text in every namespace; the rest do so as HTML elements only)
+    // Whether the content of the element being parsed is read as text rather than
+    // markup, which only HTML elements hold—in foreign content, `script` and `style`
+    // hold markup, too
     const holdsRawText = (/** @type {string} */ tag) =>
-      special.has(tag) ||
-      ((genericRawTextElements.has(tag) || escapableRawTextElements.has(tag)) && !inForeignContent());
+      (special.has(tag) || genericRawTextElements.has(tag) || escapableRawTextElements.has(tag)) && !inForeignContent();
+
+    // Where the content of the last SVG `script` or `style` start tag begins, which text
+    // there is the source of when it runs up to the element’s end tag
+    let sourcePos = -1;
+
+    // In foreign content, text runs through CDATA sections, and one without an end to the
+    // end of the input (-1)
+    const skipCDATA = (/** @type {number} */ textEnd) => {
+      while (textEnd !== -1 && fullHtml.startsWith(cdataOpen, textEnd)) {
+        const cdataEnd = fullHtml.indexOf(cdataClose, textEnd + cdataOpen.length);
+        textEnd = cdataEnd === -1 ? -1 : fullHtml.indexOf('<', cdataEnd + cdataClose.length);
+      }
+      return textEnd;
+    };
 
     // The answer changes only when the top of the stack does, so it is recomputed per stack
     // change rather than per loop iteration (`stackVersion` covers same-named tags whose
@@ -485,7 +504,10 @@ export class HTMLParser {
 
       // Make sure not to be in an element whose content is text, not markup
       if (!lastTagLower || !topHoldsRawText()) {
-        const textEnd = fullHtml.indexOf('<', pos);
+        let textEnd = fullHtml.indexOf('<', pos);
+        if (textEnd !== -1 && lastTagLower && fullHtml.charCodeAt(textEnd + 1) === 33 && inForeignContent()) {
+          textEnd = skipCDATA(textEnd);
+        }
 
         if (textEnd === pos) {
           // Tag found at current position
@@ -642,6 +664,7 @@ export class HTMLParser {
           }
         }
 
+        const textStart = pos;
         let text;
         if (textEnd >= 0) {
           text = fullHtml.substring(pos, textEnd);
@@ -700,7 +723,9 @@ export class HTMLParser {
         }
 
         if (handler.chars) {
-          const result = handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs);
+          // An element whose end tag follows its start tag’s text alone has that text for content
+          const source = sourcePos === textStart && fullHtml.charCodeAt(pos + 1) === 47 && matchEndTag(pos)?.name.toLowerCase() === lastTagLower;
+          const result = handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs, source);
           if (isThenable(result)) await result;
         }
         prevTag = '';
@@ -1192,10 +1217,13 @@ export class HTMLParser {
       }
 
       if (!unary) {
-        pushOpenElement(tagName, lowerTagName, attrs);
+        const namespace = pushOpenElement(tagName, lowerTagName, attrs);
         lastTag = tagName;
         lastTagLower = lowerTagName;
         unarySlash = '';
+        if (namespace === 'svg' && special.has(lowerTagName)) {
+          sourcePos = pos;
+        }
       }
 
       // Store attributes for `prevAttrs` tracking (used in whitespace collapsing)
@@ -1208,7 +1236,7 @@ export class HTMLParser {
 
     // Pushes an open element, noting the `p` in scope from within it: its own index
     // for a `p`, none past a scope boundary, foreign element, or `noscript` (which
-    // holds text with scripting), and otherwise its parent’s
+    // holds text with scripting), and otherwise its parent’s; returns the namespace it sits in
     function pushOpenElement(/** @type {string} */ tag, /** @type {string} */ lowerTag, /** @type {HTMLAttribute[]} */ attrs) {
       const parent = stack.length ? stack[stack.length - 1] : undefined;
       const namespace = namespaceInside(parent);
@@ -1223,6 +1251,7 @@ export class HTMLParser {
       }
       stack.push({ tag, lowerTag, attrs, namespace, pScope });
       stackVersion++;
+      return namespace;
     }
 
     // `needle` must already be lowercase

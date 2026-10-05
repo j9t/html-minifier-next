@@ -511,6 +511,128 @@ describe('SVG and MathML', () => {
     }
   });
 
+  test('Minifies SVG `script` and `style` content as HTML reads it', async () => {
+    const options = { minifyJS: true, minifyCSS: true, continueOnMinifyError: false };
+    assert.strictEqual(
+      await minify('<svg><script>if (a &amp;&amp; b) c()</script></svg>', options),
+      '<svg><script>a&&b&&c()</script></svg>'
+    );
+    // What the minifier writes is escaped again where it would read as markup or a reference
+    assert.strictEqual(
+      await minify('<svg><script>if (a &lt; b) c("&amp;amp;")</script></svg>', options),
+      '<svg><script>a&lt;b&&c("&ampamp;")</script></svg>'
+    );
+    // A `<` that starts no tag is a parse error, as in HTML content, and recovered from, splits the text
+    await assert.rejects(minify('<svg><script>if (a < b) c()</script></svg>', options), /Parse error/);
+    assert.strictEqual(
+      await minify('<svg><script>if (a < b) c()</script></svg>', { ...options, continueOnParseError: true }),
+      '<svg><script>if (a < b) c()</script></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg><style>a::after { content: "&amp;" }</style></svg>', options),
+      '<svg><style>a:after{content:"&"}</style></svg>'
+    );
+    // CDATA sections hold text as written, an end tag included
+    assert.strictEqual(
+      await minify('<svg><script><![CDATA[if (a < b && c) d()]]></script></svg>', options),
+      '<svg><script>a&lt;b&&c&&d()</script></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg><script><![CDATA[x("</script>")]]></script><rect/></svg>', options),
+      '<svg><script>x("&lt;\\/script>")</script><rect/></svg>'
+    );
+    // Whitespace is code
+    assert.strictEqual(
+      await minify('<svg><script>a()\n b()</script></svg>', { collapseWhitespace: true }),
+      '<svg><script>a()\n b()</script></svg>'
+    );
+
+    // HTML elements, also within an integration point, keep reading raw text
+    assert.strictEqual(
+      await minify('<svg><foreignObject><script>if (a &amp;&amp; b) c()</script></foreignObject></svg>', { minifyJS: true }),
+      '<svg><foreignObject><script>if (a &amp;&amp; b) c()</script></foreignObject></svg>'
+    );
+  });
+
+  test('Processes SVG `script` content as HTML reads it', async () => {
+    assert.strictEqual(
+      await minify('<svg><script type="text/x-template">&lt;p title="a"&gt;&amp;lt;&lt;/p&gt;</script></svg>', { processScripts: ['text/x-template'], removeAttributeQuotes: true }),
+      '<svg><script type=text/x-template>&lt;p title=a>&amplt;&lt;/p></script></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg><script type="application/json">{ "a": "&amp;" }</script></svg>'),
+      '<svg><script type="application/json">{"a":"&"}</script></svg>'
+    );
+  });
+
+  test('Reads markup in SVG `script` and `style` elements as HTML does', async () => {
+    // The tags are elements, so the text around them is no script of its own to minify
+    const options = { minifyJS: true, decodeEntities: true, continueOnMinifyError: false };
+    assert.strictEqual(
+      await minify('<svg><script>a(&quot;<b>x</b>&quot;)</script></svg>', options),
+      '<svg><script>a("<b>x</b>")</script></svg>'
+    );
+    // A script runs the text it holds, so a comment between is no part of it
+    assert.strictEqual(
+      await minify('<svg><script>a()<!-- x -->b()</script></svg>', { ...options, removeComments: true }),
+      '<svg><script>a()b()</script></svg>'
+    );
+  });
+
+  test('Leaves MathML `script` and `style` content unminified', async () => {
+    // Neither runs nor applies in MathML, so their content is text like any other
+    const options = { minifyJS: true, minifyCSS: true, continueOnMinifyError: false };
+    assert.strictEqual(
+      await minify('<math><script>if (a &amp;&amp; b) c()</script></math>', options),
+      '<math><script>if (a &amp;&amp; b) c()</script></math>'
+    );
+    assert.strictEqual(
+      await minify('<math><style>a::after { content: "&amp;" }</style></math>', options),
+      '<math><style>a::after { content: "&amp;" }</style></math>'
+    );
+    assert.strictEqual(
+      await minify('<math><script>if (a &amp;&amp; b) c()</script></math>', { decodeEntities: true }),
+      '<math><script>if (a && b) c()</script></math>'
+    );
+
+    // Nor are they merged, as their text is shown
+    assert.strictEqual(
+      await minify('<math><script>a()</script><script>b()</script></math><script>c()</script><script>d()</script>', { mergeScripts: true }),
+      '<math><script>a()</script><script>b()</script></math><script>c();d()</script>'
+    );
+    assert.strictEqual(
+      await minify('<svg><script>a()</script><script>b()</script></svg>', { mergeScripts: true }),
+      '<svg><script>a();b()</script></svg>'
+    );
+  });
+
+  test('Reads CDATA sections in foreign content as text', async () => {
+    assert.strictEqual(
+      await minify('<svg><text><![CDATA[a<b]]></text></svg>', { removeComments: true }),
+      '<svg><text><![CDATA[a<b]]></text></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg><text><![CDATA[a[i]>b &amp;]]></text></svg>', { decodeEntities: true }),
+      '<svg><text>a[i]>b &ampamp;</text></svg>'
+    );
+    // The element it stands in decides, so an integration point holds one, but not the HTML element within
+    assert.strictEqual(
+      await minify('<math><mtext><![CDATA[a]]><b><![CDATA[b]]></b></mtext></math>', { removeComments: true }),
+      '<math><mtext><![CDATA[a]]><b></b></mtext></math>'
+    );
+    assert.strictEqual(
+      await minify('<svg><text>x <![CDATA[a]]> y</text></svg>', { collapseWhitespace: true }),
+      '<svg><text>x <![CDATA[a]]> y</text></svg>'
+    );
+    // An unclosed section runs to the end, and is closed before the end tags written after it
+    assert.strictEqual(
+      await minify('<svg><text>x<![CDATA[a<b', { includeAutoGeneratedTags: true }),
+      '<svg><text>x<![CDATA[a<b]]></text></svg>'
+    );
+    // In HTML content, it is a comment
+    assert.strictEqual(await minify('<p><![CDATA[a]]></p>', { removeComments: true }), '<p></p>');
+  });
+
   test('Minifies SVG `style` attributes as HTML reads them', async () => {
     const result = await minify('<svg><text style="font-family: &quot;Fira Sans&#34;">c</text><rect width="10" height="10"/></svg>', { minifySVG: true, minifyCSS: true, continueOnMinifyError: false });
     assert.ok(result.includes('Fira Sans'), result);
@@ -1219,12 +1341,12 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Reads `iframe` and `xmp` as ordinary elements in SVG and MathML', async () => {
-    // `iframe` and `xmp` hold text as HTML elements, and are ordinary elements anywhere else
+  test('Reads `iframe`, `xmp`, `script`, and `style` as ordinary elements in SVG and MathML', async () => {
+    // They hold text as HTML elements, and are ordinary elements anywhere else
     const options = { removeOptionalTags: true };
     let input;
 
-    for (const tag of ['iframe', 'xmp']) {
+    for (const tag of ['iframe', 'xmp', 'script', 'style']) {
       // Foreign content here, so an optional end tag inside them is one
       assert.strictEqual(await minify(`<svg><${tag}><div><p>a</p></div></${tag}></svg>`, options), `<svg><${tag}><div><p>a</div></${tag}></svg>`, tag);
       assert.strictEqual(await minify(`<math><${tag}><div><p>a</p></div></${tag}></math>`, options), `<math><${tag}><div><p>a</div></${tag}></math>`, tag);
@@ -1232,11 +1354,6 @@ describe('SVG and MathML', () => {
       // What an integration point holds is HTML again, so the same element holds text there
       input = `<svg><foreignObject><${tag}><div><p>a</p></div></${tag}></foreignObject></svg>`;
       assert.strictEqual(await minify(input, options), input, tag);
-    }
-
-    // `script` and `style` are the exception: They hold text wherever they sit
-    for (const held of ['<svg><script><div><p>a</p></div></script></svg>', '<svg><style><div><p>a</p></div></style></svg>', '<math><script><div><p>a</p></div></script></math>']) {
-      assert.strictEqual(await minify(held, options), held, held);
     }
   });
 
@@ -1274,10 +1391,12 @@ describe('SVG and MathML', () => {
       '<math><annotation-xml encoding="text/plain"><title>&lt;b></title></annotation-xml></math>'
     );
 
-    // `script` and `style` hold text wherever they sit, so theirs are kept in either place
+    // So do `script` and `style`: Raw text as HTML elements, text that resolves them in foreign content
     assert.strictEqual(await minify('<script>a&amp;b</script>', options), '<script>a&amp;b</script>');
-    assert.strictEqual(await minify('<svg><script>a&amp;b</script></svg>', options), '<svg><script>a&amp;b</script></svg>');
-    assert.strictEqual(await minify('<svg><style>a&amp;b</style></svg>', options), '<svg><style>a&amp;b</style></svg>');
+    assert.strictEqual(await minify('<style>a&amp;b</style>', options), '<style>a&amp;b</style>');
+    assert.strictEqual(await minify('<svg><script>a&amp;b</script></svg>', options), '<svg><script>a&b</script></svg>');
+    assert.strictEqual(await minify('<svg><style>a&amp;b</style></svg>', options), '<svg><style>a&b</style></svg>');
+    assert.strictEqual(await minify('<math><script>a&amp;lt;&lt;b</script></math>', options), '<math><script>a&amplt;&lt;b</script></math>');
   });
 
   test('The namespace an element sits in stays cheap to read', async () => {

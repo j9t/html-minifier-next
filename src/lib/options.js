@@ -52,6 +52,7 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   canMinifySVG: ((text: string) => boolean) | null,
  *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
  *   cssContext?: CSSContext,
+ *   documentState?: {hasMathML: boolean},
  *   parallelJS?: boolean,
  *   nameParent?: (name: string) => string,
  *   namesAsWritten?: boolean,
