@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 * Fixed CDATA sections in SVG and MathML being read as comments, which `removeComments` removed with their text, `collapseWhitespace` removed whitespace next to, and the first `]>` ended; an unclosed one no longer fails the parse
 * Fixed `mergeScripts` merging MathML `script` elements, whose text is shown
 * Fixed `removeUnusedCSS` missing class names and IDs written with character references in SVG scripts
+* Fixed HTML elements that end SVG and MathML content (e.g., `<svg><p>` or `<math><div>`) being read as foreign, which kept `script` and `style` elements after them from holding raw text: An unescaped `<` failed the parse, and `decodeEntities` and `minifyCSS` decoded character references (e.g., `<svg><b><script>if (a &amp;&amp; b) c()</script></b></svg>`)
 
 ### Changed
 
