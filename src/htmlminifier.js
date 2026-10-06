@@ -44,7 +44,8 @@ import {
   collapseWhitespace,
   collapseWhitespaceSmart,
   canCollapseWhitespace as defaultCanCollapseWhitespace,
-  canTrimWhitespace as defaultCanTrimWhitespace
+  canTrimWhitespace as defaultCanTrimWhitespace,
+  isAllWhitespace
 } from './lib/whitespace.js';
 
 import {
@@ -644,6 +645,7 @@ const cacheStatsOrEmpty = (cache) => cache ? cache.stats() : { gets: 0, hits: 0,
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
 const RE_SCRIPT_OPEN = /<script(?=[\s>])/gi; // Finds tag start; use `findTagEnd()` for the actual closing `>`
 const RE_SCRIPT_CLOSE = /<\/script\s*>/gi;
+const RE_MATH_TAG = /<(\/?)math(?=[\s/>])/gi;
 const SCRIPT_BOOL_ATTRS = new Set(['async', 'defer', 'nomodule']);
 const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript']);
 
@@ -700,9 +702,10 @@ function nameForeign(name) {
  * preserves, so one pass finds every merge the iterated rescan found.
  *
  * @param {string} html - The HTML string to process
+ * @param {boolean} [hasMathML] - Whether the HTML holds MathML, whose `script` elements stay apart
  * @returns {string} HTML with consecutive scripts merged
  */
-function mergeConsecutiveScripts(html) {
+function mergeConsecutiveScripts(html, hasMathML = false) {
   // Parse an attribute string into a name→value map
   const parseAttrs = (/** @type {string} */ attrStr) => {
     /** @type {Record<string, string>} */
@@ -715,6 +718,21 @@ function mergeConsecutiveScripts(html) {
       attrs[name] = value;
     }
     return attrs;
+  };
+
+  // In MathML, a `script` neither runs nor is hidden, so its text is shown as it is;
+  // scripts are visited in order, so the MathML tags before each are counted once
+  let mathDepth = 0;
+  let mathPos = 0;
+  const insideMath = (/** @type {number} */ index) => {
+    if (!hasMathML) return false;
+    RE_MATH_TAG.lastIndex = mathPos;
+    let tag;
+    while ((tag = RE_MATH_TAG.exec(html)) !== null && tag.index < index) {
+      mathDepth = tag[1] ? Math.max(0, mathDepth - 1) : mathDepth + 1;
+      mathPos = RE_MATH_TAG.lastIndex;
+    }
+    return mathDepth > 0;
   };
 
   /** @type {string[]} */
@@ -775,7 +793,7 @@ function mergeConsecutiveScripts(html) {
       for (const attr of SCRIPT_BOOL_ATTRS) {
         if ((attr in a1) !== (attr in a2)) { boolConflict = true; break; }
       }
-      if (boolConflict || a1.nonce !== a2.nonce) break;
+      if (boolConflict || a1.nonce !== a2.nonce || (!mergedAny && insideMath(m1.index))) break;
 
       // Scripts are compatible—combine content: Use semicolon normally,
       // newline only for trailing `//` comments
@@ -1481,11 +1499,10 @@ async function minifyHTML(value, options, partialMarkup) {
   }
 
   // Whether the element being parsed holds text rather than markup. The namespace decides
-  // this, not the name alone: `script` and `style` hold text wherever they stand, the rest
-  // only as HTML elements—an SVG or MathML `title` holds markup like any foreign element
+  // this, not the name alone: Only HTML elements do—an SVG or MathML `script` or `title`
+  // holds markup like any foreign element
   function holdsRawText() {
-    return specialContentElements.has(currentTag) ||
-      (rawTextElements.has(currentTag) && !options.insideForeignContent);
+    return rawTextElements.has(currentTag) && !options.insideForeignContent;
   }
 
   // Whether whitespace-only text between tags survives minification
@@ -1573,6 +1590,25 @@ async function minifyHTML(value, options, partialMarkup) {
   // which may not be trimmed due to a following comment or an empty
   // element which has now been removed
   function squashTrailingWhitespace(/** @type {string} */ nextTag) {
+    // Fast path: With no transparent gap pending, a start tag or text without trailing
+    // whitespace last in the buffer ends the walk below on that entry. That leaves text
+    // alone as well where `preserveLineBreaks` has the walk collapse it again, as the
+    // text’s own pass collapsed it already.
+    if (transparentGapIndex === -1) {
+      const last = buffer[buffer.length - 1] ?? '';
+      if (last) {
+        if (last.charCodeAt(0) !== 60 /* < */) {
+          if (!endsWithWhitespace(last)) {
+            return;
+          }
+        } else {
+          const second = last.charCodeAt(1);
+          if (second !== 47 /* / */ && second !== 33 /* ! */ && last.charCodeAt(last.length - 1) === 62 /* > */) {
+            return;
+          }
+        }
+      }
+    }
     if (transparentGapIndex !== -1 && !transparentDepth && !inlineElementsTransparentAfter.has(nextTag) && !inlineElementsTransparent.has(nextTag)) {
       settleTransparentGap(collapseWhitespaceSmart(' ', '', nextTag, emptyAttrs, emptyAttrs, options, inlineSets) !== '');
     }
@@ -1672,6 +1708,10 @@ async function minifyHTML(value, options, partialMarkup) {
   let textPrevAttrs = emptyAttrs;
   /** @type {HTMLAttribute[]} */
   let textNextAttrs = emptyAttrs;
+  // Whether the text is in foreign content, and if so, whether it was read as HTML reads it
+  // and so is to be escaped again
+  let textForeign = false;
+  let textForeignDecoded = false;
 
   // Whitespace collapsing phase (sync)
   function charsCollapse(/** @type {string} */ text) {
@@ -1831,21 +1871,22 @@ async function minifyHTML(value, options, partialMarkup) {
         optionalEndTagEmitted = false;
       }
     }
-    charsPrevTag = /^\s*$/.test(text) ? textPrevTag : 'comment';
+    charsPrevTag = isAllWhitespace(text) ? textPrevTag : 'comment';
     const rawText = Boolean(text) && holdsRawText();
     if (text) {
       textVerbatim = rawText || stackNoTrimWhitespace.length > 0;
     }
     if (text && options.insideSVG && options.minifySVG) {
-      // In SVG, `script` and `style` hold markup, too
-      if (!rawText || options.insideForeignContent) {
+      // SVGO reads XML, so text is escaped for it, while raw text, which XML cannot read as
+      // HTML does (as in `foreignObject`), passes SVGO as a placeholder
+      if (!rawText) {
         text = escapeXML(text);
       } else if (text.indexOf('&') !== -1 || text.indexOf('<') !== -1 || text.indexOf(']]>') !== -1) {
         uidSVGRawText ||= uniqueId(value);
         svgRawTexts.push(text);
         text = '/*!' + uidSVGRawText + (svgRawTexts.length - 1) + '*/';
       }
-    } else if (options.decodeEntities && text && !rawText) {
+    } else if (text && (textForeign ? textForeignDecoded : options.decodeEntities && !rawText)) {
       // Escape any `&` symbols that start either:
       // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
       // 2. or any other character reference (i.e., one that does end with `;`)
@@ -1857,9 +1898,12 @@ async function minifyHTML(value, options, partialMarkup) {
       if (text.indexOf('<') !== -1) {
         // Escapable raw text ends at its own end tag alone, so only that one needs escaping;
         // in foreign content the same element holds markup, where every `<` does
-        const escapeLt = (options.insideForeignContent ? undefined : RE_ESCAPE_LT_RAW_TEXT[currentTag]) ?? RE_ESCAPE_LT;
+        const escapeLt = (textForeign ? undefined : RE_ESCAPE_LT_RAW_TEXT[currentTag]) ?? RE_ESCAPE_LT;
         text = text.replace(escapeLt, '&lt;');
       }
+    } else if (text && textForeign && text.lastIndexOf('<![CDATA[') > text.lastIndexOf(']]>')) {
+      // A CDATA section left open at the end of the input closes before the end tags written after it
+      text += ']]>';
     }
     if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
       text = text.replace(/** @type {RegExp} */ (uidPattern), function (/** @type {string} */ match, /** @type {string} */ _prefix, /** @type {string} */ index) {
@@ -2061,22 +2105,39 @@ async function minifyHTML(value, options, partialMarkup) {
         break;
       }
     }
+    // Without `maxLineLength`, a start tag is one buffer entry rather than one per attribute,
+    // which keeps the buffer and the final join small (lines only break between entries);
+    // the loop is written out per case, as a check per attribute measurably slows it down
+    let tagText = '';
     if (lastKeptIndex !== -1) {
-      if (!fragmentJoinsTag) {
-        bufferPush(' ', true);
-      }
-      for (let i = 0; i <= lastKeptIndex; i++) {
-        const normalizedAttr = normalizedAttrs[i];
-        if (normalizedAttr) {
-          if (uidAttr && normalizedAttr.name.includes(uidAttr)) {
-            markTagFragments(normalizedAttr.name);
+      if (!bufferTags) {
+        tagText = fragmentJoinsTag ? '' : ' ';
+        for (let i = 0; i <= lastKeptIndex; i++) {
+          const normalizedAttr = normalizedAttrs[i];
+          if (normalizedAttr) {
+            if (uidAttr && normalizedAttr.name.includes(uidAttr)) {
+              markTagFragments(normalizedAttr.name);
+            }
+            tagText += buildAttr(normalizedAttr, hasUnarySlash, options, i === lastKeptIndex, uidAttr);
           }
-          const builtAttr = buildAttr(normalizedAttr, hasUnarySlash, options, i === lastKeptIndex, uidAttr);
-          // One entry with the tag name, so that no line break can come between them
-          if (i === 0 && fragmentJoinsTag) {
-            buffer[buffer.length - 1] += builtAttr;
-          } else {
-            bufferPush(builtAttr, true);
+        }
+      } else {
+        if (!fragmentJoinsTag) {
+          bufferPush(' ', true);
+        }
+        for (let i = 0; i <= lastKeptIndex; i++) {
+          const normalizedAttr = normalizedAttrs[i];
+          if (normalizedAttr) {
+            if (uidAttr && normalizedAttr.name.includes(uidAttr)) {
+              markTagFragments(normalizedAttr.name);
+            }
+            const builtAttr = buildAttr(normalizedAttr, hasUnarySlash, options, i === lastKeptIndex, uidAttr);
+            // One entry with the tag name, so that no line break can come between them
+            if (i === 0 && fragmentJoinsTag) {
+              buffer[buffer.length - 1] += builtAttr;
+            } else {
+              bufferPush(builtAttr, true);
+            }
           }
         }
       }
@@ -2085,7 +2146,7 @@ async function minifyHTML(value, options, partialMarkup) {
       optionalStartTag = tag;
     }
 
-    buffer[buffer.length - 1] += (hasUnarySlash ? '/' : '') + '>';
+    buffer[buffer.length - 1] += tagText + (hasUnarySlash ? '/' : '') + '>';
 
     impliedStartTag = autoGenerated && !options.includeAutoGeneratedTags ? tag : '';
     if (impliedStartTag) {
@@ -2150,6 +2211,9 @@ async function minifyHTML(value, options, partialMarkup) {
       if (hasForeignContext) {
         lowerTag = tag.toLowerCase();
         if (lowerTag === 'svg' || lowerTag === 'math') {
+          if (lowerTag === 'math' && options.documentState) {
+            options.documentState.hasMathML = true;
+          }
           // Preserve the surrounding HTML context’s slash handling so `foreignObject`/`annotation-xml`
           // can restore it
           const keepClosingSlashHTML = Boolean(options.keepClosingSlash);
@@ -2485,7 +2549,7 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
     },
-    chars: function (/** @type {string} */ text, /** @type {string} */ prevTag, /** @type {string} */ nextTag, /** @type {HTMLAttribute[]} */ prevAttrs, /** @type {HTMLAttribute[]} */ nextAttrs) {
+    chars: function (/** @type {string} */ text, /** @type {string} */ prevTag, /** @type {string} */ nextTag, /** @type {HTMLAttribute[]} */ prevAttrs, /** @type {HTMLAttribute[]} */ nextAttrs, /** @type {boolean} */ source) {
       // Publish this node’s context for the `charsCollapse`/`charsFinalize` phases
       textPrevTag = prevTag === '' ? 'comment' : prevTag;
       textNextTag = nextTag === '' ? 'comment' : nextTag;
@@ -2493,23 +2557,27 @@ async function minifyHTML(value, options, partialMarkup) {
       textNextAttrs = nextAttrs || [];
 
       // Detect whether any async work is actually needed for this text node
-      // In SVG, which SVGO reads, `script` and `style` hold markup as well,
-      // CDATA sections included
-      const readsForeignText = Boolean(options.insideSVG && options.minifySVG && options.insideForeignContent) && holdsRawText();
-      const needsDecode = options.decodeEntities && text && (readsForeignText
-        ? text.indexOf('&') !== -1 || text.indexOf('<![CDATA[') !== -1
-        : text.indexOf('&') !== -1 && !holdsRawText());
-      const needsProcessScript = specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
-      const needsMinifyJS = options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
+      // In foreign content, text reads references and CDATA sections, and `script` and
+      // `style` hold markup, so their text is a source only where it is all they hold
+      // (and in SVG, where they run and apply)
+      const foreign = Boolean(options.insideForeignContent);
+      textForeign = foreign;
+      const holdsSource = !foreign || Boolean(source);
+      const needsProcessScript = holdsSource && specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
+      const needsMinifyJS = holdsSource && options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(
         a => a.name.toLowerCase() === 'type' && (a.value ?? '').trim().toLowerCase() === 'module'
       );
-      const needsMinifyCSS = options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
+      const needsMinifyCSS = holdsSource && options.minifyCSS !== identity && isStyleElement(currentTag, currentAttrs);
+      textForeignDecoded = foreign && Boolean(options.decodeEntities || needsProcessScript || needsMinifyJS || needsMinifyCSS);
+      const needsDecode = Boolean(text) && (foreign
+        ? textForeignDecoded && (text.indexOf('&') !== -1 || text.indexOf('<![CDATA[') !== -1)
+        : options.decodeEntities && text.indexOf('&') !== -1 && !holdsRawText());
 
       // Fast path: All work is sync—skip async machinery entirely (decoding counts once `entities` has loaded)
       if ((!needsDecode || decodeHTMLFn) && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
         if (needsDecode && decodeHTMLFn) {
-          text = readsForeignText ? decodeForeignText(text, decodeHTMLFn) : decodeHTMLFn(text);
+          text = foreign ? decodeForeignText(text, decodeHTMLFn) : decodeHTMLFn(text);
         }
         charsFinalize(charsCollapse(text));
         return;
@@ -2519,7 +2587,7 @@ async function minifyHTML(value, options, partialMarkup) {
       return (async () => {
         if (needsDecode) {
           const decode = /** @type {(text: string) => string} */ (await getDecodeHTML());
-          text = readsForeignText ? decodeForeignText(text, decode) : decode(text);
+          text = foreign ? decodeForeignText(text, decode) : decode(text);
         }
         text = charsCollapse(text);
         if (needsProcessScript) {
@@ -2928,19 +2996,23 @@ export const minify = async function (value, options) {
       }
     }
   }
-  // Work on a shallow copy so per-call reassignments don’t reach the cached base
-  const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase });
-
   // Warnings are deduplicated per document, so the state has to live on the per-call
   // copy; the `minifyCSS` closure hangs off the memoized base, shared across calls
-  processedOptions.cssContext = { warned: new Set() };
+  /** @type {NonNullable<ProcessedOptions['cssContext']>} */
+  const cssContext = { warned: new Set() };
+  // What the parse finds out about the document for post-processing, which spares a scan of the output
+  const documentState = { hasMathML: false };
+  // Work on a shallow copy so per-call reassignments don’t reach the cached base. The
+  // per-document state is part of the copy from the start, as properties added to it
+  // later slow down every option lookup.
+  const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase, cssContext, documentState });
 
   // Unused-CSS removal needs the whole document’s symbols before the first `style`
   // element is minified, so collect them upfront from the raw input. A document
   // without a style sheet has nothing to remove from, and scanning it would be work
   // spent on an empty result.
   if (processedOptions.removeUnusedCSS && RE_STYLE_ELEMENT.test(value)) {
-    Object.assign(processedOptions.cssContext, collectUsage(
+    Object.assign(cssContext, collectUsage(
       value,
       processedOptions.removeUnusedCSS.scripts,
       value.indexOf('&') !== -1
@@ -2953,7 +3025,7 @@ export const minify = async function (value, options) {
 
   // Post-processing: Merge consecutive inline scripts if enabled
   if (processedOptions.mergeScripts) {
-    result = mergeConsecutiveScripts(result);
+    result = mergeConsecutiveScripts(result, documentState.hasMathML);
   }
 
   processedOptions.log('minified in: ' + (Date.now() - start) + 'ms');

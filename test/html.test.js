@@ -7824,7 +7824,7 @@ describe('HTML', () => {
 
     // In SVG and MathML the name belongs to a foreign element, which holds markup like any
     // other, and which its end tag ends
-    assert.strictEqual(await minify('<svg><plaintext><b class="  y  ">a</b><!-- c --></plaintext>b</svg>', options), '<svg><plaintext><b class=y>a</b></plaintext>b</svg>');
+    assert.strictEqual(await minify('<svg><plaintext><a class="  y  ">a</a><!-- c --></plaintext>b</svg>', options), '<svg><plaintext><a class=y>a</a></plaintext>b</svg>');
   });
 
   test('Trims trailing newline in `pre`/`textarea` with `collapseWhitespace`', async () => {

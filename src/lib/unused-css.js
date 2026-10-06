@@ -183,7 +183,7 @@ function findRawTextElements(haystack, tagName) {
  *
  * @param {string} html - Raw document markup
  * @param {boolean} includeScripts - Also treat identifiers inside inline `script` elements as used
- * @param {((text: string) => string)} [decode] - Resolves character references in attribute values
+ * @param {((text: string) => string)} [decode] - Resolves character references in attribute values and foreign script contents
  * @param {Set<string>} [elements] - Receives the element names the markup uses, lowercased, and the identifiers found in scripts, as possible element names
  * @returns {Set<string>} Symbols to keep
  */
@@ -262,19 +262,23 @@ function collectUsedSymbols(html, includeScripts, decode, elements) {
   }
 
   if (includeScripts) {
-    // Script contents are raw text, so character references stay literal;
-    // an unclosed `script` runs to the end of the document, as it does in a browser
+    // Script contents are raw text, so character references stay literal
+    // except in SVG and MathML, where they are resolved; as the namespace
+    // isn’t tracked here, both readings count. An unclosed `script` runs
+    // to the end of the document, as it does in a browser.
     skipCursor = 0;
     for (const element of findRawTextElements(haystack, 'script')) {
       if (isSkipped(element.start)) {
         continue;
       }
       const body = html.slice(element.bodyStart, element.bodyEnd);
-      addIdentifiers(body, elements);
-      stringLiteralPattern.lastIndex = 0;
-      let literal;
-      while ((literal = stringLiteralPattern.exec(body))) {
-        addTokens(literal[1] ?? literal[2] ?? literal[3] ?? '');
+      for (const text of (decode && body.indexOf('&') !== -1) ? [body, decode(body)] : [body]) {
+        addIdentifiers(text, elements);
+        stringLiteralPattern.lastIndex = 0;
+        let literal;
+        while ((literal = stringLiteralPattern.exec(text))) {
+          addTokens(literal[1] ?? literal[2] ?? literal[3] ?? '');
+        }
       }
     }
   }
@@ -365,7 +369,7 @@ function collectUsedElements(haystack, skipped, elements) {
  * Build the unused-CSS context for a document.
  * @param {string} html - Raw document markup
  * @param {boolean} includeScripts - Also treat identifiers inside inline `script` elements as used
- * @param {((text: string) => string)} [decode] - Resolves character references in attribute values
+ * @param {((text: string) => string)} [decode] - Resolves character references in attribute values and foreign script contents
  * @returns {{usedSymbols: Set<string>, usedElements: Set<string>, usedElementsKey: string}}
  */
 function collectUsage(html, includeScripts, decode) {

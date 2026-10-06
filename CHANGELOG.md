@@ -4,6 +4,22 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.10.6] - 2026-10-06
+
+### Fixed
+
+* Fixed `minifyJS`, `minifyCSS`, and `processScripts` reading SVG `script` and `style` content as written outside `minifySVG`, which left it unminified where it held character references (e.g., `<svg><script>if (a &amp;&amp; b) c()</script></svg>`)
+* Fixed `script` and `style` elements in SVG and MathML being read as raw text where HTML reads markup, which broke the output where a CDATA section held their end tag (e.g., `<svg><script><![CDATA[x("</script>")]]></script></svg>`), kept character references under `decodeEntities`, and minified MathML `script` and `style` content, which neither runs nor applies
+* Fixed CDATA sections in SVG and MathML being read as comments, which `removeComments` removed with their text, `collapseWhitespace` removed whitespace next to, and the first `]>` ended; an unclosed one no longer fails the parse
+* Fixed `mergeScripts` merging MathML `script` elements, whose text is shown
+* Fixed `removeUnusedCSS` missing class names and IDs written with character references in SVG scripts
+* Fixed HTML elements that end SVG and MathML content (e.g., `<svg><p>` or `<math><div>`) being read as foreign, which kept `script` and `style` elements after them from holding raw text: An unescaped `<` failed the parse, and `decodeEntities` and `minifyCSS` decoded character references (e.g., `<svg><b><script>if (a &amp;&amp; b) c()</script></b></svg>`)
+
+### Changed
+
+* An unescaped `<` that starts no tag in an SVG `script` or `style` element is now a parse error, as it is in HTML content; write it as `&lt;` or within a CDATA section, or use `continueOnParseError`
+* Improved performance, with less work for attributes without a default value, for trailing whitespace next to start tags and text, and for start tags without `maxLineLength`
+
 ## [8.10.5] - 2026-10-05
 
 ### Fixed

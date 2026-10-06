@@ -14,10 +14,11 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
 
 /**
  * `start`, `chars`, and `comment` return `undefined` when their work needs no `await`
- * and a Promise when it does; the parse loop awaits only what it gets back.
- * `end`, `processingInstruction`, `doctype`, and `strayEnd` never suspend. `start` is synchronous
- * wherever it is passed no attributes, which is what keeps the calls inside
- * `parseEndTag` synchronous.
+ * and a Promise when it does; the parse loop awaits only what it gets back. `end`,
+ * `processingInstruction`, `doctype`, and `strayEnd` never suspend. `start` is
+ * synchronous wherever it is passed no attributes, which is what keeps the calls
+ * inside `parseEndTag` synchronous. `chars` is told by its sixth argument when
+ * the text is all an SVG `script` or `style` element holds, and so its source.
  * @typedef {{
  *   start?: Function,
  *   end?: Function,
@@ -98,12 +99,22 @@ const closeSelf = new Set(['colgroup', 'dd', 'dt', 'li', 'option', 'p', 'td', 't
 // Special elements (can contain anything)
 const special = new Set(['script', 'style']);
 
+// Where a CDATA section starts and ends, which holds text in foreign content
+const cdataOpen = '<![CDATA[';
+const cdataClose = ']]>';
+
 // Elements whose children are HTML rather than foreign content, each only in
 // the namespace it belongs to (`annotation-xml` is one, too, but only for some
 // `encoding` values, so it is checked separately)
 // https://html.spec.whatwg.org/multipage/parsing.html#html-integration-point
 const svgIntegrationPoints = new Set(['foreignobject', 'desc', 'title']);
 const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
+
+// Start tags that close foreign content and are read as HTML (`font` only with
+// `color`, `face`, or `size`)
+// https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inforeign
+const breaksOutOfForeignContent = new Set(['b', 'big', 'blockquote', 'body', 'br', 'center', 'code', 'dd', 'div', 'dl', 'dt', 'em', 'embed', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'hr', 'i', 'img', 'li', 'listing', 'menu', 'meta', 'nobr', 'ol', 'p', 'pre', 'ruby', 's', 'small', 'span', 'strong', 'strike', 'sub', 'sup', 'table', 'tt', 'u', 'ul', 'var']);
+const RE_FONT_BREAKOUT_ATTR = /^(?:color|face|size)$/i;
 
 // HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
 // Start tags that close an open `p`, https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inbody
@@ -458,11 +469,30 @@ export class HTMLParser {
     const startsForeignContent = (/** @type {string} */ lowerTag) =>
       Boolean(namespaceInside(stack[stack.length - 1])) || lowerTag === 'svg' || lowerTag === 'math';
 
-    // Whether the content of the element being parsed is read as text rather than markup
-    // (`script` and `style` hold text in every namespace; the rest do so as HTML elements only)
+    // Whether the content of the element being parsed is read as text rather than
+    // markup, which only HTML elements hold—in foreign content, `script` and `style`
+    // hold markup, too
     const holdsRawText = (/** @type {string} */ tag) =>
-      special.has(tag) ||
-      ((genericRawTextElements.has(tag) || escapableRawTextElements.has(tag)) && !inForeignContent());
+      (special.has(tag) || genericRawTextElements.has(tag) || escapableRawTextElements.has(tag)) && !inForeignContent();
+
+    // Where the content of the last SVG `script` or `style` start tag begins, which text
+    // there is the source of when it runs up to the element’s end tag
+    let sourcePos = -1;
+
+    // Whether the text from `textStart` is all such an element holds; kept out of the parse
+    // loop, which slows down with every line it grows by
+    const isSource = (/** @type {number} */ textStart) =>
+      sourcePos === textStart && fullHtml.charCodeAt(pos + 1) === 47 && matchEndTag(pos)?.name.toLowerCase() === lastTagLower;
+
+    // In foreign content, text runs through CDATA sections, and one without an end to the
+    // end of the input (-1)
+    const skipCDATA = (/** @type {number} */ textEnd) => {
+      while (textEnd !== -1 && fullHtml.startsWith(cdataOpen, textEnd)) {
+        const cdataEnd = fullHtml.indexOf(cdataClose, textEnd + cdataOpen.length);
+        textEnd = cdataEnd === -1 ? -1 : fullHtml.indexOf('<', cdataEnd + cdataClose.length);
+      }
+      return textEnd;
+    };
 
     // The answer changes only when the top of the stack does, so it is recomputed per stack
     // change rather than per loop iteration (`stackVersion` covers same-named tags whose
@@ -485,7 +515,10 @@ export class HTMLParser {
 
       // Make sure not to be in an element whose content is text, not markup
       if (!lastTagLower || !topHoldsRawText()) {
-        const textEnd = fullHtml.indexOf('<', pos);
+        let textEnd = fullHtml.indexOf('<', pos);
+        if (textEnd !== -1 && lastTagLower && fullHtml.charCodeAt(textEnd + 1) === 33 && inForeignContent()) {
+          textEnd = skipCDATA(textEnd);
+        }
 
         if (textEnd === pos) {
           // Tag found at current position
@@ -700,7 +733,8 @@ export class HTMLParser {
         }
 
         if (handler.chars) {
-          const result = handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs);
+          // An element whose end tag follows its start tag’s text alone has that text for content
+          const result = handler.chars(text, prevTag, nextTag, prevAttrs, nextAttrs, sourcePos !== -1 && isSource(pos - text.length));
           if (isThenable(result)) await result;
         }
         prevTag = '';
@@ -1077,63 +1111,6 @@ export class HTMLParser {
 
       docModeSettable = false;
       if (handler.parseError) reportUnquotedValueErrors(match);
-      const pIndex = stack.length ? (stack[stack.length - 1]?.pScope ?? -1) : -1;
-      if (pIndex >= 0 && closesP.has(lowerTagName)) {
-        if (lowerTagName !== 'table' || docMode === 'no-quirks') {
-          parseEndTag('', stack[pIndex]?.tag ?? 'p');
-        } else if (!docMode) {
-          pHoldingTable.add(/** @type {object} */ (stack[pIndex]));
-        }
-      }
-      // A row or cell start tag closes the row or cell still open in the same table,
-      // which may sit deeper down the stack than the element that was opened last
-      if (lowerTagName === 'tr') {
-        closeIfFoundInCurrentTable('tr');
-      } else if (lowerTagName === 'td' || lowerTagName === 'th') {
-        if (!closeIfFoundInCurrentTable('td')) {
-          closeIfFoundInCurrentTable('th');
-        }
-      }
-      if (lowerTagName === 'tbody') {
-        if (!closeIfFoundInCurrentTable('tfoot')) {
-          closeIfFoundInCurrentTable('thead');
-        }
-      } else if (lowerTagName === 'tfoot') {
-        if (!closeIfFoundInCurrentTable('tbody')) {
-          closeIfFoundInCurrentTable('thead');
-        }
-      } else if (lowerTagName === 'thead') {
-        // If a `tbody` or `tfoot` is open in the current table, close it
-        if (!closeIfFoundInCurrentTable('tbody')) {
-          closeIfFoundInCurrentTable('tfoot');
-        }
-      }
-      if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
-        lastTag = 'colgroup';
-        lastTagLower = 'colgroup';
-        pushOpenElement(lastTag, 'colgroup', []);
-        if (handler.start) {
-          handler.start(lastTag, [], false, '', true);
-        }
-      } else if (lowerTagName !== 'col' && lastTagLower === 'colgroup') {
-        // Auto-close synthetic `<colgroup>` when a non-`col` element starts
-        parseEndTag('', 'colgroup');
-      }
-
-      if (closeSelf.has(lowerTagName) && lastTagLower === lowerTagName) {
-        parseEndTag('', tagName);
-      }
-
-      // Handle `dt`/`dd` cross-closing: `dt` followed by `dd`, or `dd` followed by `dt`
-      if ((lowerTagName === 'dt' || lowerTagName === 'dd') && (lastTagLower === 'dt' || lastTagLower === 'dd')) {
-        parseEndTag('', lastTag);
-      }
-
-      // HTML ignores the slash on a start tag—only in SVG and MathML does it close the
-      // element, which `selfClosingSlash` extends back to every element
-      const selfClosed = !!unarySlash && (handler.selfClosingSlash || startsForeignContent(lowerTagName));
-      const unary = empty.has(lowerTagName) || (lowerTagName === 'html' && lastTagLower === 'head') || selfClosed;
-
       // A plain loop, so a tag costs no closure allocation per attribute
       const rawAttrs = match.attrs;
       /** @type {HTMLAttribute[]} */
@@ -1191,11 +1168,77 @@ export class HTMLParser {
         });
       }
 
+      // HTML reads these as its own, so the foreign elements open end here
+      if (namespaceInside(stack[stack.length - 1]) && (breaksOutOfForeignContent.has(lowerTagName) ||
+          (lowerTagName === 'font' && attrs.some(attr => RE_FONT_BREAKOUT_ATTR.test(attr.name))))) {
+        closeForeignContent();
+      }
+
+      const pIndex = stack.length ? (stack[stack.length - 1]?.pScope ?? -1) : -1;
+      if (pIndex >= 0 && closesP.has(lowerTagName)) {
+        if (lowerTagName !== 'table' || docMode === 'no-quirks') {
+          parseEndTag('', stack[pIndex]?.tag ?? 'p');
+        } else if (!docMode) {
+          pHoldingTable.add(/** @type {object} */ (stack[pIndex]));
+        }
+      }
+      // A row or cell start tag closes the row or cell still open in the same table,
+      // which may sit deeper down the stack than the element that was opened last
+      if (lowerTagName === 'tr') {
+        closeIfFoundInCurrentTable('tr');
+      } else if (lowerTagName === 'td' || lowerTagName === 'th') {
+        if (!closeIfFoundInCurrentTable('td')) {
+          closeIfFoundInCurrentTable('th');
+        }
+      }
+      if (lowerTagName === 'tbody') {
+        if (!closeIfFoundInCurrentTable('tfoot')) {
+          closeIfFoundInCurrentTable('thead');
+        }
+      } else if (lowerTagName === 'tfoot') {
+        if (!closeIfFoundInCurrentTable('tbody')) {
+          closeIfFoundInCurrentTable('thead');
+        }
+      } else if (lowerTagName === 'thead') {
+        // If a `tbody` or `tfoot` is open in the current table, close it
+        if (!closeIfFoundInCurrentTable('tbody')) {
+          closeIfFoundInCurrentTable('tfoot');
+        }
+      }
+      if (lowerTagName === 'col' && findTagInCurrentTable('colgroup') < 0) {
+        lastTag = 'colgroup';
+        lastTagLower = 'colgroup';
+        pushOpenElement(lastTag, 'colgroup', []);
+        if (handler.start) {
+          handler.start(lastTag, [], false, '', true);
+        }
+      } else if (lowerTagName !== 'col' && lastTagLower === 'colgroup') {
+        // Auto-close synthetic `<colgroup>` when a non-`col` element starts
+        parseEndTag('', 'colgroup');
+      }
+
+      if (closeSelf.has(lowerTagName) && lastTagLower === lowerTagName) {
+        parseEndTag('', tagName);
+      }
+
+      // Handle `dt`/`dd` cross-closing: `dt` followed by `dd`, or `dd` followed by `dt`
+      if ((lowerTagName === 'dt' || lowerTagName === 'dd') && (lastTagLower === 'dt' || lastTagLower === 'dd')) {
+        parseEndTag('', lastTag);
+      }
+
+      // HTML ignores the slash on a start tag—only in SVG and MathML does it close the
+      // element, which `selfClosingSlash` extends back to every element
+      const selfClosed = !!unarySlash && (handler.selfClosingSlash || startsForeignContent(lowerTagName));
+      const unary = empty.has(lowerTagName) || (lowerTagName === 'html' && lastTagLower === 'head') || selfClosed;
+
       if (!unary) {
-        pushOpenElement(tagName, lowerTagName, attrs);
+        const namespace = pushOpenElement(tagName, lowerTagName, attrs);
         lastTag = tagName;
         lastTagLower = lowerTagName;
         unarySlash = '';
+        if (namespace === 'svg' && special.has(lowerTagName)) {
+          sourcePos = pos;
+        }
       }
 
       // Store attributes for `prevAttrs` tracking (used in whitespace collapsing)
@@ -1208,7 +1251,7 @@ export class HTMLParser {
 
     // Pushes an open element, noting the `p` in scope from within it: its own index
     // for a `p`, none past a scope boundary, foreign element, or `noscript` (which
-    // holds text with scripting), and otherwise its parent’s
+    // holds text with scripting), and otherwise its parent’s; returns the namespace it sits in
     function pushOpenElement(/** @type {string} */ tag, /** @type {string} */ lowerTag, /** @type {HTMLAttribute[]} */ attrs) {
       const parent = stack.length ? stack[stack.length - 1] : undefined;
       const namespace = namespaceInside(parent);
@@ -1223,6 +1266,7 @@ export class HTMLParser {
       }
       stack.push({ tag, lowerTag, attrs, namespace, pScope });
       stackVersion++;
+      return namespace;
     }
 
     // `needle` must already be lowercase
@@ -1236,10 +1280,37 @@ export class HTMLParser {
       return stackIndex;
     }
 
+    // Closes the foreign elements open down to the nearest HTML element or
+    // integration point, writing their end tags so that an SVG stays well-formed
+    // for SVGO (none of them is an HTML `p`, so none can hold a table). This
+    // repeats the closing loop of `parseEndTag`, as sharing it costs that
+    // hot function about 1%.
+    function closeForeignContent() {
+      let stackIndex = stack.length;
+      while (stackIndex && namespaceInside(stack[stackIndex - 1])) {
+        stackIndex--;
+      }
+      for (let i = stack.length - 1; i >= stackIndex; i--) {
+        if (handler.end) {
+          const entry = stack[i];
+          handler.end(entry?.tag, entry?.attrs, false, '', false);
+        }
+      }
+      stack.length = stackIndex;
+      stackVersion++;
+      lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
+      lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
+    }
+
     function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
       docModeSettable = false;
       let stackIndex;
       const lowerTagName = tagName ? tagName.toLowerCase() : '';
+
+      // As with the start tags that break out of foreign content
+      if (tag && (lowerTagName === 'p' || lowerTagName === 'br') && namespaceInside(stack[stack.length - 1])) {
+        closeForeignContent();
+      }
 
       // Find the closest opened tag of the same type
       if (tagName) {
