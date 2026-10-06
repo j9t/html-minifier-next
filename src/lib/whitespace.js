@@ -50,6 +50,21 @@ function isWsOrNbsp(code) {
   return code === 32 || code === 10 || code === 13 || code === 9 || code === 12 || code === 160;
 }
 
+// Whether the string is empty or holds only what `\s` matches, scanned by code,
+// as text mostly ends the scan on its first character (where a regex costs more)
+/** @param {string} str */
+function isAllWhitespace(str) {
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (!((code >= 9 && code <= 13) || code === 32 || code === 0xA0 || code === 0x1680 ||
+        (code >= 0x2000 && code <= 0x200A) || code === 0x2028 || code === 0x2029 ||
+        code === 0x202F || code === 0x205F || code === 0x3000 || code === 0xFEFF)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Whether the last character is whitespace, no-break space included
 /** @param {string} str */
 function endsWithWhitespace(str) {
@@ -416,5 +431,6 @@ export {
   collapseWhitespace,
   collapseWhitespaceSmart,
   canCollapseWhitespace,
-  canTrimWhitespace
+  canTrimWhitespace,
+  isAllWhitespace
 };

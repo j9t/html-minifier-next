@@ -150,6 +150,16 @@ function deduplicateAttributes(attrs, caseSensitive) {
   return attrs;
 }
 
+// Names that can have a general or tag-specific default value, for the fast pre-check
+// in `isAttributeRedundant` (a Set lookup beats two `Object.hasOwn` plus property reads);
+// the legacy rules (`script[language|charset]`, `a[name]`) are named here explicitly
+const redundantDefaultNames = new Set([...Object.keys(generalDefaults), 'language', 'charset', 'name']);
+for (const defaults of Object.values(tagDefaults)) {
+  for (const name of Object.keys(defaults)) {
+    redundantDefaultNames.add(name);
+  }
+}
+
 /**
  * @param {string} tag
  * @param {string} attrName
@@ -159,6 +169,9 @@ function deduplicateAttributes(attrs, caseSensitive) {
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   // Fast-path: Check if this element–attribute combination can possibly be redundant
   // before normalizing the value; own properties only, so `constructor` has no default
+  if (!redundantDefaultNames.has(attrName)) {
+    return false;
+  }
   const generalDefault = Object.hasOwn(generalDefaults, attrName)
     ? /** @type {Record<string, string>} */ (generalDefaults)[attrName]
     : undefined;

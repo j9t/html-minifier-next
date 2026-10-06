@@ -4,7 +4,7 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [8.10.6] - 2026-10-07
+## [8.10.6] - 2026-10-06
 
 ### Fixed
 
@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * An unescaped `<` that starts no tag in an SVG `script` or `style` element is now a parse error, as it is in HTML content; write it as `&lt;` or within a CDATA section, or use `continueOnParseError`
+* Improved performance, with less work for attributes without a default value, for trailing whitespace next to start tags and text, and for start tags without `maxLineLength`
 
 ## [8.10.5] - 2026-10-05
 
