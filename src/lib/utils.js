@@ -409,6 +409,14 @@ function singleCode(ranges) {
 }
 
 /**
+ * @param {string} source @param {number} i @param {boolean} nested - Whether the pattern carries `v`
+ * @returns {boolean} Whether a `v` class subtracts or intersects at the position
+ */
+function isSetOperator(source, i, nested) {
+  return nested && i >= 0 && (source.startsWith('--', i) || source.startsWith('&&', i));
+}
+
+/**
  * @param {string} atom - Atom as it reads in the source, already unwrapped
  * @param {boolean} [nested] - Whether the pattern carries `v`
  * @param {number} [depth] - Class nesting level of this call
@@ -425,44 +433,83 @@ function atomRanges(atom, nested = false, depth = 0) {
   const negated = i === 2;
   const end = atom.length - 1;
   /** @type {[number, number][]} */
-  const members = [];
+  let members = [];
+  // A `v` class subtracts or intersects where it does not unite, one operand at a time
+  let operator = '';
 
   while (i < end) {
-    // A `v` class nests, and nesting alone is a union to read through
+    if (isSetOperator(atom, i, nested)) {
+      operator = atom.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+
+    /** @type {[number, number][] | null} */
+    let operand;
     if (nested && atom[i] === '[') {
       const close = skipCharacterClass(atom, i, true);
-      const inner = atomRanges(atom.slice(i, close), true, depth + 1);
-      if (!inner) return null;
-      members.push(...inner);
+      operand = atomRanges(atom.slice(i, close), true, depth + 1);
       i = close;
-      continue;
+    } else {
+      const fromLength = tokenLength(atom, i);
+      operand = tokenRanges(atom.slice(i, i + fromLength), true);
+      i += fromLength;
+      // A dash right before the closing `]` is a member, not the start of a range,
+      // and so is the `--` that subtracts
+      if (operand && atom[i] === '-' && i + 1 < end && !isSetOperator(atom, i, nested)) {
+        const toLength = tokenLength(atom, i + 1);
+        // Only single characters bound a range; `\d-z` is not a range at all
+        const low = singleCode(operand);
+        const high = singleCode(tokenRanges(atom.slice(i + 1, i + 1 + toLength), true));
+        operand = low === null || high === null ? null : [[low, high]];
+        i += 1 + toLength;
+      }
     }
-    // Subtraction and intersection are not unions, and are left unread
-    //
-    // @@ Read `--` and `&&` as set difference and intersection
-    // (so that a `v` class built is compared rather than passed unjudged)
-    if (nested && (atom.startsWith('--', i) || atom.startsWith('&&', i))) return null;
+    if (!operand) return null;
 
-    const fromLength = tokenLength(atom, i);
-    const from = tokenRanges(atom.slice(i, i + fromLength), true);
-    if (!from) return null;
-    i += fromLength;
-
-    // A dash right before the closing `]` is a member, not the start of a range
-    if (atom[i] !== '-' || i + 1 >= end) {
-      members.push(...from);
-      continue;
-    }
-    const toLength = tokenLength(atom, i + 1);
-    // Only single characters bound a range; `\d-z` is not a range at all
-    const low = singleCode(from);
-    const high = singleCode(tokenRanges(atom.slice(i + 1, i + 1 + toLength), true));
-    if (low === null || high === null) return null;
-    members.push([low, high]);
-    i += 1 + toLength;
+    members = operator === '--' ? intersectRanges(members, complement(operand))
+      : operator === '&&' ? intersectRanges(members, operand)
+        : members.concat(operand);
   }
 
   return negated ? complement(members) : members;
+}
+
+/** @param {[number, number][]} ranges @returns {[number, number][]} The same set, sorted and merged */
+function mergeRanges(ranges) {
+  const sorted = [...ranges].sort((one, other) => one[0] - other[0]);
+  /** @type {[number, number][]} */
+  const out = [];
+  for (const [low, high] of sorted) {
+    const last = out[out.length - 1];
+    if (last && low <= last[1] + 1) last[1] = Math.max(last[1], high);
+    else out.push([low, high]);
+  }
+  return out;
+}
+
+/**
+ * @param {[number, number][]} ranges @param {[number, number][]} other
+ * @returns {[number, number][]} What both match, merged so that repeated
+ *   operations cannot multiply the pieces
+ */
+function intersectRanges(ranges, other) {
+  const one = mergeRanges(ranges);
+  const two = mergeRanges(other);
+  /** @type {[number, number][]} */
+  const out = [];
+  let i = 0;
+  let j = 0;
+  while (i < one.length && j < two.length) {
+    const [low, high] = /** @type {[number, number]} */ (one[i]);
+    const [otherLow, otherHigh] = /** @type {[number, number]} */ (two[j]);
+    const from = Math.max(low, otherLow);
+    const to = Math.min(high, otherHigh);
+    if (from <= to) out.push([from, to]);
+    if (high < otherHigh) i++;
+    else j++;
+  }
+  return out;
 }
 
 /** @param {[number, number][]} ranges @param {[number, number][]} other */
@@ -565,6 +612,12 @@ function foldCase(source, nested = false) {
       continue;
     }
 
+    if (isSetOperator(source, i, nested)) {
+      out += source.slice(i, i + 2);
+      i += 2;
+      continue;
+    }
+
     const fromLength = tokenLength(source, i);
     const from = source.slice(i, i + fromLength);
     const afterFrom = i + fromLength;
@@ -572,7 +625,7 @@ function foldCase(source, nested = false) {
     // A range needs the other case’s range beside it—only where both ends are
     // ASCII letters, the one span whose two cases are contiguous and parallel
     // (`ÿ` uppercases to `Ÿ`, 150 code points past where its range ends)
-    if (source[afterFrom] === '-' && afterFrom + 1 < source.length && source[afterFrom + 1] !== ']') {
+    if (source[afterFrom] === '-' && afterFrom + 1 < source.length && source[afterFrom + 1] !== ']' && !isSetOperator(source, afterFrom, nested)) {
       const toLength = tokenLength(source, afterFrom + 1);
       const to = source.slice(afterFrom + 1, afterFrom + 1 + toLength);
       out += RE_ASCII_LETTER.test(from) && RE_ASCII_LETTER.test(to) && isLower(from) === isLower(to)
@@ -584,7 +637,11 @@ function foldCase(source, nested = false) {
       continue;
     }
 
-    out += fromLength === 1 && foldsCase(from) ? from.toLowerCase() + from.toUpperCase() : from;
+    // A set operand is one character, so both cases go into a class of their own
+    const folded = from.toLowerCase() + from.toUpperCase();
+    out += fromLength !== 1 || !foldsCase(from) ? from
+      : isSetOperator(source, afterFrom, nested) || isSetOperator(source, i - 2, nested) ? '[' + folded + ']'
+        : folded;
     i = afterFrom;
   }
 
@@ -670,7 +727,7 @@ function lostFlag(pattern) {
         j += tokenLength(source, j);
         continue;
       }
-      if (source[j] === '[' || source.startsWith('--', j) || source.startsWith('&&', j)) return 'v';
+      if (source[j] === '[' || isSetOperator(source, j, true)) return 'v';
       j++;
     }
     i = end;

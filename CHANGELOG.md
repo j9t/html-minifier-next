@@ -4,6 +4,12 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.10.7] - 2026-10-07
+
+### Fixed
+
+* Fixed the `ignoreCustomFragments` ReDoS check leaving subtraction and intersection in `v`-flag character classes unjudged (e.g., `[[ab]&&[bc]]*b*`) and reading a subtracted character as a range (e.g., `[a--b]*b*`), which flagged patterns that do not backtrack and missed ones that do
+
 ## [8.10.6] - 2026-10-06
 
 ### Fixed

@@ -133,6 +133,10 @@ describe('Utils', () => {
       assert.strictEqual(embedSource(/\x6a/i), '\\x6a');
       // Outside ASCII the two case blocks are not parallel, so the range stands
       assert.strictEqual(embedSource(/[ü-ÿ]/i), '[ü-ÿ]');
+      // A set operand folds into a class of its own, and `--` is no range
+      assert.strictEqual(embedSource(/[a--b]/vi), '[[aA]--[bB]]');
+      assert.strictEqual(embedSource(/[\w&&a]/vi), '[\\w&&[aA]]');
+      assert.strictEqual(embedSource(/[[ab]--[b]]/vi), '[[aAbB]--[bB]]');
     });
 
     test('What `i` cannot reach is left alone, never widened', () => {
@@ -261,15 +265,40 @@ describe('Utils', () => {
       assert.strictEqual(describeQuantifierRisk(/[[a][b]]*c*/v) !== null, false);
       assert.strictEqual(describeQuantifierRisk(/[^[a][b]]*c*/v) !== null, true);
       assert.strictEqual(describeQuantifierRisk(/[^[a][b]]*a*/v) !== null, false);
-      // Subtraction, intersection, and string literals are not unions to read
-      assert.strictEqual(describeQuantifierRisk(/[[a]--[b]]*b*/v) !== null, false);
-      assert.strictEqual(describeQuantifierRisk(/[[ab]&&[bc]]*b*/v) !== null, false);
+      // String literals are not characters to read
       assert.strictEqual(describeQuantifierRisk(/[\q{ab}]*a*/v) !== null, false);
       // Without `v` a `[` inside a class is a member, and the first `]` closes it
       assert.strictEqual(hasRiskyQuantifiers('[[a]*a*'), true);
       // Nesting past the bound is declined rather than recursed into
       const deep = new RegExp('['.repeat(3000) + 'a' + ']'.repeat(3000) + '*a*', 'v');
       assert.strictEqual(describeQuantifierRisk(deep), null);
+    });
+
+    test('A `v` class is read through subtraction and intersection', () => {
+      assert.strictEqual(describeQuantifierRisk(/[[ab]--[b]]*a*/v) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[[ab]--[a]]*a*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[[ab]&&[bc]]*b*/v) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[[ab]&&[bc]]*a*/v) !== null, false);
+      // Bare characters and escapes are operands, too, and a `--` is no range
+      assert.strictEqual(describeQuantifierRisk(/[a--b]*b*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[\d--[0]]*0*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[\d--[0]]*1*/v) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[\w&&\d]*a*/v) !== null, false);
+      // Operations chain left to right
+      assert.strictEqual(describeQuantifierRisk(/[\w--a--b]*b*/v) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[\w--a--b]*c*/v) !== null, true);
+      // Negation applies to the result
+      assert.strictEqual(describeQuantifierRisk(/[^[ab]--[b]]*b*/v) !== null, true);
+      assert.strictEqual(describeQuantifierRisk(/[^[ab]--[b]]*a*/v) !== null, false);
+      // Folding case reaches every operand
+      assert.strictEqual(describeQuantifierRisk(/[[ab]--b]*B*/vi) !== null, false);
+      assert.strictEqual(describeQuantifierRisk(/[[ab]--b]*A*/vi) !== null, true);
+      // An operand this does not read leaves the class unread
+      assert.strictEqual(describeQuantifierRisk(/[\p{L}&&[a]]*b*/v) !== null, false);
+      // Pieces stay merged, so nesting cannot multiply them past the length bound
+      const wide = '[' + 'a'.repeat(40) + ']';
+      const nested = new RegExp('['.repeat(40) + wide + ('&&' + wide + ']').repeat(40) + '*a*', 'v');
+      assert.strictEqual(describeQuantifierRisk(nested) !== null, true);
     });
 
     test('Repeats reach each other across atoms that can match empty', () => {
