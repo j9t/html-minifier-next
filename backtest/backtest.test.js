@@ -141,7 +141,7 @@ ${failOn ? `  if (html.includes('${failOn}')) throw new Error('Stub failure');\n
   }
 
   async function git(dir, ...args) {
-    const { code, stdout, stderr } = await exec('git', ['-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', ...args], { cwd: dir });
+    const { code, stdout, stderr } = await exec('git', args, { cwd: dir });
     assert.strictEqual(code, 0, `git ${args.join(' ')}: ${stderr}`);
     return stdout.trim();
   }
@@ -150,7 +150,7 @@ ${failOn ? `  if (html.includes('${failOn}')) throw new Error('Stub failure');\n
     const date = `2026-01-0${day} 10:00:00 +0000`;
     await git(dir, 'add', '-A');
     const identity = { GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 'test@example.com' };
-    const { code, stderr } = await exec('git', ['-c', 'commit.gpgsign=false', 'commit', '-q', '--no-verify', '-m', `Commit ${day}`], {
+    const { code, stderr } = await exec('git', ['commit', '-q', '--no-verify', '-m', `Commit ${day}`], {
       cwd: dir,
       env: { ...process.env, ...identity, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }
     });
@@ -165,6 +165,9 @@ ${failOn ? `  if (html.includes('${failOn}')) throw new Error('Stub failure');\n
     const dir = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'hmn-backtest-')));
     t.after(() => fs.rm(dir, { recursive: true, force: true }));
     await git(dir, 'init', '-q');
+    // In the repository’s config, so the backtest’s own Git calls use it, too (Windows runners enable `autocrlf`)
+    await git(dir, 'config', 'core.autocrlf', 'false');
+    await git(dir, 'config', 'commit.gpgsign', 'false');
 
     await write(dir, 'package.json', JSON.stringify({ type: 'module' }));
     await write(dir, 'src/htmlminifier.js', stub('A', { failOn: 'Beta' }));
