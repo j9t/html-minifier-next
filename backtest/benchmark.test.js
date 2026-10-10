@@ -1,9 +1,11 @@
-// @@ Extend to `main()`—the per-file loop, totals, noise weighting, and baseline saving—e.g., against a small fixture corpus
-
-import { describe, test } from 'node:test';
+import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import { minify } from '../src/htmlminifier.js';
 import { getPreset, getPresetNames } from '../src/presets.js';
-import { BROTLI_QUALITY, GZIP_LEVEL } from './compression.js';
+import { BROTLI_QUALITY, GZIP_LEVEL, compressedSizes } from './compression.js';
 import {
   DEFAULT_CONFIG,
   DEFAULT_ITERATIONS,
@@ -13,6 +15,7 @@ import {
   fastest,
   formatDelta,
   formatTimeDelta,
+  main,
   median,
   optionsForSite,
   padDisplay,
@@ -189,6 +192,151 @@ describe('Benchmark', () => {
       const values = [10, 10, 100, 10];
       assert.strictEqual(reproducibility(values), 0);
       assert.strictEqual(spread(values), 900);
+    });
+  });
+
+  describe('`main`', () => {
+    const options = { collapseWhitespace: true, removeComments: true };
+    const sites = { alpha: 'https://alpha.example/', beta: 'https://beta.example/' };
+    const inputs = {
+      alpha: '<!DOCTYPE html>\n<html>\n  <head>\n    <title>Alpha</title>\n  </head>\n  <body>\n    <!-- Comment -->\n    <p>Alpha   text</p>\n  </body>\n</html>\n',
+      beta: '<div>\n  <p>Beta</p>\n  <p>Text</p>\n</div>\n'
+    };
+    let dirWork;
+    let logs;
+    let errors;
+
+    // Runs `main` against the fixture corpus, collecting what it prints
+    async function run(t, argv) {
+      logs = [];
+      errors = [];
+      // Stacked mocks would leave the console mocked after the test
+      t.mock.restoreAll();
+      t.mock.method(console, 'log', (...args) => logs.push(args.join(' ')));
+      t.mock.method(console, 'error', (...args) => errors.push(args.join(' ')));
+      return await main({ argv, dirWork });
+    }
+
+    // The printed line starting with `prefix`, ignoring the blank lines some lines open with
+    function findLine(lines, prefix) {
+      return lines.find(line => line.trimStart().startsWith(prefix));
+    }
+
+    async function readBaseline() {
+      return JSON.parse(await fs.readFile(path.join(dirWork, 'benchmark-baseline.json'), 'utf8'));
+    }
+
+    before(async () => {
+      dirWork = await fs.mkdtemp(path.join(os.tmpdir(), 'hmn-benchmark-'));
+    });
+
+    beforeEach(async () => {
+      await fs.rm(dirWork, { recursive: true, force: true });
+      await fs.mkdir(path.join(dirWork, 'input'), { recursive: true });
+      await fs.writeFile(path.join(dirWork, 'sites.json'), JSON.stringify(sites));
+      await fs.writeFile(path.join(dirWork, DEFAULT_CONFIG), JSON.stringify(options));
+      for (const [name, html] of Object.entries(inputs)) {
+        await fs.writeFile(path.join(dirWork, 'input', name + '.html'), html);
+      }
+    });
+
+    after(async () => {
+      await fs.rm(dirWork, { recursive: true, force: true });
+    });
+
+    test('Reports each file’s minified and compressed size, and totals them', async (t) => {
+      const { files, totals } = await run(t, ['--iterations=1']);
+      for (const [name, html] of Object.entries(inputs)) {
+        const minified = await minify(html, optionsForSite(options, sites[name]));
+        const { gzip, brotli } = compressedSizes(minified);
+        assert.strictEqual(files[name].size, Buffer.byteLength(minified), name);
+        assert.strictEqual(files[name].gzip, gzip, name);
+        assert.strictEqual(files[name].brotli, brotli, name);
+      }
+      for (const key of ['size', 'gzip', 'brotli']) {
+        assert.strictEqual(totals[key], files.alpha[key] + files.beta[key], key);
+      }
+      assert.ok(findLine(logs, 'Total'));
+    });
+
+    test('Leaves noise unmeasured for a single iteration', async (t) => {
+      const { files, noise } = await run(t, ['--iterations=1']);
+      assert.strictEqual(files.alpha.spread, null);
+      assert.deepStrictEqual(noise, { total: null, typical: null });
+      assert.ok(findLine(logs, 'Noise: Unmeasured'));
+    });
+
+    test('Weights the total’s noise by each file’s time', async (t) => {
+      const { files, noise } = await run(t, ['--iterations=4']);
+      const spreads = [files.alpha.spread, files.beta.spread];
+      // A time-weighted mean lies between the per-file values (rounded to a tenth, hence the margin)
+      assert.ok(noise.total >= Math.min(...spreads) - 0.05 && noise.total <= Math.max(...spreads) + 0.05, `${noise.total} outside ${spreads}`);
+      assert.ok(Math.abs(noise.typical - (spreads[0] + spreads[1]) / 2) <= 0.05);
+      assert.ok(findLine(logs, `Noise: ${noise.total.toFixed(1)}% on the total`));
+    });
+
+    test('`--save` writes a baseline with the run’s settings and per-file results', async (t) => {
+      const { files } = await run(t, ['--save', '--iterations=2']);
+      const baseline = await readBaseline();
+      assert.strictEqual(baseline.metric, 'fastest');
+      assert.deepStrictEqual(baseline.compression, { gzip: GZIP_LEVEL, brotli: BROTLI_QUALITY });
+      assert.strictEqual(baseline.iterations, 2);
+      assert.strictEqual(baseline.config, DEFAULT_CONFIG);
+      assert.strictEqual(baseline.preset, null);
+      assert.deepStrictEqual(baseline.files, files);
+      assert.ok(findLine(logs, 'Baseline saved to'));
+    });
+
+    test('Shows deltas against a saved baseline, per file and in total', async (t) => {
+      await run(t, ['--save', '--iterations=1']);
+      await run(t, ['--iterations=1']);
+      assert.ok(findLine(logs, 'Comparing against baseline'));
+      for (const label of ['alpha', 'beta', 'Total']) {
+        const line = findLine(logs, label);
+        assert.match(line, /B \(±0%\)/, label);
+        assert.match(line, /Gzip [\d,]+ \(±0%\)/, label);
+        assert.match(line, /Brotli [\d,]+ \(±0%\)/, label);
+      }
+    });
+
+    test('Omits total deltas when not every file has a baseline entry', async (t) => {
+      await run(t, ['--save', '--iterations=1']);
+      const baseline = await readBaseline();
+      delete baseline.files.beta;
+      await fs.writeFile(path.join(dirWork, 'benchmark-baseline.json'), JSON.stringify(baseline));
+      await run(t, ['--iterations=1']);
+      assert.match(findLine(logs, 'alpha'), /\(±0%\)/);
+      assert.doesNotMatch(findLine(logs, 'Total'), /\(/);
+      assert.ok(findLine(logs, 'Note: Total deltas omitted—only 1 of 2'));
+    });
+
+    test('Ignores a baseline saved with another timing metric', async (t) => {
+      await run(t, ['--save', '--iterations=1']);
+      const baseline = await readBaseline();
+      await fs.writeFile(path.join(dirWork, 'benchmark-baseline.json'), JSON.stringify({ ...baseline, metric: 'median' }));
+      await run(t, ['--iterations=1']);
+      assert.ok(findLine(logs, 'Warning: Ignoring baseline saved with an older timing metric'));
+      assert.ok(!findLine(logs, 'Comparing against baseline'));
+    });
+
+    test('Skips a file whose input is missing', async (t) => {
+      await fs.rm(path.join(dirWork, 'input', 'beta.html'));
+      const { files } = await run(t, ['--iterations=1']);
+      assert.deepStrictEqual(Object.keys(files), ['alpha']);
+      assert.ok(findLine(errors, 'Skipping beta: input not found'));
+    });
+
+    test('Fails without any input', async (t) => {
+      await fs.rm(path.join(dirWork, 'input'), { recursive: true });
+      await assert.rejects(run(t, ['--iterations=1']), { message: /^\s*No input files found/ });
+    });
+
+    test('Fails on an unreadable options file', async (t) => {
+      await assert.rejects(run(t, ['--config=missing.json']), { message: /^Failed to read missing\.json/ });
+    });
+
+    test('Fails on invalid arguments', async (t) => {
+      await assert.rejects(run(t, ['--preset=unknown']), { message: /^Error: Unknown preset “unknown”/ });
     });
   });
 
