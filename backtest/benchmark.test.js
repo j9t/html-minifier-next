@@ -210,6 +210,8 @@ describe('Benchmark', () => {
     async function run(t, argv) {
       logs = [];
       errors = [];
+      // Stacked mocks would leave the console mocked after the test
+      t.mock.restoreAll();
       t.mock.method(console, 'log', (...args) => logs.push(args.join(' ')));
       t.mock.method(console, 'error', (...args) => errors.push(args.join(' ')));
       return await main({ argv, dirWork });
