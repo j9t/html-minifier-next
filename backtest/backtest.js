@@ -138,21 +138,29 @@ async function ensureHistoricalDeps() {
 
   console.log(`Installing ${missing.length} historical dependency(ies)…`);
   await new Promise((resolve) => {
-    const proc = spawn('npm', ['install', '--no-save', ...missing], {
+    // Through a shell, as npm is a batch file on Windows (the package names are constants)
+    const proc = spawn(`npm install --no-save ${missing.join(' ')}`, {
       cwd: dirRoot,
-      stdio: ['ignore', 'pipe', 'pipe']
+      shell: true,
+      stdio: ['ignore', 'ignore', 'pipe']
     });
+    // Read, so a chatty install cannot fill the pipe and stall
+    let stderr = '';
+    proc.stderr.setEncoding('utf8');
+    proc.stderr.on('data', (data) => {
+      stderr += data;
+    });
+    let spawnFailed = false;
     proc.on('error', (err) => {
+      spawnFailed = true;
       console.error('Warning: Failed to spawn npm install:', err.message);
       resolve();
     });
-    proc.on('exit', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        console.error('Warning: Failed to install some historical dependencies; old commits may fail');
-        resolve();
+    proc.on('close', (code) => {
+      if (!spawnFailed && code !== 0) {
+        console.error(`Warning: Failed to install some historical dependencies; old commits may fail\n${stderr.trim()}`);
       }
+      resolve();
     });
   });
 }
@@ -536,10 +544,15 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
         total: commits.length * 2
       });
 
+      // Children share the working tree, so only one at a time checks out and loads its commit
+      let starting = false;
+
       function forkTask() {
-        if (commits.length && running < nThreads) {
+        if (commits.length && running < nThreads && !starting) {
+          starting = true;
           const hash = commits.shift();
           const task = fork(path.join(__dirname, 'backtest.js'), { silent: true });
+          let ready = false;
           let error = '';
           const id = setTimeout(function () {
             if (task.connected) {
@@ -549,13 +562,19 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
           }, TASK_TIMEOUT_MS);
           task.on('message', function (data) {
             if (data === 'ready') {
+              ready = true;
+              starting = false;
               progress.tick(1);
               forkTask();
             } else {
               table[hash][data.name] = { size: data.size, gzip: data.gzip, brotli: data.brotli, time: data.time };
             }
-          }).on('exit', async function () {
-            progress.tick(1);
+          // Not `exit`, which can come before the child’s last messages and output
+          }).on('close', async function () {
+            if (!ready) {
+              starting = false;
+            }
+            progress.tick(ready ? 1 : 2);
             clearTimeout(id);
             if (error) {
               table[hash].error = error;
@@ -645,6 +664,7 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
 export {
   formatChange,
   formatResults,
+  historicalDeps,
   ordinal,
   parseRange
 };

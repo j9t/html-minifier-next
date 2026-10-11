@@ -44,10 +44,13 @@ const CORE_DISABLED_OPTIONS = ['minifyCSS', 'minifyJS', 'minifySVG', 'minifyURLs
 // resolve the kind of change this benchmark is usually used to check
 const NOISE_WARN_PCT = 15;
 
-const PATH_BASELINE = path.join(__dirname, 'benchmark-baseline.json');
+const FILE_BASELINE = 'benchmark-baseline.json';
 
 // Which iteration a saved `time` stands for; a baseline naming another one is not comparable
 const METRIC = 'fastest';
+
+// A failure to report as is, without a stack
+class UsageError extends Error {}
 
 /** @param {{metric?: string, files?: Record<string, {spread?: number}>}} baseline */
 function baselineMetric(baseline) {
@@ -223,14 +226,12 @@ async function readJSON(pathFile, label) {
   try {
     text = await fs.readFile(pathFile, 'utf8');
   } catch (err) {
-    console.error(`Failed to read ${label} (${pathFile}): ${err.message}`);
-    process.exit(1);
+    throw new UsageError(`Failed to read ${label} (${pathFile}): ${err.message}`);
   }
   try {
     return JSON.parse(text);
   } catch (err) {
-    console.error(`Failed to parse ${label} (${pathFile}): ${err.message}`);
-    process.exit(1);
+    throw new UsageError(`Failed to parse ${label} (${pathFile}): ${err.message}`);
   }
 }
 
@@ -245,27 +246,27 @@ function getGitInfo() {
   }
 }
 
-async function main() {
+// `dirWork` holds sites.json, input, the options file, and the baseline
+async function main({ argv = process.argv.slice(2), dirWork = __dirname } = {}) {
   let args;
   try {
-    args = parseArgs(process.argv.slice(2));
+    args = parseArgs(argv);
   } catch (err) {
-    console.error(`Error: ${err.message}`);
-    process.exit(1);
+    throw new UsageError(`Error: ${err.message}`);
   }
 
   const { minify } = await import('../src/htmlminifier.js');
 
-  const urls = await readJSON(path.join(__dirname, 'sites.json'), 'sites.json');
+  const urls = await readJSON(path.join(dirWork, 'sites.json'), 'sites.json');
   const fileNames = Object.keys(urls);
-  const dirInput = path.join(__dirname, 'input');
+  const dirInput = path.join(dirWork, 'input');
+  const pathBaseline = path.join(dirWork, FILE_BASELINE);
 
   let baseOptions;
   try {
-    baseOptions = resolvePreset(args.preset ? { preset: args.preset } : await readJSON(path.resolve(__dirname, args.config), args.config));
+    baseOptions = resolvePreset(args.preset ? { preset: args.preset } : await readJSON(path.resolve(dirWork, args.config), args.config));
   } catch (err) {
-    console.error(`Error: ${err.message}`);
-    process.exit(1);
+    throw err instanceof UsageError ? err : new UsageError(`Error: ${err.message}`);
   }
   if (args.core) {
     for (const key of CORE_DISABLED_OPTIONS) {
@@ -280,7 +281,7 @@ async function main() {
   let baseline = null;
   if (!args.save) {
     try {
-      baseline = JSON.parse(await fs.readFile(PATH_BASELINE, 'utf8'));
+      baseline = JSON.parse(await fs.readFile(pathBaseline, 'utf8'));
       // `time` held the median before it held the fastest iteration, and a median never
       // reads faster—comparing across the two would show an improvement that is not there.
       // A baseline predating the marker names its metric by whether it carries the
@@ -295,7 +296,7 @@ async function main() {
       // A missing baseline is normal (first run reports absolute numbers only);
       // anything else (corrupt JSON, malformed entries, permissions) is worth surfacing
       if (err.code !== 'ENOENT') {
-        console.error(`Warning: Ignoring unreadable baseline (${PATH_BASELINE}): ${err.message}`);
+        console.error(`Warning: Ignoring unreadable baseline (${pathBaseline}): ${err.message}`);
       }
     }
   }
@@ -395,8 +396,7 @@ async function main() {
   }
 
   if (!processed) {
-    console.error('\nNo input files found. Run `npm run backtest` once to download the corpus.');
-    process.exit(1);
+    throw new UsageError('\nNo input files found. Run `npm run backtest` once to download the corpus.');
   }
 
   // Only show total deltas when every processed file has a baseline entry, so the
@@ -446,15 +446,21 @@ async function main() {
       compression: { gzip: GZIP_LEVEL, brotli: BROTLI_QUALITY },
       files: results
     };
-    await fs.writeFile(PATH_BASELINE, JSON.stringify(payload, null, 2) + '\n', 'utf8');
-    console.log(`\nBaseline saved to ${path.relative(process.cwd(), PATH_BASELINE)} (${processed} file(s))`);
+    await fs.writeFile(pathBaseline, JSON.stringify(payload, null, 2) + '\n', 'utf8');
+    console.log(`\nBaseline saved to ${path.relative(process.cwd(), pathBaseline)} (${processed} file(s))`);
   }
+
+  return {
+    files: results,
+    totals: { size: sizeTotal, gzip: gzipTotal, brotli: brotliTotal, time: timeTotal },
+    noise: { total: noiseTotal, typical: noiseTypical }
+  };
 }
 
 // Run when executed as a script (not when imported by tests)
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(err => {
-    console.error(err);
+    console.error(err instanceof UsageError ? err.message : err);
     process.exit(1);
   });
 }
@@ -470,6 +476,7 @@ export {
   fastest,
   formatDelta,
   formatTimeDelta,
+  main,
   median,
   optionsForSite,
   padDisplay,
