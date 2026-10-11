@@ -1,8 +1,10 @@
 import { after, before, beforeEach, describe, test } from 'node:test';
 import assert from 'node:assert';
+import { spawnSync } from 'child_process';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { minify } from '../src/htmlminifier.js';
 import { getPreset, getPresetNames } from '../src/presets.js';
 import { BROTLI_QUALITY, GZIP_LEVEL, compressedSizes } from './compression.js';
@@ -252,10 +254,13 @@ describe('Benchmark', () => {
         assert.strictEqual(files[name].size, Buffer.byteLength(minified), name);
         assert.strictEqual(files[name].gzip, gzip, name);
         assert.strictEqual(files[name].brotli, brotli, name);
+        assert.ok(Number.isFinite(files[name].time), name);
       }
       for (const key of ['size', 'gzip', 'brotli']) {
         assert.strictEqual(totals[key], files.alpha[key] + files.beta[key], key);
       }
+      // Per-file times are rounded to hundredths, the total is not
+      assert.ok(Math.abs(totals.time - (files.alpha.time + files.beta.time)) <= 0.01, `${totals.time} vs. ${files.alpha.time} + ${files.beta.time}`);
       assert.ok(findLine(logs, 'Total'));
     });
 
@@ -337,6 +342,15 @@ describe('Benchmark', () => {
 
     test('Fails on invalid arguments', async (t) => {
       await assert.rejects(run(t, ['--preset=unknown']), { message: /^Error: Unknown preset “unknown”/ });
+    });
+
+    test('Exits with only the message, without a stack, when run as a script', () => {
+      const pathScript = path.join(path.dirname(fileURLToPath(import.meta.url)), 'benchmark.js');
+      // Rejected before any file is read, so the real corpus does not matter
+      const { status, stdout, stderr } = spawnSync(process.execPath, [pathScript, '--config=other.json', '--preset=comprehensive'], { encoding: 'utf8' });
+      assert.strictEqual(status, 1);
+      assert.strictEqual(stdout, '');
+      assert.strictEqual(stderr.trim(), 'Error: Use either `--config` or `--preset`, not both (an options file can name a `preset` itself)');
     });
   });
 
