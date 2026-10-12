@@ -10,7 +10,8 @@
 // Usage (from the backtest folder):
 //   npm run benchmark: Run; if a baseline exists, show deltas
 //   npm run benchmark -- --save: Run and save the result as the baseline
-//   npm run benchmark -- --core: Disable external minifiers (CSS/JS/SVG/URLs) to isolate HMN’s processing time
+//   npm run benchmark -- --core: Disable external minifiers (CSS/JS/SVG/URLs) to isolate HMN’s
+//     processing time
 //   npm run benchmark -- --cold: Switch the minification caches off so CSS/JS/SVG work is
 //     redone every iteration—without this, warm caches hide any change to those minifiers
 //   npm run benchmark -- --iterations=10
@@ -464,8 +465,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(1);
   });
 }
-
-// Exports
 
 export {
   DEFAULT_CONFIG,

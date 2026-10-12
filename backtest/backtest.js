@@ -334,7 +334,7 @@ function sortHashes(table) {
   return Object.keys(table).sort((a, b) => new Date(table[b].date) - new Date(table[a].date));
 }
 
-// Render a “ (±N%)” suffix against the older value, or nothing if there is none or it rounds to 0.00%
+// A “ (±N%)” suffix against the older value; nothing if there is none or it rounds to 0.00%
 function formatChange(curr, prev) {
   if (!prev) {
     return '';
@@ -350,7 +350,6 @@ function formatChange(curr, prev) {
 function formatResults(table, names, step = 1, generated = new Date()) {
   const hashes = sortHashes(table);
 
-  // JSON output—compact and readable format
   const jsonOutput = {
     summary: {
       commits: hashes.length,
@@ -376,8 +375,7 @@ function formatResults(table, names, step = 1, generated = new Date()) {
         const dateShort = data.date.substring(0, 16); // “2025-12-27 18:23”
         const key = `${dateShort} ${hash}`;
 
-        // Calculate deltas comparing to the entry displayed below (index + 1, chronologically older)
-        // This shows how the commit performs compared to the older one below it
+        // Deltas against the entry displayed below (index + 1, chronologically older)
         let dataPrev = null;
         for (let i = index + 1; i < hashes.length; i++) {
           const candidateData = table[hashes[i]][fileName];
@@ -387,7 +385,8 @@ function formatResults(table, names, step = 1, generated = new Date()) {
           }
         }
 
-        // Format value: “size · Gzip size · Brotli size @ time”, each value followed by “(±N%)” where it changed
+        // Format value: “size · Gzip size · Brotli size @ time”, each value followed
+        // by “(±N%)” where it changed
         jsonOutput.sites[fileName][key] = `${formatNumber(size)}${formatChange(size, dataPrev?.size)}` +
           ` · Gzip ${formatNumber(gzip)}${formatChange(gzip, dataPrev?.gzip)}` +
           ` · Brotli ${formatNumber(brotli)}${formatChange(brotli, dataPrev?.brotli)}` +
@@ -400,7 +399,6 @@ function formatResults(table, names, step = 1, generated = new Date()) {
 }
 
 async function print(table, step = 1) {
-  // Ensure output directory exists
   await fs.mkdir(DIR_OUTPUT, { recursive: true });
 
   const errors = [];
@@ -658,8 +656,6 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
     });
   });
 }
-
-// Exports
 
 export {
   formatChange,

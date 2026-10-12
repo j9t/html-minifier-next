@@ -77,8 +77,6 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
 
 /** @import { ProcessedOptions } from './lib/options.js' */
 
-// Type definitions
-
 /**
  * @typedef {Object} HTMLAttribute
  *  Representation of an attribute from the HTML parser.
@@ -467,7 +465,8 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  * Tag name only: `["td", "span"]`—preserves all empty elements of these types
  *  * With valued attributes: `["<i class='test'>"]`—preserves only when attribute values match
- *  * With boolean attributes: `["<input disabled>"]`—preserves only when boolean attribute is present
+ *  * With boolean attributes: `["<input disabled>"]`—preserves only when the
+ *    boolean attribute is present
  *  * Mixed: `["<button type='button' disabled>"]`—all specified attributes must match
  *
  *  Attribute matching:
@@ -480,7 +479,8 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  Limitations:
  *
  *  * Self-closing syntax (e.g., `["<span/>"]`) is not supported; use `["span"]` instead
- *  * Definitions containing `>` within quoted attribute values (e.g., `["<span title='a>b'>"]`) are not supported
+ *  * Definitions containing `>` within quoted attribute values (e.g.,
+ *    `["<span title='a>b'>"]`) are not supported
  *
  *  Default: `[]`
  *
@@ -641,7 +641,7 @@ let svgMinifyCache = null;
  */
 const cacheStatsOrEmpty = (cache) => cache ? cache.stats() : { gets: 0, hits: 0, size: 0, limit: 0 };
 
-// Pre-compiled patterns for script merging (avoid repeated allocation in hot path)
+// Patterns for script merging
 const RE_SCRIPT_ATTRS = /([^\s=]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g;
 const RE_SCRIPT_OPEN = /<script(?=[\s>])/gi; // Finds tag start; use `findTagEnd()` for the actual closing `>`
 const RE_SCRIPT_CLOSE = /<\/script\s*>/gi;
@@ -649,7 +649,7 @@ const RE_MATH_TAG = /<(\/?)math(?=[\s/>])/gi;
 const SCRIPT_BOOL_ATTRS = new Set(['async', 'defer', 'nomodule']);
 const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript']);
 
-// Pre-compiled patterns for buffer scanning
+// Patterns for buffer scanning
 const RE_START_TAG = /^<[^/!]/;
 const RE_START_TAG_NAME = /^<([^\s/>]+)/;
 const RE_LEADING_WHITESPACE = /^[ \t\n\r\f]/;
@@ -663,7 +663,7 @@ const RE_BLANKS_LINE_BREAK_START = /^[ \t\f]*(?:\r\n?|\n)/;
 const RE_BLANKS_START = /^[ \t\f]+/;
 const RE_BLANKS_ONLY = /^[ \t\f]+$/;
 
-// Pre-compiled patterns for `htmlmin:ignore` block content analysis
+// Patterns for `htmlmin:ignore` block content analysis
 const RE_HTML_COMMENT_START = /^\s*<!--/;
 const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
 const RE_FIRST_HTML_TAG = /^\s*<([a-zA-Z][\w:-]*)/;
@@ -681,10 +681,8 @@ function nameForeign(name) {
   return namesForeignMixedCase.get(nameLower) ?? nameLower;
 }
 
-// Script merging
-
 /**
- * Merge consecutive inline script tags into one (`mergeConsecutiveScripts`).
+ * Merge consecutive inline script tags into one.
  * Only merges scripts that are compatible:
  * - Both inline (no `src` attribute)
  * - Same `type` (or both default JavaScript)
@@ -701,12 +699,11 @@ function nameForeign(name) {
  * only on the attributes of the first script in a chain, which merging
  * preserves, so one pass finds every merge the iterated rescan found.
  *
- * @param {string} html - The HTML string to process
+ * @param {string} html
  * @param {boolean} [hasMathML] - Whether the HTML holds MathML, whose `script` elements stay apart
  * @returns {string} HTML with consecutive scripts merged
  */
 function mergeConsecutiveScripts(html, hasMathML = false) {
-  // Parse an attribute string into a name→value map
   const parseAttrs = (/** @type {string} */ attrStr) => {
     /** @type {Record<string, string>} */
     const attrs = {};
@@ -743,7 +740,7 @@ function mergeConsecutiveScripts(html, hasMathML = false) {
   let m1;
 
   while ((m1 = RE_SCRIPT_OPEN.exec(html)) !== null) {
-    // Use findTagEnd() to get the real closing '>', skipping quoted attribute values
+    // `findTagEnd` skips quoted attribute values to find the real closing `>`
     const tagEnd1 = findTagEnd(html, m1.index + 7);
     if (tagEnd1 === -1) break;
 
@@ -768,7 +765,6 @@ function mergeConsecutiveScripts(html, hasMathML = false) {
 
     // Absorb all directly following compatible scripts
     while (mergeable) {
-      // Skip optional whitespace and check for a consecutive <script> tag
       let i = afterClose;
       while (i < html.length && (html[i] === ' ' || html[i] === '\t' || html[i] === '\n' || html[i] === '\r' || html[i] === '\f')) i++;
       const gapNext = html.slice(afterClose, i);
@@ -779,7 +775,6 @@ function mergeConsecutiveScripts(html, hasMathML = false) {
 
       const attrs2Str = html.slice(i + 7, tagEnd2);
 
-      // Find end of the following script’s content
       RE_SCRIPT_CLOSE.lastIndex = tagEnd2 + 1;
       const close2 = RE_SCRIPT_CLOSE.exec(html);
       if (!close2) break;
@@ -795,14 +790,11 @@ function mergeConsecutiveScripts(html, hasMathML = false) {
       }
       if (boolConflict || a1.nonce !== a2.nonce || (!mergedAny && insideMath(m1.index))) break;
 
-      // Scripts are compatible—combine content: Use semicolon normally,
-      // newline only for trailing `//` comments
+      // Join with a semicolon, or with a newline where the first ends in a `//` comment
       const content2 = html.slice(tagEnd2 + 1, close2.index);
       const c1 = mergedContent.trim();
       const c2 = content2.trim();
       if (c1 && c2) {
-        // Check if last line of c1 contains `//` (single-line comment)
-        // If so, use newline to terminate it; otherwise use semicolon (if not already present)
         const lastLine = c1.slice(c1.lastIndexOf('\n') + 1);
         const separator = lastLine.includes('//') ? '\n' : (c1.endsWith(';') ? '' : ';');
         mergedContent = c1 + separator + c2;
@@ -816,7 +808,8 @@ function mergeConsecutiveScripts(html, hasMathML = false) {
     }
 
     if (mergedAny) {
-      // Whitespace goes after the merged script, unless nothing or whitespace is on either side anyway
+      // Whitespace goes after the merged script, unless nothing or
+      // whitespace is on either side anyway
       if (gap && (!m1.index || afterClose === html.length || RE_ASCII_WHITESPACE.test(html.charAt(m1.index - 1) + html.charAt(afterClose)))) {
         gap = '';
       }
@@ -857,16 +850,13 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
   }
 
   function shouldKeepToken(/** @type {string} */ token) {
-    // Filter out any HTML comment tokens (UID placeholders)
-    // These are temporary markers created by `htmlmin:ignore` and `ignoreCustomFragments`
+    // Comments are UID placeholders from `htmlmin:ignore` and `ignoreCustomFragments`
     if (token.startsWith('<!--') && token.endsWith('-->')) {
       return false;
     }
     return shouldSkipUID(token, uidIgnore) && shouldSkipUID(token, uidAttr);
   }
 
-  // Pre-compile regex patterns for reuse (performance optimization)
-  // These must be declared before `scan()` since scan uses them
   const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
   const whitespaceSplitPatternSort = /[ \n\f\r]+/;
 
@@ -895,7 +885,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
             currentType = attr.value;
           }
         }
-        // As on the main path: What a unary tag holds ends with the tag, so no text can belong to it
+        // As on the main path: What a unary tag holds ends with the tag,
+        // so no text can belong to it
         if (unary) {
           currentTag = '';
           currentType = undefined;
@@ -905,17 +896,14 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         currentTag = '';
       },
       chars: async function (/** @type {string} */ text) {
-        // Only recursively scan HTML content, not JSON-LD or other non-HTML script types
-        // `scan()` is for analyzing HTML attribute order, not for parsing JSON
+        // Only HTML content is scanned recursively, not JSON-LD or other non-HTML script types
         if (options.processScripts && specialContentElements.has(currentTag) &&
             options.processScripts.indexOf(currentType ?? '') > -1 &&
             currentType === 'text/html') {
           await scan(text);
         }
       },
-      // No need for `nextTag` information in this scan
       wantsNextTag: false,
-      // Continue on parse errors during analysis pass
       continueOnParseError: options.continueOnParseError,
       selfClosingSlash: options.keepClosingSlash
     });
@@ -923,7 +911,8 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     try {
       await parser.parse();
     } catch (err) {
-      // If parsing fails during analysis pass, skip it—there’s partial frequency data from what can be parsed
+      // If parsing fails during analysis pass, skip it—there’s partial frequency
+      // data from what can be parsed
       if (!options.continueOnParseError) {
         throw err;
       }
@@ -932,10 +921,9 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
 
   // For the first pass, create a copy of options and disable aggressive minification.
   // Keep attribute transformations (like `removeDefaultTypeAttributes`) for accurate analysis.
-  // This is safe because `createSortFns` is called before custom fragment UID markers (`uidAttr`) are added.
+  // Safe because `createSortFns` runs before custom-fragment UID markers (`uidAttr`) are added.
   // Note: `htmlmin:ignore` UID markers (`uidIgnore`) already exist and are expanded for analysis.
   const firstPassOptions = Object.assign({}, options, {
-    // Disable sorting for the analysis pass
     sortAttributes: false,
     sortClassNames: false,
     // Disable aggressive minification that doesn’t affect attribute analysis
@@ -944,14 +932,12 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     removeTagWhitespace: false,
     decodeEntities: false,
     processScripts: false,
-    // Keep `ignoreCustomFragments` to handle template syntax correctly
-    // Continue on parse errors during analysis (e.g., template syntax)
+    // `ignoreCustomFragments` stays, and template syntax may not parse cleanly
     continueOnParseError: true,
     log: identity
   });
 
-  // Temporarily enable `continueOnParseError` for the `scan()` function call below.
-  // Note: `firstPassOptions` already has `continueOnParseError: true` for the `minifyHTML` call.
+  // `scan()` reads `options` rather than `firstPassOptions`, so it needs the same leniency
   const originalContinueOnParseError = options.continueOnParseError;
   options.continueOnParseError = true;
 
@@ -969,16 +955,13 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       expandedValue = value.replace(uidReplacePattern, function (/** @type {string} */ _match, /** @type {string} */ index) {
         return ignoredMarkupChunks[+index] || '';
       });
-      // Reset `lastIndex` for pattern reuse
       uidReplacePattern.lastIndex = 0;
     }
 
-    // First pass minification applies attribute transformations like `removeDefaultTypeAttributes` for accurate frequency analysis
     const firstPassOutput = await minifyHTML(expandedValue, firstPassOptions);
 
-    // For frequency analysis, remove custom fragments temporarily
-    // because HTML comments in opening tags prevent proper attribute parsing;
-    // removed with a space to preserve attribute boundaries
+    // Custom fragments are removed for frequency analysis, as HTML comments in start tags keep
+    // attributes from parsing; a space in their place preserves attribute boundaries
     let scanValue = firstPassOutput;
     if (customFragments.length) {
       scanValue = replaceCustomFragments(firstPassOutput, customFragments, () => ' ');
@@ -986,7 +969,6 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
 
     await scan(scanValue);
   } finally {
-    // Restore original option
     if (originalContinueOnParseError !== undefined) {
       options.continueOnParseError = originalContinueOnParseError;
     } else {
@@ -1007,12 +989,12 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       if (sorter) {
         const names = attrNames(attrs);
 
-        // Create order-independent cache key from tag and sorted attribute names
+        // Order-independent cache key
         const cacheKey = tag + ':' + names.slice().sort().join(',');
         let sortedNames = /** @type {string[] | undefined} */ (attrOrderCache.get(cacheKey));
 
         if (sortedNames === undefined) {
-          // Only sort if not in cache—need to clone names since sort mutates in place
+          // `sort` works in place, hence the copy
           sortedNames = sorter.sort(names.slice());
           attrOrderCache.set(cacheKey, sortedNames);
         }
@@ -1039,7 +1021,6 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         return classNames;
       }
 
-      // Check cache first
       const cached = /** @type {string | undefined} */ (classNameCache.get(classNames));
       if (cached !== undefined) {
         return cached;
@@ -1052,7 +1033,6 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
         expandedValue = classNames.replace(uidReplacePattern, function (/** @type {string} */ _match, /** @type {string} */ index) {
           return ignoredMarkupChunks[+index] || '';
         });
-        // Reset `lastIndex` for pattern reuse
         uidReplacePattern.lastIndex = 0;
       }
       const classes = expandedValue.split(whitespaceSplitPatternSort).filter(function(/** @type {string} */ cls) {
@@ -1061,7 +1041,6 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
       const sorted = sorter.sort(classes);
       const result = sorted.join(' ');
 
-      // Cache the result
       classNameCache.set(classNames, result);
       return result;
     };
@@ -1090,13 +1069,13 @@ function matchPlainEndTag(str) {
 }
 
 /**
- * @param {string} value - HTML content to minify
- * @param {ProcessedOptions} options - Normalized minification options
+ * @param {string} value
+ * @param {ProcessedOptions} options
  * @param {boolean} [partialMarkup] - Whether treating input as partial markup
- * @returns {Promise<string>} Minified HTML
+ * @returns {Promise<string>}
  */
 async function minifyHTML(value, options, partialMarkup) {
-  // Check input length limitation to prevent ReDoS attacks
+  // Input length limit, against ReDoS
   if (options.maxInputLength && value.length > options.maxInputLength) {
     throw new Error(`Input length (${value.length}) exceeds maximum allowed length (${options.maxInputLength})`);
   }
@@ -1111,15 +1090,16 @@ async function minifyHTML(value, options, partialMarkup) {
 
   /** @type {string[]} */
   const buffer = [];
-  // Parallel to `buffer`: whether an entry belongs to a start or end tag, the only place lines may break
+  // Parallel to `buffer`: whether the entry is a tag—the only place lines may break
   const bufferTags = options.maxLineLength ? /** @type {boolean[]} */ ([]) : null;
   /** @type {string} */
   let charsPrevTag = '';
   let currentChars = '';
   /** @type {boolean} */
   let hasChars = false;
-  // Open elements under `removeEmptyElements`, so that an element whose content went is removed, too:
-  // where its start tag sits in `buffer`, and whether anything kept went in since
+  // Open elements under `removeEmptyElements`, so an element whose content
+  // went is removed, too: where its start tag sits in `buffer`, and whether
+  // anything kept went in since
   /** @type {Array<{tag: string, index: number, empty: boolean}>} */
   const openElements = [];
   // A start tag the parser implied without writing it, whose end tag, if it comes next, is a stray
@@ -1195,7 +1175,6 @@ async function minifyHTML(value, options, partialMarkup) {
     ? buildInlineSets(inlineElements, inlineTextSet)
     : defaultInlineSets;
 
-  // Parse `removeEmptyElementsExcept` option
   /** @type {Array<{tag: string, attrs: {[x: string]: string | undefined} | null}>} */
   let removeEmptyElementsExcept;
   if (options.removeEmptyElementsExcept && !Array.isArray(options.removeEmptyElementsExcept)) {
@@ -1207,8 +1186,7 @@ async function minifyHTML(value, options, partialMarkup) {
     removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept || [], options) || [];
   }
 
-  // Temporarily replace ignored chunks with comments, so that there’s no need to worry what’s there;
-  // there might be completely-horribly-broken-alien-non-html-emoji-cthulhu-filled content
+  // Temporarily replace ignored chunks with comments, so whatever they hold needn’t be parsed
   if (value.indexOf('<!-- htmlmin:ignore -->') !== -1) {
     // Use `indexOf`-based O(n) loop instead of a global regex with [\s\S]*? to avoid O(n²)
     // backtracking on adversarial HTML with many `<!--` prefixes but no closing marker
@@ -1242,8 +1220,8 @@ async function minifyHTML(value, options, partialMarkup) {
     value = ignoreResult;
   }
 
-  // Create sort functions after `htmlmin:ignore` processing but before custom fragment UID markers
-  // This allows proper frequency analysis with access to ignored content via UID tokens
+  // Sort functions are created after `htmlmin:ignore` processing but before custom fragment UID
+  // markers, so frequency analysis can reach ignored content via UID tokens
   if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
       (options.sortClassNames && typeof options.sortClassNames !== 'function')) {
     await createSortFns(value, options, uidIgnore ?? '', uidAttr ?? '', ignoredMarkupChunks);
@@ -1378,7 +1356,8 @@ async function minifyHTML(value, options, partialMarkup) {
     ? (/** @type {string} */ tag) => defaultCanTrimWhitespace(tag.toLowerCase())
     : defaultCanTrimWhitespace;
 
-  // The defaults decide by `tag`, a hook gets `tagOut`; without a hook, the option holds the default itself
+  // The defaults decide by `tag`, a hook gets `tagOut`; without a hook, the
+  // option holds the default itself
   function canCollapseWhitespace(/** @type {string} */ tag, /** @type {string} */ tagOut, /** @type {HTMLAttribute[]} */ attrs) {
     const hook = options.canCollapseWhitespace;
     return hook === defaultCanCollapseWhitespace ? defaultCanCollapseWhitespace(tag) : hook(tagOut, attrs, defaultCanCollapse);
@@ -1558,7 +1537,7 @@ async function minifyHTML(value, options, partialMarkup) {
     bufferTruncate(index);
   }
 
-  // Look for trailing whitespaces, bypass any inline tags
+  // Look for trailing whitespace, bypassing inline tags
   function trimTrailingWhitespace(/** @type {number} */ index, /** @type {string} */ nextTag) {
     // Nothing to the left of the text is in play here, so only its trailing run can
     // change—unless preserved line breaks bring the leading run into play, too
@@ -1586,9 +1565,8 @@ async function minifyHTML(value, options, partialMarkup) {
     }
   }
 
-  // Look for trailing whitespaces from previously processed text
-  // which may not be trimmed due to a following comment or an empty
-  // element which has now been removed
+  // Look for trailing whitespace in earlier text that a following comment, or an empty element
+  // removed since, kept from being trimmed
   function squashTrailingWhitespace(/** @type {string} */ nextTag) {
     // Fast path: With no transparent gap pending, a start tag or text without trailing
     // whitespace last in the buffer ends the walk below on that entry. That leaves text
@@ -1625,7 +1603,8 @@ async function minifyHTML(value, options, partialMarkup) {
       }
       charsIndex--;
     }
-    // Right before an element that doesn’t render, the text’s own pass has weighed both sides already
+    // Right before an element that doesn’t render, the text’s own pass has
+    // weighed both sides already
     if (charsIndex === buffer.length - 1 && inlineElementsTransparent.has(nextTag)) {
       return;
     }
@@ -1684,8 +1663,7 @@ async function minifyHTML(value, options, partialMarkup) {
       // Skip what an element that doesn’t render holds
       if (endTagName !== null) {
         const startTag = '<' + endTagName.toLowerCase();
-        // Only the start of each entry is compared,
-        // as what such an element holds can be large
+        // Only the start of each entry is compared, as what such an element holds can be large
         while (index > 0 && (buffer[index - 1] ?? '').slice(0, startTag.length).toLowerCase() !== startTag) {
           index--;
         }
@@ -1715,14 +1693,11 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // Whitespace collapsing phase (sync)
   function charsCollapse(/** @type {string} */ text) {
-    // Trim outermost newline-based whitespace inside `pre`/`textarea` elements
-    // This removes trailing newlines often added by template engines before closing tags
-    // Only trims single trailing newlines (multiple newlines are likely intentional formatting)
+    // Trim a single trailing newline inside `pre`/`textarea`, often a template engine artifact
+    // (several are likely intentional formatting)
     if (options.collapseWhitespace && stackNoTrimWhitespace.length) {
       const topTag = stackNoTrimWhitespace[stackNoTrimWhitespace.length - 1];
       if (preTextareaDepth > 0) {
-        // Trim trailing whitespace only if it ends with a single newline (not multiple)
-        // Multiple newlines are likely intentional formatting, single newline is often a template artifact
         // Treat CRLF (`\r\n`), CR (`\r`), and LF (`\n`) as single line-ending units
         if (textNextTag && textNextTag === '/' + topTag && /[^\r\n](?:\r\n|\r|\n)[ \t]*$/.test(text)) {
           text = text.replace(RE_LINE_BREAK_BLANKS_END, '');
@@ -1731,9 +1706,9 @@ async function minifyHTML(value, options, partialMarkup) {
     }
     if (options.collapseWhitespace) {
       if (!stackNoTrimWhitespace.length) {
-        // When the prev item is a UID placeholder, compute its effective tag name for whitespace decisions;
-        // this is only used in `collapseWhitespaceSmart`—`textPrevTag` itself is not modified,
-        // to avoid side effects on the `inlineTextSet` branch below
+        // When the prev item is a UID placeholder, compute its effective tag name for whitespace
+        // decisions; this is only used in `collapseWhitespaceSmart`—`textPrevTag` itself is not
+        // modified, to avoid side effects on the `inlineTextSet` branch below
         let effectivePrevTag = textPrevTag;
         if (textPrevTag === 'comment') {
           const prevComment = buffer[buffer.length - 1] ?? '';
@@ -1752,7 +1727,7 @@ async function minifyHTML(value, options, partialMarkup) {
           } else if (uidIgnorePlaceholderPattern && textNextTag !== 'comment') {
             // UID placeholder followed by a real element—derive the effective `prevTag` from the
             // placeholder’s last HTML tag so `collapseWhitespaceSmart` can make the right call;
-            // when `textNextTag` is `comment` (another UID placeholder), `commentFinalize` handles it
+            // `commentFinalize` handles a `textNextTag` of `comment` (another UID placeholder)
             const match = prevComment.match(uidIgnorePlaceholderPattern);
             if (match) {
               const idx = +(match[1] ?? '');
@@ -1785,7 +1760,8 @@ async function minifyHTML(value, options, partialMarkup) {
         if (textPrevTag || textNextTag) {
           let collapsed = collapseWhitespaceSmart(text, effectivePrevTag, textNextTag, textPrevAttrs, textNextAttrs, options, inlineSets, !stackNoCollapseWhitespace.length);
           if (!transparentDepth && inlineElementsTransparentAfter.has(textPrevTag)) {
-            // Between elements that don’t render, whitespace stays pending when it may separate text, and one space does
+            // Between elements that don’t render, whitespace stays pending when it may
+            // separate text, and one space does
             if (!collapsed && text && inlineElementsTransparent.has(textNextTag)) {
               if (transparentGapIndex === -1 && precedesTransparentRun()) {
                 transparentGapPending = true;
@@ -1794,7 +1770,8 @@ async function minifyHTML(value, options, partialMarkup) {
                 text = '';
               }
             } else {
-              // Text that follows decides, while a tag that follows does so in `squashTrailingWhitespace`
+              // Text that follows decides, while a tag that follows does so in
+              // `squashTrailingWhitespace`
               if (RE_LEADING_WHITESPACE.test(collapsed)) {
                 if (transparentGapIndex !== -1) settleTransparentGap(false);
                 // Where nothing before the elements renders a space, the text’s own goes, too
@@ -1848,13 +1825,15 @@ async function minifyHTML(value, options, partialMarkup) {
         }
       }
       // `<html>` may be omitted if first thing inside is not a comment
-      // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
+      // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`,
+      //   `<script>`, `<style>`, or `<template>`
       if (optionalStartTag === 'html' || (optionalStartTag === 'body' && !/^\s/.test(effectiveText))) {
         removeStartTag();
       }
       optionalStartTag = '';
       // `</html>` or `</body>` may be omitted if not followed by comment
-      // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or comment
+      // `</head>`, `</colgroup>`, or `</caption>` may be omitted if not followed by space or
+      //   comment
       if (optionalEndTagEmitted && (compactElements.has(optionalEndTag) || (looseElements.has(optionalEndTag) && !/^\s/.test(effectiveText)))) {
         removeEndTag();
         // The tag is gone from the buffer, so nothing is left to omit later
@@ -1902,7 +1881,8 @@ async function minifyHTML(value, options, partialMarkup) {
         text = text.replace(escapeLt, '&lt;');
       }
     } else if (text && textForeign && text.lastIndexOf('<![CDATA[') > text.lastIndexOf(']]>')) {
-      // A CDATA section left open at the end of the input closes before the end tags written after it
+      // A CDATA section left open at the end of the input closes before the
+      // end tags written after it
       text += ']]>';
     }
     if (uidPattern && options.collapseWhitespace && stackNoTrimWhitespace.length) {
@@ -1926,7 +1906,7 @@ async function minifyHTML(value, options, partialMarkup) {
     }
   }
 
-  // Comment finalization (sync): Optional tag handling, `htmlmin:ignore` whitespace collapsing, buffer push
+  // Comment finalization (sync): Optional tags, `htmlmin:ignore` whitespace, buffer push
   function commentFinalize(/** @type {string} */ comment) {
     if (options.removeOptionalTags && comment) {
       if (uidIgnorePlaceholderPattern) {
@@ -1980,9 +1960,7 @@ async function minifyHTML(value, options, partialMarkup) {
           const prevText = buffer[buffer.length - 1];
           const prevComment = buffer[buffer.length - 2];
 
-          // Check if previous item is whitespace-only and item before that is ignore-placeholder
           if (prevText && RE_WHITESPACE_ONLY.test(prevText) && prevComment && uidIgnorePlaceholderPattern.test(prevComment)) {
-            // Extract the index from both placeholders to check their content
             const currentMatch = comment.match(uidIgnorePlaceholderPattern);
             const prevMatch = prevComment.match(uidIgnorePlaceholderPattern);
 
@@ -1990,7 +1968,6 @@ async function minifyHTML(value, options, partialMarkup) {
               const currentIndex = +(currentMatch[1] ?? 0);
               const prevIndex = +(prevMatch[1] ?? 0);
 
-              // Defensive bounds check to ensure indices are valid
               if (currentIndex < ignoredMarkupChunks.length && prevIndex < ignoredMarkupChunks.length) {
                 const currentContent = ignoredMarkupChunks[currentIndex];
                 const prevContent = ignoredMarkupChunks[prevIndex];
@@ -1998,7 +1975,6 @@ async function minifyHTML(value, options, partialMarkup) {
                 // Only collapse whitespace if both blocks contain HTML (start with `<`)
                 // Don’t collapse if either contains plain text, as that would change meaning
                 if (currentContent && prevContent && /^\s*</.test(currentContent) && /^\s*</.test(prevContent)) {
-                  // Extract tag names from the HTML content
                   const currentTagMatch = currentContent.match(RE_FIRST_HTML_TAG);
                   const prevTagMatch = prevContent.match(RE_FIRST_HTML_TAG);
                   // HTML comments are invisible (no block/inline nature), treat as non-inline
@@ -2008,7 +1984,8 @@ async function minifyHTML(value, options, partialMarkup) {
                   const prevClosingTagMatch = !prevTagMatch && RE_CLOSING_TAG_START.exec(prevContent);
                   const currentClosingTagMatch = !currentTagMatch && RE_CLOSING_TAG_START.exec(currentContent);
 
-                  // Collapse if both sides are element/closing tags or HTML comments, and neither is inline
+                  // Collapse if both sides are element/closing tags or HTML
+                  // comments, and neither is inline
                   if ((currentTagMatch || currentIsHtmlComment || currentClosingTagMatch) &&
                       (prevTagMatch || prevIsHtmlComment || prevClosingTagMatch)) {
                     const currentTagName = currentTagMatch ? resolveName(currentTagMatch[1] ?? '')
@@ -2018,10 +1995,8 @@ async function minifyHTML(value, options, partialMarkup) {
 
                     // Don’t collapse between inline elements (HTML comments count as non-inline)
                     if (!inlineElements.has(currentTagName ?? '') && !inlineElements.has(prevTagName ?? '')) {
-                      // Collapse whitespace respecting context rules
                       let collapsedText = prevText;
 
-                      // Apply `collapseWhitespace` with appropriate context
                       if (!stackNoTrimWhitespace.length && !stackNoCollapseWhitespace.length) {
                         // Not in pre or other no-collapse context
                         if (prevText.includes('\xA0')) {
@@ -2040,7 +2015,6 @@ async function minifyHTML(value, options, partialMarkup) {
                         }
                       }
 
-                      // Replace the whitespace in buffer
                       buffer[buffer.length - 1] = collapsedText;
                     }
                   }
@@ -2168,7 +2142,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
   // SVG subtree capture: When SVGO is active, record buffer positions for post-processing
   /** @type {Array<{start: number, end: number}>} */
-  const svgBlocks = []; // Array of { start, end } buffer indices
+  const svgBlocks = [];
   let svgBufferStartIndex = -1;
   let svgDepth = 0;
   // HTML raw text in an SVG block, which XML cannot read as HTML does,
@@ -2188,8 +2162,7 @@ async function minifyHTML(value, options, partialMarkup) {
     // The short doctype makes the output no-quirks, so the input is read as such
     noQuirksMode: options.useShortDoctype,
     continueOnParseError: options.continueOnParseError,
-    // Recovered errors would have aborted without the option,
-    // so they are worth knowing about
+    // Recovered errors would have aborted without the option, so they are worth knowing about
     parseError: options.continueOnParseError && options.log !== identity
       ? (/** @type {string} */ message) => options.log('Warning: ' + message)
       : undefined,
@@ -2214,11 +2187,12 @@ async function minifyHTML(value, options, partialMarkup) {
           if (lowerTag === 'math' && options.documentState) {
             options.documentState.hasMathML = true;
           }
-          // Preserve the surrounding HTML context’s slash handling so `foreignObject`/`annotation-xml`
-          // can restore it
+          // Preserve the surrounding HTML context’s slash handling so
+          // `foreignObject`/`annotation-xml` can restore it
           const keepClosingSlashHTML = Boolean(options.keepClosingSlash);
           options = Object.create(options);
-          // SVGO reads an SVG block whole, nested MathML included, so what the block is stays true inside it
+          // SVGO reads an SVG block whole, nested MathML included, so what the
+          // block is stays true inside it
           options.insideSVG = lowerTag === 'svg' || Boolean(options.insideSVG);
           // XML reads names as written, so wherever SVGO reads, they are written the way HTML reads
           // them (`viewbox` as `viewBox`), and attributes differing only in case are one attribute
@@ -2266,7 +2240,7 @@ async function minifyHTML(value, options, partialMarkup) {
           pushedContext = true;
         }
       }
-      // `nameParent` is always set when `useNameParentForTag` is true; the extra check only narrows the type
+      // `nameParent` is set whenever `useNameParentForTag` is; the extra check narrows the type
       const nameTag = useNameParentForTag && options.nameParent ? options.nameParent : options.name;
       const tagSource = tag;
       tag = nameTag(tag);
@@ -2285,7 +2259,8 @@ async function minifyHTML(value, options, partialMarkup) {
         const htmlTag = htmlElements.has(tag);
         // `<html>` may be omitted if first thing inside is not a comment
         // `<head>` may be omitted if first thing inside is an element
-        // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`, `<script>`, `<style>`, or `<template>`
+        // `<body>` may be omitted if first thing inside is not space, comment, `<meta>`, `<link>`,
+        //   `<script>`, `<style>`, or `<template>`
         // `<colgroup>` may be omitted if first thing inside is `<col>`
         // `<tbody>` may be omitted if first thing inside is `<tr>`
         if (htmlTag && canRemoveParentTag(optionalStartTag, tag)) {
@@ -2300,7 +2275,8 @@ async function minifyHTML(value, options, partialMarkup) {
             removeEndTag();
           }
           // `<colgroup>` cannot be omitted if preceding `</colgroup>` is omitted
-          // `<tbody>` cannot be omitted if preceding `</tbody>`, `</thead>`, or `</tfoot>` is omitted
+          // `<tbody>` cannot be omitted if preceding `</tbody>`, `</thead>`, or `</tfoot>` is
+          //   omitted
           optional = !isStartTagMandatory(optionalEndTag, tag);
         }
         optionalEndTag = '';
@@ -2354,13 +2330,13 @@ async function minifyHTML(value, options, partialMarkup) {
       // Whatever runs into the tag name has to stay first
       const tagFragment = fragmentJoinsTag ? attrs.shift() : undefined;
 
-      // Remove duplicate attributes (per HTML spec, first occurrence wins)
-      // Duplicate attributes result in invalid HTML
+      // Duplicate attributes are invalid; per spec, the first one wins
       // https://html.spec.whatwg.org/multipage/parsing.html#attribute-name-state
       deduplicateAttributes(attrs, Boolean(options.caseSensitive));
 
       if (options.sortAttributes) {
-        // By the time tags are processed, `createSortFns` has replaced any truthy non-function value
+        // By the time tags are processed, `createSortFns` has replaced any
+        // truthy non-function value
         /** @type {(tag: string, attrs: HTMLAttribute[]) => void} */ (options.sortAttributes)(tagOut, attrs);
       }
       if (tagFragment) {
@@ -2424,7 +2400,6 @@ async function minifyHTML(value, options, partialMarkup) {
         endTagText = '</' + tagOut + (joinsTag ? '' : ' ') + fragments.join(' ') + '>';
       }
 
-      // Check if current tag is in a whitespace stack
       const insideNoTrim = stackNoTrimWhitespace.length > 0;
       let closesNoTrim = false;
       if (stackNoTrimWhitespace.length) {
@@ -2447,9 +2422,9 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       const endsImpliedStart = !autoGenerated && impliedStartTag === tag;
-      // A `p` that holds a `table` while the mode is unknown needs its end tag as written: One after the
-      // `table` that the source lacks would be stray in no-quirks mode, and one that it has, closing the `p`
-      // in quirks mode, would be missed there
+      // A `p` that holds a `table` while the mode is unknown needs its end tag as written: One
+      // after the `table` that the source lacks would be stray in no-quirks mode, and one that it
+      // has, closing the `p` in quirks mode, would be missed there
       const skipsEndTag = autoGenerated && (!options.includeAutoGeneratedTags || Boolean(holdsTable));
       impliedStartTag = '';
 
@@ -2464,17 +2439,17 @@ async function minifyHTML(value, options, partialMarkup) {
       const isElementEmptied = !isElementEmpty && Boolean(openElement?.empty) && lastStartTagIndex() === openElement?.index;
 
       if (options.removeOptionalTags) {
-        // `<html>`, `<head>` or `<body>` may be omitted if the element is empty
+        // `<html>`, `<head>`, or `<body>` may be omitted if the element is empty
         if (isElementEmpty && topLevelElements.has(optionalStartTag)) {
           removeStartTag();
         }
         optionalStartTag = '';
-        // `</html>` or `</body>` may be omitted if not followed by comment,
-        // `</head>` may be omitted if not followed by space or comment,
-        // `</p>` may be omitted if no more content in parent,
-        // as long as the parent’s end tag closes the `p` in browsers (`pClosingParents`)
-        // (https://html.spec.whatwg.org/multipage/syntax.html#optional-tags);
-        // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
+        // `</html>` or `</body>` may be omitted if not followed by comment
+        // `</head>` may be omitted if not followed by space or comment
+        // `</p>` may be omitted if no more content in parent, as long as the parent’s end tag
+        //   closes the `p` in browsers (`pClosingParents`)
+        // Except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent
+        // https://html.spec.whatwg.org/multipage/syntax.html#optional-tags
         if (tag && optionalEndTag && optionalEndTagEmitted && !trailingElements.has(optionalEndTag) && (optionalEndTag !== 'p' || pClosingParents.has(tag))) {
           removeEndTag(insideNoTrim);
         }
@@ -2488,13 +2463,11 @@ async function minifyHTML(value, options, partialMarkup) {
           !(autoGenerated && formattingElements.has(tag))) {
         let preserve = false;
         if (removeEmptyElementsExcept.length) {
-          // Normalize attribute names for comparison with specs
           const normalizedAttrs = attrs.map((/** @type {HTMLAttribute} */ attr) => ({ ...attr, name: resolveName(attr.name) }));
           preserve = shouldPreserveEmptyElement(tag, normalizedAttrs, removeEmptyElementsExcept);
         }
 
         if (!preserve) {
-          // Remove last element from buffer
           removeStartTag();
           isElementRemoved = true;
           optionalStartTag = '';
@@ -2556,10 +2529,9 @@ async function minifyHTML(value, options, partialMarkup) {
       textPrevAttrs = prevAttrs || [];
       textNextAttrs = nextAttrs || [];
 
-      // Detect whether any async work is actually needed for this text node
-      // In foreign content, text reads references and CDATA sections, and `script` and
-      // `style` hold markup, so their text is a source only where it is all they hold
-      // (and in SVG, where they run and apply)
+      // Whether this text node needs any async work. In foreign content, text reads references
+      // and CDATA sections, and `script` and `style` hold markup, so their text is a source only
+      // where it is all they hold (and in SVG, where they run and apply)
       const foreign = Boolean(options.insideForeignContent);
       textForeign = foreign;
       const holdsSource = !foreign || Boolean(source);
@@ -2574,7 +2546,8 @@ async function minifyHTML(value, options, partialMarkup) {
         ? textForeignDecoded && (text.indexOf('&') !== -1 || text.indexOf('<![CDATA[') !== -1)
         : options.decodeEntities && text.indexOf('&') !== -1 && !holdsRawText());
 
-      // Fast path: All work is sync—skip async machinery entirely (decoding counts once `entities` has loaded)
+      // Fast path: All work is sync—skip async machinery (decoding counts
+      // once `entities` has loaded)
       if ((!needsDecode || decodeHTMLFn) && !needsProcessScript && !needsMinifyJS && !needsMinifyCSS) {
         if (needsDecode && decodeHTMLFn) {
           text = foreign ? decodeForeignText(text, decodeHTMLFn) : decodeHTMLFn(text);
@@ -2636,8 +2609,7 @@ async function minifyHTML(value, options, partialMarkup) {
 
   await parser.parse();
 
-  // Nothing follows at the end, so whitespace still pending goes
-  // (before SVG blocks shift the buffer)
+  // Nothing follows at the end, so pending whitespace goes (before SVG blocks shift the buffer)
   if (transparentGapIndex !== -1) {
     settleTransparentGap(Boolean(options.conservativeCollapse));
   }
@@ -2676,7 +2648,7 @@ async function minifyHTML(value, options, partialMarkup) {
     if (topLevelElements.has(optionalStartTag)) {
       removeStartTag();
     }
-    // except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent element
+    // Except for `</dt>` or `</thead>`, end tags may be omitted if no more content in parent
     if (optionalEndTag && optionalEndTagEmitted && !trailingElements.has(optionalEndTag)) {
       removeEndTag();
     }
@@ -2804,16 +2776,14 @@ function joinResultSegments(results, resultTags, markers, options, restoreCustom
  * - Caches are created on the first `minify()` call and persist for the lifetime of the process
  * - Cache sizes are locked after first initialization—subsequent calls use the same caches
  *   even if different `cacheCSS`/`cacheJS`/`cacheSVG` options are provided
- * - The first call’s options determine the cache sizes for subsequent calls
  * - Invalid values (NaN, Infinity, negative) fall back to the default size (500)
  */
 /** @param {MinifierOptions} options */
 function initCaches(options) {
-  // Only create caches once (on first call)—sizes are locked after this
   if (!cssMinifyCache) {
     const defaultSize = 500;
 
-    // Helper to parse env var—returns parsed number (including 0) or undefined if absent, invalid, or negative
+    // Parses an env var size (0 allowed); undefined when absent, invalid, or negative
     const parseEnvCacheSize = (/** @type {string | undefined} */ envVar) => {
       if (envVar === undefined) return undefined;
       const parsed = Number(envVar);
@@ -2827,7 +2797,7 @@ function initCaches(options) {
     // environment variables above
     const sanitizeSize = (/** @type {number} */ size) => Number.isFinite(size) && size >= 0 ? Math.floor(size) : defaultSize;
 
-    // Get cache sizes with precedence: Options > env > default
+    // Precedence: Options > env > default
     const cssSize = options.cacheCSS !== undefined ? options.cacheCSS
                  : (parseEnvCacheSize(process.env.HMN_CACHE_CSS) ?? defaultSize);
     const jsSize = options.cacheJS !== undefined ? options.cacheJS
@@ -2879,8 +2849,7 @@ const processedOptionsCache = new WeakMap();
 
 // A “plain” value is an array or plain object, which the snapshot copies and
 // compares structurally; anything else (functions, RegExps, class instances)
-// is kept and compared by identity—a false mismatch merely reprocesses, which
-// is the pre-memoization behavior
+// is kept and compared by identity—a false mismatch merely reprocesses
 /** @param {unknown} value */
 function isPlainValue(value) {
   if (Array.isArray(value)) return true;
@@ -2963,7 +2932,6 @@ export const minify = async function (value, options) {
 
   const inputOptions = options || EMPTY_OPTIONS;
 
-  // Initialize caches on first use with configurable sizes
   const caches = initCaches(inputOptions);
 
   // WeakMap keys must be objects
@@ -3000,7 +2968,7 @@ export const minify = async function (value, options) {
   // copy; the `minifyCSS` closure hangs off the memoized base, shared across calls
   /** @type {NonNullable<ProcessedOptions['cssContext']>} */
   const cssContext = { warned: new Set() };
-  // What the parse finds out about the document for post-processing, which spares a scan of the output
+  // What the parse finds out about the document for post-processing, sparing an output scan
   const documentState = { hasMathML: false };
   // Work on a shallow copy so per-call reassignments don’t reach the cached base. The
   // per-document state is part of the copy from the start, as properties added to it
@@ -3023,7 +2991,6 @@ export const minify = async function (value, options) {
 
   let result = await minifyHTML(value, processedOptions);
 
-  // Post-processing: Merge consecutive inline scripts if enabled
   if (processedOptions.mergeScripts) {
     result = mergeConsecutiveScripts(result, documentState.hasMathML);
   }
@@ -3031,8 +2998,6 @@ export const minify = async function (value, options) {
   processedOptions.log('minified in: ' + (Date.now() - start) + 'ms');
   return result;
 };
-
-// Exports
 
 export {
   presets,

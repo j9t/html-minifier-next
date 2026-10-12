@@ -376,7 +376,8 @@ function collectUsage(html, includeScripts, decode) {
   // A script may create the elements a rule is for, so its identifiers count as names, too
   const usedElements = new Set();
   const usedSymbols = collectUsedSymbols(html, includeScripts, decode, usedElements);
-  // Elements the parser supplies inside others, added once scripts are in, as one may create a `table`, too
+  // Elements the parser supplies inside a `table`, added after script identifiers, as a script
+  // may create a `table`, too
   if (usedElements.has('table')) {
     usedElements.add('tbody');
     usedElements.add('tr');

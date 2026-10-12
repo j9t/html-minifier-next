@@ -28,8 +28,6 @@ const RE_NON_WS = /\S/;
 // Any no-break space character (the `collapseNoBreakSpaces` early-exit scan)
 const RE_NO_BREAK_SPACE_CHARS = /[\xA0\u202F\u2007]/;
 
-// Trim whitespace
-
 /** @param {string} str */
 const trimWhitespace = str => {
   if (!str) return str;
@@ -71,12 +69,9 @@ function endsWithWhitespace(str) {
   return str.length > 0 && isWsOrNbsp(str.charCodeAt(str.length - 1));
 }
 
-// Collapse all whitespace
-
 // Module scope so the hot path doesn’t allocate a closure per call
 /** @param {string} spaces */
 function collapseRun(spaces) {
-  // Preserve standalone tabs
   if (spaces === '\t') return '\t';
   if (spaces.indexOf('\xA0') === -1) return ' ';
   return spaces.replace(RE_NBSP_LEADING_GROUP, '$1 ');
@@ -353,8 +348,9 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
   const prevTransparent = inlineElementsTransparentAfter.has(prevTag);
   const nextTransparent = inlineElementsTransparent.has(nextTag);
 
-  // Every branch below that consults the text’s content needs a side left untrimmed, an element that
-  // doesn’t render, or `collapseInlineTagWhitespace`, so the scan for a non-whitespace character is only worth making then
+  // Every branch below that consults the text’s content needs a side left untrimmed, an element
+  // that doesn’t render, or `collapseInlineTagWhitespace`, so the scan for a non-whitespace
+  // character is only worth making then
   const isPureWhitespace = (!trimLeft || !trimRight || prevTransparent || nextTransparent || Boolean(options.collapseInlineTagWhitespace)) && !RE_NON_WS.test(str);
 
   // Next to text, spacing is part of the text, so aggressive collapsing only applies between tags
@@ -377,7 +373,8 @@ function collapseWhitespaceSmart(str, prevTag, nextTag, prevAttrs, nextAttrs, op
     }
   }
 
-  // Aggressive mode keeps whitespace around standard text-level elements only, not around all inline elements
+  // Aggressive mode keeps whitespace around standard text-level elements only, not
+  // around all inline elements
   if (trimLeft) {
     trimLeft = prevTag.charCodeAt(0) === 47 /* / */ ? !(inlineOption ? inlineElementsToKeepWhitespaceBetweenEnd : inlineSets.aroundEnd).has(prevTag) : !inlineSets.within.has(prevTag);
   }
@@ -418,8 +415,6 @@ function canCollapseWhitespace(tag) {
 function canTrimWhitespace(tag) {
   return !noTrimWhitespaceTags.has(tag);
 }
-
-// Exports
 
 export {
   buildInlineSets,

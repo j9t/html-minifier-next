@@ -46,7 +46,8 @@ describe('Options', () => {
     });
   });
 
-  // `removeUnusedCSS`, whose prerequisite can be set and still unusable, is covered in css+js.test.js
+  // `removeUnusedCSS`, whose prerequisite can be set and still unusable, is
+  // covered in css+js.test.js
   describe('Option dependencies', () => {
     test('Every entry names options that exist', () => {
       for (const { option, requires } of optionDependencies) {

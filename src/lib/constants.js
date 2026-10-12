@@ -54,7 +54,8 @@ const inlineElementsToKeepWhitespaceAround = new Set(['a', 'abbr', 'acronym', 'a
 // Non-empty elements that will maintain whitespace within them
 const inlineElementsToKeepWhitespaceWithin = new Set(['a', 'abbr', 'acronym', 'b', 'big', 'data', 'del', 'em', 'font', 'i', 'ins', 'kbd', 'map', 'mark', 'nobr', 's', 'samp', 'slot', 'small', 'span', 'strike', 'strong', 'sub', 'sup', 'time', 'tt', 'u', 'var']);
 
-// Text-level elements that maintain whitespace between them and other elements under `collapseInlineTagWhitespace`
+// Text-level elements that keep whitespace between them and other elements under
+// `collapseInlineTagWhitespace`
 const inlineElementsToKeepWhitespaceBetween = new Set([...inlineElementsToKeepWhitespaceWithin, 'bdi', 'bdo', 'cite', 'code', 'dfn', 'label', 'math', 'q', 'ruby']);
 
 // Phrasing elements that don’t render, whose neighbors decide on the whitespace around them
@@ -87,8 +88,6 @@ const inlineElementsToKeepWhitespaceBetweenEnd = toEndTags(inlineElementsToKeepW
 // Spelled as the tags that sit before and after the element: a start tag before it, an end tag
 // (or, for void elements, the start tag) after it
 const inlineElementsTransparentAfter = new Set([...toEndTags(inlineElementsTransparent), ...inlineElementsTransparentVoid]);
-
-// Default attribute values
 
 // Default attribute values (could apply to any element)
 const generalDefaults = {
@@ -160,11 +159,7 @@ const collapsibleValues = new Map([
   ['contenteditable', new Set([''])]
 ]);
 
-// `srcset` elements
-
 const srcsetElements = new Set(['img', 'source']);
-
-// JSON script types
 
 const jsonScriptTypes = new Set([
   'application/json',
@@ -178,11 +173,11 @@ const jsonScriptTypes = new Set([
   'speculationrules',
 ]);
 
-// Tag omission rules and element sets
-
-// Tag omission rules from https://html.spec.whatwg.org/multipage/syntax.html#optional-tags with the following extensions:
+// Tag omission rules from https://html.spec.whatwg.org/multipage/syntax.html#optional-tags
+// with the following extensions:
 // - retain `<body>` if followed by `<noscript>`
-// - `<rb>`, `<rt>`, `<rtc>`, `<rp>` follow HTML Ruby Markup Extensions draft (https://www.w3.org/TR/html-ruby-extensions/)
+// - `<rb>`, `<rt>`, `<rtc>`, `<rp>` follow the HTML Ruby Markup Extensions draft:
+//   https://www.w3.org/TR/html-ruby-extensions/
 // - retain all tags which are adjacent to non-standard HTML tags
 
 const optionalStartTags = new Set(['html', 'head', 'body', 'colgroup', 'tbody']);
@@ -229,10 +224,9 @@ const quirksSystemIds = new Set(['http://www.ibm.com/data/dtd/v11/ibmxhtml1-tran
 
 const quirksPublicIdPrefixes = ['+//silmaril//dtd html pro v0r11 19970101//', '-//as//dtd html 3.0 aswedit + extensions//', '-//advasoft ltd//dtd html 3.0 aswedit + extensions//', '-//ietf//dtd html 2.0 level 1//', '-//ietf//dtd html 2.0 level 2//', '-//ietf//dtd html 2.0 strict level 1//', '-//ietf//dtd html 2.0 strict level 2//', '-//ietf//dtd html 2.0 strict//', '-//ietf//dtd html 2.0//', '-//ietf//dtd html 2.1e//', '-//ietf//dtd html 3.0//', '-//ietf//dtd html 3.2 final//', '-//ietf//dtd html 3.2//', '-//ietf//dtd html 3//', '-//ietf//dtd html level 0//', '-//ietf//dtd html level 1//', '-//ietf//dtd html level 2//', '-//ietf//dtd html level 3//', '-//ietf//dtd html strict level 0//', '-//ietf//dtd html strict level 1//', '-//ietf//dtd html strict level 2//', '-//ietf//dtd html strict level 3//', '-//ietf//dtd html strict//', '-//ietf//dtd html//', '-//metrius//dtd metrius presentational//', '-//microsoft//dtd internet explorer 2.0 html strict//', '-//microsoft//dtd internet explorer 2.0 html//', '-//microsoft//dtd internet explorer 2.0 tables//', '-//microsoft//dtd internet explorer 3.0 html strict//', '-//microsoft//dtd internet explorer 3.0 html//', '-//microsoft//dtd internet explorer 3.0 tables//', '-//netscape comm. corp.//dtd html//', '-//netscape comm. corp.//dtd strict html//', '-//o\'reilly and associates//dtd html 2.0//', '-//o\'reilly and associates//dtd html extended 1.0//', '-//o\'reilly and associates//dtd html extended relaxed 1.0//', '-//sq//dtd html 2.0 hotmetal + extensions//', '-//softquad software//dtd hotmetal pro 6.0::19990601::extensions to html 4.0//', '-//softquad//dtd hotmetal pro 4.0::19971010::extensions to html 4.0//', '-//spyglass//dtd html 2.0 extended//', '-//sun microsystems corp.//dtd hotjava html//', '-//sun microsystems corp.//dtd hotjava strict html//', '-//w3c//dtd html 3 1995-03-24//', '-//w3c//dtd html 3.2 draft//', '-//w3c//dtd html 3.2 final//', '-//w3c//dtd html 3.2//', '-//w3c//dtd html 3.2s draft//', '-//w3c//dtd html 4.0 frameset//', '-//w3c//dtd html 4.0 transitional//', '-//w3c//dtd html experimental 19960712//', '-//w3c//dtd html experimental 970421//', '-//w3c//dtd w3 html//', '-//w3o//dtd w3 html 3.0//', '-//c.0//', '-//webtechs//dtd mozilla html//'];
 
-// Prefixes that set quirks mode only without a system identifier or with an empty one (else limited-quirks mode)
+// Prefixes that set quirks mode only without a system identifier or with an empty one
+// (limited-quirks mode otherwise)
 const quirksPublicIdPrefixesNoSystemId = ['-//w3c//dtd html 4.01 frameset//', '-//w3c//dtd html 4.01 transitional//'];
-
-// Special content elements
 
 const specialContentElements = new Set(['script', 'style']);
 
@@ -306,8 +300,6 @@ const namesForeignMixedCase = new Map([
   // MathML attributes
   'definitionURL'
 ].map(name => [name.toLowerCase(), name]));
-
-// Exports
 
 export {
   // Regex patterns

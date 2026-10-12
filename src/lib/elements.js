@@ -18,8 +18,6 @@ import { hasAttrName } from './attributes.js';
 /** @import { HTMLAttribute } from './attributes.js' */
 /** @import { ProcessedOptions } from './options.js' */
 
-// Tag omission rules
-
 /**
  * @param {string} optionalStartTag
  * @param {string} tag
@@ -93,8 +91,6 @@ function canRemovePrecedingTag(optionalEndTag, tag) {
   }
   return false;
 }
-
-// Element removal logic
 
 /**
  * @param {string} tag
@@ -178,7 +174,6 @@ function parseElementSpec(str, options) {
   }
 
   // HTML-like markup: `<span aria-hidden='true'>` or `<td></td>`
-  // Extract opening tag using regex
   const match = trimmed.match(/^<([a-zA-Z][\w:-]*)((?:\s+[^>]*)?)>/);
   if (!match) {
     return null;
@@ -191,7 +186,6 @@ function parseElementSpec(str, options) {
     return { tag, attrs: null };
   }
 
-  // Parse attributes from string
   /** @type {{[key: string]: string | undefined}} */
   const attrs = {};
   const attrRegex = /([a-zA-Z][\w:-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>/]+)))?/g;
@@ -243,17 +237,14 @@ function parseRemoveEmptyElementsExcept(input, options) {
  */
 function shouldPreserveEmptyElement(tag, attrs, preserveList) {
   for (const spec of preserveList) {
-    // Tag name must match
     if (spec.tag !== tag) {
       continue;
     }
 
-    // If no attributes specified in spec, tag match is enough
     if (!spec.attrs) {
       return true;
     }
 
-    // Check if all specified attributes match
     const allAttrsMatch = Object.entries(spec.attrs).every(([name, value]) => {
       const attr = attrs.find(a => a.name === name);
       if (!attr) {
@@ -263,7 +254,6 @@ function shouldPreserveEmptyElement(tag, attrs, preserveList) {
       if (value === undefined) {
         return true;
       }
-      // Valued attribute must match exactly
       return attr.value === value;
     });
 
@@ -274,8 +264,6 @@ function shouldPreserveEmptyElement(tag, attrs, preserveList) {
 
   return false;
 }
-
-// Exports
 
 export {
   // Tag omission

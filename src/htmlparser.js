@@ -10,8 +10,6 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
 
 /** @import { HTMLAttribute } from './lib/attributes.js' */
 
-// Type definitions
-
 /**
  * `start`, `chars`, and `comment` return `undefined` when their work needs no `await`
  * and a Promise when it does; the parse loop awaits only what it gets back. `end`,
@@ -53,17 +51,14 @@ import { endlessRawTextElements, escapableRawTextElements, formattingElements, g
 const singleAttrIdentifier = /([^\s"'<>/=]+)/;
 const singleAttrAssigns = [/=/];
 const singleAttrValues = [
-  // Attr value double quotes
   /"([^"]*)"+/.source,
-  // Attr value, single quotes
   /'([^']*)'+/.source,
   // Attr value, no quotes (strict: excludes `=` per HTML spec)
   /([^ \t\n\f\r"'`=<>]+)/.source
 ];
-// Lenient unquoted value pattern for `continueOnParseError`:
-// allows `<`, `=`, and backticks per HTML error-recovery rules
-// (all are parse errors in unquoted-attribute-value state but appended to the value);
-// `"` and `'` remain excluded—permitting them requires broader test coverage
+// Lenient unquoted value pattern for `continueOnParseError`: Allows `<`, `=`, and backticks per
+// HTML error-recovery rules (all are parse errors in unquoted-attribute-value state but appended to
+// the value); `"` and `'` remain excluded—permitting them requires broader test coverage
 const singleAttrValueLenientUnquoted = /([^ \t\n\f\r"'>]+)/.source;
 // The characters the lenient pattern takes in beyond the strict one, each a parse error
 const RE_UNQUOTED_VALUE_ERROR = /[<=`]/;
@@ -116,11 +111,12 @@ const mathIntegrationPoints = new Set(['mi', 'mo', 'mn', 'ms', 'mtext']);
 const breaksOutOfForeignContent = new Set(['b', 'big', 'blockquote', 'body', 'br', 'center', 'code', 'dd', 'div', 'dl', 'dt', 'em', 'embed', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'head', 'hr', 'i', 'img', 'li', 'listing', 'menu', 'meta', 'nobr', 'ol', 'p', 'pre', 'ruby', 's', 'small', 'span', 'strong', 'strike', 'sub', 'sup', 'table', 'tt', 'u', 'ul', 'var']);
 const RE_FONT_BREAKOUT_ATTR = /^(?:color|face|size)$/i;
 
-// HTML elements, https://html.spec.whatwg.org/multipage/indices.html#elements-3
-// Start tags that close an open `p`, https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inbody
-// (other start tags, like `meta` or `style`, go in it, or are ignored, like `td` outside a table)
-// Elements that end the scope the `p` is looked for in, https://html.spec.whatwg.org/multipage/parsing.html#has-an-element-in-button-scope
+// Elements that end the scope an open `p` is looked for in
+// https://html.spec.whatwg.org/multipage/parsing.html#has-an-element-in-button-scope
 const buttonScopeBoundaries = new Set(['applet', 'button', 'caption', 'html', 'marquee', 'object', 'table', 'td', 'template', 'th']);
+// Start tags that close an open `p` (other start tags, like `meta` or `style`, go in it, or are
+// ignored, like `td` outside a table)
+// https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inbody
 const closesP = new Set(['address', 'article', 'aside', 'blockquote', 'center', 'dd', 'details', 'dialog', 'dir', 'div', 'dl', 'dt', 'fieldset', 'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hgroup', 'hr', 'li', 'listing', 'main', 'menu', 'nav', 'ol', 'p', 'plaintext', 'pre', 'search', 'section', 'summary', 'table', 'ul', 'xmp']);
 
 // A tag name ends at whitespace, a slash, or the closing bracket, so `</scriptx>` names a
@@ -173,7 +169,7 @@ function findEndTagClose(text, nameEnd) {
   // A quoted attribute value can hold a `>` that does not end the tag it stands in, so a
   // quote ahead of that bracket calls for a scan that knows about quoting. It stops at the
   // next `<`, which no tag reaches past: The scans of consecutive tags then never overlap,
-  // and an unquoted value that spans one leaves the first bracket as the end, as before.
+  // and an unquoted value that spans one leaves the first bracket as the end, as `indexOf` does.
   for (let index = nameEnd; index < close; index++) {
     const character = text[index];
     if (character === '"' || character === "'") {
@@ -307,7 +303,6 @@ export class HTMLParser {
     // Lowercase counterpart of `lastTag`, kept in sync to avoid per-iteration lowercasing
     /** @type {string} */
     let lastTagLower = '';
-    // Use cached attribute regex for this handler configuration
     const attribute = getAttrRegexForHandler(handler);
     const attributeY = getAttrRegexStickyForHandler(handler);
     /** @type {string | undefined} */
@@ -385,7 +380,6 @@ export class HTMLParser {
       return { end: hasCloseAtOrAfter(p + 2) ? nextGtPos + 1 : fullLength, dropped };
     };
 
-    // Helper to advance position
     const advance = (/** @type {number} */ n) => { pos += n; };
 
     // Lazy line/column calculation—only compute on actual errors
@@ -426,7 +420,6 @@ export class HTMLParser {
       handler.parseError(`Parse error at line ${line}, column ${column}: ${recovery}`);
     };
 
-    // Helper to safely extract substring when needed for stacked tag content
     const sliceFromPos = (/** @type {number} */ startPos) => {
       return fullHtml.slice(startPos);
     };
@@ -521,9 +514,7 @@ export class HTMLParser {
         }
 
         if (textEnd === pos) {
-          // Tag found at current position
-
-          // Check cache from previous lookahead (avoids re-parsing the same tag)
+          // Tag found at current position; the lookahead may have parsed it already
           if (cachedNextStartTag && cachedNextStartTag.pos === pos) {
             const startTagMatch = cachedNextStartTag.match;
             cachedNextStartTag = null;
@@ -553,7 +544,6 @@ export class HTMLParser {
           // another one never run—a name lookup costs several regex executions
           const nextCode = fullHtml.charCodeAt(pos + 1);
           if (nextCode === 33) { // `!`
-            // Comment
             commentTestY.lastIndex = pos;
             if (commentTestY.test(fullHtml)) {
               const commentEnd = commentEndAhead ? fullHtml.indexOf('-->', pos + 4) : -1;
@@ -589,7 +579,6 @@ export class HTMLParser {
               }
             }
 
-            // Doctype
             doctypeY.lastIndex = pos;
             const doctypeMatch = doctypeY.exec(fullHtml);
             if (doctypeMatch) {
@@ -606,7 +595,6 @@ export class HTMLParser {
               continue;
             }
           } else if (nextCode === 63) { // `?`
-            // Processing instruction
             const processingInstructionEnd = matchProcessingInstruction(pos);
             if (processingInstructionEnd !== -1) {
               if (handler.processingInstruction) {
@@ -659,7 +647,6 @@ export class HTMLParser {
               continue;
             }
           } else {
-            // Start tag
             const startTagMatch = parseStartTag(pos);
             if (startTagMatch) {
               advance(startTagMatch.advance);
@@ -668,11 +655,7 @@ export class HTMLParser {
               continue;
             }
           }
-
-          // Treat `<` as text
-          if (handler.continueOnParseError) {
-            // Continue looking for next tag
-          }
+          // Otherwise, the `<` is read as text
         }
 
         let text;
@@ -785,7 +768,7 @@ export class HTMLParser {
 
       if (pos === lastPos) {
         if (handler.continueOnParseError) {
-          // Skip the problematic character and continue
+          // Keep the problematic character as text and move on
           docModeSettable = false;
           reportParseError(pos, `Kept \`${fullHtml[pos]}\` as text`);
           if (handler.chars) {
@@ -798,7 +781,8 @@ export class HTMLParser {
           continue;
         }
         const loc = getLineColumn(pos);
-        // Include some context before the error position so the snippet contains the offending markup plus preceding characters (e.g., `invalid<tag`)
+        // Include some context before the error position so the snippet contains the offending
+        // markup plus preceding characters (e.g., `invalid<tag`)
         const CONTEXT_BEFORE = 50;
         const startPos = Math.max(0, pos - CONTEXT_BEFORE);
         const snippet = fullHtml.slice(startPos, startPos + 200).replace(/\n/g, ' ');
@@ -811,8 +795,7 @@ export class HTMLParser {
       parseEndTag('', '');
     }
 
-    // Helper to extract minimal attribute info (name/value pairs) from raw attribute matches
-    // Used for whitespace collapsing logic—doesn’t need full processing
+    // Minimal attribute info (name/value pairs) from raw matches, for whitespace collapsing
     function extractAttrInfo(/** @type {Array<Array<string | undefined>>} */ rawAttrs) {
       if (!rawAttrs || !rawAttrs.length) return [];
 
@@ -820,12 +803,11 @@ export class HTMLParser {
       const baseIndex = 1 + numCustomParts;
 
       return /** @type {HTMLAttribute[]} */ (rawAttrs.map((/** @type {Array<string | undefined>} */ args) => {
-        // Extract attribute name (always at `baseIndex`)
         const name = args[baseIndex];
-        // Extract value from double-quoted (`baseIndex + 2`), single-quoted (`baseIndex + 3`), or unquoted (`baseIndex + 4`)
+        // Double-quoted (`baseIndex + 2`), single-quoted (`+ 3`), or unquoted (`+ 4`)
         const value = args[baseIndex + 2] ?? args[baseIndex + 3] ?? args[baseIndex + 4];
         return { name: name?.toLowerCase() ?? '', value };
-      }).filter(attr => attr.name)); // Filter out invalid entries
+      }).filter(attr => attr.name));
     }
 
     /**
@@ -899,8 +881,7 @@ export class HTMLParser {
       let currentPos = startPos + consumed;
       let close, attr;
 
-      // Safety limit: Max length of input to check for attributes
-      // Protects against catastrophic backtracking on massive attribute values
+      // Caps the input the attribute regex sees, against catastrophic backtracking on huge values
       const MAX_ATTR_PARSE_LENGTH = 20000; // 20 KB should be enough for any reasonable tag
 
       while (true) {
@@ -910,7 +891,6 @@ export class HTMLParser {
           break;
         }
 
-        // Limit the input length to pass to the regex to prevent catastrophic backtracking
         const remainingLen = fullLength - currentPos;
         const isLimited = remainingLen > MAX_ATTR_PARSE_LENGTH;
 
@@ -927,7 +907,6 @@ export class HTMLParser {
 
           // If input was limited and there’s a match, check if the value might be truncated
           if (attr) {
-            // Check if the attribute value extends beyond our search window
             const attrEnd = attr[0].length;
             const numCustomParts = handler.customAttrSurround
               ? handler.customAttrSurround.length * NCP
@@ -957,7 +936,6 @@ export class HTMLParser {
                     attr[baseIndex] = manualMatch[1]; // Attribute name
                     attr[baseIndex + 1] = '='; // `customAssign` (falls back to "=" for huge attributes)
                     const value = searchStr.substring(manualMatch[0].length + 1, closeQuote);
-                    // Place value at correct index based on quote type
                     if (quoteChar === '"') {
                       attr[baseIndex + 2] = value; // Double-quoted value
                     } else {
@@ -981,8 +959,8 @@ export class HTMLParser {
           }
 
           if (!attr) {
-            // If input was limited and there’s no match, try manual extraction
-            // This handles cases where quoted attributes exceed `MAX_ATTR_PARSE_LENGTH`
+            // If input was limited and there’s no match, a quoted value may exceed
+            // `MAX_ATTR_PARSE_LENGTH`, so try manual extraction
             const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
             if (manualMatch) {
               const quoteChar = searchStr[manualMatch[0].length];
@@ -999,9 +977,8 @@ export class HTMLParser {
                   attr = [];
                   attr[0] = fullHtml.substring(currentPos, closeQuote + 1);
                   attr[baseIndex] = manualMatch[1]; // Attribute name
-                  attr[baseIndex + 1] = '='; // customAssign
+                  attr[baseIndex + 1] = '='; // `customAssign`
                   const value = fullHtml.substring(currentPos + manualMatch[0].length + 1, closeQuote);
-                  // Place value at correct index based on quote type
                   if (quoteChar === '"') {
                     attr[baseIndex + 2] = value; // Double-quoted value
                   } else {
@@ -1049,7 +1026,6 @@ export class HTMLParser {
         if (currentTag === needle) {
           return stackIndex;
         }
-        // Stop searching if hitting a table boundary
         if (currentTag === 'table') {
           break;
         }
@@ -1200,7 +1176,6 @@ export class HTMLParser {
           closeIfFoundInCurrentTable('thead');
         }
       } else if (lowerTagName === 'thead') {
-        // If a `tbody` or `tfoot` is open in the current table, close it
         if (!closeIfFoundInCurrentTable('tbody')) {
           closeIfFoundInCurrentTable('tfoot');
         }
@@ -1241,7 +1216,7 @@ export class HTMLParser {
         }
       }
 
-      // Store attributes for `prevAttrs` tracking (used in whitespace collapsing)
+      // `prevAttrs` feeds whitespace collapsing
       prevAttrs = attrs;
 
       // The name is returned so the parse loop can skip lowercasing it again
@@ -1331,7 +1306,6 @@ export class HTMLParser {
           }
         }
 
-        // Remove the open elements from the stack
         stack.length = stackIndex;
         stackVersion++;
         lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';

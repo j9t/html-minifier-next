@@ -116,7 +116,8 @@ describe('Git walk', () => {
   const dirBacktest = path.dirname(fileURLToPath(import.meta.url));
   const inputs = { alpha: '<p>Alpha</p>', beta: '<p>Beta</p>' };
 
-  // Each commit’s minifier prefixes its own marker and the config’s, so a result shows which source and config produced it
+  // Each commit’s minifier prefixes its own marker and the config’s, so a result shows which
+  // source and config produced it
   function stub(marker, { failOn } = {}) {
     return `export async function minify(html, options) {
 ${failOn ? `  if (html.includes('${failOn}')) throw new Error('Stub failure');\n` : ''}  return '${marker}' + options.marker + html;
@@ -165,7 +166,8 @@ ${failOn ? `  if (html.includes('${failOn}')) throw new Error('Stub failure');\n
     const dir = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'hmn-backtest-')));
     t.after(() => fs.rm(dir, { recursive: true, force: true }));
     await git(dir, 'init', '-q');
-    // In the repository’s config, so the backtest’s own Git calls use it, too (Windows runners enable `autocrlf`)
+    // In the repository’s config, so the backtest’s own Git calls use it, too (Windows
+    // runners enable `autocrlf`)
     await git(dir, 'config', 'core.autocrlf', 'false');
     await git(dir, 'config', 'commit.gpgsign', 'false');
 
@@ -194,7 +196,8 @@ ${failOn ? `  if (html.includes('${failOn}')) throw new Error('Stub failure');\n
     }
     await write(dir, 'backtest/node_modules/progress/package.json', JSON.stringify({ name: 'progress', main: 'index.js' }));
     await write(dir, 'backtest/node_modules/progress/index.js', 'module.exports = class { tick() {} };');
-    // All present but the first, whose install goes to an npm stub that records its arguments and fails
+    // All present but the first, whose install goes to an npm stub that
+    // records its arguments and fails
     for (const dep of historicalDeps.slice(1)) {
       await fs.mkdir(path.join(dir, 'node_modules', dep), { recursive: true });
     }

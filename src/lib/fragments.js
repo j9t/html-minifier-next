@@ -333,8 +333,6 @@ function replaceCustomFragments(value, fragments, replacer) {
   return copied === 0 ? value : out + value.slice(copied);
 }
 
-// Exports
-
 export {
   toDelimitedFragment,
   toFragment,

@@ -32,7 +32,6 @@ function relativize(baseDir, targetPath) {
   const targetSegments = targetPath.split('/').filter(Boolean);
   const isDirectoryTarget = targetPath.endsWith('/');
 
-  // Find common prefix length
   let common = 0;
   while (
     common < baseSegments.length &&
@@ -49,7 +48,6 @@ function relativize(baseDir, targetPath) {
 
   let relative = '../'.repeat(ups) + remaining.join('/');
 
-  // Preserve trailing slash
   if (isDirectoryTarget && relative !== '' && !relative.endsWith('/')) {
     relative += '/';
   }
@@ -112,15 +110,12 @@ export function createUrlMinifier(site) {
       }
     }
 
-    // Skip rejected schemes
     if (REJECTED_SCHEMES.has(targetUrl.protocol)) return url;
 
-    // Clean up pathname
     targetUrl.pathname = removeDirectoryIndex(targetUrl.pathname);
 
     const suffix = targetUrl.search + targetUrl.hash;
 
-    // No base URL—return normalized absolute URL
     if (!baseUrl) {
       return targetUrl.href;
     }
@@ -130,22 +125,18 @@ export function createUrlMinifier(site) {
       return targetUrl.href;
     }
 
-    // Check if same origin (protocol + hostname + port)
     const sameOrigin =
       targetUrl.protocol === baseUrl.protocol &&
       targetUrl.hostname === baseUrl.hostname &&
       targetUrl.port === baseUrl.port;
 
     if (!sameOrigin) {
-      // Same scheme, different host—use scheme-relative
       if (targetUrl.protocol === baseUrl.protocol) {
         return '//' + targetUrl.host + targetUrl.pathname + suffix;
       }
-      // Different scheme—return normalized absolute
       return targetUrl.href;
     }
 
-    // Same origin—compute shortest representation
     const targetPath = targetUrl.pathname;
     const rootRelative = targetPath + suffix;
     const pathRelative = relativize(getDirectory(baseUrl.pathname), targetPath) + suffix;

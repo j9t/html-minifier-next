@@ -31,7 +31,7 @@ async function resolveTarget(outputFile) {
       file = path.resolve(dir, link);
     }
   }
-  // A loop, which writing through would not resolve, either—refused so the rename cannot replace the link
+  // A loop, which writing through wouldn’t resolve either—refused, so the rename can’t replace it
   throw Object.assign(new Error(`ELOOP: Too many symbolic links encountered, '${outputFile}'`), { code: 'ELOOP', path: outputFile });
 }
 
@@ -62,7 +62,7 @@ async function openTempFile(targetFile, mode) {
 export async function writeFileAtomic(outputFile, data) {
   // A rename would replace a symlink itself, so work on the file it points to
   const targetFile = await resolveTarget(outputFile);
-  // The rename replaces the output rather than writing through it, so a mode set on the output has to be carried over
+  // The rename replaces the output rather than writing through it, so its mode is carried over
   const stats = await fs.promises.stat(targetFile).catch(() => undefined);
   const mode = stats ? stats.mode & 0o7777 : undefined;
 

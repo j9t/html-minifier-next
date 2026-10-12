@@ -338,10 +338,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     await execCli(cliArguments);
 
-    // Should process .html files
     assert.strictEqual(existsFixture('tmp/single-ext/extension.html'), true);
-
-    // Should not process other extensions
     assert.strictEqual(existsFixture('tmp/single-ext/extension.htm'), false);
     assert.strictEqual(existsFixture('tmp/single-ext/extension.php'), false);
     assert.strictEqual(existsFixture('tmp/single-ext/extension.txt'), false);
@@ -357,12 +354,9 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     await execCli(cliArguments);
 
-    // Should process specified extensions
     assert.strictEqual(existsFixture('tmp/multi-ext/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/multi-ext/extension.htm'), true);
     assert.strictEqual(existsFixture('tmp/multi-ext/extension.php'), true);
-
-    // Should not process unspecified extensions
     assert.strictEqual(existsFixture('tmp/multi-ext/extension.txt'), false);
   });
 
@@ -392,7 +386,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     await execCli(cliArguments);
 
-    // Should handle spaces around commas correctly
     assert.strictEqual(existsFixture('tmp/spaced-ext/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/spaced-ext/extension.htm'), true);
     assert.strictEqual(existsFixture('tmp/spaced-ext/extension.php'), true);
@@ -408,13 +401,10 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     await execCli(cliArguments);
 
-    // Should process default HTML extensions
     assert.strictEqual(existsFixture('tmp/default-ext/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.htm'), true);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.shtml'), true);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.shtm'), true);
-
-    // Should not process non-default extensions
     assert.strictEqual(existsFixture('tmp/default-ext/extension.xhtml'), false);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.php'), false);
     assert.strictEqual(existsFixture('tmp/default-ext/extension.txt'), false);
@@ -430,8 +420,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     const { stderr } = await execCliWithStderr(cliArguments);
     assert.ok(stderr.includes('Warning:'), 'Should warn when processing all file types');
-
-    // Should process all files when wildcard is specified
     assert.strictEqual(existsFixture('tmp/all-files/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/all-files/extension.htm'), true);
     assert.strictEqual(existsFixture('tmp/all-files/extension.php'), true);
@@ -501,11 +489,8 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     await execCli(cliArguments);
 
-    // Should process extensions specified in config
     assert.strictEqual(existsFixture('tmp/config-string/extension.html'), true);
     assert.strictEqual(existsFixture('tmp/config-string/extension.htm'), true);
-
-    // Should not process unspecified extensions
     assert.strictEqual(existsFixture('tmp/config-string/extension.php'), false);
     assert.strictEqual(existsFixture('tmp/config-string/extension.txt'), false);
   });
@@ -526,10 +511,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     await execCli(cliArguments);
 
-    // Should process extensions specified in config array
     assert.strictEqual(existsFixture('tmp/config-array/extension.html'), true);
-
-    // Should not process other extensions
     assert.strictEqual(existsFixture('tmp/config-array/extension.htm'), false);
     assert.strictEqual(existsFixture('tmp/config-array/extension.php'), false);
     assert.strictEqual(existsFixture('tmp/config-array/extension.txt'), false);
@@ -552,10 +534,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     await execCli(cliArguments);
 
-    // Should process CLI-specified extensions, not config extensions
     assert.strictEqual(existsFixture('tmp/config-override/extension.htm'), true);
-
-    // Should not process config-specified extensions
     assert.strictEqual(existsFixture('tmp/config-override/extension.html'), false);
     assert.strictEqual(existsFixture('tmp/config-override/extension.php'), false);
     assert.strictEqual(existsFixture('tmp/config-override/extension.txt'), false);
@@ -631,8 +610,8 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
   });
 
   test('Refuses a string value for an object-valued option in a config file', async () => {
-    // Config values are JSON-parsed first, so `"true"` and `"false"` arrive as
-    // booleans; anything that is not JSON stays a string and used to read as “on”
+    // Config values are JSON-parsed first, so `"true"` and `"false"` arrive as booleans; anything
+    // that is not JSON stays a string, which must not read as “on”
     const dir = setupConfigDir('config-string-value', {
       'html-minifier-next.config.json': { minifyCSS: 'yes' }
     });
@@ -813,18 +792,13 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('collapseWhitespace'));
 
-    // Should output to STDERR
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Would minify:'));
     assert.ok(result.stderr.includes('Original:'));
     assert.ok(result.stderr.includes('Minified:'));
     assert.ok(result.stderr.includes('Saved:'));
     assert.ok(result.stderr.includes('bytes'));
-
-    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
-
-    // Should exit successfully
     assert.strictEqual(result.exitCode, 0);
   });
 
@@ -838,16 +812,11 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     const result = await execCliWithStderr(cliArguments);
 
-    // Should output to STDERR
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Would process directory:'));
     assert.ok(result.stderr.includes('Total:'));
     assert.ok(result.stderr.includes('bytes'));
-
-    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
-
-    // Should exit successfully
     assert.strictEqual(result.exitCode, 0);
   });
 
@@ -861,7 +830,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
 
     await execCliWithStderr(cliArguments);
 
-    // Should not create output directory or files
     assert.strictEqual(existsFixture('tmp/dry-no-write'), false);
     assert.strictEqual(existsFixture('tmp/dry-no-write/default.html'), false);
   });
@@ -881,7 +849,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(stderrStr.includes('Original:'));
     assert.ok(stderrStr.includes('Minified:'));
     assert.ok(stderrStr.includes('Saved:'));
-    // Should not output minified HTML to STDOUT in dry run
     assert.strictEqual(stdout.toString().trim(), '');
   });
 
@@ -899,7 +866,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(stderrStr.includes('Original:'));
     assert.ok(stderrStr.includes('Minified:'));
     assert.strictEqual(stdout.toString().trim(), '');
-    // Should not create output file
     assert.strictEqual(existsFixture('tmp/stdin-output.html'), false);
   });
 
@@ -937,7 +903,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(result.stderr.includes('Original:'));
     assert.ok(result.stderr.includes('Minified:'));
     assert.strictEqual(result.stdout, '');
-    // Should not create output file
     assert.strictEqual(existsFixture('tmp/output-flag.html'), false);
   });
 
@@ -951,7 +916,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
       '--collapse-whitespace'
     ]);
 
-    // Should create output file
     assert.strictEqual(existsFixture('tmp/output-normal.html'), true);
 
     const output = await readFixture('tmp/output-normal.html');
@@ -1023,7 +987,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
       '--collapse-whitespace'
     ]);
 
-    // Should exit with error
     assert.notStrictEqual(result.exitCode, 0);
     assert.ok(result.stderr.includes('Cannot read') || result.stderr.includes('no such file'));
   });
@@ -1036,7 +999,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
       '--collapse-whitespace'
     ]);
 
-    // Should exit with error
     assert.notStrictEqual(result.exitCode, 0);
     assert.ok(result.stderr.includes('Cannot read') || result.stderr.includes('no such file'));
   });
@@ -1072,21 +1034,14 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
       '-o', 'tmp/verbose-output.html'
     ]);
 
-    // Should output to STDERR
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('collapseWhitespace'));
     assert.ok(result.stderr.includes('✓'));
     assert.ok(result.stderr.includes('default.html'));
     assert.ok(result.stderr.includes('→'));
     assert.ok(result.stderr.includes('bytes'));
-
-    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
-
-    // Should exit successfully
     assert.strictEqual(result.exitCode, 0);
-
-    // Should create output file
     assert.strictEqual(existsFixture('tmp/verbose-output.html'), true);
   });
 
@@ -1098,20 +1053,13 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
       '--collapse-whitespace'
     ]);
 
-    // Should output to STDERR
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('✓'));
     assert.ok(result.stderr.includes('→'));
     assert.ok(result.stderr.includes('bytes'));
     assert.ok(result.stderr.includes('Total:'));
-
-    // Should not output to STDOUT
     assert.strictEqual(result.stdout, '');
-
-    // Should exit successfully
     assert.strictEqual(result.exitCode, 0);
-
-    // Should create output files
     assert.strictEqual(existsFixture('tmp/verbose-dir/default.html'), true);
   });
 
@@ -1129,11 +1077,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(stderrStr.includes('STDIN'));
     assert.ok(stderrStr.includes('→'));
     assert.ok(stderrStr.includes('bytes'));
-
-    // Should not output to STDOUT
     assert.strictEqual(stdout.toString().trim(), '');
-
-    // Should create output file
     assert.strictEqual(existsFixture('tmp/verbose-stdin.html'), true);
   });
 
@@ -1247,7 +1191,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
       '--collapse-whitespace'
     ]);
 
-    // Should show both dry run and verbose output
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes('Would minify:'));
@@ -1265,7 +1208,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
       '-o', 'tmp/non-verbose.html'
     ]);
 
-    // Should not show verbose output
     assert.ok(!result.stderr.includes('CLI options:'));
     assert.ok(!result.stderr.includes('✓'));
 
@@ -1273,7 +1215,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.strictEqual(result.stderr, '');
     assert.strictEqual(result.exitCode, 0);
 
-    // Should still create output file
     assert.strictEqual(existsFixture('tmp/non-verbose.html'), true);
   });
 
@@ -1360,7 +1301,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
       '--collapse-whitespace'
     ]);
 
-    // Should successfully process all files in nested directories
     assert.strictEqual(result.exitCode, 0);
     assert.strictEqual(existsFixture('tmp-out/test1.html'), true);
     assert.strictEqual(existsFixture('tmp-out/sub1/test2.html'), true);
@@ -1519,8 +1459,8 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.strictEqual(status, 0);
     // Cache options are valid config keys and must not trigger the unknown-option warning
     assert.ok(!stderr.toString().includes('cacheCSS'));
-    // The flag value must reach the options passed to `minify` (regression: values used to be parsed but dropped)—
-    // verbose mode lists the CLI-provided options that made it into the final options object
+    // The flag value must reach the options passed to `minify`—verbose mode lists the CLI-provided
+    // options that made it into the final options object
     assert.ok(stderr.toString().includes('cacheJS'));
     assert.ok(!stdout.toString().includes('<!-- comment -->'));
   });
@@ -1621,10 +1561,8 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     ]);
 
     assert.strictEqual(result.exitCode, 0);
-    // Should process a.html and sub/c.html
     assert.strictEqual(existsFixture('tmp-out/a.html'), true);
     assert.strictEqual(existsFixture('tmp-out/sub/c.html'), true);
-    // Should not process libs/b.html and libs/sub/d.html
     assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
     assert.strictEqual(existsFixture('tmp-out/libs/sub/d.html'), false);
   });
@@ -1647,10 +1585,8 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     ]);
 
     assert.strictEqual(result.exitCode, 0);
-    // Should process a.html and src/d.html
     assert.strictEqual(existsFixture('tmp-out/a.html'), true);
     assert.strictEqual(existsFixture('tmp-out/src/d.html'), true);
-    // Should not process libs/b.html and vendor/c.html
     assert.strictEqual(existsFixture('tmp-out/libs/b.html'), false);
     assert.strictEqual(existsFixture('tmp-out/vendor/c.html'), false);
   });
@@ -1671,10 +1607,8 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     ]);
 
     assert.strictEqual(result.exitCode, 0);
-    // Should process a.html and libs/c.html
     assert.strictEqual(existsFixture('tmp-out/a.html'), true);
     assert.strictEqual(existsFixture('tmp-out/libs/c.html'), true);
-    // Should not process static/libs/b.html
     assert.strictEqual(existsFixture('tmp-out/static/libs/b.html'), false);
   });
 
@@ -1944,7 +1878,6 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
   });
 
   test('`--no-newlines-before-tag-close` is applied and matches the JS API', async () => {
-    // This flag was previously silently ignored due to a Commander key mismatch
     const input = '<a title="x"href=" ">foo</a>';
     const expected = await minify(input, { maxLineLength: 25, noNewlinesBeforeTagClose: true });
 
@@ -2330,7 +2263,8 @@ describe('Output file integrity', () => {
     assert.strictEqual(await fs.promises.readFile(fileTarget, 'utf8'), '<p class="x">Text</p>', 'The file linked to should hold the output');
     assert.strictEqual(await fs.promises.readFile(fileMode, 'utf8'), '<p class="x">Text</p>', 'b.html should have been rewritten');
     assert.strictEqual((await fs.promises.stat(fileMode)).mode & 0o777, 0o600, 'b.html should stay 600');
-    // Writing in place keeps the inode (and the symlink and mode above along with it), so only a new one shows the output was moved into place
+    // Writing in place keeps the inode (and the symlink and mode above along with it), so only a
+    // new one shows the output was moved into place
     assert.notStrictEqual((await fs.promises.stat(fileMode)).ino, ino, 'b.html should have been replaced rather than written through');
     assert.deepStrictEqual((await fs.promises.readdir(dirOutput)).sort(), ['a.html', 'b.html'], 'No temporary file should be left');
   });
@@ -2364,7 +2298,8 @@ describe('Output file integrity', () => {
     }
   });
 
-  // Stands in for `fs.promises.open` while `run` goes, so a test can watch or steer how temporary files are created
+  // Stands in for `fs.promises.open` while `run` goes, so a test can watch or steer how
+  // temporary files are created
   const withOpen = async (replacement, run) => {
     const open = fs.promises.open;
     fs.promises.open = (...args) => replacement(open.bind(fs.promises), ...args);
