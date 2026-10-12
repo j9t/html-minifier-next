@@ -28,8 +28,6 @@ import { escapeXML, identity, isThenable, lowercase } from './utils.js';
 
 /** @import { ProcessedOptions } from './options.js' */
 
-// Type definitions
-
 /**
  * @typedef {{ name: string, value?: string | undefined, quote?: string, customAssign?: string, customOpen?: string, customClose?: string }} HTMLAttribute
  *  Internal counterpart of the public typedef in htmlminifier.js—keep in sync.
@@ -167,8 +165,8 @@ for (const defaults of Object.values(tagDefaults)) {
  * @param {HTMLAttribute[]} attrs
  */
 function isAttributeRedundant(tag, attrName, attrValue, attrs) {
-  // Fast-path: Check if this element–attribute combination can possibly be redundant
-  // before normalizing the value; own properties only, so `constructor` has no default
+  // Fast path: Check if this element–attribute combination can possibly be redundant before
+  // normalizing the value; own properties only, so `constructor` has no default
   if (!redundantDefaultNames.has(attrName)) {
     return false;
   }
@@ -180,7 +178,6 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
     : undefined;
   const tagDefault = tagAttrDefaults && Object.hasOwn(tagAttrDefaults, attrName) ? tagAttrDefaults[attrName] : undefined;
 
-  // Check for legacy attribute rules (element- and attribute-specific)
   const isLegacyAttr = (tag === 'script' && (attrName === 'language' || attrName === 'charset')) || (tag === 'a' && attrName === 'name');
 
   // Without a default for this very attribute, nor a legacy rule, the value cannot be redundant
@@ -191,7 +188,6 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs) {
   // Value needs to be checked, so normalize it
   attrValue = attrValue ? trimWhitespace(attrValue.toLowerCase()) : '';
 
-  // Legacy attribute checks
   if (tag === 'script' && attrName === 'language' && attrValue === 'javascript') {
     return true;
   }
@@ -474,14 +470,12 @@ function dedupeClassNames(value) {
 function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTMLSelf, markers = [], attrNameOut = attrName) {
   const isEventAttr = isEventAttribute(attrName, options, attrNameOut);
 
-  // Apply early whitespace normalization if enabled
-  // Preserves special spaces (no-break space, hair space, etc.) for consistency with `collapseWhitespace`
+  // Special spaces (no-break space, hair space, etc.) stay, for consistency
+  // with `collapseWhitespace`
   if (options.collapseAttributeWhitespace && !collapseAttributeWhitespaceExempt.has(attrName) && !(attrName === 'value' && valueWhitespaceExemptElements.has(tag)) && !isEventAttr) {
     // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
     if (RE_ATTR_WS_CHECK.test(attrValue)) {
       // Two-pass approach (faster than single-pass with callback)
-      // First: Collapse internal whitespace sequences to single space
-      // Second: Trim leading/trailing whitespace
       attrValue = attrValue.replace(RE_ATTR_WS_COLLAPSE, ' ').replace(RE_ATTR_WS_TRIM, '');
     }
   }
@@ -522,7 +516,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     // may not repeat once a template renders
     const holdsFragment = markers.some(marker => attrValue.indexOf(marker) !== -1);
     if (options.sortClassNames) {
-      // By the time attributes are processed, `createSortFns` has replaced any truthy non-function value
+      // `createSortFns` has replaced any truthy non-function value by now
       attrValue = /** @type {(value: string) => string} */ (options.sortClassNames)(attrValue);
     } else {
       attrValue = collapseWhitespaceAll(attrValue);
@@ -563,8 +557,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       if (isThenable(cssResult)) {
         return cssResult
           .then((/** @type {string} */ minified) => {
-            // After minification, check if CSS consists entirely of invalid properties (no values)
-            // I.e., `color:` or `margin:;padding:` should be treated as empty
+            // CSS of nothing but properties without values (`color:`, `margin:;padding:`) is empty
             if (minified && /^(?:[a-z-]+:[;\s]*)+$/i.test(minified)) return '';
             return minified;
           })
@@ -666,8 +659,8 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
 
   if (isMediaQuery(tag, attrs, attrName)) {
     attrValue = trimWhitespace(attrValue);
-    // Only minify actual media queries (those with features in parentheses)
-    // Skip simple media types like `all`, `screen`, `print` which are already minimal
+    // Only media queries with features (in parentheses) need minifying; media types like `all`,
+    // `screen`, or `print` are minimal already
     if (!/[()]/.test(attrValue)) {
       return attrValue;
     }
@@ -684,7 +677,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
   }
 
   if (tag === 'iframe' && attrName === 'srcdoc') {
-    // Fast-path: Skip if nothing would change
+    // Fast path: Skip if nothing would change
     if (!shouldMinifyInnerHTML(options)) {
       return attrValue;
     }
@@ -889,26 +882,25 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
     return attr.customOpen + attrName + (isLast ? '' : ' ') + attr.customClose;
   }
 
-  // Determine if need to add/keep quotes
   const shouldAddQuotes = typeof attrValue !== 'undefined' && (
     // If `removeAttributeQuotes` is enabled, add quotes only if they can’t be removed
     (options.removeAttributeQuotes && ((uidAttr ? attrValue.indexOf(uidAttr) !== -1 : false) || !canRemoveAttributeQuotes(attrValue))) ||
-    // If `removeAttributeQuotes` is not enabled, preserve original quote style or add quotes if value requires them
+    // If `removeAttributeQuotes` is not enabled, preserve original quote style, or add
+    // quotes if value requires them
     (!options.removeAttributeQuotes && (attrQuote !== '' || !canRemoveAttributeQuotes(attrValue) ||
       // XML quotes every attribute value
       readAsXML ||
-      // Special case: With `removeTagWhitespace`, unquoted values that aren’t last will have space added,
-      // which can create ambiguous/invalid HTML—add quotes to be safe
+      // With `removeTagWhitespace`, unquoted values that aren’t last get a space added, which can
+      // create ambiguous or invalid HTML—add quotes to be safe
       (options.removeTagWhitespace && attrQuote === '' && !isLast)))
   );
 
   let emittedAttrValue;
   if (shouldAddQuotes) {
     attrValue = attrValue ?? '';
-    // Determine the appropriate quote character
     if (!options.preventAttributesEscaping) {
-      // Normal mode: Choose optimal quote type to minimize escaping
-      // unless preserving original quotes and they don’t need escaping
+      // Normal mode: Choose the quote type that minimizes escaping, unless the original quotes are
+      // kept and need no escaping
       const needsEscaping = (attrQuote === '"' && attrValue.indexOf('"') !== -1) || (attrQuote === "'" && attrValue.indexOf("'") !== -1);
 
       if (options.removeAttributeQuotes || typeof options.quoteCharacter !== 'undefined' || needsEscaping || attrQuote === '') {
@@ -935,7 +927,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
         } else {
           attrValue = attrValue.replace(/'/g, '&#39;');
         }
-      // Auto quote selection: Prefer the opposite quote type when value contains one quote type, default to double quotes when none present
+      // No `quoteCharacter` set: Prefer the quote type the value doesn’t hold, default to double
       } else if (typeof options.quoteCharacter === 'undefined') {
         if (attrQuote === '"' && hasDoubleQuote && !hasSingleQuote) {
           attrQuote = "'";
@@ -964,7 +956,7 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       } else {
         // `quoteCharacter` is explicitly set
         const preferredQuote = options.quoteCharacter === '\'' ? '\'' : '"';
-        // Safety check: If the preferred quote conflicts with value content, switch to the opposite quote
+        // If the preferred quote conflicts with value content, switch to the opposite one
         if ((preferredQuote === '"' && hasDoubleQuote && !hasSingleQuote) || (preferredQuote === "'" && hasSingleQuote && !hasDoubleQuote)) {
           attrQuote = preferredQuote === '"' ? "'" : '"';
         } else if ((preferredQuote === '"' && hasDoubleQuote && hasSingleQuote) || (preferredQuote === "'" && hasSingleQuote && hasDoubleQuote)) {
@@ -985,19 +977,15 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
       emittedAttrValue += ' ';
     }
   } else if (isLast && !hasUnarySlash) {
-    // Last attribute in a non-self-closing tag:
-    // No space needed
+    // Last attribute in a non-self-closing tag: No space needed
     emittedAttrValue = attrValue;
   } else {
-    // Not last attribute, or is a self-closing tag:
-    // Unquoted values must have space after them to delimit from next attribute
+    // Not last attribute, or a self-closing tag: Unquoted values need a space to delimit them
     emittedAttrValue = attrValue + ' ';
   }
 
   return attr.customOpen + attrName + attr.customAssign + emittedAttrValue + attr.customClose;
 }
-
-// Exports
 
 export {
   // Validators

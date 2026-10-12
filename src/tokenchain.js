@@ -73,14 +73,12 @@ class TokenChain {
   createSorter() {
     const sorter = new Sorter();
 
-    // Convert map entries to array and sort by frequency (descending), then alphabetically
+    // Sort tokens by usage frequency (descending), then alphabetically
     const entries = Array.from(this.map.entries()).sort((a, b) => {
       const m = a[1].arrays.length;
       const n = b[1].arrays.length;
-      // Sort by length descending (larger first)
       const lengthDiff = n - m;
       if (lengthDiff !== 0) return lengthDiff;
-      // If lengths equal, sort by key ascending
       return a[0].localeCompare(b[0]);
     });
 
@@ -98,7 +96,6 @@ class TokenChain {
             }
           }
 
-          // Mark remaining tokens as processed
           filtered.forEach((t) => {
             const tData = this.map.get(t);
             if (tData) {

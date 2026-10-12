@@ -4,6 +4,18 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.10.8] - 2026-10-12
+
+### Changed
+
+* Improved the backtest and working-tree benchmark scripts, with more tests
+* Tidied up code comments, now limited to 100 characters via ESLint
+
+### Removed
+
+* Removed a parser workaround for a long-fixed Firefox regex bug
+* Removed commitlint, which only checked commit message lengths
+
 ## [8.10.7] - 2026-10-07
 
 ### Fixed

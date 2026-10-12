@@ -106,8 +106,6 @@ function hashContent(str) {
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
-// Unique ID generator
-
 /** @param {string} value */
 function uniqueId(value) {
   let id;
@@ -116,8 +114,6 @@ function uniqueId(value) {
   } while (~value.indexOf(id));
   return id;
 }
-
-// XML escaping
 
 /** @type {Record<string, string>} */
 const xmlEscapes = { '&': '&amp;', '<': '&lt;', ']]>': ']]&gt;', '\t': '&#9;', '\n': '&#10;', '\r': '&#13;' };
@@ -160,8 +156,6 @@ function decodeForeignText(text, decode) {
   return out;
 }
 
-// Identity and transform functions
-
 /** @param {string} value */
 function identity(value) {
   return value;
@@ -180,13 +174,11 @@ function lowercase(value) {
   return value.toLowerCase();
 }
 
-// Option name to CLI flag name (ASCII-only, no Unicode needed)
+// Option name to CLI flag name (names are ASCII, so no Unicode handling is needed)
 /** @param {string} value */
 function paramCase(value) {
   return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
 }
-
-// Replace async helper
 
 /**
  * Asynchronously replace matches in a string.
@@ -991,8 +983,7 @@ function describeDependencyFailure(label, specifier, cause) {
     (cause instanceof Error ? cause.message : String(cause));
 }
 
-// Whether a doctype sets quirks mode, per the HTML parser
-// (limited-quirks mode counts as no-quirks,
+// Whether a doctype sets quirks mode, per the HTML parser (limited-quirks mode counts as no-quirks,
 // as it only differs in line height calculation)
 // https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode
 /** @param {string} doctype */
@@ -1011,8 +1002,6 @@ function isQuirksDoctype(doctype) {
     quirksPublicIdPrefixes.some(prefix => publicId.startsWith(prefix)) ||
     (!systemId && quirksPublicIdPrefixesNoSystemId.some(prefix => publicId.startsWith(prefix)));
 }
-
-// Exports
 
 export {
   stableStringify,

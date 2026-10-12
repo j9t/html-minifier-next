@@ -28,8 +28,6 @@ function compressedSizes(text) {
   };
 }
 
-// Exports
-
 export {
   BROTLI_QUALITY,
   GZIP_LEVEL,

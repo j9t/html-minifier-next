@@ -274,7 +274,8 @@ describe('Benchmark', () => {
     test('Weights the total’s noise by each file’s time', async (t) => {
       const { files, noise } = await run(t, ['--iterations=4']);
       const spreads = [files.alpha.spread, files.beta.spread];
-      // A time-weighted mean lies between the per-file values (rounded to a tenth, hence the margin)
+      // A time-weighted mean lies between the per-file values (rounded to
+      // a tenth, hence the margin)
       assert.ok(noise.total >= Math.min(...spreads) - 0.05 && noise.total <= Math.max(...spreads) + 0.05, `${noise.total} outside ${spreads}`);
       assert.ok(Math.abs(noise.typical - (spreads[0] + spreads[1]) / 2) <= 0.05);
       assert.ok(findLine(logs, `Noise: ${noise.total.toFixed(1)}% on the total`));

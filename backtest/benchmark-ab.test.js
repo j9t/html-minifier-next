@@ -40,7 +40,8 @@ describe('A/B benchmark', () => {
   });
 
   describe('`combineRuns`', () => {
-    // B is 10% slower and 5 bytes shorter on the first file; a run that loaded B first reports it as `A`
+    // B is 10% slower and 5 bytes shorter on the first file; a run that loaded
+    // B first reports it as `A`
     const straight = { on: { best: { A: [100, 50], B: [110, 50] }, size: { A: [20, 10], B: [15, 10] } } };
     const swapped = { on: { best: { A: [110, 50], B: [100, 50] }, size: { A: [15, 10], B: [20, 10] } } };
 

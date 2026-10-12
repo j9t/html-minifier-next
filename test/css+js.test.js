@@ -147,7 +147,6 @@ describe('CSS and JS', () => {
   });
 
   test('Removes invalid and empty CSS in `style` attributes', async () => {
-    // Regression test for issue where invalid CSS like `color: ` was minified to `color:` instead of being removed
     let input, output;
 
     // Properties with no value should be detected as empty
@@ -181,10 +180,9 @@ describe('CSS and JS', () => {
   });
 
   test('Handles CSS minification errors', async () => {
-    // Test invalid CSS syntax—should attempt to minify or preserve original
+    // Invalid CSS syntax—should attempt to minify or preserve original
     let input = '<style>body { color: #invalid!!! }</style>';
     let result = await minify(input, { minifyCSS: true });
-    // Should not crash and should contain style element
     assert.ok(result.includes('<style>'));
     assert.ok(result.includes('</style>'));
     // Should crash with continueOnMinifyError: false
@@ -193,7 +191,7 @@ describe('CSS and JS', () => {
       { message: /Unexpected token/ }
     );
 
-    // Test completely malformed CSS
+    // Completely malformed CSS
     input = '<style>this is not valid css at all { { { </style>';
     result = await minify(input, { minifyCSS: true });
     assert.ok(result.includes('<style>'));
@@ -203,14 +201,14 @@ describe('CSS and JS', () => {
       { message: /Unexpected end of input/ }
     );
 
-    // Test CSS with unclosed braces
+    // CSS with unclosed braces
     input = '<style>body { color: red;</style>';
     result = await minify(input, { minifyCSS: true });
     assert.ok(result.includes('style'));
-    // Note: Lightning CSS can handle unclosed braces without error, even with `errorRecovery: false`
+    // Lightning CSS handles unclosed braces without error, even with `errorRecovery: false`
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyCSS: true }));
 
-    // Test empty `style` element
+    // Empty `style` element
     input = '<style></style>';
     result = await minify(input, { minifyCSS: true, removeEmptyElements: false });
     assert.strictEqual(result, '<style></style>');
@@ -220,7 +218,7 @@ describe('CSS and JS', () => {
       removeEmptyElements: false
     }));
 
-    // Test `style` attribute with invalid CSS
+    // `style` attribute with invalid CSS
     input = '<div style="color: #invalid!!!">Test</div>';
     result = await minify(input, { minifyCSS: true });
     assert.ok(result.includes('div'));
@@ -230,7 +228,7 @@ describe('CSS and JS', () => {
       { message: /Unexpected token/ }
     );
 
-    // Test valid CSS still works
+    // Valid CSS still works
     input = '<style>  body { color: red; }  </style>';
     result = await minify(input, { minifyCSS: true });
     assert.strictEqual(result, '<style>body{color:red}</style>');
@@ -238,8 +236,8 @@ describe('CSS and JS', () => {
   });
 
   test('Large CSS inputs with identical first/last 50 chars are not confused in cache', async () => {
-    // Craft two CSS inputs that share the same length, first 50 chars, and last 50 chars
-    // but differ in the middle—previously the fingerprint key caused a cache collision
+    // Craft two CSS inputs that share the same length, first 50 chars, and last 50 chars but differ
+    // in the middle, which a fingerprint key would confuse
     const first50 = 'div,p,span,section,article,main,header,footer,nav{'; // exactly 50 chars
     const last50 = '}/*' + 'x'.repeat(45) + '*/'; // exactly 50 chars
     const filler = '/* ' + 'f'.repeat(1970) + ' */'; // stripped by minifier
@@ -569,7 +567,7 @@ describe('CSS and JS', () => {
   });
 
   test('Handles JavaScript minification errors', async () => {
-    // Test invalid JavaScript syntax
+    // Invalid JavaScript syntax
     let input = '<script>function foo( { syntax error</script>';
     let result = await minify(input, { minifyJS: true });
     // Should not crash and should contain `script` element
@@ -582,7 +580,7 @@ describe('CSS and JS', () => {
       { message: /Unexpected token/ }
     );
 
-    // Test completely malformed JavaScript
+    // Completely malformed JavaScript
     input = '<script>{{ this is not valid javascript }} [[</script>';
     result = await minify(input, { minifyJS: true });
     assert.ok(result.includes('<script>'));
@@ -592,7 +590,7 @@ describe('CSS and JS', () => {
       { message: /Unexpected token/ }
     );
 
-    // Test JS with unclosed brackets
+    // JS with unclosed brackets
     input = '<script>function test() { console.log("hi");</script>';
     result = await minify(input, { minifyJS: true });
     assert.ok(result.includes('script'));
@@ -601,13 +599,13 @@ describe('CSS and JS', () => {
       { message: /Unexpected token/ }
     );
 
-    // Test empty `script` element
+    // Empty `script` element
     input = '<script></script>';
     result = await minify(input, { minifyJS: true, removeEmptyElements: false });
     assert.strictEqual(result, '<script></script>');
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
-    // Test event attribute with invalid JS
+    // Event attribute with invalid JS
     input = '<button onclick="function( { syntax">Click</button>';
     result = await minify(input, { minifyJS: true });
     assert.ok(result.includes('button'));
@@ -617,13 +615,13 @@ describe('CSS and JS', () => {
       { message: /Unexpected token/ }
     );
 
-    // Test valid JS still works
+    // Valid JS still works
     input = '<script>  console.log( "test" );  </script>';
     result = await minify(input, { minifyJS: true });
     assert.strictEqual(result, '<script>console.log("test")</script>');
     await assert.doesNotReject(minify(input, { continueOnMinifyError: false, minifyJS: true }));
 
-    // Test event attribute with valid JS (quote style may change during minification)
+    // Event attribute with valid JS (quote style may change during minification)
     input = '<button onclick="  alert( \'test\' )  ">Click</button>';
     result = await minify(input, { minifyJS: true });
     // Minifier may normalize quote styles
@@ -732,19 +730,21 @@ describe('CSS and JS', () => {
   test('Applies presets', async () => {
     const { getPreset } = await import('../src/presets.js');
 
-    // Test with conservative preset
+    // With conservative preset
     let input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n    <script type="application/ld+json">\n{\n  "name": "Test",\n  "url": "https://example.com/page"\n}\n    </script>\n  </head>\n</html>';
     const conservativeResult = await minify(input, getPreset('conservative'));
-    // Conservative preset should: remove comments, collapse whitespace, minify JSON, use short doctype
+    // Conservative preset should: remove comments, collapse whitespace,
+    // minify JSON, use short doctype
     assert.ok(!conservativeResult.includes('<!-- Comment -->'), 'Conservative: Should remove comments');
     assert.ok(conservativeResult.includes('<!doctype html>'), 'Conservative: Should use short doctype');
     assert.ok(conservativeResult.includes('{"name":"Test","url":"https://example.com/page"}'), 'Conservative: Should minify JSON');
     assert.ok(!conservativeResult.includes('\n{\n'), 'Conservative: Should collapse whitespace in script content');
 
-    // Test with comprehensive preset
+    // With comprehensive preset
     input = '<script type="importmap">\n{\n  "imports": {\n    "vue": "https://cdn.example.com/vue.js"\n  }\n}\n</script>';
     const comprehensiveResult = await minify(input, getPreset('comprehensive'));
-    // Comprehensive preset should: minify JSON, collapse whitespace, remove quotes from attributes where possible
+    // Comprehensive preset should: minify JSON, collapse whitespace, remove quotes from
+    // attributes where possible
     assert.ok(comprehensiveResult.includes('{"imports":{"vue":"https://cdn.example.com/vue.js"}}'), 'Comprehensive: Should minify JSON');
     assert.ok(comprehensiveResult.includes('type=importmap'), 'Comprehensive: Should remove attribute quotes');
 
@@ -753,19 +753,19 @@ describe('CSS and JS', () => {
     const noOptionsResult = await minify(input, {});
     assert.strictEqual(noOptionsResult, '<script type="application/json">{"test":"value"}</script>', 'No options: should still minify JSON automatically');
 
-    // Test preset as option key (should work the same as spreading `getPreset`)
+    // Preset as option key (should work the same as spreading `getPreset`)
     input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n  </head>\n</html>';
     const presetOptionResult = await minify(input, { preset: 'conservative' });
     const spreadPresetResult = await minify(input, getPreset('conservative'));
     assert.strictEqual(presetOptionResult, spreadPresetResult, 'Using preset option should produce same result as spreading getPreset()');
     assert.ok(!presetOptionResult.includes('<!-- Comment -->'), 'Preset option: Should apply preset settings');
 
-    // Test preset with overrides (user options should override preset)
+    // Preset with overrides (user options should override preset)
     input = '<!DOCTYPE html>\n<html>\n  <head>\n    <!-- Comment -->\n  </head>\n</html>';
     const presetWithOverride = await minify(input, { preset: 'conservative', removeComments: false });
     assert.ok(presetWithOverride.includes('<!-- Comment -->'), 'User option should override preset setting');
 
-    // Test unknown preset emits warning (once per preset name per process)
+    // Unknown preset emits warning (once per preset name per process)
     const originalWarn = console.warn;
     let warnMessage = '';
     let warnCount = 0;
@@ -896,8 +896,8 @@ describe('CSS and JS', () => {
   });
 
   describe('Object-valued options handed a string', () => {
-    // `'false'` used to switch minification on: Any non-empty string is truthy, and
-    // these options read a non-object as `{}`
+    // `'false'` must not switch minification on: Any non-empty string is truthy, and these options
+    // read a non-object as `{}`
     const cases = [
       ['minifyCSS', '<style>.a { color : red }</style>'],
       ['minifyJS', '<script>var x  =  1</script>'],
@@ -1495,7 +1495,7 @@ describe('CSS and JS', () => {
     });
 
     test('Default sizes work', async () => {
-      // Test that caches work without explicit configuration
+      // Caches work without explicit configuration
       const input = `
         <style>body { color: red; margin: 0; }</style>
         <script>let x = 1; console.log(x);</script>
@@ -1572,14 +1572,13 @@ describe('CSS and JS', () => {
       });
 
       assert.ok(result.includes('#fff'), 'CSS should be minified');
-      // Check that object properties are minified
       assert.ok(result.includes('x:1') && result.includes('y:2'), 'JS should be minified with custom cache sizes');
     });
 
     test('Environment variables set the cache size', async () => {
       const input = '<style>.test { color: purple; }</style>';
 
-      // Test environment variable override
+      // Environment variable override
       process.env.HMN_CACHE_CSS = '900';
       try {
         const result = await minify(input, {

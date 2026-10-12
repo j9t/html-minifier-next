@@ -38,11 +38,10 @@ import { Command, Option } from 'commander';
 /** @param {string} str */
 const camelCase = (str) => paramCase(str).replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
-// Commander derives its internal option key by applying paramCase then camelCase to the flag name,
-// stripping a leading `no-` first for negated flags (e.g., `--no-foo-bar` → `fooBar`);
-// because option definition keys may differ from the result of that round-trip (e.g.,
-// `minifyURLs` → Commander key `minifyUrls`, `noNewlinesBeforeTagClose` → `newlinesBeforeTagClose`),
-// `commanderOptionKey` uses the same paramCase + camelCase path to compute the key Commander will use
+// Commander derives its option key by applying paramCase then camelCase to the flag name, after
+// stripping a leading `no-` for negated flags (`--no-foo-bar` → `fooBar`); as option definition
+// keys may not survive that round-trip (`minifyURLs` → `minifyUrls`, `noNewlinesBeforeTagClose` →
+// `newlinesBeforeTagClose`), `commanderOptionKey` takes the same path to get Commander’s key
 /** @param {string} key */
 const commanderOptionKey = (key) => {
   const pc = paramCase(key);
@@ -243,7 +242,6 @@ async function loadConfigFromPath(configPath) {
     catch (err) { fatal(`Cannot load config file: ${errorMessage(err)}`); }
   }
 
-  // Unknown extension: Try JSON, then module import
   /** @type {unknown} */
   let jsonErr;
   try { return JSON.parse(readFile(abs).replace(/^\uFEFF/, '')); }
@@ -274,7 +272,7 @@ function parseConfigValue(key, type, value) {
   switch (type) {
     case 'int':
       return getParser(key, type)(String(value));
-    // A single value is wrapped as its string form is; `null` and `undefined` leave the option unset
+    // A single value is wrapped as its string form is; `null` and `undefined` leave it unset
     case 'regexpArray':
       return value == null ? undefined : (Array.isArray(value) ? value : [value]).map(parseRegExp);
     case 'jsonArray':
@@ -293,7 +291,7 @@ function normalizeConfig(config) {
   /** @type {Record<string, any>} */
   const normalized = { ...config };
 
-  // Warn about unrecognized config keys—catches typos as well as options removed in earlier versions
+  // Warn about unrecognized config keys—catches typos and options removed in earlier versions
   Object.keys(normalized).forEach(function (key) {
     if (!Object.hasOwn(optionDefinitions, key) && !CONFIG_KEYS_EXTRA.has(key)) {
       console.error(`Ignoring unknown or deprecated config option \`${key}\` (see \`--help\` or README for available options)`);
@@ -309,7 +307,6 @@ function normalizeConfig(config) {
     }
   });
 
-  // Handle `fileExt` in config file
   if ('fileExt' in normalized) {
     // Support both string (`html,htm`) and array (`["html", "htm"]`) formats
     if (Array.isArray(normalized.fileExt)) {
@@ -317,7 +314,6 @@ function normalizeConfig(config) {
     }
   }
 
-  // Handle `ignoreDir` in config file
   if ('ignoreDir' in normalized) {
     // Support both string (`libs,vendor`) and array (`["libs", "vendor"]`) formats
     if (Array.isArray(normalized.ignoreDir)) {
@@ -361,20 +357,18 @@ program.helpOption('-h, --help', 'Display help for command');
 
   const programOptions = program.opts();
 
-  // Check if any `parseJSON` options consumed a filename as their value
-  // If so, treat the option as boolean true and add the filename back to the files list
+  // A `parseJSON` option that consumed a filename as its value is `true`, and the
+  // file goes back on the list
   const jsonOptionKeys = ['minifyCss', 'minifyJs', 'minifyUrls'];
   for (const key of jsonOptionKeys) {
     const value = programOptions[key];
     if (typeof value === 'string' && /\.(html?|shtml?|xhtml?|php|xml|svg|jsx|tsx|vue|ejs|hbs|mustache|twig)$/i.test(value)) {
-      // The option consumed a filename—inject it back
       programOptions[key] = true;
       capturedFiles.push(value);
       filesProvided = true;
     }
   }
 
-  // If `--input` was specified, treat it as a positional file argument
   if (programOptions.input) {
     capturedFiles.unshift(programOptions.input);
     filesProvided = true;
@@ -414,7 +408,6 @@ program.helpOption('-h, --help', 'Display help for command');
         process.exit(0);
       }
 
-      // Apply comprehensive preset for all processing
       programOptions.preset = 'comprehensive';
 
       const inputDirResolved = await fs.promises.realpath(cwd).catch(() => cwd);
@@ -663,8 +656,6 @@ program.helpOption('-h, --help', 'Display help for command');
     }
   }
 
-  // Print a one-line-per-cache hits/misses/size summary to STDERR, skipping caches
-  // that were never touched (e.g., their minifier is disabled)
   async function printCacheStats() {
     const { getCacheStats } = await import('./src/htmlminifier.js');
     const cacheStats = getCacheStats();
@@ -674,6 +665,7 @@ program.helpOption('-h, --help', 'Display help for command');
     /** @type {string[]} */
     const lines = [];
     for (const [key, { gets, hits, size, limit }] of Object.entries(cacheStats)) {
+      // Untouched caches (e.g., with their minifier disabled) are left out
       if (gets === 0) continue;
       const misses = gets - hits;
       lines.push(`  ${labels[key]} cache: ${hits.toLocaleString()} hit${hits === 1 ? '' : 's'}, ${misses.toLocaleString()} miss${misses === 1 ? '' : 'es'}, ${size.toLocaleString()}/${limit.toLocaleString()} entries`);
@@ -709,7 +701,6 @@ program.helpOption('-h, --help', 'Display help for command');
 
     const stats = calculateStats(data, minified);
 
-    // Show stats if dry run or verbose mode
     if (isDryRun || isVerbose) {
       console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
     }
@@ -744,7 +735,6 @@ program.helpOption('-h, --help', 'Display help for command');
    * @param {string[]} fileExtensions
    */
   function shouldProcessFile(filename, fileExtensions) {
-    // Wildcard: process all files
     if (fileExtensions.includes('*')) {
       return true;
     }
@@ -754,7 +744,6 @@ program.helpOption('-h, --help', 'Display help for command');
   }
 
   /**
-   * Parse comma-separated ignore patterns into an array.
    * @param {string} patterns - Comma-separated directory patterns (e.g., "libs,vendor")
    * @returns {string[]} Array of trimmed pattern strings with normalized separators
    */
@@ -817,7 +806,6 @@ program.helpOption('-h, --help', 'Display help for command');
       }
 
       if (lst.isDirectory()) {
-        // Skip ignored directories
         if (shouldIgnoreDirectory(filePath, ignorePatterns, baseDir)) {
           continue;
         }
@@ -842,7 +830,7 @@ program.helpOption('-h, --help', 'Display help for command');
       const percentage = (ratio * 100).toFixed(1);
       process.stderr.write(`Processing ${current.toLocaleString()}/${total.toLocaleString()} (${percentage}%)`);
     } else {
-      // Indeterminate progress - no total known yet
+      // Indeterminate progress—no total known yet
       process.stderr.write(`Processing ${current.toLocaleString()} files…`);
     }
   }
@@ -851,7 +839,6 @@ program.helpOption('-h, --help', 'Display help for command');
     process.stderr.write('\r\x1b[K'); // Clear the line
   }
 
-  // Utility: concurrency runner
   /**
    * @template T, R
    * @param {T[]} items
@@ -1004,7 +991,6 @@ program.helpOption('-h, --help', 'Display help for command');
   const writeMinify = async () => {
     const minifierOptions = createOptions();
 
-    // Show config info if verbose
     if (programOptions.verbose || programOptions.dry) {
       getActiveOptionsDisplay(minifierOptions);
     }
@@ -1032,7 +1018,6 @@ program.helpOption('-h, --help', 'Display help for command');
       return;
     }
 
-    // Show stats if verbose
     if (programOptions.verbose) {
       const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
       console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
@@ -1083,7 +1068,6 @@ program.helpOption('-h, --help', 'Display help for command');
       // `--dry` automatically enables verbose mode
       const isVerbose = programOptions.verbose || programOptions.dry;
 
-      // Show config info if verbose
       if (isVerbose) {
         const minifierOptions = createOptions();
         getActiveOptionsDisplay(minifierOptions);
@@ -1099,7 +1083,6 @@ program.helpOption('-h, --help', 'Display help for command');
       }
       let skipRootAbs;
       if (inputReal && outputReal && outputReal !== inputReal && outputReal.startsWith(inputReal + path.sep)) {
-        // Skip traversing into the output directory when it is nested inside the input directory
         skipRootAbs = outputReal;
       }
 
@@ -1107,15 +1090,12 @@ program.helpOption('-h, --help', 'Display help for command');
         console.error(`[DRY RUN] Would process directory: ${inputDir} → ${outputDir}`);
       }
 
-      // Set up progress indicator (only in TTY and when not verbose/dry)
       const showProgress = process.stderr.isTTY && !isVerbose;
       /** @type {Progress | null} */
       let progress = null;
 
-      // Parse ignore patterns
       const ignorePatterns = parseIgnorePatterns(resolvedIgnoreDir);
 
-      // Validate that the input directory exists and is readable
       try {
         const stat = await fs.promises.stat(inputDir);
         if (!stat.isDirectory()) {
@@ -1132,11 +1112,8 @@ program.helpOption('-h, --help', 'Display help for command');
         // Start with indeterminate progress, count in background
         progress = {current: 0, total: null};
 
-        // Note: `countFiles` runs asynchronously and mutates `progress.total` when complete.
-        // This shared-state mutation is safe because JavaScript is single-threaded—
-        // `updateProgress` may read `progress.total` as `null` initially,
-        // then see the updated value once `countFiles` resolves,
-        // transitioning the indicator from indeterminate to determinate progress without race conditions.
+        // `countFiles` sets `progress.total` once it resolves (safe, as JavaScript is
+        // single-threaded); until then, `updateProgress` reads `null` and shows no total
         const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
         countFiles(inputDir, extensions, skipRootAbs, ignorePatterns, inputDirResolved).then(total => {
           if (progress) {
@@ -1149,7 +1126,6 @@ program.helpOption('-h, --help', 'Display help for command');
 
       const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress, ignorePatterns, inputDirResolved);
 
-      // Show completion message and clear progress indicator
       if (progress) {
         clearProgress();
         console.error(`${MARK_SUCCESS}Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}.${MARK_RESET}`);
@@ -1170,10 +1146,9 @@ program.helpOption('-h, --help', 'Display help for command');
         await printCacheStats();
       }
     })();
-  } else if (filesProvided) { // Minifying one or more files specified on the CMD line
+  } else if (filesProvided) { // Minifying one or more files specified on the command line
     // Process each file independently, then concatenate outputs
     const minifierOptions = createOptions();
-    // Show config info if verbose/dry
     if (programOptions.verbose || programOptions.dry) {
       getActiveOptionsDisplay(minifierOptions);
     }
@@ -1188,7 +1163,6 @@ program.helpOption('-h, --help', 'Display help for command');
     const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
     const inputs = capturedFiles.slice();
 
-    // Read originals and minify in parallel with bounded concurrency
     const originals = new Array(inputs.length);
     const outputs = new Array(inputs.length);
 

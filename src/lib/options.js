@@ -13,8 +13,6 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
 
 /** @import { MinifierOptions, HTMLAttribute } from '../htmlminifier.js' */
 
-// Type definitions
-
 /**
  * Per-document state handed to `minifyCSS`. Its closure hangs off the memoized
  * options object that every `minify()` call with those options shares, so state
@@ -62,12 +60,8 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  * }} ProcessedOptions
  */
 
-// Patterns
-
 const RE_SCOPE_AT_RULE = /@scope\b/i;
 const RE_SVGO_EMPTY_ATTRIBUTE = / ([^\s"'<>/=]+)=""/g;
-
-// Helper functions
 
 /** @param {ProcessedOptions} options */
 function shouldMinifyInnerHTML(options) {
@@ -224,8 +218,6 @@ function describeEngine(engine) {
   }
 }
 
-// Main options processor
-
 /**
  * @param {MinifierOptions} inputOptions - User-provided options
  * @param {{getLightningCSS?: Function | undefined, getTerser?: Function | undefined, getSwc?: Function | undefined, getSvgo?: Function | undefined, cssMinifyCache?: LRU | undefined, jsMinifyCache?: LRU | undefined, svgMinifyCache?: LRU | undefined}} [deps] - Dependencies from htmlminifier.js
@@ -258,11 +250,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   const parseNestedRegExpArray = (/** @type {unknown} */ arr) => {
     if (!Array.isArray(arr)) return [];
     return arr.map(item => {
-      // If item is an array (a pair), recursively convert each element
       if (Array.isArray(item)) {
         return item.map(parseRegExp);
       }
-      // Otherwise, convert single item
       return parseRegExp(item);
     });
   };
@@ -278,7 +268,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
   // its consumer already knows the source.
   const warn = typeof inputOptions.log === 'function' ? inputOptions.log : console.warn;
 
-  // Warn about unrecognized options—catches typos as well as options removed in earlier versions
+  // Warn about unrecognized options—catches typos and options removed in earlier versions
   Object.keys(inputOptions).forEach(function (key) {
     if (!Object.hasOwn(optionDefinitions, key) && !optionKeysExtra.has(key) && !optionKeysWarned.has(key)) {
       optionKeysWarned.add(key);
@@ -286,8 +276,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   });
 
-  // Merge preset with user options so all values go through normalization
-  // User options take precedence over preset values
+  // Merge preset with user options (which take precedence), so all values go through normalization
   let effectiveInput = inputOptions;
   if (inputOptions.preset) {
     const preset = getPreset(inputOptions.preset);
@@ -326,8 +315,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
 
     if (key === 'caseSensitive') {
-      // HTML names are read in lowercase, like browsers do,
-      // and only written as in the source
+      // HTML names are read in lowercase, like browsers do, and only written as in the source
       if (option) {
         options.namesAsWritten = true;
       }
@@ -366,12 +354,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return text;
         }
 
-        // Warnings are stored with the minified result and replayed on every hit, so a
-        // second document with the same defect hears about it, too; `context.warned`
-        // then keeps one document from repeating itself. Reporting from the cache
-        // rather than only from the transform keeps the output independent of cache
-        // size and eviction. They are built and cached even when `log` is the default
-        // no-op, so a later document that does pass a `log` hook still gets them.
+        // Warnings are cached with the result and replayed on every hit, so a second document with
+        // the same defect hears about it, too (`context.warned` keeps one document from repeating
+        // itself), and the output doesn’t depend on cache size or eviction. They are cached even
+        // with the no-op `log`, so a later document with a `log` hook still gets them.
         const report = (/** @type {string[]} */ messages) => {
           if (!messages.length || options.log === identity) {
             return;
@@ -388,8 +374,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           }
         };
 
-        // Optimization: Only process URLs if minification is enabled (not identity function)
-        // This avoids expensive `replaceAsync` when URL minification is disabled
+        // Skip the costly `replaceAsync` when URL minification is off
         if (options.minifyURLs !== identity) {
           text = await replaceAsync(
             text,
@@ -458,7 +443,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           // of the same CSS content (same pattern as JS minification)
           const inFlight = (async () => {
             const transformCSS = await cssLoader();
-            // Note: `Buffer.from()` is required—Lightning CSS API expects Uint8Array
+            // `Buffer.from()` is required—the Lightning CSS API expects a `Uint8Array`
             const result = transformCSS({
               filename: 'input.css',
               code: Buffer.from(inputCSS),
@@ -489,18 +474,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
             const outputCSS = unwrapCSS(result.code.toString(), type);
 
-            // If Lightning CSS removed significant content that looks like template syntax or UIDs, return original
-            // This preserves:
-            // 1. Template code like `<?php ?>`, `<%= ?>`, `{{ }}`, etc. (contain `<` or `>` but not `CDATA`)
-            // 2. UIDs representing custom fragments (only lowercase letters and digits, no spaces)
-            // CDATA sections, HTML entities, and other invalid CSS are allowed to be removed
+            // Where Lightning CSS emptied template syntax (`<?php ?>`, `{{ }}`: `<` or `>` without
+            // `CDATA`) or custom-fragment UIDs (long lowercase alphanumeric runs), keep the
+            // original; CDATA sections, entities, and other invalid CSS may go
             const isCDATA = text.includes('<![CDATA[');
             const uidPattern = /[a-z0-9]{10,}/; // UIDs are long alphanumeric strings
             const hasUID = uidPattern.test(text) && !isCDATA; // Exclude CDATA from UID detection
             const looksLikeTemplate = (text.includes('<') || text.includes('>')) && !isCDATA;
 
-            // Preserve if output is empty and input had template syntax or UIDs
-            // This catches cases where Lightning CSS removed content that should be preserved
             const css = (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
             return { css, warnings };
           })();
@@ -529,17 +510,14 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       const loadSwc = getSwc;
       const jsCache = jsMinifyCache;
 
-      // Parse configuration
       const config = typeof option === 'object' ? option : {};
       const engine = normalizeEngine(config.engine, 'terser');
 
-      // Validate engine
       const supportedEngines = ['terser', 'swc'];
       if (!supportedEngines.includes(/** @type {string} */ (engine))) {
         throw new Error(`Unsupported JS minifier engine: \`${describeEngine(engine)}\`. Supported engines: ${supportedEngines.join(', ')}`);
       }
 
-      // Extract engine-specific options (excluding `engine` field itself)
       const engineOptions = { ...config };
       delete engineOptions.engine;
 
@@ -553,7 +531,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       // SWC options (when engine is `swc`)
       const swcOptions = engine === 'swc' ? engineOptions : {};
 
-      // Pre-compute option signatures once for performance (avoid repeated stringification)
+      // Option signatures, computed once rather than per call
       const terserSig = stableStringify({
         ...terserOptions,
         cont: !!options.continueOnMinifyError
@@ -576,14 +554,12 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return text;
         }
 
-        // Hybrid strategy: Always use Terser for inline JS (needs bare returns support)
-        // Use user’s chosen engine for script blocks
+        // Inline JS always goes to Terser, for bare returns; script blocks go to the chosen engine
         const useEngine = inline ? 'terser' : engine;
         let jsKey;
         const isCacheable = code.length <= MAX_CACHE_ENTRY_SIZE;
 
         try {
-          // Select pre-computed signature based on engine
           const optsSig = useEngine === 'terser' ? terserSig : swcSig;
 
           if (isCacheable) {
@@ -598,7 +574,6 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           }
 
           const inFlight = (async () => {
-            // Dispatch to appropriate minifier
             if (useEngine === 'terser') {
               // Create a copy to avoid mutating shared `terserOptions` (race condition)
               const terserCallOptions = {
@@ -665,13 +640,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       const instanceCache = getUrlMinifyCache(urlOptions.site || '');
 
       options.minifyURLs = function (/** @type {string} */ text) {
-        // Fast-path: Skip if text doesn’t look like a URL that needs processing
-        // Only process if contains URL-like characters (`/`, `:`, `#`, `?`) or spaces that need encoding
+        // Fast path: Skip text without URL-like characters (`/`, `:`, `#`, `?`) or spaces
         if (!/[/:?#\s]/.test(text)) {
           return text;
         }
 
-        // Check cache
         const cached = /** @type {string | undefined} */ (instanceCache.get(text));
         if (cached !== undefined) {
           return cached;
@@ -703,7 +676,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       const svgoConfig = typeof option === 'object' ? /** @type {{plugins?: unknown[]}} */ (option) : {};
       const svgoOptions = { ...svgoConfig, plugins: svgoConfig.plugins ?? svgoPluginsInline };
 
-      // Pre-compute option signature for cache keys
+      // Option signature for cache keys
       const svgSig = stableStringify({
         ...svgoOptions,
         cont: !!options.continueOnMinifyError
@@ -790,13 +763,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   }
 
-  // Fragments that compound quantifiers or alternation under unbounded repetition
-  // are the shapes that backtrack catastrophically, and they are also the ones a
-  // linear scan cannot stand in for; so are patterns too long or too deeply
-  // nested to read, which are refused for that rather than for a shape. A lone
-  // `[\s\S]*?` up to a literal terminator is linear and passes; HMN’s default
-  // fragments have exactly that shape, so the check flagging it would mean
-  // warning about the defaults themselves.
+  // Quantifiers or alternation compounded under unbounded repetition backtrack catastrophically,
+  // and a linear scan cannot stand in for them; patterns too long or too deeply nested to read are
+  // refused for that alone. A lone `[\s\S]*?` up to a literal terminator is linear and passes, as
+  // HMN’s default fragments have exactly that shape.
   for (const re of options.ignoreCustomFragments || []) {
     const risk = describeQuantifierRisk(re);
     if (!risk) continue;
@@ -810,11 +780,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   }
 
-  // Options that silently do nothing without the option they build on say so rather
-  // than let them pass. The option is read from `effectiveInput` (user options
-  // over preset), so that a default filled in above doesn’t count as the user asking
-  // for it; the option it needs is read from the settled options, so that a minifier
-  // asked for but not loadable counts as absent rather than as present.
+  // Options that do nothing without the option they build on say so. The option is read from
+  // `effectiveInput` (user options over preset), so a default filled in above doesn’t count as
+  // asked for; the one it needs comes from the settled options, so an unloadable minifier is absent
   const requestedOptions = /** @type {Record<string, any>} */ (effectiveInput);
   const settledOptions = /** @type {Record<string, any>} */ (options);
   for (const { option, requires, unusable, clear } of optionDependencies) {
@@ -833,8 +801,6 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
   return options;
 };
-
-// Exports
 
 export {
   optionDependencies,

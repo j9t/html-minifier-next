@@ -13,8 +13,7 @@ import { trimWhitespace } from './whitespace.js';
 
 // CSS processing
 
-// Wrap CSS declarations for inline styles and media queries
-// This ensures proper context for CSS minification
+// Give bare declarations and media queries a parseable context for CSS minifiers
 /**
  * @param {string} text
  * @param {string} [type]
@@ -92,11 +91,9 @@ async function processScript(text, options, currentAttrs, minifyHTML) {
     if (attrName === 'type') {
       const rawValue = attr.value;
       const normalizedValue = trimWhitespace((rawValue || '').split(/;/, 2)[0] ?? '').toLowerCase();
-      // Minify JSON script types automatically
       if (jsonScriptTypes.has(normalizedValue)) {
         return minifyJson(text, options);
       }
-      // Process custom script types if specified
       if (options.processScripts && rawValue && options.processScripts.indexOf(rawValue) > -1) {
         return await minifyHTML(text, options);
       }
@@ -174,8 +171,6 @@ function extractScriptBodies(html) {
 
   return bodies;
 }
-
-// Exports
 
 export {
   // CSS
