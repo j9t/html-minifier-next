@@ -203,9 +203,9 @@ async function ensureInput() {
   }
 }
 
-function git() {
-  const args = [].concat.apply([], [].slice.call(arguments, 0, -1));
-  const callback = arguments[arguments.length - 1];
+function git(...params) {
+  const callback = params.pop();
+  const args = params.flat();
   const task = spawn('git', args, { cwd: dirRoot, stdio: ['ignore', 'pipe', 'ignore'] });
   let output = '';
   task.stdout.setEncoding('utf8');

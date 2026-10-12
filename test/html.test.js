@@ -2421,6 +2421,12 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<img src="a.png" alt="">', getPreset('comprehensive')), '<img src=a.png alt>');
   });
 
+  test('Keeps empty quoted values apart from bare attributes', async () => {
+    assert.strictEqual(await minify('<p a="" b=\'\' c d=e f="g">x</p>'), '<p a="" b=\'\' c d=e f="g">x</p>');
+    assert.strictEqual(await minify('<p a="" b=\'\' c>x</p>', { removeAttributeQuotes: true }), '<p a="" b="" c>x</p>');
+    assert.strictEqual(await minify('<p (a="") (b)>x</p>', { customAttrSurround: [[/\(/, /\)/]] }), '<p (a="" )(b)>x</p>');
+  });
+
   test('Collapses empty attributes only where assigned by `=`', async () => {
     assert.strictEqual(await minify('<div a=="" class=""></div>', { collapseEmptyAttributes: true, customAttrAssign: [/==/] }), '<div a=="" class></div>');
 

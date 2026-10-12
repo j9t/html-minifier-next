@@ -79,12 +79,6 @@ const qnameCapture = (function () {
 const startTagOpen = new RegExp('^<' + qnameCapture);
 const endTagOpen = new RegExp('^</' + qnameCapture);
 
-let IS_REGEX_CAPTURING_BROKEN = false;
-'x'.replace(/x(.)?/g, function (/** @type {string} */ m, /** @type {string | undefined} */ g) {
-  IS_REGEX_CAPTURING_BROKEN = g === '';
-  return m;
-});
-
 // Empty elements
 const empty = new Set(['area', 'base', 'basefont', 'br', 'col', 'embed', 'frame', 'hr', 'img', 'input', 'isindex', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
 
@@ -1092,13 +1086,6 @@ export class HTMLParser {
         const args = /** @type {Array<string | undefined>} */ (rawAttrs[i]);
         /** @type {string | undefined} */
         let name, value, customOpen, customClose, customAssign, quote;
-
-        // Hackish workaround for Firefox bug, https://bugzilla.mozilla.org/show_bug.cgi?id=369778
-        if (IS_REGEX_CAPTURING_BROKEN && (args[0] ?? '').indexOf('""') === -1) {
-          if (args[3] === '') { delete args[3]; }
-          if (args[4] === '') { delete args[4]; }
-          if (args[5] === '') { delete args[5]; }
-        }
 
         // Where `customAssign` sits; the value is in one of the three slots after it
         let assignIndex = -1;
