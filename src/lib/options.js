@@ -354,12 +354,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return text;
         }
 
-        // Warnings are stored with the minified result and replayed on every hit, so a
-        // second document with the same defect hears about it, too; `context.warned`
-        // then keeps one document from repeating itself. Reporting from the cache
-        // rather than only from the transform keeps the output independent of cache
-        // size and eviction. They are built and cached even when `log` is the default
-        // no-op, so a later document that does pass a `log` hook still gets them.
+        // Warnings are cached with the result and replayed on every hit, so a second document with
+        // the same defect hears about it, too (`context.warned` keeps one document from repeating
+        // itself), and the output doesn’t depend on cache size or eviction. They are cached even
+        // with the no-op `log`, so a later document with a `log` hook still gets them.
         const report = (/** @type {string[]} */ messages) => {
           if (!messages.length || options.log === identity) {
             return;
@@ -476,11 +474,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
             const outputCSS = unwrapCSS(result.code.toString(), type);
 
-            // If Lightning CSS removed significant content that looks like template
-            // syntax or UIDs, return the original. This preserves:
-            // 1. Template code like `<?php ?>`, `<%= ?>`, `{{ }}` (has `<` or `>` but no `CDATA`)
-            // 2. UIDs representing custom fragments (long runs of lowercase letters and digits)
-            // CDATA sections, HTML entities, and other invalid CSS are allowed to be removed
+            // Where Lightning CSS emptied template syntax (`<?php ?>`, `{{ }}`: `<` or `>` without
+            // `CDATA`) or custom-fragment UIDs (long lowercase alphanumeric runs), keep the
+            // original; CDATA sections, entities, and other invalid CSS may go
             const isCDATA = text.includes('<![CDATA[');
             const uidPattern = /[a-z0-9]{10,}/; // UIDs are long alphanumeric strings
             const hasUID = uidPattern.test(text) && !isCDATA; // Exclude CDATA from UID detection
@@ -767,13 +763,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   }
 
-  // Fragments that compound quantifiers or alternation under unbounded repetition
-  // are the shapes that backtrack catastrophically, and they are also the ones a
-  // linear scan cannot stand in for; so are patterns too long or too deeply
-  // nested to read, which are refused for that rather than for a shape. A lone
-  // `[\s\S]*?` up to a literal terminator is linear and passes; HMN’s default
-  // fragments have exactly that shape, so the check flagging it would mean
-  // warning about the defaults themselves.
+  // Quantifiers or alternation compounded under unbounded repetition backtrack catastrophically,
+  // and a linear scan cannot stand in for them; patterns too long or too deeply nested to read are
+  // refused for that alone. A lone `[\s\S]*?` up to a literal terminator is linear and passes, as
+  // HMN’s default fragments have exactly that shape.
   for (const re of options.ignoreCustomFragments || []) {
     const risk = describeQuantifierRisk(re);
     if (!risk) continue;
@@ -787,11 +780,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
     }
   }
 
-  // Options that silently do nothing without the option they build on say so rather
-  // than let them pass. The option is read from `effectiveInput` (user options
-  // over preset), so that a default filled in above doesn’t count as the user asking
-  // for it; the option it needs is read from the settled options, so that a minifier
-  // asked for but not loadable counts as absent rather than as present.
+  // Options that do nothing without the option they build on say so. The option is read from
+  // `effectiveInput` (user options over preset), so a default filled in above doesn’t count as
+  // asked for; the one it needs comes from the settled options, so an unloadable minifier is absent
   const requestedOptions = /** @type {Record<string, any>} */ (effectiveInput);
   const settledOptions = /** @type {Record<string, any>} */ (options);
   for (const { option, requires, unusable, clear } of optionDependencies) {

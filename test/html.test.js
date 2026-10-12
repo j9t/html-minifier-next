@@ -4381,7 +4381,7 @@ describe('HTML', () => {
     output = '<a href="HTTPS://EXAMPLE.COM/TEST">link</a>';
     assert.strictEqual(await minify(input, { minifyURLs: promiseUrlMinifier }), output);
 
-    // Backwards compatibility—sync function should still work
+    // Sync functions work, too
     const syncUrlMinifier = (url) => url.replace('example.com', 'test.com');
 
     input = '<a href="https://example.com/page">link</a>';
@@ -7960,7 +7960,7 @@ describe('HTML', () => {
   test('Minifying twice changes nothing', async () => {
     // Whatever a run produces must be a fixed point: Feeding the output back in has to
     // return it unchanged. Tag omission and whitespace collapsing decide together what
-    // survives, and each has been caught relocating or dropping the other’s whitespace.
+    // survives, and each can relocate or drop the other’s whitespace.
     const documents = {
       'line-broken document': '<!doctype html>\n<title>Test</title>\n<p>First</p>\n<p>Second</p>\n',
       'nested lists': '<ul>\n  <li>one</li>\n  <li><ol>\n    <li>a</li>\n    <li>b</li>\n  </ol></li>\n</ul>\n',
@@ -7996,9 +7996,8 @@ describe('HTML', () => {
 
   test('Minifying twice changes nothing, in generated combinations, too', async () => {
     // The documents above are written by hand, so they reach the adjacencies someone thought
-    // of. Building the input from fragments instead reaches the ones no one writes down—two
-    // fixed points that were none turned up that way, a paragraph left open across a `<pre>`
-    // and whitespace behind a `textarea` that only the second run removed.
+    // of. Building the input from fragments instead reaches the ones no one writes down, like
+    // a paragraph left open across a `<pre>` or whitespace behind a `textarea`.
     const fragments = [
       '<p>a</p>', '<li>x<li>y', '<pre> p </pre>', '<textarea> t </textarea>', '<title> t </title>',
       '<table><tr><td>t</table>', '<div a="b"> d </div>', '<span> s </span>',

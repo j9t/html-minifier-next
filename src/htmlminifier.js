@@ -919,10 +919,9 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     }
   }
 
-  // For the first pass, create a copy of options and disable aggressive minification.
-  // Keep attribute transformations (like `removeDefaultTypeAttributes`) for accurate analysis.
-  // Safe because `createSortFns` runs before custom-fragment UID markers (`uidAttr`) are added.
-  // Note: `htmlmin:ignore` UID markers (`uidIgnore`) already exist and are expanded for analysis.
+  // First-pass options: Aggressive minification is off, attribute transformations (like
+  // `removeDefaultTypeAttributes`) stay. Custom-fragment UID markers (`uidAttr`) don’t
+  // exist yet; `htmlmin:ignore` ones (`uidIgnore`) do and are expanded for analysis.
   const firstPassOptions = Object.assign({}, options, {
     sortAttributes: false,
     sortClassNames: false,
@@ -1866,10 +1865,8 @@ async function minifyHTML(value, options, partialMarkup) {
         text = '/*!' + uidSVGRawText + (svgRawTexts.length - 1) + '*/';
       }
     } else if (text && (textForeign ? textForeignDecoded : options.decodeEntities && !rawText)) {
-      // Escape any `&` symbols that start either:
-      // 1. a legacy-named character reference (i.e., one that doesn’t end with `;`)
-      // 2. or any other character reference (i.e., one that does end with `;`)
-      // Note that `&` can be escaped as `&amp`, without the semicolon.
+      // Escape every `&` that starts a character reference, legacy-named (without `;`) or not;
+      // `&amp` needs no semicolon either
       // https://mathiasbynens.be/notes/ambiguous-ampersands
       if (text.indexOf('&') !== -1) {
         text = text.replace(RE_LEGACY_ENTITIES, '&amp$1');
@@ -2029,10 +2026,9 @@ async function minifyHTML(value, options, partialMarkup) {
     bufferPush(comment, false);
   }
 
-  // Inline scripts are minified one at a time as the parse reaches them, which serializes
-  // work the minifier could overlap. Dispatching them all up front turns that into a single
-  // wave the parse then reads results from. Bodies are matched by exact content, so one the
-  // parse asks for in another form simply misses and takes the original path.
+  // Inline scripts minified as the parse reaches them run one at a time; dispatching them all up
+  // front lets the minifier overlap the work. Bodies are matched by exact content, so one the parse
+  // asks for in another form misses and takes the original path.
   /** @type {Map<string, Promise<string>> | null} */
   let jsPrewarmed = null;
   if (options.parallelJS && options.minifyJS !== identity && !options.processScripts?.length) {
@@ -2834,14 +2830,11 @@ export function getCacheStats() {
   };
 }
 
-// Memoized options processing: Batch runs typically pass one options object to
-// many `minify()` calls, and full processing (regex parsing, closure creation,
-// option-signature stringification) is comparatively expensive. The cache is
-// keyed on the options object and verified against a deep snapshot, so any
-// mutation of a reused object—top-level or nested (e.g., engine options)—still
-// triggers reprocessing. Each call works on a shallow copy of the processed
-// options, since `minifyHTML` reassigns top-level keys (wrapped minifiers,
-// sorters, UID comment patterns) that must not leak across calls.
+// Memoized options processing: Batch runs pass one options object to many `minify()` calls, and
+// processing it (regex parsing, closures, option signatures) is expensive. The cache is keyed on
+// the object and checked against a deep snapshot, so mutating a reused object, nested values
+// included, still triggers reprocessing. Each call works on a shallow copy, as `minifyHTML`
+// reassigns top-level keys (wrapped minifiers, sorters, UID comment patterns) per call.
 /** @type {MinifierOptions} */
 const EMPTY_OPTIONS = {};
 /** @type {WeakMap<object, {snapshot: unknown, processed: ProcessedOptions}>} */
@@ -2975,10 +2968,8 @@ export const minify = async function (value, options) {
   // later slow down every option lookup.
   const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase, cssContext, documentState });
 
-  // Unused-CSS removal needs the whole document’s symbols before the first `style`
-  // element is minified, so collect them upfront from the raw input. A document
-  // without a style sheet has nothing to remove from, and scanning it would be work
-  // spent on an empty result.
+  // Unused-CSS removal needs the whole document’s symbols before the first `style` element is
+  // minified, so they are collected upfront from the raw input—where there is a style sheet at all
   if (processedOptions.removeUnusedCSS && RE_STYLE_ELEMENT.test(value)) {
     Object.assign(cssContext, collectUsage(
       value,

@@ -333,11 +333,9 @@ export class HTMLParser {
     let pos = 0;
     let lastPos;
 
-    // An end tag always ends at a `>`; without one ahead, matching the name only to find
-    // no bracket behind it repeats the name run at every position, which costs O(n²) on a
-    // long unclosed name (e.g., `</aaaa…` with no `>`). Track the next `>` monotonically—
-    // `pos` only advances, so the aggregate scan work stays O(n)—and skip the match when
-    // none lies ahead, where the tag could not be complete anyway.
+    // An end tag always ends at a `>`; without one ahead, matching the name would rescan the name
+    // run at every position, O(n²) on a long unclosed name (`</aaaa…`). Tracking the next `>`
+    // (`pos` only advances, so this stays O(n)) skips the match where the tag cannot be complete.
     let nextGtPos = fullHtml.indexOf('>');
     const hasCloseAtOrAfter = (/** @type {number} */ p) => {
       if (nextGtPos !== -1 && nextGtPos < p) {
@@ -835,10 +833,9 @@ export class HTMLParser {
       return close === -1 ? null : { text: fullHtml.slice(startPos, close + 1), name };
     }
 
-    // Where a tag ends: After optional whitespace, at `>` or `/>`. Scanned by hand in a
-    // single pass, where a regex did the same with one execution per attribute. The
-    // result packs length and slash into one number (`length << 1 | hasSlash`, 0 for no
-    // match) so the per-attribute loop allocates nothing.
+    // Where a tag ends: After optional whitespace, at `>` or `/>`. Scanned by hand in one pass, as
+    // a regex costs an execution per attribute; the result packs length and slash into one number
+    // (`length << 1 | hasSlash`, 0 for no match), so the per-attribute loop allocates nothing.
     function matchTagClose(/** @type {number} */ currentPos) {
       let scan = currentPos;
       let code = fullHtml.charCodeAt(scan);

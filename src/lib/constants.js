@@ -150,8 +150,7 @@ const isSimpleBoolean = new Set(['allowfullscreen', 'async', 'autofocus', 'autop
 
 const isBooleanValue = new Set(['true', 'false']);
 
-// Attributes where certain values can be collapsed to just the attribute name;
-// maps each attribute name to the set of values that collapse to the bare attribute:
+// Values that collapse to the bare attribute name:
 // - `crossorigin=""` and `crossorigin="anonymous"` → `crossorigin` (anonymous is the default)
 // - `contenteditable=""` → `contenteditable` (empty string means inherit/true)
 const collapsibleValues = new Map([
