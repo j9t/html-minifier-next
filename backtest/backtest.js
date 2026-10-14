@@ -495,7 +495,7 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
 
       // Register cleanup handlers for various exit scenarios
       const sigintHandler = async () => {
-        await cleanup('SIGINT (Ctrl+C)');
+        await cleanup('SIGINT (Ctrl + C)');
         process.exit(130);
       };
       const sigtermHandler = async () => {
