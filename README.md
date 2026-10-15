@@ -593,7 +593,7 @@ The CLI’s `--verbose` and `--dry` modes print the same information to STDERR a
 
 ## Minification comparison
 
-Please see [**the Minifier Benchmarks project**](https://github.com/j9t/minifier-benchmarks) for details on how HTML Minifier Next compares to other minifiers. (The benchmarks are currently maintained by the author of HTML Minifier Next. Contributions, including from other minifier authors, are welcome.)
+Please see [**the Minifier Benchmarks project**](https://j9t.github.io/minifier-benchmarks/) for details on how HTML Minifier Next compares to other minifiers. (The benchmarks are currently maintained by the author of HTML Minifier Next. Contributions, including from other minifier authors, are welcome.)
 
 ## Examples
 
