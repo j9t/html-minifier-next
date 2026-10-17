@@ -195,11 +195,12 @@ function isNamespaceRedundant(attrName, attrValue, options) {
  * @param {ProcessedOptions} options
  */
 function isTargetSelfRedundant(attrValue, options) {
-  if (options.partialMarkup || trimWhitespace(attrValue.toLowerCase()) !== '_self') {
+  // Matched as is, as padded it names a browsing context of its own
+  if (options.partialMarkup || attrValue.toLowerCase() !== '_self') {
     return false;
   }
   // Written as markup or within a value
-  const state = options.documentState;
+  const state = options.baseState;
   return !state || !(state.hasBase ??= RE_BASE_ELEMENT.test(state.source));
 }
 
@@ -801,17 +802,14 @@ async function minifySrcdoc(attrValue, options, minifyHTMLSelf) {
     wasEncoded = markup !== attrValue;
   }
 
-  let srcdocOptions = options;
-  // The inner document sees none of the parent’s markup, so its style sheets
-  // minify against the symbols the `srcdoc` content references itself
+  // The inner document sees none of the parent’s markup, so its `base` element is its own,
+  // and its style sheets minify against the symbols the `srcdoc` content references itself
+  const srcdocOptions = { ...options, baseState: { hasBase: undefined, source: markup } };
   if (options.removeUnusedCSS && RE_STYLE_ELEMENT.test(markup)) {
     const decode = markup.indexOf('&') !== -1 ? await getDecodeHTMLStrict() : undefined;
-    srcdocOptions = {
-      ...options,
-      cssContext: {
-        warned: options.cssContext ? options.cssContext.warned : new Set(),
-        ...collectUsage(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
-      }
+    srcdocOptions.cssContext = {
+      warned: options.cssContext ? options.cssContext.warned : new Set(),
+      ...collectUsage(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
     };
   }
 

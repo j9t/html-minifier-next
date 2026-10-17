@@ -204,7 +204,8 @@ const tagDefaultsSVG = {
   rect: { x: '0', y: '0' },
   stop: { offset: '0' },
   svg: { preserveaspectratio: 'xmidymid meet', version: '1.1', x: '0', y: '0' },
-  symbol: { preserveaspectratio: 'xmidymid meet', refx: '0', refy: '0' },
+  // Not `refX` and `refY` on `symbol`, which, unset, set no reference point
+  symbol: { preserveaspectratio: 'xmidymid meet' },
   // Unlike in `tspan`, where they continue from the text before
   text: { lengthadjust: 'spacing', x: '0', y: '0' },
   textpath: { lengthadjust: 'spacing', method: 'align', spacing: 'exact', startoffset: '0' },

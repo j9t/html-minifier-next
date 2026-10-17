@@ -1508,7 +1508,9 @@ describe('HTML', () => {
 
   test('Removes redundant attributes: `<a target="_self" …>`', async () => {
     const options = { removeRedundantAttributes: true };
-    assert.strictEqual(await minify('<a href=/ target="_self">a</a><area href=/ target=_SELF><form target=" _self "></form>', options), '<a href=/>a</a><area href=/><form></form>');
+    assert.strictEqual(await minify('<a href=/ target="_self">a</a><area href=/ target=_SELF><form target="_self"></form>', options), '<a href=/>a</a><area href=/><form></form>');
+    // Padded, it names a browsing context of its own
+    assert.strictEqual(await minify('<a href=/ target=" _self ">a</a>', options), '<a href=/ target=" _self ">a</a>');
     assert.strictEqual(await minify('<svg><a href=/ target=_self>a</a></svg>', options), '<svg><a href=/>a</a></svg>');
     assert.strictEqual(await minify('<a href=/ target=_blank>a</a>', options), '<a href=/ target=_blank>a</a>');
 
@@ -1519,6 +1521,11 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, options), '<a href=/ target=_self>a</a><base target=_top>');
     input = '<iframe srcdoc="&lt;base target=_top>&lt;a href=/ target=_self>a&lt;/a>"></iframe>';
     assert.strictEqual(await minify(input, options), input);
+    // An iframe document is read as decoded, and on its own
+    input = '<iframe srcdoc="&lt;base&#32;target=_blank>&lt;a href=/ target=_self>a&lt;/a>"></iframe>';
+    assert.strictEqual(await minify(input, { ...options, collapseWhitespace: true }), '<iframe srcdoc="<base target=_blank><a href=/ target=_self>a</a>"></iframe>');
+    input = '<base target=_top><iframe srcdoc="&lt;a href=/ target=_self>a&lt;/a>"></iframe>';
+    assert.strictEqual(await minify(input, { ...options, collapseWhitespace: true }), '<base target=_top><iframe srcdoc="<a href=/>a</a>"></iframe>');
     input = '<a href=/ target=_self>a</a><script>document.head.append(Object.assign(document.createElement("base"), { target: "_blank" }))</script>';
     assert.strictEqual(await minify(input, options), input);
     input = '<a href=/ target=_self>a</a><script>const base = 1</script>';

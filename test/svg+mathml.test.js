@@ -109,6 +109,10 @@ describe('SVG and MathML', () => {
     let input = '<svg><linearGradient href="#a" x1="0"/><radialGradient xlink:href="#b" r="50%"/><pattern href="#c" x="0"/><filter href="#d" x="-10%"/></svg>';
     assert.strictEqual(await minify(input, options), input);
 
+    // Unset, `refX` and `refY` set no reference point on `symbol`, which zero does
+    input = '<svg><symbol viewBox="10 10 20 20" refX="0" refY="0"></symbol></svg>';
+    assert.strictEqual(await minify(input, options), input);
+
     // Presentation attributes inherit, values other than the default mean something,
     // and HTML defaults stay out of SVG
     input = '<svg><g fill="#000" stroke-width="1" opacity="1"><rect x="1" fill="#000"/><stop offset="0.5"/><textarea rows="2"/></g></svg>';
@@ -133,10 +137,16 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify(input, options), input);
     assert.strictEqual(await minify('<svg><foreignObject></foreignObject></svg>', options), '<svg><foreignObject/></svg>');
     assert.strictEqual(await minify('<svg><g></g><p></p></svg>', options), '<svg><g/></svg><p></p>');
-    // As in SVG `title` and `desc` and in MathML token elements, but for `mglyph` and `malignmark`
+    // As in SVG `title` and `desc` and in MathML token elements (`mglyph` and `malignmark` are
+    // MathML there only right inside them, which is not told apart here)
     input = '<svg><title><b></b></title><desc><g></g><i>a</i></desc></svg><math><mi><mo></mo></mi><mtext><span></span></mtext></math>';
     assert.strictEqual(await minify(input, options), input);
-    assert.strictEqual(await minify('<svg><title></title><desc><svg><path></path></svg></desc><g></g></svg><math><mi><mglyph></mglyph><malignmark></malignmark></mi><mi></mi></math>', options), '<svg><title/><desc><svg><path/></svg></desc><g/></svg><math><mi><mglyph/><malignmark/></mi><mi/></math>');
+    assert.strictEqual(await minify('<svg><title></title><desc><svg><path></path></svg></desc><g></g></svg><math><mi><mglyph></mglyph></mi><mi></mi></math>', options), '<svg><title/><desc><svg><path/></svg></desc><g/></svg><math><mi><mglyph></mglyph></mi><mi/></math>');
+    input = '<math><mtext><span><mglyph></mglyph>x</span></mtext></math>';
+    assert.strictEqual(await minify(input, options), input);
+    // The names alone do not make an integration point
+    input = '<svg></svg><annotation-xml></annotation-xml><foreignObject></foreignObject><p>a</p>';
+    assert.strictEqual(await minify(input, options), '<svg/><annotation-xml></annotation-xml><foreignobject></foreignobject><p>a</p>');
 
     // Custom fragments may write anything into a tag
     input = '<svg><path <?php echo $d ?>></path></svg>';

@@ -1530,8 +1530,7 @@ async function minifyHTML(value, options, partialMarkup) {
       foreignScopes.pop();
     }
     const scope = foreignScopes[foreignScopes.length - 1];
-    return lowerTag === 'svg' || lowerTag === 'math' || scope === undefined || scope === 'svg' || scope === 'math' ||
-      ((lowerTag === 'mglyph' || lowerTag === 'malignmark') && integrationPointsForeign.math.has(scope));
+    return lowerTag === 'svg' || lowerTag === 'math' || scope === undefined || scope === 'svg' || scope === 'math';
   }
 
   function markOpenElementFilled() {
@@ -2446,7 +2445,9 @@ async function minifyHTML(value, options, partialMarkup) {
         !(options.insideSVG && options.minifySVG);
       if (hasForeignContext) {
         lowerTag = tag.toLowerCase();
-        selfCloses &&= Boolean(options.insideForeignContent) || lowerTag === 'foreignobject' || lowerTag === 'annotation-xml';
+        // An integration point is named in its parent’s context, which it opened one inside of
+        selfCloses &&= Boolean(options.insideForeignContent) || ((lowerTag === 'foreignobject' || lowerTag === 'annotation-xml') &&
+          Boolean(Object.getPrototypeOf(options).insideForeignContent));
         if (foreignScopes.length && !leaveForeignScope(lowerTag)) {
           selfCloses = false;
         }
@@ -3044,14 +3045,15 @@ export const minify = async function (value, options) {
   // copy; the `minifyCSS` closure hangs off the memoized base, shared across calls
   /** @type {NonNullable<ProcessedOptions['cssContext']>} */
   const cssContext = { warned: new Set() };
-  // What the parse finds out about the document for post-processing, sparing an output scan,
-  // and whether the document holds a `base` element, looked up in it on the first `target=_self`
-  /** @type {NonNullable<ProcessedOptions['documentState']>} */
-  const documentState = { hasMathML: false, hasBase: undefined, source: value };
+  // What the parse finds out about the document for post-processing, sparing an output scan
+  const documentState = { hasMathML: false };
+  // Whether the document holds a `base` element, looked up in it on the first `target=_self`
+  /** @type {NonNullable<ProcessedOptions['baseState']>} */
+  const baseState = { hasBase: undefined, source: value };
   // Work on a shallow copy so per-call reassignments don’t reach the cached base. The
   // per-document state is part of the copy from the start, as properties added to it
   // later slow down every option lookup.
-  const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase, cssContext, documentState });
+  const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase, cssContext, documentState, baseState });
 
   // Unused-CSS removal needs the whole document’s symbols before the first `style` element is
   // minified, so they are collected upfront from the raw input—where there is a style sheet at all

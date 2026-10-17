@@ -50,7 +50,8 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   canMinifySVG: ((text: string) => boolean) | null,
  *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
  *   cssContext?: CSSContext,
- *   documentState?: {hasMathML: boolean, hasBase: boolean | undefined, source: string},
+ *   documentState?: {hasMathML: boolean},
+ *   baseState?: {hasBase: boolean | undefined, source: string},
  *   parallelJS?: boolean,
  *   nameParent?: (name: string) => string,
  *   namesAsWritten?: boolean,
@@ -66,9 +67,8 @@ const RE_SVGO_EMPTY_ATTRIBUTE = / ([^\s"'<>/=]+)=""/g;
 const RE_SVG_START = /^<svg(?=[\s/>])/;
 const RE_QUOTED_VALUE = /"[^"]*"|'[^']*'/g;
 const RE_XLINK_DECLARATION = /\sxmlns:xlink(?=[\s=/>]|$)/;
-// The declaration as SVGO writes it, on any element and on the root; values escape `>` there
+// The declaration as SVGO writes it
 const XLINK_DECLARATION_SVGO = ' xmlns:xlink="' + namespaceXLink + '"';
-const RE_XLINK_DECLARATION_SVGO_ROOT = new RegExp('^(<svg[^>]*?)' + XLINK_DECLARATION_SVGO.replace(/[.:/]/g, '\\$&'));
 
 /**
  * SVGO plugin dropping the `xmlns` declarations HTML reads anyway on `svg` and `math` elements
@@ -758,7 +758,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             if (removeNamespaces) {
               data = data.replaceAll(XLINK_DECLARATION_SVGO, '');
             } else if (addsXLink) {
-              data = data.replace(RE_XLINK_DECLARATION_SVGO_ROOT, '$1');
+              // SVGO escapes `>` in values, so the root’s start tag ends at the first one
+              const at = data.indexOf(XLINK_DECLARATION_SVGO);
+              if (at !== -1 && at < data.indexOf('>')) {
+                data = data.slice(0, at) + data.slice(at + XLINK_DECLARATION_SVGO.length);
+              }
             }
             return collapseEmpty ? data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : data;
           })();
