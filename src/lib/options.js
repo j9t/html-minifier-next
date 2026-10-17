@@ -3,8 +3,8 @@
  */
 
 import { createUrlMinifier } from './urls.js';
-import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, isThenable, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
-import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY, svgoPluginsInline } from './constants.js';
+import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, isThenable, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag, findTagEnd } from './utils.js';
+import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY, svgoPluginsInline, namespaceSVG, namespaceMathML, namespaceXLink } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
 import { createSelectorPruner, findUnusedSymbols, normalizeUnusedCSSOptions } from './unused-css.js';
@@ -51,17 +51,44 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
  *   cssContext?: CSSContext,
  *   documentState?: {hasMathML: boolean},
+ *   baseState?: {hasBase: boolean | undefined, source: string},
  *   parallelJS?: boolean,
  *   nameParent?: (name: string) => string,
  *   namesAsWritten?: boolean,
  *   keepClosingSlashHTML?: boolean,
  *   insideSVG?: boolean,
- *   insideForeignContent?: boolean
+ *   insideForeignContent?: boolean,
+ *   namespaceForeign?: 'svg' | 'math'
  * }} ProcessedOptions
  */
 
 const RE_SCOPE_AT_RULE = /@scope\b/i;
 const RE_SVGO_EMPTY_ATTRIBUTE = / ([^\s"'<>/=]+)=""/g;
+const RE_SVG_START = /^<svg(?=[\s/>])/;
+const RE_QUOTED_VALUE = /"[^"]*"|'[^']*'/g;
+const RE_XLINK_DECLARATION = /\sxmlns:xlink(?=[\s=/>]|$)/;
+// The declaration as SVGO writes it, and where it may be, outside comments and
+// CDATA sections, which SVGO writes as is (values and text escape `"`)
+const XLINK_DECLARATION_SVGO = ' xmlns:xlink="' + namespaceXLink + '"';
+const RE_XLINK_DECLARATION_SVGO = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>| xmlns:xlink="[^"]*"/g;
+
+/**
+ * SVGO plugin dropping the `xmlns` declarations HTML reads anyway on `svg` and `math` elements
+ * (`xmlns:xlink` goes after SVGO, as each pass of `multipass` reads XML again, which needs it)
+ */
+const pluginNamespacesHTML = {
+  name: 'removeNamespacesHTML',
+  fn: () => ({
+    element: {
+      enter: (/** @type {{name: string, attributes: Record<string, string>}} */ node) => {
+        const attrs = node.attributes;
+        if (attrs.xmlns === (node.name === 'math' ? namespaceMathML : node.name === 'svg' ? namespaceSVG : undefined)) {
+          delete attrs.xmlns;
+        }
+      }
+    }
+  })
+};
 
 /** @param {ProcessedOptions} options */
 function shouldMinifyInnerHTML(options) {
@@ -695,12 +722,24 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         // where an empty value can go; it escapes quotes in values and text, so `=""`
         // is always one. Read here, as options are processed in the order they are given.
         const collapseEmpty = Boolean(options.collapseEmptyAttributes);
+        const removeNamespaces = Boolean(options.removeRedundantAttributes);
+
+        // XML reads `xlink:` names only where their prefix is declared, which HTML needs not be;
+        // a declaration added to the root for SVGO goes after it (one on a nested `svg` covers
+        // that one only)
+        const rootEnd = svgContent.indexOf('xlink:') !== -1 && RE_SVG_START.test(svgContent) ? findTagEnd(svgContent, 4) : -1;
+        // Values are quoted where SVGO reads, so what is left is names
+        const addsXLink = rootEnd !== -1 &&
+          !RE_XLINK_DECLARATION.test(svgContent.slice(4, rootEnd).replace(RE_QUOTED_VALUE, ''));
+        const svgInput = addsXLink
+          ? '<svg xmlns:xlink="' + namespaceXLink + '"' + svgContent.slice(4)
+          : svgContent;
 
         const isCacheable = svgContent.length <= MAX_CACHE_ENTRY_SIZE;
         const svgKey = isCacheable
           ? (svgContent.length > 2048
             ? (hashContent(svgContent) + '|' + svgSig)
-            : (svgContent + '|' + svgSig)) + (collapseEmpty ? '|c' : '')
+            : (svgContent + '|' + svgSig)) + (collapseEmpty ? '|c' : '') + (removeNamespaces ? '|n' : '')
           : undefined;
 
         try {
@@ -713,8 +752,21 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
           const inFlight = (async () => {
             const optimize = await loadSvgo();
-            const result = optimize(svgContent, svgoOptions);
-            return collapseEmpty ? result.data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : result.data;
+            const result = optimize(svgInput, removeNamespaces
+              ? { ...svgoOptions, plugins: [...svgoOptions.plugins, pluginNamespacesHTML] }
+              : svgoOptions);
+            let data = result.data;
+            // The root’s declaration was added for SVGO, unless all of them go
+            if (removeNamespaces) {
+              data = data.replace(RE_XLINK_DECLARATION_SVGO, (/** @type {string} */ match) => match === XLINK_DECLARATION_SVGO ? '' : match);
+            } else if (addsXLink) {
+              // SVGO escapes `>` in values, so the root’s start tag ends at the first one
+              const at = data.indexOf(XLINK_DECLARATION_SVGO);
+              if (at !== -1 && at < data.indexOf('>')) {
+                data = data.slice(0, at) + data.slice(at + XLINK_DECLARATION_SVGO.length);
+              }
+            }
+            return collapseEmpty ? data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : data;
           })();
 
           if (svgKey !== undefined) svgCache.set(svgKey, inFlight);

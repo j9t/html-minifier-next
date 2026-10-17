@@ -47,6 +47,124 @@ describe('SVG and MathML', () => {
     );
   });
 
+  test('Removes namespace declarations HTML reads anyway', async () => {
+    const options = { removeRedundantAttributes: true };
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const xlinkNS = 'http://www.w3.org/1999/xlink';
+
+    assert.strictEqual(await minify(`<svg xmlns="${svgNS}" xmlns:xlink="${xlinkNS}" viewBox="0 0 1 1"><svg xmlns=${svgNS}><use xlink:href="#a"></use></svg></svg>`, options), '<svg viewBox="0 0 1 1"><svg><use xlink:href="#a"></use></svg></svg>');
+    assert.strictEqual(await minify('<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi></math>', options), '<math><mi>x</mi></math>');
+    assert.strictEqual(await minify('<html xmlns="http://www.w3.org/1999/xhtml"><svg><foreignObject><div xmlns="http://www.w3.org/1999/xhtml">a</div></foreignObject></svg></html>', options), '<html><svg><foreignObject><div>a</div></foreignObject></svg></html>');
+
+    // Only the namespace the element is in, and only that way spelled, goes
+    let input = `<svg xmlns="${svgNS}/"><math xmlns="${svgNS}"></math></svg><p xmlns="${svgNS}" xmlns:xlink="${xlinkNS}">a</p><svg xmlns:xlink="${svgNS}" xmlns:svg="${svgNS}"></svg>`;
+    assert.strictEqual(await minify(input, options), input);
+    input = `<svg xmlns="${svgNS}" xmlns:xlink="${xlinkNS}"></svg>`;
+    assert.strictEqual(await minify(input), input);
+
+    // Wherever SVGO reads the SVG, it needs them, and they go after
+    assert.strictEqual(await minify(`<svg xmlns="${svgNS}" xmlns:xlink="${xlinkNS}"><use xlink:href="#a"></use></svg>`, { ...options, minifySVG: true }), '<svg><use xlink:href="#a"/></svg>');
+    assert.strictEqual(await minify(`<svg xmlns="${svgNS}"><path d="M0 0h1"/></svg>`, { minifySVG: true }), `<svg xmlns="${svgNS}"><path d="M0 0h1"/></svg>`);
+  });
+
+  test('Declares the XLink namespace for SVGO, which HTML needs not', async () => {
+    const options = { minifySVG: true, continueOnMinifyError: false };
+    assert.strictEqual(await minify('<svg><use xlink:href="#a" x="0"></use></svg>', options), '<svg><use xlink:href="#a"/></svg>');
+    assert.strictEqual(await minify('<svg viewBox="0 0 1 1"><use xlink:href="#a"/></svg><svg><use xlink:href="#b"/></svg>', options), '<svg viewBox="0 0 1 1"><use xlink:href="#a"/></svg><svg><use xlink:href="#b"/></svg>');
+    // A declaration written stays
+    assert.strictEqual(await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/></svg>', options), '<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/></svg>');
+    // As does one on a nested `svg`, which declares it for that one only
+    const input = '<svg><use xlink:href="#a"/><svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#b"/></svg></svg>';
+    assert.strictEqual(await minify(input, options), input);
+    // Unless redundant
+    assert.strictEqual(await minify(input, { ...options, removeRedundantAttributes: true }), '<svg><use xlink:href="#a"/><svg><use xlink:href="#b"/></svg></svg>');
+    // A root start tag holding `>` in a value is read to its end
+    assert.strictEqual(await minify('<svg aria-label="a>b"><use xlink:href="#a"/></svg>', options), '<svg aria-label="a&gt;b"><use xlink:href="#a"/></svg>');
+    // A value naming the declaration is no declaration
+    assert.strictEqual(await minify('<svg aria-label="xmlns:xlink"><use xlink:href="#a"/></svg>', options), '<svg aria-label="xmlns:xlink"><use xlink:href="#a"/></svg>');
+    // Every pass of `multipass` reads XML again, so the declarations go after the last
+    const multipass = { ...options, minifySVG: { multipass: true } };
+    assert.strictEqual(await minify('<svg><use xlink:href="#a" x="0"/></svg>', multipass), '<svg><use xlink:href="#a"/></svg>');
+    assert.strictEqual(await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/></svg>', { ...multipass, removeRedundantAttributes: true }), '<svg><use xlink:href="#a"/></svg>');
+    // Comments SVGO keeps stay as written
+    assert.strictEqual(await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><!--! xmlns:xlink="http://www.w3.org/1999/xlink" --><use xlink:href="#a"/></svg>', { ...options, removeRedundantAttributes: true }), '<svg><!--! xmlns:xlink="http://www.w3.org/1999/xlink"--><use xlink:href="#a"/></svg>');
+  });
+
+  test('Removes redundant SVG attributes', async () => {
+    const options = { removeRedundantAttributes: true };
+    assert.strictEqual(
+      await minify('<svg version="1.1" x="0" y="0" preserveAspectRatio="xMidYMid meet"><filter id="f" x="-10%" y="-10%" width="120%" height="120%" filterUnits="objectBoundingBox" primitiveUnits="userSpaceOnUse"><feColorMatrix type="matrix" values="0"/><feBlend mode="normal"/><feOffset dx="0" dy="0"/><feDropShadow dx="2" dy="2" stdDeviation="2"/></filter></svg>', options),
+      '<svg><filter id="f"><feColorMatrix values="0"/><feBlend/><feOffset/><feDropShadow/></filter></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg><linearGradient id="a" x1="0" y1="0%" x2="100%" y2="0" gradientUnits="objectBoundingBox" spreadMethod="pad"><stop offset="0" stop-color="#000"/></linearGradient><radialGradient id="b" cx="50%" cy="50%" r="50%"/></svg>', options),
+      '<svg><linearGradient id="a"><stop stop-color="#000"/></linearGradient><radialGradient id="b"/></svg>'
+    );
+    assert.strictEqual(
+      await minify('<svg><rect x="0" y="0" width="1" height="1"/><circle cx="0" cy="0" r="1"/><text x="0" y="0">a<tspan x="0">b</tspan></text><animateTransform type="translate"/><marker markerUnits="strokeWidth" refX="0" markerWidth="3"/><use x="0" href="#a"/></svg>', options),
+      '<svg><rect width="1" height="1"/><circle r="1"/><text>a<tspan x="0">b</tspan></text><animateTransform/><marker/><use href="#a"/></svg>'
+    );
+    // Names are matched as HTML reads them
+    assert.strictEqual(await minify('<svg><fecolormatrix TYPE="matrix"/><svg preserveaspectratio="xMidYMid meet"/></svg>', options), '<svg><fecolormatrix/><svg/></svg>');
+
+    // A gradient, pattern, or filter referring to another inherits what it does not set itself
+    let input = '<svg><linearGradient href="#a" x1="0"/><radialGradient xlink:href="#b" r="50%"/><pattern href="#c" x="0"/><filter href="#d" x="-10%"/></svg>';
+    assert.strictEqual(await minify(input, options), input);
+
+    // Unset, `refX` and `refY` set no reference point on `symbol`, which zero does
+    input = '<svg><symbol viewBox="10 10 20 20" refX="0" refY="0"></symbol></svg>';
+    assert.strictEqual(await minify(input, options), input);
+
+    // Presentation attributes inherit, values other than the default mean something,
+    // and HTML defaults stay out of SVG
+    input = '<svg><g fill="#000" stroke-width="1" opacity="1"><rect x="1" fill="#000"/><stop offset="0.5"/><textarea rows="2"/></g></svg>';
+    assert.strictEqual(await minify(input, options), input);
+    assert.strictEqual(await minify('<svg version="1.1"><stop offset="0"/></svg>'), '<svg version="1.1"><stop offset="0"/></svg>');
+  });
+
+  test('Self-closes empty foreign elements under `selfCloseForeignElements`', async () => {
+    const options = { selfCloseForeignElements: true };
+    assert.strictEqual(await minify('<svg><path d="M0 0"></path><g><use href="#a"></use></g><stop offset=".5" ></stop><g></g></svg>', options), '<svg><path d="M0 0"/><g><use href="#a"/></g><stop offset=".5"/><g/></svg>');
+    assert.strictEqual(await minify('<svg></svg><math><mi></mi><mspace width="1em"></mspace></math>', options), '<svg/><math><mi/><mspace width="1em"/></math>');
+
+    // A slash after an unquoted value would belong to the value
+    assert.strictEqual(await minify('<svg><use href="#a"></use><path hidden></path></svg>', { ...options, removeAttributeQuotes: true }), '<svg><use href=#a /><path hidden/></svg>');
+
+    // Elements holding anything stay as they are
+    let input = '<svg><text>a</text><g> </g><g><!-- c --></g><g><path/></g><g><?php x ?></g></svg>';
+    assert.strictEqual(await minify(input, options), input);
+
+    // HTML stays HTML, in integration points and where it ends foreign content
+    input = '<svg><foreignObject><div></div><p></p></foreignObject></svg><math><annotation-xml encoding="text/html"><span></span></annotation-xml></math>';
+    assert.strictEqual(await minify(input, options), input);
+    assert.strictEqual(await minify('<svg><foreignObject></foreignObject></svg>', options), '<svg><foreignObject/></svg>');
+    assert.strictEqual(await minify('<svg><g></g><p></p></svg>', options), '<svg><g/></svg><p></p>');
+    // As in SVG `title` and `desc` and in MathML token elements (`mglyph` and `malignmark` are
+    // MathML there only right inside them, which is not told apart here)
+    input = '<svg><title><b></b></title><desc><g></g><i>a</i></desc></svg><math><mi><mo></mo></mi><mtext><span></span></mtext></math>';
+    assert.strictEqual(await minify(input, options), input);
+    assert.strictEqual(await minify('<svg><title></title><desc><svg><path></path></svg></desc><g></g></svg><math><mi><mglyph></mglyph></mi><mi></mi></math>', options), '<svg><title/><desc><svg><path/></svg></desc><g/></svg><math><mi><mglyph></mglyph></mi><mi/></math>');
+    input = '<math><mtext><span><mglyph></mglyph>x</span></mtext></math>';
+    assert.strictEqual(await minify(input, options), input);
+    // The names alone do not make an integration point
+    input = '<svg></svg><annotation-xml></annotation-xml><foreignObject></foreignObject><p>a</p>';
+    assert.strictEqual(await minify(input, options), '<svg/><annotation-xml></annotation-xml><foreignobject></foreignobject><p>a</p>');
+
+    // Custom fragments may write anything into a tag
+    input = '<svg><path <?php echo $d ?>></path></svg>';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<svg><path d="a"></path <?php echo 1 ?>></svg>';
+    assert.strictEqual(await minify(input, options), input);
+
+    // Lines break within tags, which the slash closes all the same
+    assert.strictEqual(await minify('<svg><path d="M0 0" fill="red"></path></svg>', { ...options, maxLineLength: 10 }), '<svg><path\nd="M0 0"\nfill="red"/></svg>');
+
+    // Without the option, or where SVGO writes the SVG anyway
+    input = '<svg><path d="M0 0"></path></svg>';
+    assert.strictEqual(await minify(input), input);
+    assert.strictEqual(await minify(input, { ...options, minifySVG: true }), '<svg><path d="M0 0"/></svg>');
+  });
+
   test('Preserves case sensitivity', async () => {
     // SVG element and attribute names preserve case (camelCase)
     const result = await minify('<svg><text textLength="100" lengthAdjust="spacingAndGlyphs">Text</text></svg>', { minifySVG: true, collapseWhitespace: true });

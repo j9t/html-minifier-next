@@ -289,6 +289,10 @@
         "object"
       ]
     },
+    "selfCloseForeignElements": {
+      "description": "Self-close empty SVG and MathML elements (e.g., `<path d=\"…\"></path>` → `<path d=\"…\"/>`)",
+      "type": "boolean"
+    },
     "sortAttributes": {
       "description": "Sort attributes by frequency",
       "type": "boolean"

@@ -4,6 +4,24 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [8.11.0] - 2026-10-17
+
+### Fixed
+
+* Fixed `decodeEntities` decoding carriage return references (e.g., `&#13;`) into raw carriage returns (which HTML reads as line feeds), changing the text (e.g., in `pre` or in attribute values)
+* Fixed `minifySVG` leaving SVG unminified (or failing under `continueOnMinifyError: false`) where it uses `xlink:` attributes without declaring the XLink namespace, which HTML needs not
+
+### Added
+
+* Added `selfCloseForeignElements`, which writes empty SVG and MathML elements as self-closing (e.g., `<path d="…"></path>` as `<path d="…"/>`); included by the `comprehensive` preset
+* Added the removal of namespace declarations HTML reads anyway to `removeRedundantAttributes` (e.g., `xmlns="http://www.w3.org/2000/svg"` and `xmlns:xlink="http://www.w3.org/1999/xlink"` on inline SVG, or `xmlns="http://www.w3.org/1999/xhtml"` on `html`), also after SVGO under `minifySVG`; SVG taken from the page via `outerHTML` then lacks them, which `XMLSerializer` adds back
+* Added SVG default values to `removeRedundantAttributes`, leaving alone presentation attributes (which inherit) and gradients, patterns, and filters referring to another (which take what they do not set from it)
+* Added several additional default values to be handled with `removeRedundantAttributes`
+
+### Changed
+
+* CRLF and CR line breaks are now written as line feeds, as HTML reads them, except in markup within `htmlmin:ignore` and in custom fragments with whitespace padding them
+
 ## [8.10.8] - 2026-10-12
 
 ### Changed

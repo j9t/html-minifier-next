@@ -410,6 +410,22 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, {}), input);
   });
 
+  test('Normalizes line breaks to line feeds, as HTML reads them', async () => {
+    for (const nl of ['\r\n', '\r']) {
+      const input = `<p title="a${nl}b">x${nl}y</p>${nl}<pre>${nl}a${nl}b</pre><textarea>a${nl}b</textarea>` +
+        `<script>a()${nl}b()</script><style>a{}${nl}b{}</style><!-- a${nl}b --><svg><text>a${nl}b</text></svg>`;
+      const output = '<p title="a\nb">x\ny</p>\n<pre>\na\nb</pre><textarea>a\nb</textarea>' +
+        '<script>a()\nb()</script><style>a{}\nb{}</style><!-- a\nb --><svg><text>a\nb</text></svg>';
+      assert.strictEqual(await minify(input), output);
+      assert.strictEqual(await minify(input, { decodeEntities: true }), output);
+    }
+    assert.strictEqual(await minify('a\r\r\n\n\rb'), 'a\n\n\n\nb');
+
+    // Ignored markup is kept as written, as are custom fragments with the whitespace padding them
+    assert.strictEqual(await minify('a\r\n<!-- htmlmin:ignore -->b\r\nc<!-- htmlmin:ignore -->\r\nd'), 'a\nb\r\nc\nd');
+    assert.strictEqual(await minify('a\r\nb<?php\r\nc ?>\r\nd', { ignoreCustomFragments: [/<\?php[\s\S]*?\?>/] }), 'a\nb<?php\r\nc ?>\r\nd');
+  });
+
   test('Normalizes case', async () => {
     assert.strictEqual(await minify('<P>foo</p>'), '<p>foo</p>');
     assert.strictEqual(await minify('<DIV>boo</DIV>'), '<div>boo</div>');
@@ -1490,6 +1506,48 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeRedundantAttributes: true }), output);
   });
 
+  test('Removes redundant attributes: `<a target="_self" …>`', async () => {
+    const options = { removeRedundantAttributes: true };
+    assert.strictEqual(await minify('<a href=/ target="_self">a</a><area href=/ target=_SELF><form target="_self"></form>', options), '<a href=/>a</a><area href=/><form></form>');
+    // Padded, it names a browsing context of its own
+    assert.strictEqual(await minify('<a href=/ target=" _self ">a</a>', options), '<a href=/ target=" _self ">a</a>');
+    assert.strictEqual(await minify('<svg><a href=/ target=_self>a</a></svg>', options), '<svg><a href=/>a</a></svg>');
+    assert.strictEqual(await minify('<a href=/ target=_blank>a</a>', options), '<a href=/ target=_blank>a</a>');
+
+    // A `base` element’s target makes `_self` mean something, wherever it is written
+    let input = '<base target=_blank><a href=/ target=_self>a</a>';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<a href=/ target=_self>a</a><BASE TARGET=_top>';
+    assert.strictEqual(await minify(input, options), '<a href=/ target=_self>a</a><base target=_top>');
+    input = '<iframe srcdoc="&lt;base target=_top>&lt;a href=/ target=_self>a&lt;/a>"></iframe>';
+    assert.strictEqual(await minify(input, options), input);
+    // An iframe document is read as decoded, and on its own
+    input = '<iframe srcdoc="&lt;base&#32;target=_blank>&lt;a href=/ target=_self>a&lt;/a>"></iframe>';
+    assert.strictEqual(await minify(input, { ...options, collapseWhitespace: true }), '<iframe srcdoc="<base target=_blank><a href=/ target=_self>a</a>"></iframe>');
+    input = '<base target=_top><iframe srcdoc="&lt;a href=/ target=_self>a&lt;/a>"></iframe>';
+    assert.strictEqual(await minify(input, { ...options, collapseWhitespace: true }), '<base target=_top><iframe srcdoc="<a href=/>a</a>"></iframe>');
+    input = '<a href=/ target=_self>a</a><script>document.head.append(Object.assign(document.createElement("base"), { target: "_blank" }))</script>';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<a href=/ target=_self>a</a><script>const base = 1</script>';
+    assert.strictEqual(await minify(input, options), '<a href=/>a</a><script>const base = 1</script>');
+    input = '<a href=/ target=_self>a</a><!-- htmlmin:ignore --><base target=_top><!-- htmlmin:ignore -->';
+    assert.strictEqual(await minify(input, options), '<a href=/ target=_self>a</a><base target=_top>');
+
+    // Partial markup may sit in a document with such a `base` element
+    input = '<a href=/ target=_self>a</a>';
+    assert.strictEqual(await minify(input, { ...options, partialMarkup: true }), input);
+  });
+
+  test('Removes redundant attributes: table, form control, and list defaults', async () => {
+    const options = { removeRedundantAttributes: true };
+    assert.strictEqual(await minify('<table><colgroup span=1><col span="1"></colgroup><tr><th colspan=1 rowspan=1 scope=auto>a<td colspan="1" rowspan="1">b</table>', options), '<table><colgroup><col></colgroup><tr><th>a<td>b</table>');
+    assert.strictEqual(await minify('<td colspan=2 rowspan=0>a</td><th scope=row>b</th>', options), '<td colspan=2 rowspan=0>a</td><th scope=row>b</th>');
+    assert.strictEqual(await minify('<textarea rows=2 cols=20></textarea><textarea rows=3 cols=40></textarea>', options), '<textarea></textarea><textarea rows=3 cols=40></textarea>');
+    assert.strictEqual(await minify('<meter min=0 max=1 value=.5></meter><meter min=1 max=2 value=1.5></meter><progress max=1 value=.5></progress>', options), '<meter value=.5></meter><meter min=1 max=2 value=1.5></meter><progress value=.5></progress>');
+    assert.strictEqual(await minify('<form autocomplete=on></form><form autocomplete=off></form>', options), '<form></form><form autocomplete=off></form>');
+    assert.strictEqual(await minify('<ol type=1></ol><ol type=a></ol><ol type=I></ol>', options), '<ol></ol><ol type=a></ol><ol type=I></ol>');
+  });
+
   test('Removes redundant attributes: `<… = "javascript: …" …>`', async () => {
     let input;
 
@@ -1792,7 +1850,7 @@ describe('HTML', () => {
       { name: 'tab', input: '<div data-test="a\tb">test</div>', expected: '<div data-test="a\tb">test</div>' },
       { name: 'newline', input: '<div data-test="a\nb">test</div>', expected: '<div data-test="a\nb">test</div>' },
       { name: 'form feed', input: '<div data-test="a\fb">test</div>', expected: '<div data-test="a\fb">test</div>' },
-      { name: 'carriage return', input: '<div data-test="a\rb">test</div>', expected: '<div data-test="a\rb">test</div>' },
+      { name: 'carriage return', input: '<div data-test="a\rb">test</div>', expected: '<div data-test="a\nb">test</div>' },
       // Special HTML characters
       { name: 'equals sign', input: '<div data-test="a=b">test</div>', expected: '<div data-test="a=b">test</div>' },
       { name: 'less than', input: '<div data-test="a<b">test</div>', expected: '<div data-test="a<b">test</div>' },
@@ -1982,7 +2040,7 @@ describe('HTML', () => {
       '<!-- hello --><div><!--! hello --><div><div class="">' +
       '<textarea disabled="disabled">     this is a textarea </textarea>' +
       '</div></div></div></div></div></div>' +
-      '<pre>       \r\nxxxx</pre><span>x</span> <span>Hello</span> <b>billy</b> ' +
+      '<pre>       \nxxxx</pre><span>x</span> <span>Hello</span> <b>billy</b> ' +
       '<input type="text"> <textarea></textarea><pre></pre>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
@@ -2980,7 +3038,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div>\n  <!-- a -->\n  <!-- b -->\n</div>', options), '<div>\n</div>');
     assert.strictEqual(await minify('<div>\n  <!-- a --> <!-- b -->\n</div>', options), '<div>\n</div>');
     assert.strictEqual(await minify('<div>\n  <span>a</span> <!-- c -->\n</div>', options), '<div>\n  <span>a</span> \n</div>');
-    assert.strictEqual(await minify('<div>\r\n  <!-- c -->\r\n</div>', options), '<div>\r\n</div>');
+    assert.strictEqual(await minify('<div>\r\n  <!-- c -->\r\n</div>', options), '<div>\n</div>');
     assert.strictEqual(await minify('<div>\n\f<!-- c -->\n</div>', options), '<div>\n</div>');
     assert.strictEqual(await minify('<div>\n  <!-- a -->\f<!-- b -->\n</div>', options), '<div>\n</div>');
 
@@ -3055,8 +3113,10 @@ describe('HTML', () => {
     const reFragments = [/<\?[^?]+\?>/, /<%[^%]+%>/, /\{\{[^}]*\}\}/];
 
     input = 'This is the start. <% … %>\r\n<%= … %>\r\n<? … ?>\r\n<!-- This is the middle, and a comment. -->\r\nNo comment, but middle.\r\n{{ … }}\r\n<?php … ?>\r\n<?xml … ?>\r\nHello, this is the end!';
+    // Line breaks become line feeds but where they pad (default) custom fragments
+    output = 'This is the start. <% … %>\r\n<%= … %>\r\n<? … ?>\r\n<!-- This is the middle, and a comment. -->\nNo comment, but middle.\n{{ … }}\r\n<?php … ?>\r\n<?xml … ?>\r\nHello, this is the end!';
+    assert.strictEqual(await minify(input, {}), output);
     output = 'This is the start. <% … %> <%= … %> <? … ?> No comment, but middle. {{ … }} <?php … ?> <?xml … ?> Hello, this is the end!';
-    assert.strictEqual(await minify(input, {}), input);
     assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true }), output);
     assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, ignoreCustomFragments: reFragments }), output);
 
@@ -3067,8 +3127,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeComments: true, collapseWhitespace: true, preserveLineBreaks: true, ignoreCustomFragments: reFragments }), output);
 
     input = '{{ if foo? }}\r\n  <div class="bar">\r\n    …\r\n  </div>\r\n{{ end \n}}';
+    assert.strictEqual(await minify(input, {}), input.replaceAll('\r\n', '\n'));
     output = '{{ if foo? }}<div class="bar">…</div>{{ end }}';
-    assert.strictEqual(await minify(input, {}), input);
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
     assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [] }), output);
     // A bare (non-array) RegExp is treated as an empty fragment list, same as `[]`
@@ -6273,6 +6333,23 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, decodeEntities: true }), output);
   });
 
+  test('`decodeEntities` keeps carriage returns encoded, which HTML reads as line feeds when raw', async () => {
+    const options = { decodeEntities: true };
+    assert.strictEqual(await minify('<p title="a&#13;b">x&#13;y</p>', options), '<p title="a&#13;b">x&#13;y</p>');
+    assert.strictEqual(await minify('<pre>a&#xD;b&#x0d;c</pre>', options), '<pre>a&#13;b&#13;c</pre>');
+    assert.strictEqual(await minify('<textarea>a&#13;b</textarea>', options), '<textarea>a&#13;b</textarea>');
+    assert.strictEqual(await minify('<p title="&#13;&amp;lt;">x</p>', options), '<p title="&#13;&amp;lt;">x</p>');
+    assert.strictEqual(await minify('<p title="a&#13;b">x</p>', { ...options, removeAttributeQuotes: true }), '<p title=a&#13;b>x</p>');
+    assert.strictEqual(await minify('<pre>a&#13;b</pre>', { ...options, collapseWhitespace: true }), '<pre>a&#13;b</pre>');
+
+    // In foreign content without `minifySVG`, too
+    assert.strictEqual(await minify('<svg><text x="a&#13;b">a&#13;b</text></svg>', options), '<svg><text x="a&#13;b">a&#13;b</text></svg>');
+
+    // Raw text a minifier of one’s own writes stays as written
+    assert.strictEqual(await minify('<p>&#13;</p><script>a()</script><style>a{}</style>', { ...options, minifyJS: text => text + '\r', minifyCSS: text => text + '\r' }), '<p>&#13;</p><script>a()\r</script><style>a{}\r</style>');
+    assert.strictEqual(await minify('<math><mi>a&#13;b</mi></math>', options), '<math><mi>a&#13;b</mi></math>');
+  });
+
   test('Applies the `canCollapseWhitespace` and `canTrimWhitespace` hooks', async () => {
     function canCollapseAndTrimWhitespace(tagName, attrs, defaultFn) {
       if ((attrs || []).some(function (attr) { return attr.name === 'class' && attr.value === 'leaveAlone'; })) {
@@ -7524,18 +7601,18 @@ describe('HTML', () => {
     const options = { removeOptionalTags: true, collapseWhitespace: true, preserveLineBreaks: true };
     for (const [name, nl] of [['LF', '\n'], ['CRLF', '\r\n'], ['CR', '\r']]) {
       let input = `<pre><p>a </p>${nl}<p>b</p></pre>`;
-      let output = `<pre><p>a ${nl}<p>b</pre>`;
+      let output = '<pre><p>a \n<p>b</pre>';
       assert.strictEqual(await minify(input, options), output, `${name}: in pre`);
       assert.strictEqual(await minify(output, options), output, `${name}: in pre, twice`);
 
       // Content in `textarea` is escapable raw text, so no tag is omitted inside it;
       // the whitespace it holds stays verbatim all the same
       input = `<div><p>a </p>${nl}<textarea>  x${nl}${nl}y  </textarea></div>`;
-      output = `<div><p>a</p>\n<textarea>  x${nl}${nl}y  </textarea></div>`;
+      output = '<div><p>a</p>\n<textarea>  x\n\ny  </textarea></div>';
       assert.strictEqual(await minify(input, options), output, `${name}: in textarea`);
 
       input = `<x-el><p>a </p>${nl}<p>b</p></x-el>`;
-      output = `<x-el><p>a ${nl}<p>b</p></x-el>`;
+      output = '<x-el><p>a \n<p>b</p></x-el>';
       assert.strictEqual(await minify(input, {
         ...options,
         canTrimWhitespace: (tag, attrs, defaultFn) => tag === 'x-el' ? false : defaultFn(tag, attrs)
@@ -7886,15 +7963,15 @@ describe('HTML', () => {
 
       // Multiple trailing newlines are preserved (likely intentional)
       input = `<pre>foo${nl}${nl}</pre>`;
-      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input, `${name}: multiple trailing preserved`);
+      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input.replaceAll(nl, '\n'), `${name}: multiple trailing preserved`);
 
       // Leading newlines are preserved
       input = `<pre>${nl}foo</pre>`;
-      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input, `${name}: leading preserved`);
+      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input.replaceAll(nl, '\n'), `${name}: leading preserved`);
 
       // Newline-only content is preserved (no non-newline char before newline)
       input = `<pre>${nl}</pre>`;
-      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input, `${name}: newline-only preserved`);
+      assert.strictEqual(await minify(input, { collapseWhitespace: true }), input.replaceAll(nl, '\n'), `${name}: newline-only preserved`);
     }
 
     // Additional scenarios (LF only, as the line-ending handling is tested above)

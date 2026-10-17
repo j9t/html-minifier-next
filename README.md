@@ -180,6 +180,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
 | `removeUnusedCSS`<br>`--remove-unused-css` | [Remove CSS from `style` elements](#unused-css-removal) that name an element, class, or ID the document doesn’t reference—use with `minifyCSS`, and `safelist` for names only external scripts use | `false` (could be `true`, `{ safelist, scripts }`) |
+| `selfCloseForeignElements`<br>`--self-close-foreign-elements` | Self-close empty SVG and MathML elements (e.g., `<path d="…"></path>` → `<path d="…"/>`) | `false` |
 | `sortAttributes`<br>`--sort-attributes` | [Sort attributes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `sortClassNames`<br>`--sort-class-names` | [Sort style classes by frequency](#sorting-attributes-and-style-classes) | `false` |
 | `strictCustomFragments`<br>`--strict-custom-fragments` | [Reject `ignoreCustomFragments` patterns that risk catastrophic backtracking](#redos-protection) (rather than warning about them) | `false` |
@@ -507,6 +508,7 @@ const result = await minify(html, {
 
 * SVG minification only applies within `<svg>` elements
 * Case sensitivity and self-closing slashes are automatically preserved in SVG (regardless of global settings); where SVGO reads, names are written the way HTML reads them (e.g., `viewbox` as `viewBox`), and attributes without a value get an empty one (e.g., Vue’s `data-v-…` markers), which `collapseEmptyAttributes` removes again after SVGO
+* SVG that uses `xlink:` attributes without declaring the XLink namespace, which HTML needs not, gets the declaration for SVGO, which reads XML, and loses it again after
 * For maximum compression, use `minifySVG` together with `collapseWhitespace` and other options
 
 ### CSS, JavaScript, and SVG cache configuration
@@ -672,6 +674,10 @@ npx html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whites
 
 If you have chunks of markup you would like preserved, you can wrap them with `<!-- htmlmin:ignore -->`.
 
+### Line breaks
+
+HTML reads CRLF and CR line breaks as line feeds, so HMN writes them so, too. Markup within `<!-- htmlmin:ignore -->` and custom fragments, with the whitespace padding them, stay as written. A carriage return written as a character reference (e.g., `&#13;`) stays one under `decodeEntities`.
+
 ### Minifying JSON content
 
 JSON script types are minified automatically without configuration, including `application/json`, `application/ld+json`, `application/manifest+json`, `application/vnd.geo+json`, `application/problem+json`, `application/merge-patch+json`, `application/json-patch+json`, `importmap`, and `speculationrules`. Malformed JSON is preserved by default (with `continueOnMinifyError: true`).
@@ -680,7 +686,9 @@ Note: The `processScripts` option is only for script types containing HTML templ
 
 ### Preserving SVG and MathML elements
 
-SVG and MathML elements are automatically recognized as foreign elements, and when they are minified, both case-sensitivity and self-closing slashes are preserved, regardless of the minification settings used for the rest of the file. This ensures valid output for these namespaced elements.
+SVG and MathML elements are automatically recognized as foreign elements, and when they are minified, both case-sensitivity and self-closing slashes are preserved, regardless of the minification settings used for the rest of the file. This ensures valid output for these namespaced elements. `selfCloseForeignElements` writes empty ones as self-closing, too (e.g., `<use href="#a"/>`), while HTML elements in them, as in `foreignObject`, keep their end tags.
+
+`removeRedundantAttributes` removes the namespace declarations HTML reads anyway (`xmlns` on `html`, `svg`, `math`, and other elements in the namespace it declares, and `xmlns:xlink` on SVG and MathML elements), along with SVG attributes set to their default values (e.g., `<feBlend mode="normal">`, `<stop offset="0">`; presentation attributes like `fill` are left alone, as they inherit). Without the declarations, SVG markup taken from the page via `outerHTML` (e.g., to save it as a file) is no standalone SVG; `XMLSerializer` adds them back.
 
 ### Working with invalid or partial markup
 
@@ -688,7 +696,7 @@ By default, HMN parses markup into a complete tree structure, then modifies it (
 
 _Input markup (e.g., `<p id="">foo`) → Internal representation of markup in a form of tree (e.g., `{ tag: "p", attr: "id", children: ["foo"] }`) → Transformation of internal representation (e.g., removal of `id` attribute) → Output of resulting markup (e.g., `<p>foo</p>`)_
 
-For partial HTML fragments (such as template includes, SSI fragments, or closing tags without opening tags), use the `partialMarkup: true` option. This preserves stray end tags (closing tags without corresponding opening tags) and prevents auto-closing of unclosed tags at the end of input. Note that normal HTML auto-closing rules still apply during parsing—for example, a closing parent tag will still auto-close its unclosed child elements. Whitespace at the start and end of a fragment stays, too, as it may separate the fragment from what surrounds it (unless `collapseWhitespace` removes it).
+For partial HTML fragments (such as template includes, SSI fragments, or closing tags without opening tags), use the `partialMarkup: true` option. This preserves stray end tags and prevents auto-closing of unclosed tags at the end of input. Note that normal HTML auto-closing rules still apply during parsing—for example, a closing parent tag will still auto-close its unclosed child elements. Whitespace at the start and end of a fragment stays, too, as it may separate the fragment from what surrounds it (unless `collapseWhitespace` removes it). `removeRedundantAttributes` keeps `target="_self"` in partial markup, as there may be a `base` element setting another target elsewhere. (Where an external script adds such a `base` element, wrap links whose `target="_self"` needs to stay in `<!-- htmlmin:ignore -->`.)
 
 Markup with [parse errors](https://html.spec.whatwg.org/multipage/parsing.html#parse-errors) that HMN cannot read, like a stray `</>` or an `=` in an unquoted attribute value, makes it abort with the line and column of the error, so that the error can be fixed. With `continueOnParseError`, HMN handles such errors the way browsers do instead.
 

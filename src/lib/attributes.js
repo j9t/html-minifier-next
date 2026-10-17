@@ -6,12 +6,21 @@ import {
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
   RE_AMP_ENTITY,
+  RE_CR,
+  RE_BASE_ELEMENT,
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
   RE_ATTR_WS_TRIM,
   RE_WS_CHAR,
   generalDefaults,
   tagDefaults,
+  targetSelfElements,
+  tagDefaultsSVG,
+  svgElementsInheritingByReference,
+  namespaceHTML,
+  namespaceSVG,
+  namespaceMathML,
+  namespaceXLink,
   executableScriptsMimetypes,
   keepScriptsMimetypes,
   isSimpleBoolean,
@@ -159,12 +168,96 @@ for (const defaults of Object.values(tagDefaults)) {
 }
 
 /**
+ * Whether `xmlns` or `xmlns:xlink` repeats the namespace HTML puts the element or its
+ * attributes in anyway
+ * @param {string} attrName - In lowercase
+ * @param {string} attrValue
+ * @param {ProcessedOptions} options
+ */
+function isNamespaceRedundant(attrName, attrValue, options) {
+  // XML, which SVGO reads, needs the declarations, which go after it (see `minifySVG`)
+  if (options.insideSVG && options.minifySVG) {
+    return false;
+  }
+  if (attrName === 'xmlns') {
+    if (!options.insideForeignContent) {
+      return attrValue === namespaceHTML;
+    }
+    return attrValue === (options.namespaceForeign === 'math' ? namespaceMathML : namespaceSVG);
+  }
+  return Boolean(options.insideForeignContent) && attrValue === namespaceXLink;
+}
+
+/**
+ * Whether `target=_self` is redundant, which it is not where a `base` element may set another
+ * target—as far as the document shows, which partial markup does not
+ * @param {string} attrValue
+ * @param {ProcessedOptions} options
+ */
+function isTargetSelfRedundant(attrValue, options) {
+  // Matched as is, as padded it names a browsing context of its own
+  if (options.partialMarkup || attrValue.toLowerCase() !== '_self') {
+    return false;
+  }
+  // Written as markup or within a value
+  const state = options.baseState;
+  return !state || !(state.hasBase ??= RE_BASE_ELEMENT.test(state.source));
+}
+
+/**
+ * @param {string} tag - In lowercase
+ * @param {string} attrName - In lowercase
+ * @param {string} attrValue
+ * @param {HTMLAttribute[]} attrs
+ */
+function isAttributeRedundantSVG(tag, attrName, attrValue, attrs) {
+  const defaults = Object.hasOwn(tagDefaultsSVG, tag)
+    ? /** @type {Record<string, string | string[]>} */ (/** @type {Record<string, unknown>} */ (tagDefaultsSVG)[tag])
+    : undefined;
+  const value = defaults && Object.hasOwn(defaults, attrName) ? defaults[attrName] : undefined;
+  if (value === undefined) {
+    return false;
+  }
+  if (svgElementsInheritingByReference.has(tag) && attrs.some(a => {
+    const name = a.name.toLowerCase();
+    return name === 'href' || name === 'xlink:href';
+  })) {
+    return false;
+  }
+  attrValue = trimWhitespace(attrValue.toLowerCase());
+  return typeof value === 'string' ? attrValue === value : value.includes(attrValue);
+}
+
+/**
  * @param {string} tag
  * @param {string} attrName
  * @param {string} attrValue
  * @param {HTMLAttribute[]} attrs
+ * @param {ProcessedOptions} options
  */
-function isAttributeRedundant(tag, attrName, attrValue, attrs) {
+function isAttributeRedundant(tag, attrName, attrValue, attrs, options) {
+  // Foreign names are as written (`viewBox`, `viewbox`), which the HTML parser reads alike
+  if (options.insideForeignContent) {
+    const attrNameLower = attrName.toLowerCase();
+    if (attrNameLower === 'xmlns' || attrNameLower === 'xmlns:xlink') {
+      return isNamespaceRedundant(attrNameLower, attrValue, options);
+    }
+    if (options.namespaceForeign !== 'svg') {
+      return false;
+    }
+    const tagLower = tag.toLowerCase();
+    if (tagLower === 'a' && attrNameLower === 'target') {
+      return isTargetSelfRedundant(attrValue, options);
+    }
+    return isAttributeRedundantSVG(tagLower, attrNameLower, attrValue, attrs);
+  }
+  if (attrName === 'xmlns') {
+    return isNamespaceRedundant(attrName, attrValue, options);
+  }
+  if (attrName === 'target' && targetSelfElements.has(tag)) {
+    return isTargetSelfRedundant(attrValue, options);
+  }
+
   // Fast path: Check if this element–attribute combination can possibly be redundant before
   // normalizing the value; own properties only, so `constructor` has no default
   if (!redundantDefaultNames.has(attrName)) {
@@ -709,17 +802,14 @@ async function minifySrcdoc(attrValue, options, minifyHTMLSelf) {
     wasEncoded = markup !== attrValue;
   }
 
-  let srcdocOptions = options;
-  // The inner document sees none of the parent’s markup, so its style sheets
-  // minify against the symbols the `srcdoc` content references itself
+  // The inner document sees none of the parent’s markup, so its `base` element is its own,
+  // and its style sheets minify against the symbols the `srcdoc` content references itself
+  const srcdocOptions = { ...options, baseState: { hasBase: undefined, source: markup } };
   if (options.removeUnusedCSS && RE_STYLE_ELEMENT.test(markup)) {
     const decode = markup.indexOf('&') !== -1 ? await getDecodeHTMLStrict() : undefined;
-    srcdocOptions = {
-      ...options,
-      cssContext: {
-        warned: options.cssContext ? options.cssContext.warned : new Set(),
-        ...collectUsage(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
-      }
+    srcdocOptions.cssContext = {
+      warned: options.cssContext ? options.cssContext.warned : new Set(),
+      ...collectUsage(markup, options.removeUnusedCSS.scripts, /** @type {((text: string) => string) | undefined} */ (decode))
     };
   }
 
@@ -808,7 +898,7 @@ function normalizeAttr(attr, attrs, tag, tagOut, options, minifyHTML, markers) {
  */
 function normalizeAttrContinue(attrName, attrNameOut, attrValue, attr, attrs, tag, tagOut, options, minifyHTML, markers) {
   if ((options.removeRedundantAttributes &&
-       isAttributeRedundant(tag, attrName, attrValue ?? '', attrs)) ||
+       isAttributeRedundant(tag, attrName, attrValue ?? '', attrs, options)) ||
       (options.removeDefaultTypeAttributes && attrName === 'type' && (
         ((tag === 'style' || tag === 'link') && isStyleLinkTypeAttribute(attrValue)) ||
         (tag === 'script' && isScriptTypeAttribute(attrValue) && !keepScriptTypeAttribute(attrValue))
@@ -845,8 +935,13 @@ function normalizeAttrFinish(attrName, attrNameOut, attrValue, attr, tag, tagOut
 
   if (attrValue && options.insideSVG && options.minifySVG) {
     attrValue = escapeXML(attrValue, true);
-  } else if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
-    attrValue = attrValue.replace(RE_AMP_ENTITY, '&amp;$1');
+  } else if (options.decodeEntities && attrValue) {
+    if (attrValue.indexOf('&') !== -1) {
+      attrValue = attrValue.replace(RE_AMP_ENTITY, '&amp;$1');
+    }
+    if (attrValue.indexOf('\r') !== -1) {
+      attrValue = attrValue.replace(RE_CR, '&#13;');
+    }
   }
 
   return {

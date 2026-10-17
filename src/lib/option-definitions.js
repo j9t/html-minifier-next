@@ -196,6 +196,10 @@ const optionDefinitions = {
     description: 'Remove CSS from `style` elements that name an element, class, or ID the document doesn’t reference—use with `--minify-css`, and `{"safelist": […]}` for names only external scripts use',
     type: 'jsonObject'
   },
+  selfCloseForeignElements: {
+    description: 'Self-close empty SVG and MathML elements (e.g., `<path d="…"></path>` → `<path d="…"/>`)',
+    type: 'boolean'
+  },
   sortAttributes: {
     description: 'Sort attributes by frequency',
     type: 'boolean'

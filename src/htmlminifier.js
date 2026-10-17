@@ -6,7 +6,9 @@ import { LRU, decodeForeignText, describeDependencyFailure, escapeXML, findTagEn
 import { collectUsage } from './lib/unused-css.js';
 
 import {
+  RE_CR,
   RE_LEGACY_ENTITIES,
+  RE_LINE_BREAK_CR,
   RE_ESCAPE_LT,
   RE_ESCAPE_LT_RAW_TEXT,
   RE_HTML_ENCODING,
@@ -31,6 +33,7 @@ import {
   trailingElements,
   pClosingParents,
   namesForeignMixedCase,
+  integrationPointsForeign,
   MISSING_DEPENDENCY
 } from './lib/constants.js';
 
@@ -521,6 +524,14 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  Default: `false`
  *
+ * @prop {boolean} [selfCloseForeignElements]
+ *  When true, writes empty SVG and MathML elements as self-closing tags (for
+ *  example `<path d="…"/>` for `<path d="…"></path>`), which HTML reads as the
+ *  same element in foreign content; HTML elements, including those in
+ *  `foreignObject` and `annotation-xml`, keep their end tags.
+ *
+ *  Default: `false`
+ *
  * @prop {boolean | ((tag: string, attrs: HTMLAttribute[]) => void)} [sortAttributes]
  *  When true, enables sorting of attributes. If a function is provided it
  *  will be used as a custom attribute sorter, which should mutate `attrs`
@@ -651,6 +662,7 @@ const DEFAULT_JS_TYPES = new Set(['', 'text/javascript', 'application/javascript
 
 // Patterns for buffer scanning
 const RE_START_TAG = /^<[^/!]/;
+const RE_UNQUOTED_VALUE_END = /=[^\s"'=<>`]+$/;
 const RE_START_TAG_NAME = /^<([^\s/>]+)/;
 const RE_LEADING_WHITESPACE = /^[ \t\n\r\f]/;
 const RE_ASCII_WHITESPACE = /[ \t\n\r\f]/;
@@ -1101,6 +1113,10 @@ async function minifyHTML(value, options, partialMarkup) {
   // anything kept went in since
   /** @type {Array<{tag: string, index: number, empty: boolean}>} */
   const openElements = [];
+  // Under `selfCloseForeignElements`, the open `svg` and `math` elements and the integration points
+  // in them, whose children are HTML, which a slash does not close
+  /** @type {string[]} */
+  const foreignScopes = [];
   // A start tag the parser implied without writing it, whose end tag, if it comes next, is a stray
   // one that browsers read as an empty element (as `</p>` is), so it must not be omitted
   let impliedStartTag = '';
@@ -1269,6 +1285,12 @@ async function minifyHTML(value, options, partialMarkup) {
     };
 
     value = replaceCustomFragments(value, customFragments, replaceFragment);
+  }
+
+  // HTML reads every line break as a line feed, while ignored markup and custom fragments,
+  // now placeholders, stay as written
+  if (value.indexOf('\r') !== -1) {
+    value = value.replace(RE_LINE_BREAK_CR, '\n');
   }
 
   // Custom fragment and `htmlmin:ignore` placeholders hold these
@@ -1467,6 +1489,48 @@ async function minifyHTML(value, options, partialMarkup) {
 
   function removeStartTag() {
     bufferTruncate(lastStartTagIndex());
+  }
+
+  // Write the last start tag as self-closing, where it is the last thing written and holds no
+  // custom fragment, which may write anything; returns whether it did
+  function closeLastStartTag() {
+    const start = lastStartTagIndex();
+    let last = buffer.length - 1;
+    while (last > start && buffer[last] === '') {
+      last--;
+    }
+    for (let i = start; i <= last; i++) {
+      const entry = buffer[i] ?? '';
+      if ((i > start && entry[0] === '<') || (uidAttr && entry.indexOf(uidAttr) !== -1)) {
+        return false;
+      }
+    }
+    const tagText = buffer[last] ?? '';
+    if (!tagText.endsWith('>') || tagText.endsWith('/>')) {
+      return false;
+    }
+    const tagOpen = tagText.slice(0, -1);
+    // A slash right after an unquoted value would belong to the value
+    buffer[last] = tagOpen + (RE_UNQUOTED_VALUE_END.test(tagOpen) ? ' />' : '/>');
+    return true;
+  }
+
+  /** @param {string} lowerTag */
+  function enterForeignScope(lowerTag) {
+    if (lowerTag === 'svg' || lowerTag === 'math' ||
+        (options.namespaceForeign && integrationPointsForeign[options.namespaceForeign].has(lowerTag))) {
+      foreignScopes.push(lowerTag);
+    }
+  }
+
+  // Leaves the scope the element opened, if any; returns whether a slash would close the element
+  /** @param {string} lowerTag */
+  function leaveForeignScope(lowerTag) {
+    if (foreignScopes[foreignScopes.length - 1] === lowerTag) {
+      foreignScopes.pop();
+    }
+    const scope = foreignScopes[foreignScopes.length - 1];
+    return lowerTag === 'svg' || lowerTag === 'math' || scope === undefined || scope === 'svg' || scope === 'math';
   }
 
   function markOpenElementFilled() {
@@ -1877,6 +1941,9 @@ async function minifyHTML(value, options, partialMarkup) {
         const escapeLt = (textForeign ? undefined : RE_ESCAPE_LT_RAW_TEXT[currentTag]) ?? RE_ESCAPE_LT;
         text = text.replace(escapeLt, '&lt;');
       }
+      if (text.indexOf('\r') !== -1) {
+        text = text.replace(RE_CR, '&#13;');
+      }
     } else if (text && textForeign && text.lastIndexOf('<![CDATA[') > text.lastIndexOf(']]>')) {
       // A CDATA section left open at the end of the input closes before the
       // end tags written after it
@@ -2198,6 +2265,7 @@ async function minifyHTML(value, options, partialMarkup) {
           options.name = readBySVGO ? nameForeign : identity;
           options.keepClosingSlashHTML = keepClosingSlashHTML;
           options.insideForeignContent = true;
+          options.namespaceForeign = lowerTag;
           // Disable HTML-specific options that produce invalid XML:
           // SVG with `minifySVG` enabled is passed to SVGO, which requires valid XML input;
           // MathML is never processed by SVGO, so these restrictions never apply to it
@@ -2234,6 +2302,9 @@ async function minifyHTML(value, options, partialMarkup) {
           // the entire SVG block must be valid XML for SVGO processing
           useNameParentForTag = true;
           pushedContext = true;
+        }
+        if (options.selfCloseForeignElements && options.insideForeignContent && !unary) {
+          enterForeignScope(lowerTag);
         }
       }
       // `nameParent` is set whenever `useNameParentForTag` is; the extra check narrows the type
@@ -2368,8 +2439,18 @@ async function minifyHTML(value, options, partialMarkup) {
       // Named as the start tag was: an `svg` or `math` element in its own context,
       // a `foreignObject` or `annotation-xml` element in its parent’s
       let name = options.name;
+      // Whether the element is SVG or MathML, which a slash can close, and SVGO, if it
+      // reads the element, writes so anyway
+      let selfCloses = Boolean(options.selfCloseForeignElements) && hasForeignContext &&
+        !(options.insideSVG && options.minifySVG);
       if (hasForeignContext) {
         lowerTag = tag.toLowerCase();
+        // An integration point is named in its parent’s context, which it opened one inside of
+        selfCloses &&= Boolean(options.insideForeignContent) || ((lowerTag === 'foreignobject' || lowerTag === 'annotation-xml') &&
+          Boolean(Object.getPrototypeOf(options).insideForeignContent));
+        if (foreignScopes.length && !leaveForeignScope(lowerTag)) {
+          selfCloses = false;
+        }
         // Restore parent context when exiting SVG/MathML or HTML-in-foreign-content elements
         if (lowerTag === 'svg' || lowerTag === 'math') {
           options = Object.getPrototypeOf(options);
@@ -2394,6 +2475,8 @@ async function minifyHTML(value, options, partialMarkup) {
         const marker = uidAttr;
         const fragments = Array.from(rest.matchAll(/** @type {RegExp} */ (uidPattern)), uid => marker + (uid[2] ?? '') + marker);
         endTagText = '</' + tagOut + (joinsTag ? '' : ' ') + fragments.join(' ') + '>';
+        // Which a slash would drop
+        selfCloses = false;
       }
 
       const insideNoTrim = stackNoTrimWhitespace.length > 0;
@@ -2429,6 +2512,7 @@ async function minifyHTML(value, options, partialMarkup) {
         currentTag = '';
         isElementEmpty = !hasChars;
       }
+      selfCloses &&= isElementEmpty;
       // A stray end tag has no open element of its own
       const openElement = options.removeEmptyElements && openElements[openElements.length - 1]?.tag === tag ? openElements.pop() : undefined;
       // Emptied by removing what it held, as long as its start tag is still the last one written
@@ -2486,7 +2570,7 @@ async function minifyHTML(value, options, partialMarkup) {
       } else {
         if (skipsEndTag) {
           optionalEndTagEmitted = false;
-        } else {
+        } else if (!selfCloses || !closeLastStartTag()) {
           bufferPush(endTagText, true);
         }
         charsPrevTag = '/' + tag;
@@ -2963,10 +3047,13 @@ export const minify = async function (value, options) {
   const cssContext = { warned: new Set() };
   // What the parse finds out about the document for post-processing, sparing an output scan
   const documentState = { hasMathML: false };
+  // Whether the document holds a `base` element, looked up in it on the first `target=_self`
+  /** @type {NonNullable<ProcessedOptions['baseState']>} */
+  const baseState = { hasBase: undefined, source: value };
   // Work on a shallow copy so per-call reassignments don’t reach the cached base. The
   // per-document state is part of the copy from the start, as properties added to it
   // later slow down every option lookup.
-  const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase, cssContext, documentState });
+  const processedOptions = /** @type {ProcessedOptions} */ ({ ...processedBase, cssContext, documentState, baseState });
 
   // Unused-CSS removal needs the whole document’s symbols before the first `style` element is
   // minified, so they are collected upfront from the raw input—where there is a style sheet at all
