@@ -86,6 +86,8 @@ describe('SVG and MathML', () => {
     const multipass = { ...options, minifySVG: { multipass: true } };
     assert.strictEqual(await minify('<svg><use xlink:href="#a" x="0"/></svg>', multipass), '<svg><use xlink:href="#a"/></svg>');
     assert.strictEqual(await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/></svg>', { ...multipass, removeRedundantAttributes: true }), '<svg><use xlink:href="#a"/></svg>');
+    // Comments SVGO keeps stay as written
+    assert.strictEqual(await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><!--! xmlns:xlink="http://www.w3.org/1999/xlink" --><use xlink:href="#a"/></svg>', { ...options, removeRedundantAttributes: true }), '<svg><!--! xmlns:xlink="http://www.w3.org/1999/xlink"--><use xlink:href="#a"/></svg>');
   });
 
   test('Removes redundant SVG attributes', async () => {
