@@ -34,6 +34,7 @@ export const presets = {
     removeEmptyAttributes: true,
     removeOptionalTags: true,
     removeRedundantAttributes: true,
+    selfCloseForeignElements: true,
     useShortDoctype: true
   }
 };

@@ -15,8 +15,13 @@ const RE_EVENT_ATTR_DEFAULT = /^on[a-z]{3,}$/;
 const RE_CAN_REMOVE_ATTR_QUOTES = /^[^ \t\n\f\r"'`=<>]+$/;
 const RE_TRAILING_SEMICOLON = /;$/;
 const RE_AMP_ENTITY = /&(#?[0-9a-zA-Z]+;)/g;
+// Line breaks HTML reads as line feeds when raw
+const RE_CR = /\r/g;
+const RE_LINE_BREAK_CR = /\r\n?/g;
 const RE_LEGACY_ENTITIES = /&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt)(?!;)|(?:#?[0-9a-zA-Z]+;))/g;
 const RE_ESCAPE_LT = /</g;
+// A `base` element, also as character references may write it
+const RE_BASE_ELEMENT = /(?:<|&lt;?|&#0*60;?|&#x0*3c;?)base[\s/>]/i;
 // What decoded text and attribute values hold that XML reads otherwise: markup, and
 // line breaks and tabs XML normalizes (quotes are left to attribute quoting)
 const RE_XML_ESCAPE_TEXT = /[&<\r]|]]>/g;
@@ -101,7 +106,10 @@ const generalDefaults = {
 const tagDefaults = {
   area: { shape: 'rect' },
   button: { type: 'submit' },
+  col: { span: '1' },
+  colgroup: { span: '1' },
   form: {
+    autocomplete: 'on',
     enctype: 'application/x-www-form-urlencoded',
     method: 'get'
   },
@@ -117,11 +125,93 @@ const tagDefaults = {
     direction: 'left'
   },
   meta: { media: 'all' },
+  meter: {
+    max: '1',
+    min: '0'
+  },
+  ol: { type: '1' },
+  progress: { max: '1' },
   source: { media: 'all' },
   style: { media: 'all' },
-  textarea: { wrap: 'soft' },
+  td: {
+    colspan: '1',
+    rowspan: '1'
+  },
+  textarea: {
+    cols: '20',
+    rows: '2',
+    wrap: 'soft'
+  },
+  th: {
+    colspan: '1',
+    rowspan: '1',
+    scope: 'auto'
+  },
   track: { kind: 'subtitles' }
 };
+
+// Elements whose `target` defaults to `_self` where no `base` element sets another
+const targetSelfElements = new Set(['a', 'area', 'form']);
+
+const transferFunctionDefaults = { amplitude: '1', exponent: '1', intercept: '0', offset: '0', slope: '1', type: 'identity' };
+
+// SVG default attribute values, keyed by element and attribute names in lowercase, with
+// values in lowercase as well; presentation attributes are left out, as they inherit
+const tagDefaultsSVG = {
+  animatemotion: { rotate: '0' },
+  animatetransform: { type: 'translate' },
+  circle: { cx: '0', cy: '0' },
+  clippath: { clippathunits: 'userspaceonuse' },
+  ellipse: { cx: '0', cy: '0' },
+  feblend: { mode: 'normal' },
+  fecolormatrix: { type: 'matrix' },
+  fecomposite: { k1: '0', k2: '0', k3: '0', k4: '0', operator: 'over' },
+  feconvolvematrix: { bias: '0', edgemode: 'duplicate', order: '3', preservealpha: 'false' },
+  fediffuselighting: { diffuseconstant: '1', surfacescale: '1' },
+  fedisplacementmap: { scale: '0', xchannelselector: 'a', ychannelselector: 'a' },
+  fedistantlight: { azimuth: '0', elevation: '0' },
+  fedropshadow: { dx: '2', dy: '2', stddeviation: '2' },
+  fefunca: transferFunctionDefaults,
+  fefuncb: transferFunctionDefaults,
+  fefuncg: transferFunctionDefaults,
+  fefuncr: transferFunctionDefaults,
+  fegaussianblur: { stddeviation: '0' },
+  feimage: { preserveaspectratio: 'xmidymid meet' },
+  femorphology: { operator: 'erode', radius: '0' },
+  feoffset: { dx: '0', dy: '0' },
+  fepointlight: { x: '0', y: '0', z: '0' },
+  fespecularlighting: { specularconstant: '1', specularexponent: '1', surfacescale: '1' },
+  fespotlight: { pointsatx: '0', pointsaty: '0', pointsatz: '0', specularexponent: '1', x: '0', y: '0', z: '0' },
+  feturbulence: { basefrequency: '0', numoctaves: '1', seed: '0', stitchtiles: 'nostitch', type: 'turbulence' },
+  filter: { filterunits: 'objectboundingbox', height: '120%', primitiveunits: 'userspaceonuse', width: '120%', x: '-10%', y: '-10%' },
+  foreignobject: { x: '0', y: '0' },
+  image: { preserveaspectratio: 'xmidymid meet', x: '0', y: '0' },
+  line: { x1: '0', x2: '0', y1: '0', y2: '0' },
+  lineargradient: { gradientunits: 'objectboundingbox', spreadmethod: 'pad', x1: ['0', '0%'], x2: '100%', y1: ['0', '0%'], y2: ['0', '0%'] },
+  marker: { markerheight: '3', markerunits: 'strokewidth', markerwidth: '3', orient: '0', preserveaspectratio: 'xmidymid meet', refx: '0', refy: '0' },
+  mask: { height: '120%', maskcontentunits: 'userspaceonuse', maskunits: 'objectboundingbox', width: '120%', x: '-10%', y: '-10%' },
+  pattern: { height: '0', patterncontentunits: 'userspaceonuse', patternunits: 'objectboundingbox', preserveaspectratio: 'xmidymid meet', width: '0', x: '0', y: '0' },
+  radialgradient: { cx: '50%', cy: '50%', fr: ['0', '0%'], gradientunits: 'objectboundingbox', r: '50%', spreadmethod: 'pad' },
+  rect: { x: '0', y: '0' },
+  stop: { offset: '0' },
+  svg: { preserveaspectratio: 'xmidymid meet', version: '1.1', x: '0', y: '0' },
+  symbol: { preserveaspectratio: 'xmidymid meet', refx: '0', refy: '0' },
+  // Unlike in `tspan`, where they continue from the text before
+  text: { lengthadjust: 'spacing', x: '0', y: '0' },
+  textpath: { lengthadjust: 'spacing', method: 'align', spacing: 'exact', startoffset: '0' },
+  tspan: { lengthadjust: 'spacing' },
+  use: { x: '0', y: '0' },
+  view: { preserveaspectratio: 'xmidymid meet' }
+};
+
+// SVG elements taking what they do not set from the element they refer to
+const svgElementsInheritingByReference = new Set(['filter', 'lineargradient', 'pattern', 'radialgradient']);
+
+// The namespaces HTML puts elements in, which `xmlns` may only repeat
+const namespaceHTML = 'http://www.w3.org/1999/xhtml';
+const namespaceSVG = 'http://www.w3.org/2000/svg';
+const namespaceMathML = 'http://www.w3.org/1998/Math/MathML';
+const namespaceXLink = 'http://www.w3.org/1999/xlink';
 
 // Script MIME types
 
@@ -315,8 +405,11 @@ export {
   RE_CAN_REMOVE_ATTR_QUOTES,
   RE_TRAILING_SEMICOLON,
   RE_AMP_ENTITY,
+  RE_CR,
+  RE_LINE_BREAK_CR,
   RE_LEGACY_ENTITIES,
   RE_ESCAPE_LT,
+  RE_BASE_ELEMENT,
   RE_ESCAPE_LT_RAW_TEXT,
   RE_XML_ESCAPE_TEXT,
   RE_XML_ESCAPE_ATTR,
@@ -345,6 +438,13 @@ export {
   // Default values
   generalDefaults,
   tagDefaults,
+  targetSelfElements,
+  tagDefaultsSVG,
+  svgElementsInheritingByReference,
+  namespaceHTML,
+  namespaceSVG,
+  namespaceMathML,
+  namespaceXLink,
 
   // Script/style constants
   executableScriptsMimetypes,

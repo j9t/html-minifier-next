@@ -47,6 +47,7 @@
   "removeOptionalTags": true,
   "removeRedundantAttributes": true,
   "removeTagWhitespace": false,
+  "selfCloseForeignElements": true,
   "sortAttributes": false,
   "sortClassNames": false,
   "trimCustomFragments": true,

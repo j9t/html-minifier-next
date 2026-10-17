@@ -177,6 +177,10 @@ const demoConfig = {
     unsafe: true,
     helpText: 'Remove CSS from <code>style</code> elements that name an element, class, or ID the document doesn’t reference (if CSS is to be minified; disabled in web demo because it requires Node.js)'
   },
+  selfCloseForeignElements: {
+    label: 'Self-close empty SVG and MathML elements',
+    checked: true
+  },
   sortAttributes: {
     label: 'Sort attributes',
     unsafe: true
