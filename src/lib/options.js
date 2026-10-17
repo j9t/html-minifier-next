@@ -3,7 +3,7 @@
  */
 
 import { createUrlMinifier } from './urls.js';
-import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, isThenable, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag } from './utils.js';
+import { LRU, MAX_CACHE_ENTRY_SIZE, stableStringify, hashContent, identity, isThenable, lowercase, paramCase, replaceAsync, parseRegExp, describeQuantifierRisk, lostFlag, findTagEnd } from './utils.js';
 import { RE_TRAILING_SEMICOLON, MISSING_DEPENDENCY, svgoPluginsInline, namespaceSVG, namespaceMathML, namespaceXLink } from './constants.js';
 import { canCollapseWhitespace, canTrimWhitespace } from './whitespace.js';
 import { wrapCSS, unwrapCSS } from './content.js';
@@ -50,7 +50,7 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
  *   canMinifySVG: ((text: string) => boolean) | null,
  *   removeUnusedCSS: {safelist: Array<string | RegExp>, scripts: boolean} | null,
  *   cssContext?: CSSContext,
- *   documentState?: {hasMathML: boolean, hasBase: boolean},
+ *   documentState?: {hasMathML: boolean, hasBase: boolean | undefined, source: string},
  *   parallelJS?: boolean,
  *   nameParent?: (name: string) => string,
  *   namesAsWritten?: boolean,
@@ -67,21 +67,22 @@ const RE_SVG_START = /^<svg(?=[\s/>])/;
 
 /**
  * SVGO plugin dropping the namespace declarations HTML reads anyway, once SVGO, which reads
- * XML, needs them no more
- * @param {boolean} removeXMLNS - Whether to drop `xmlns` on `svg` and `math` elements
- * @param {boolean} removeXLink - Whether to drop `xmlns:xlink`
+ * XML, needs them no more; the root’s `xmlns:xlink` goes in any case, as either it was added
+ * for SVGO or the others go, too
+ * @param {boolean} removeAll - Whether to drop `xmlns` on `svg` and `math` elements, and
+ *   `xmlns:xlink` beyond the root
  */
-function createNamespacesPlugin(removeXMLNS, removeXLink) {
+function createNamespacesPlugin(removeAll) {
   return {
     name: 'removeNamespacesHTML',
     fn: () => ({
       element: {
-        enter: (/** @type {{name: string, attributes: Record<string, string>}} */ node) => {
+        enter: (/** @type {{name: string, attributes: Record<string, string>}} */ node, /** @type {{type: string}} */ parentNode) => {
           const attrs = node.attributes;
-          if (removeXMLNS && attrs.xmlns === (node.name === 'math' ? namespaceMathML : node.name === 'svg' ? namespaceSVG : undefined)) {
+          if (removeAll && attrs.xmlns === (node.name === 'math' ? namespaceMathML : node.name === 'svg' ? namespaceSVG : undefined)) {
             delete attrs.xmlns;
           }
-          if (removeXLink && attrs['xmlns:xlink'] === namespaceXLink) {
+          if ((removeAll || parentNode.type === 'root') && attrs['xmlns:xlink'] === namespaceXLink) {
             delete attrs['xmlns:xlink'];
           }
         }
@@ -725,9 +726,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         const removeNamespaces = Boolean(options.removeRedundantAttributes);
 
         // XML reads `xlink:` names only where their prefix is declared, which HTML needs not be;
-        // a declaration added for SVGO goes after it
-        const declaresXLink = svgContent.indexOf('xlink:') !== -1 &&
-          svgContent.indexOf('xmlns:xlink') === -1 && RE_SVG_START.test(svgContent);
+        // a declaration added to the root for SVGO goes after it (one on a nested `svg` covers
+        // that one only)
+        const rootEnd = svgContent.indexOf('xlink:') !== -1 && RE_SVG_START.test(svgContent) ? findTagEnd(svgContent, 4) : -1;
+        const declaresXLink = rootEnd !== -1 && svgContent.lastIndexOf('xmlns:xlink', rootEnd) === -1;
         const svgInput = declaresXLink
           ? '<svg xmlns:xlink="' + namespaceXLink + '"' + svgContent.slice(4)
           : svgContent;
@@ -750,7 +752,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           const inFlight = (async () => {
             const optimize = await loadSvgo();
             const result = optimize(svgInput, removeNamespaces || declaresXLink
-              ? { ...svgoOptions, plugins: [...svgoOptions.plugins, createNamespacesPlugin(removeNamespaces, removeNamespaces || declaresXLink)] }
+              ? { ...svgoOptions, plugins: [...svgoOptions.plugins, createNamespacesPlugin(removeNamespaces)] }
               : svgoOptions);
             return collapseEmpty ? result.data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : result.data;
           })();

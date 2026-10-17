@@ -6,7 +6,7 @@ import {
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
   RE_AMP_ENTITY,
-  RE_CR,
+  RE_BASE_ELEMENT,
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
   RE_ATTR_WS_TRIM,
@@ -194,8 +194,12 @@ function isNamespaceRedundant(attrName, attrValue, options) {
  * @param {ProcessedOptions} options
  */
 function isTargetSelfRedundant(attrValue, options) {
-  return !options.partialMarkup && !options.documentState?.hasBase &&
-    trimWhitespace(attrValue.toLowerCase()) === '_self';
+  if (options.partialMarkup || trimWhitespace(attrValue.toLowerCase()) !== '_self') {
+    return false;
+  }
+  // Written as markup or within a value
+  const state = options.documentState;
+  return !state || !(state.hasBase ??= RE_BASE_ELEMENT.test(state.source));
 }
 
 /**
@@ -932,13 +936,8 @@ function normalizeAttrFinish(attrName, attrNameOut, attrValue, attr, tag, tagOut
 
   if (attrValue && options.insideSVG && options.minifySVG) {
     attrValue = escapeXML(attrValue, true);
-  } else if (options.decodeEntities && attrValue) {
-    if (attrValue.indexOf('&') !== -1) {
-      attrValue = attrValue.replace(RE_AMP_ENTITY, '&amp;$1');
-    }
-    if (attrValue.indexOf('\r') !== -1) {
-      attrValue = attrValue.replace(RE_CR, '&#13;');
-    }
+  } else if (options.decodeEntities && attrValue && attrValue.indexOf('&') !== -1) {
+    attrValue = attrValue.replace(RE_AMP_ENTITY, '&amp;$1');
   }
 
   return {

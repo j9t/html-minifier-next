@@ -20,8 +20,9 @@ const RE_CR = /\r/g;
 const RE_LINE_BREAK_CR = /\r\n?/g;
 const RE_LEGACY_ENTITIES = /&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt)(?!;)|(?:#?[0-9a-zA-Z]+;))/g;
 const RE_ESCAPE_LT = /</g;
-// A `base` element, also as character references may write it
-const RE_BASE_ELEMENT = /(?:<|&lt;?|&#0*60;?|&#x0*3c;?)base[\s/>]/i;
+// A `base` element, also as character references may write it, or as a script may name it
+// (e.g., `createElement('base')`)
+const RE_BASE_ELEMENT = /(?:<|&lt;?|&#0*60;?|&#x0*3c;?)base[\s/>]|(["'`])base\1/i;
 // What decoded text and attribute values hold that XML reads otherwise: markup, and
 // line breaks and tabs XML normalizes (quotes are left to attribute quoting)
 const RE_XML_ESCAPE_TEXT = /[&<\r]|]]>/g;
@@ -148,6 +149,14 @@ const tagDefaults = {
     scope: 'auto'
   },
   track: { kind: 'subtitles' }
+};
+
+// SVG and MathML elements whose children HTML reads as HTML, but for MathML `mglyph` and
+// `malignmark` (`foreignObject` and `annotation-xml` get a context of their own)
+// https://html.spec.whatwg.org/multipage/parsing.html#mathml-text-integration-point
+const integrationPointsForeign = {
+  svg: new Set(['desc', 'title']),
+  math: new Set(['mi', 'mn', 'mo', 'ms', 'mtext'])
 };
 
 // Elements whose `target` defaults to `_self` where no `base` element sets another
@@ -439,6 +448,7 @@ export {
   generalDefaults,
   tagDefaults,
   targetSelfElements,
+  integrationPointsForeign,
   tagDefaultsSVG,
   svgElementsInheritingByReference,
   namespaceHTML,

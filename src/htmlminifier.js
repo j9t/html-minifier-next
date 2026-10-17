@@ -11,7 +11,6 @@ import {
   RE_LINE_BREAK_CR,
   RE_ESCAPE_LT,
   RE_ESCAPE_LT_RAW_TEXT,
-  RE_BASE_ELEMENT,
   RE_HTML_ENCODING,
   RE_WS_START,
   RE_WS_END,
@@ -34,6 +33,7 @@ import {
   trailingElements,
   pClosingParents,
   namesForeignMixedCase,
+  integrationPointsForeign,
   MISSING_DEPENDENCY
 } from './lib/constants.js';
 
@@ -1113,6 +1113,10 @@ async function minifyHTML(value, options, partialMarkup) {
   // anything kept went in since
   /** @type {Array<{tag: string, index: number, empty: boolean}>} */
   const openElements = [];
+  // Under `selfCloseForeignElements`, the open `svg` and `math` elements and the integration points
+  // in them, whose children are HTML, which a slash does not close
+  /** @type {string[]} */
+  const foreignScopes = [];
   // A start tag the parser implied without writing it, whose end tag, if it comes next, is a stray
   // one that browsers read as an empty element (as `</p>` is), so it must not be omitted
   let impliedStartTag = '';
@@ -1509,6 +1513,25 @@ async function minifyHTML(value, options, partialMarkup) {
     // A slash right after an unquoted value would belong to the value
     buffer[last] = tagOpen + (RE_UNQUOTED_VALUE_END.test(tagOpen) ? ' />' : '/>');
     return true;
+  }
+
+  /** @param {string} lowerTag */
+  function enterForeignScope(lowerTag) {
+    if (lowerTag === 'svg' || lowerTag === 'math' ||
+        (options.namespaceForeign && integrationPointsForeign[options.namespaceForeign].has(lowerTag))) {
+      foreignScopes.push(lowerTag);
+    }
+  }
+
+  // Leaves the scope the element opened, if any; returns whether a slash would close the element
+  /** @param {string} lowerTag */
+  function leaveForeignScope(lowerTag) {
+    if (foreignScopes[foreignScopes.length - 1] === lowerTag) {
+      foreignScopes.pop();
+    }
+    const scope = foreignScopes[foreignScopes.length - 1];
+    return lowerTag === 'svg' || lowerTag === 'math' || scope === undefined || scope === 'svg' || scope === 'math' ||
+      ((lowerTag === 'mglyph' || lowerTag === 'malignmark') && integrationPointsForeign.math.has(scope));
   }
 
   function markOpenElementFilled() {
@@ -1919,9 +1942,6 @@ async function minifyHTML(value, options, partialMarkup) {
         const escapeLt = (textForeign ? undefined : RE_ESCAPE_LT_RAW_TEXT[currentTag]) ?? RE_ESCAPE_LT;
         text = text.replace(escapeLt, '&lt;');
       }
-      if (text.indexOf('\r') !== -1) {
-        text = text.replace(RE_CR, '&#13;');
-      }
     } else if (text && textForeign && text.lastIndexOf('<![CDATA[') > text.lastIndexOf(']]>')) {
       // A CDATA section left open at the end of the input closes before the
       // end tags written after it
@@ -2281,6 +2301,9 @@ async function minifyHTML(value, options, partialMarkup) {
           useNameParentForTag = true;
           pushedContext = true;
         }
+        if (options.selfCloseForeignElements && options.insideForeignContent && !unary) {
+          enterForeignScope(lowerTag);
+        }
       }
       // `nameParent` is set whenever `useNameParentForTag` is; the extra check narrows the type
       const nameTag = useNameParentForTag && options.nameParent ? options.nameParent : options.name;
@@ -2421,6 +2444,9 @@ async function minifyHTML(value, options, partialMarkup) {
       if (hasForeignContext) {
         lowerTag = tag.toLowerCase();
         selfCloses &&= Boolean(options.insideForeignContent) || lowerTag === 'foreignobject' || lowerTag === 'annotation-xml';
+        if (foreignScopes.length && !leaveForeignScope(lowerTag)) {
+          selfCloses = false;
+        }
         // Restore parent context when exiting SVG/MathML or HTML-in-foreign-content elements
         if (lowerTag === 'svg' || lowerTag === 'math') {
           options = Object.getPrototypeOf(options);
@@ -2707,6 +2733,18 @@ async function minifyHTML(value, options, partialMarkup) {
     squashTrailingWhitespace('br');
   }
   trimOutputWhitespace();
+
+  // Line breaks are all line feeds by now, so a carriage return left came from decoding a
+  // reference (rare), which keeps it a carriage return where raw it would read as a line feed;
+  // fragments and ignored markup are still placeholders, keeping theirs
+  if (value.indexOf('&#') !== -1) {
+    for (let i = 0; i < buffer.length; i++) {
+      const segment = /** @type {string} */ (buffer[i]);
+      if (segment.indexOf('\r') !== -1) {
+        buffer[i] = segment.replace(RE_CR, '&#13;');
+      }
+    }
+  }
 
   return joinResultSegments(buffer, bufferTags ?? [], markers, options, uidPattern
     ? function (/** @type {string} */ str) {
@@ -3014,8 +3052,9 @@ export const minify = async function (value, options) {
   /** @type {NonNullable<ProcessedOptions['cssContext']>} */
   const cssContext = { warned: new Set() };
   // What the parse finds out about the document for post-processing, sparing an output scan,
-  // and whether the document holds a `base` element, written as markup or within a value
-  const documentState = { hasMathML: false, hasBase: RE_BASE_ELEMENT.test(value) };
+  // and whether the document holds a `base` element, looked up in it on the first `target=_self`
+  /** @type {NonNullable<ProcessedOptions['documentState']>} */
+  const documentState = { hasMathML: false, hasBase: undefined, source: value };
   // Work on a shallow copy so per-call reassignments don’t reach the cached base. The
   // per-document state is part of the copy from the start, as properties added to it
   // later slow down every option lookup.

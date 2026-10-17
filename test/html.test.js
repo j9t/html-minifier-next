@@ -1519,6 +1519,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, options), '<a href=/ target=_self>a</a><base target=_top>');
     input = '<iframe srcdoc="&lt;base target=_top>&lt;a href=/ target=_self>a&lt;/a>"></iframe>';
     assert.strictEqual(await minify(input, options), input);
+    input = '<a href=/ target=_self>a</a><script>document.head.append(Object.assign(document.createElement("base"), { target: "_blank" }))</script>';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<a href=/ target=_self>a</a><script>const base = 1</script>';
+    assert.strictEqual(await minify(input, options), '<a href=/>a</a><script>const base = 1</script>');
     input = '<a href=/ target=_self>a</a><!-- htmlmin:ignore --><base target=_top><!-- htmlmin:ignore -->';
     assert.strictEqual(await minify(input, options), '<a href=/ target=_self>a</a><base target=_top>');
 
@@ -6328,7 +6332,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<pre>a&#xD;b&#x0d;c</pre>', options), '<pre>a&#13;b&#13;c</pre>');
     assert.strictEqual(await minify('<textarea>a&#13;b</textarea>', options), '<textarea>a&#13;b</textarea>');
     assert.strictEqual(await minify('<p title="&#13;&amp;lt;">x</p>', options), '<p title="&#13;&amp;lt;">x</p>');
-    assert.strictEqual(await minify('<p title="a&#13;b">x</p>', { ...options, removeAttributeQuotes: true }), '<p title=a&#13;b>x</p>');
+    // Re-encoded at the end, so quotes stay as around a raw carriage return
+    assert.strictEqual(await minify('<p title="a&#13;b">x</p>', { ...options, removeAttributeQuotes: true }), '<p title="a&#13;b">x</p>');
     assert.strictEqual(await minify('<pre>a&#13;b</pre>', { ...options, collapseWhitespace: true }), '<pre>a&#13;b</pre>');
 
     // In foreign content without `minifySVG`, too

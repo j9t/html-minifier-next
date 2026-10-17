@@ -73,6 +73,13 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify('<svg viewBox="0 0 1 1"><use xlink:href="#a"/></svg><svg><use xlink:href="#b"/></svg>', options), '<svg viewBox="0 0 1 1"><use xlink:href="#a"/></svg><svg><use xlink:href="#b"/></svg>');
     // A declaration written stays
     assert.strictEqual(await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/></svg>', options), '<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/></svg>');
+    // As does one on a nested `svg`, which declares it for that one only
+    const input = '<svg><use xlink:href="#a"/><svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#b"/></svg></svg>';
+    assert.strictEqual(await minify(input, options), input);
+    // Unless redundant
+    assert.strictEqual(await minify(input, { ...options, removeRedundantAttributes: true }), '<svg><use xlink:href="#a"/><svg><use xlink:href="#b"/></svg></svg>');
+    // A root start tag holding `>` in a value is read to its end
+    assert.strictEqual(await minify('<svg aria-label="a>b"><use xlink:href="#a"/></svg>', options), '<svg aria-label="a&gt;b"><use xlink:href="#a"/></svg>');
   });
 
   test('Removes redundant SVG attributes', async () => {
@@ -120,6 +127,10 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify(input, options), input);
     assert.strictEqual(await minify('<svg><foreignObject></foreignObject></svg>', options), '<svg><foreignObject/></svg>');
     assert.strictEqual(await minify('<svg><g></g><p></p></svg>', options), '<svg><g/></svg><p></p>');
+    // As in SVG `title` and `desc` and in MathML token elements, but for `mglyph` and `malignmark`
+    input = '<svg><title><b></b></title><desc><g></g><i>a</i></desc></svg><math><mi><mo></mo></mi><mtext><span></span></mtext></math>';
+    assert.strictEqual(await minify(input, options), input);
+    assert.strictEqual(await minify('<svg><title></title><desc><svg><path></path></svg></desc><g></g></svg><math><mi><mglyph></mglyph><malignmark></malignmark></mi><mi></mi></math>', options), '<svg><title/><desc><svg><path/></svg></desc><g/></svg><math><mi><mglyph/><malignmark/></mi><mi/></math>');
 
     // Custom fragments may write anything into a tag
     input = '<svg><path <?php echo $d ?>></path></svg>';
