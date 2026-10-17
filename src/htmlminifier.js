@@ -2474,6 +2474,8 @@ async function minifyHTML(value, options, partialMarkup) {
         const marker = uidAttr;
         const fragments = Array.from(rest.matchAll(/** @type {RegExp} */ (uidPattern)), uid => marker + (uid[2] ?? '') + marker);
         endTagText = '</' + tagOut + (joinsTag ? '' : ' ') + fragments.join(' ') + '>';
+        // Which a slash would drop
+        selfCloses = false;
       }
 
       const insideNoTrim = stackNoTrimWhitespace.length > 0;

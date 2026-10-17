@@ -66,32 +66,27 @@ const RE_SVGO_EMPTY_ATTRIBUTE = / ([^\s"'<>/=]+)=""/g;
 const RE_SVG_START = /^<svg(?=[\s/>])/;
 const RE_QUOTED_VALUE = /"[^"]*"|'[^']*'/g;
 const RE_XLINK_DECLARATION = /\sxmlns:xlink(?=[\s=/>]|$)/;
+// The declaration as SVGO writes it, on any element and on the root; values escape `>` there
+const XLINK_DECLARATION_SVGO = ' xmlns:xlink="' + namespaceXLink + '"';
+const RE_XLINK_DECLARATION_SVGO_ROOT = new RegExp('^(<svg[^>]*?)' + XLINK_DECLARATION_SVGO.replace(/[.:/]/g, '\\$&'));
 
 /**
- * SVGO plugin dropping the namespace declarations HTML reads anyway, once SVGO, which reads
- * XML, needs them no more; the root’s `xmlns:xlink` goes in any case, as either it was added
- * for SVGO or the others go, too
- * @param {boolean} removeAll - Whether to drop `xmlns` on `svg` and `math` elements, and
- *   `xmlns:xlink` beyond the root
+ * SVGO plugin dropping the `xmlns` declarations HTML reads anyway on `svg` and `math` elements
+ * (`xmlns:xlink` goes after SVGO, as each pass of `multipass` reads XML again, which needs it)
  */
-function createNamespacesPlugin(removeAll) {
-  return {
-    name: 'removeNamespacesHTML',
-    fn: () => ({
-      element: {
-        enter: (/** @type {{name: string, attributes: Record<string, string>}} */ node, /** @type {{type: string}} */ parentNode) => {
-          const attrs = node.attributes;
-          if (removeAll && attrs.xmlns === (node.name === 'math' ? namespaceMathML : node.name === 'svg' ? namespaceSVG : undefined)) {
-            delete attrs.xmlns;
-          }
-          if ((removeAll || parentNode.type === 'root') && attrs['xmlns:xlink'] === namespaceXLink) {
-            delete attrs['xmlns:xlink'];
-          }
+const pluginNamespacesHTML = {
+  name: 'removeNamespacesHTML',
+  fn: () => ({
+    element: {
+      enter: (/** @type {{name: string, attributes: Record<string, string>}} */ node) => {
+        const attrs = node.attributes;
+        if (attrs.xmlns === (node.name === 'math' ? namespaceMathML : node.name === 'svg' ? namespaceSVG : undefined)) {
+          delete attrs.xmlns;
         }
       }
-    })
-  };
-}
+    }
+  })
+};
 
 /** @param {ProcessedOptions} options */
 function shouldMinifyInnerHTML(options) {
@@ -755,10 +750,17 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
           const inFlight = (async () => {
             const optimize = await loadSvgo();
-            const result = optimize(svgInput, removeNamespaces || addsXLink
-              ? { ...svgoOptions, plugins: [...svgoOptions.plugins, createNamespacesPlugin(removeNamespaces)] }
+            const result = optimize(svgInput, removeNamespaces
+              ? { ...svgoOptions, plugins: [...svgoOptions.plugins, pluginNamespacesHTML] }
               : svgoOptions);
-            return collapseEmpty ? result.data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : result.data;
+            let data = result.data;
+            // The root’s declaration was added for SVGO, unless all of them go
+            if (removeNamespaces) {
+              data = data.replaceAll(XLINK_DECLARATION_SVGO, '');
+            } else if (addsXLink) {
+              data = data.replace(RE_XLINK_DECLARATION_SVGO_ROOT, '$1');
+            }
+            return collapseEmpty ? data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : data;
           })();
 
           if (svgKey !== undefined) svgCache.set(svgKey, inFlight);

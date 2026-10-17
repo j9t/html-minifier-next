@@ -82,6 +82,10 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify('<svg aria-label="a>b"><use xlink:href="#a"/></svg>', options), '<svg aria-label="a&gt;b"><use xlink:href="#a"/></svg>');
     // A value naming the declaration is no declaration
     assert.strictEqual(await minify('<svg aria-label="xmlns:xlink"><use xlink:href="#a"/></svg>', options), '<svg aria-label="xmlns:xlink"><use xlink:href="#a"/></svg>');
+    // Every pass of `multipass` reads XML again, so the declarations go after the last
+    const multipass = { ...options, minifySVG: { multipass: true } };
+    assert.strictEqual(await minify('<svg><use xlink:href="#a" x="0"/></svg>', multipass), '<svg><use xlink:href="#a"/></svg>');
+    assert.strictEqual(await minify('<svg xmlns:xlink="http://www.w3.org/1999/xlink"><use xlink:href="#a"/></svg>', { ...multipass, removeRedundantAttributes: true }), '<svg><use xlink:href="#a"/></svg>');
   });
 
   test('Removes redundant SVG attributes', async () => {
@@ -136,6 +140,8 @@ describe('SVG and MathML', () => {
 
     // Custom fragments may write anything into a tag
     input = '<svg><path <?php echo $d ?>></path></svg>';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<svg><path d="a"></path <?php echo 1 ?>></svg>';
     assert.strictEqual(await minify(input, options), input);
 
     // Lines break within tags, which the slash closes all the same
