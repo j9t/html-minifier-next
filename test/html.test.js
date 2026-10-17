@@ -6332,12 +6332,14 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<pre>a&#xD;b&#x0d;c</pre>', options), '<pre>a&#13;b&#13;c</pre>');
     assert.strictEqual(await minify('<textarea>a&#13;b</textarea>', options), '<textarea>a&#13;b</textarea>');
     assert.strictEqual(await minify('<p title="&#13;&amp;lt;">x</p>', options), '<p title="&#13;&amp;lt;">x</p>');
-    // Re-encoded at the end, so quotes stay as around a raw carriage return
-    assert.strictEqual(await minify('<p title="a&#13;b">x</p>', { ...options, removeAttributeQuotes: true }), '<p title="a&#13;b">x</p>');
+    assert.strictEqual(await minify('<p title="a&#13;b">x</p>', { ...options, removeAttributeQuotes: true }), '<p title=a&#13;b>x</p>');
     assert.strictEqual(await minify('<pre>a&#13;b</pre>', { ...options, collapseWhitespace: true }), '<pre>a&#13;b</pre>');
 
     // In foreign content without `minifySVG`, too
     assert.strictEqual(await minify('<svg><text x="a&#13;b">a&#13;b</text></svg>', options), '<svg><text x="a&#13;b">a&#13;b</text></svg>');
+
+    // Raw text a minifier of one’s own writes stays as written
+    assert.strictEqual(await minify('<p>&#13;</p><script>a()</script><style>a{}</style>', { ...options, minifyJS: text => text + '\r', minifyCSS: text => text + '\r' }), '<p>&#13;</p><script>a()\r</script><style>a{}\r</style>');
     assert.strictEqual(await minify('<math><mi>a&#13;b</mi></math>', options), '<math><mi>a&#13;b</mi></math>');
   });
 

@@ -64,6 +64,8 @@ import { optionDefinitions, optionDefaults } from './option-definitions.js';
 const RE_SCOPE_AT_RULE = /@scope\b/i;
 const RE_SVGO_EMPTY_ATTRIBUTE = / ([^\s"'<>/=]+)=""/g;
 const RE_SVG_START = /^<svg(?=[\s/>])/;
+const RE_QUOTED_VALUE = /"[^"]*"|'[^']*'/g;
+const RE_XLINK_DECLARATION = /\sxmlns:xlink(?=[\s=/>]|$)/;
 
 /**
  * SVGO plugin dropping the namespace declarations HTML reads anyway, once SVGO, which reads
@@ -729,8 +731,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
         // a declaration added to the root for SVGO goes after it (one on a nested `svg` covers
         // that one only)
         const rootEnd = svgContent.indexOf('xlink:') !== -1 && RE_SVG_START.test(svgContent) ? findTagEnd(svgContent, 4) : -1;
-        const declaresXLink = rootEnd !== -1 && svgContent.lastIndexOf('xmlns:xlink', rootEnd) === -1;
-        const svgInput = declaresXLink
+        // Values are quoted where SVGO reads, so what is left is names
+        const addsXLink = rootEnd !== -1 &&
+          !RE_XLINK_DECLARATION.test(svgContent.slice(4, rootEnd).replace(RE_QUOTED_VALUE, ''));
+        const svgInput = addsXLink
           ? '<svg xmlns:xlink="' + namespaceXLink + '"' + svgContent.slice(4)
           : svgContent;
 
@@ -751,7 +755,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
 
           const inFlight = (async () => {
             const optimize = await loadSvgo();
-            const result = optimize(svgInput, removeNamespaces || declaresXLink
+            const result = optimize(svgInput, removeNamespaces || addsXLink
               ? { ...svgoOptions, plugins: [...svgoOptions.plugins, createNamespacesPlugin(removeNamespaces)] }
               : svgoOptions);
             return collapseEmpty ? result.data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : result.data;

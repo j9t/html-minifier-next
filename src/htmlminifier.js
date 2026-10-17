@@ -1942,6 +1942,9 @@ async function minifyHTML(value, options, partialMarkup) {
         const escapeLt = (textForeign ? undefined : RE_ESCAPE_LT_RAW_TEXT[currentTag]) ?? RE_ESCAPE_LT;
         text = text.replace(escapeLt, '&lt;');
       }
+      if (text.indexOf('\r') !== -1) {
+        text = text.replace(RE_CR, '&#13;');
+      }
     } else if (text && textForeign && text.lastIndexOf('<![CDATA[') > text.lastIndexOf(']]>')) {
       // A CDATA section left open at the end of the input closes before the
       // end tags written after it
@@ -2733,18 +2736,6 @@ async function minifyHTML(value, options, partialMarkup) {
     squashTrailingWhitespace('br');
   }
   trimOutputWhitespace();
-
-  // Line breaks are all line feeds by now, so a carriage return left came from decoding a
-  // reference (rare), which keeps it a carriage return where raw it would read as a line feed;
-  // fragments and ignored markup are still placeholders, keeping theirs
-  if (value.indexOf('&#') !== -1) {
-    for (let i = 0; i < buffer.length; i++) {
-      const segment = /** @type {string} */ (buffer[i]);
-      if (segment.indexOf('\r') !== -1) {
-        buffer[i] = segment.replace(RE_CR, '&#13;');
-      }
-    }
-  }
 
   return joinResultSegments(buffer, bufferTags ?? [], markers, options, uidPattern
     ? function (/** @type {string} */ str) {

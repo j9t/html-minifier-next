@@ -80,6 +80,8 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify(input, { ...options, removeRedundantAttributes: true }), '<svg><use xlink:href="#a"/><svg><use xlink:href="#b"/></svg></svg>');
     // A root start tag holding `>` in a value is read to its end
     assert.strictEqual(await minify('<svg aria-label="a>b"><use xlink:href="#a"/></svg>', options), '<svg aria-label="a&gt;b"><use xlink:href="#a"/></svg>');
+    // A value naming the declaration is no declaration
+    assert.strictEqual(await minify('<svg aria-label="xmlns:xlink"><use xlink:href="#a"/></svg>', options), '<svg aria-label="xmlns:xlink"><use xlink:href="#a"/></svg>');
   });
 
   test('Removes redundant SVG attributes', async () => {
