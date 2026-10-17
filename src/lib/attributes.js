@@ -10,7 +10,6 @@ import {
   RE_BASE_ELEMENT,
   RE_ATTR_WS_CHECK,
   RE_ATTR_WS_COLLAPSE,
-  RE_ATTR_WS_TRIM,
   RE_WS_CHAR,
   generalDefaults,
   tagDefaults,
@@ -568,8 +567,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
   if (options.collapseAttributeWhitespace && !collapseAttributeWhitespaceExempt.has(attrName) && !(attrName === 'value' && valueWhitespaceExemptElements.has(tag)) && !isEventAttr) {
     // Fast path: Only process if whitespace exists (avoids regex overhead on clean values)
     if (RE_ATTR_WS_CHECK.test(attrValue)) {
-      // Two-pass approach (faster than single-pass with callback)
-      attrValue = attrValue.replace(RE_ATTR_WS_COLLAPSE, ' ').replace(RE_ATTR_WS_TRIM, '');
+      attrValue = trimWhitespace(attrValue).replace(RE_ATTR_WS_COLLAPSE, ' ');
     }
   }
 
