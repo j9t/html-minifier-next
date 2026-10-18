@@ -4,6 +4,11 @@ import { spawnSync } from 'node:child_process';
 import { minify, getCacheStats } from '../src/htmlminifier.js';
 import { hashContent } from '../src/lib/utils.js';
 
+// Sizes fall back to these, so values set in the shell running the tests must not leak in
+for (const key of ['HMN_CACHE_CSS', 'HMN_CACHE_JS', 'HMN_CACHE_SVG']) {
+  delete process.env[key];
+}
+
 describe('Caches', () => {
   test('Hashes keys of large inputs without the collisions a 32-bit hash has', () => {
     // FNV-1a 32-bit collisions
