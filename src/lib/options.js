@@ -98,6 +98,7 @@ function shouldMinifyInnerHTML(options) {
     options.removeOptionalTags ||
     options.minifyJS !== identity ||
     options.minifyCSS !== identity ||
+    options.minifyJSON ||
     options.minifyURLs !== identity ||
     options.minifySVG
   );

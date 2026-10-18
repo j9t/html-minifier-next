@@ -752,6 +752,12 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { minifyJSON: true }), output);
   });
 
+  test('Minifies JSON in `iframe srcdoc` with `minifyJSON` alone', async () => {
+    const input = '<iframe srcdoc="<script type=&quot;application/json&quot;>{ &quot;a&quot;: 1 }</script>"></iframe>';
+    const output = '<iframe srcdoc="<script type=&quot;application/json&quot;>{&quot;a&quot;:1}</script>"></iframe>';
+    assert.strictEqual(await minify(input, { minifyJSON: true }), output);
+  });
+
   test('Keeps JSON values intact', async () => {
     const values = [
       ['{"id": 12345678901234567890}', '{"id":12345678901234567890}'],
