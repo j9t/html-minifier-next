@@ -307,12 +307,8 @@ You can pass Lightning CSS configuration options by providing an object:
 ```js
 const result = await minify(html, {
   minifyCSS: {
-    targets: {
-      // Browser targets for vendor prefix handling
-      chrome: 95,
-      firefox: 90,
-      safari: 14
-    },
+    // Support Safari 15 and later (Lightning CSS encodes versions as `major << 16`)
+    targets: { safari: 15 << 16 },
     unusedSymbols: ['unused-class', 'old-animation']
   }
 });
@@ -320,7 +316,7 @@ const result = await minify(html, {
 
 Available Lightning CSS options when passed as an object:
 
-* `targets`: Browser targets for vendor prefix optimization (e.g., `{ chrome: 95, firefox: 90 }`).
+* `targets`: Oldest browser versions to support; without it, CSS is minified as written. Lightning CSS encodes versions as `major << 16` (e.g., `{ safari: 15 << 16 }`; a plain `15` means version 0.0.15); in a JSON configuration file, use the computed number (`983040` for 15). Projects already using Browserslist can convert their query with Lightning CSS’s `browserslistToTargets()`.
 * `unusedSymbols`: Array of class names, IDs, keyframe names, and CSS variables to remove.
 * `errorRecovery`: Boolean to skip invalid rules instead of throwing errors. This is disabled by default in Lightning CSS, but enabled in HMN when the `continueOnMinifyError` option is set to `true` (the default). Explicitly setting `errorRecovery` in `minifyCSS` options will override this automatic behavior. What Lightning CSS takes issue with is reported through [the `log` hook](#api-only-options)—it drops some of it (`@property` with an invalid `syntax`) and passes the rest through (an unknown at-rule), so that a dropped rule does not go unnoticed. Every document is reported on separately.
 * `sourceMap`: Boolean to generate source maps.

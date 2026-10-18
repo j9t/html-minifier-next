@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 * **BREAKING:** JSON is no longer minified by default (also not by the `conservative` preset); use `minifyJSON` (or the `comprehensive` preset)
 * Improved `collapseAttributeWhitespace` performance
+* Corrected the README on Lightning CSS `targets`
 * Refactored tests: Split test/css+js.test.js into css.test.js, js.test.js, json.test.js, and caches.test.js, moving tests that combine options into options.test.js
 
 ## [8.11.0] - 2026-10-17
