@@ -13,22 +13,6 @@ describe('Caches', () => {
     assert.strictEqual(hashContent('a'), hashContent('a'));
   });
 
-  test('Default sizes work', async () => {
-    // Caches work without explicit configuration
-    const input = `
-      <style>body { color: red; margin: 0; }</style>
-      <script>let x = 1; console.log(x);</script>
-    `;
-
-    const result = await minify(input, {
-      minifyCSS: true,
-      minifyJS: { compress: { drop_console: true } }
-    });
-
-    assert.ok(result.includes('body{color:red;margin:0}'), 'CSS should be minified');
-    assert.ok(!result.includes('console.log'), 'Console should be dropped from JS');
-  });
-
   test('Lightning CSS options differing only in a visitor function do not share a cache entry', async () => {
     const input = '<style>a{color:red}</style>';
     // Same source; only the closed-over channel value differs
@@ -48,196 +32,111 @@ describe('Caches', () => {
     assert.ok(resultB.includes('/*keep-b*/') && !resultB.includes('/*keep-a*/'), resultB);
   });
 
-  test('A custom CSS cache size works', async () => {
-    const input = '<style>body { color: blue; padding: 0; }</style>';
-
-    // Should work with custom CSS cache size
-    const result = await minify(input, {
-      minifyCSS: true,
-      cacheCSS: 750 // Custom size
-    });
-
-    // Just verify that minification worked - the exact output may vary
-    assert.ok(result.length < input.length, 'Output should be smaller than input');
-    assert.ok(result.includes('body'), 'Should contain body selector');
-    assert.ok(result.includes('color:'), 'Should contain color property');
-  });
-
-  test('A custom JS cache size works', async () => {
-    const input = '<script>function test() { return 42; }</script>';
-
-    // Should work with custom JS cache size
-    const result = await minify(input, {
-      minifyJS: true,
-      cacheJS: 250 // Custom size
-    });
-
-    assert.ok(result.includes('function test(){return 42}') || result.includes('function test(){return 42;}'),
-      'JS should be minified with custom cache');
-  });
-
-  test('Both cache sizes work together', async () => {
-    const input = `
-      <style>div { background: #fff; margin: 10px; }</style>
-      <script>let data = { x: 1, y: 2 };</script>
-    `;
-
-    // Should work with both custom cache sizes
-    const result = await minify(input, {
-      minifyCSS: true,
-      minifyJS: true,
-      cacheCSS: 600,
-      cacheJS: 400
-    });
-
-    assert.ok(result.includes('#fff'), 'CSS should be minified');
-    assert.ok(result.includes('x:1') && result.includes('y:2'), 'JS should be minified with custom cache sizes');
-  });
-
-  test('Environment variables set the cache size', async () => {
-    const input = '<style>.test { color: purple; }</style>';
-
-    // Environment variable override
-    process.env.HMN_CACHE_CSS = '900';
-    try {
-      const result = await minify(input, {
-        minifyCSS: true
-      });
-
-      assert.ok(result.includes('.test{color:purple}'), 'CSS should minify with env var cache size');
-    } finally {
-      // Cleanup always runs, even if assertion fails
-      delete process.env.HMN_CACHE_CSS;
-    }
-  });
-
-  test('Option overrides environment variable', async () => {
-    const input = '<style>.foo { border: none; }</style>';
-
-    // Set env var first
-    process.env.HMN_CACHE_CSS = '100';
-
-    try {
-      // Option should override env var
-      const result = await minify(input, {
-        minifyCSS: true,
-        cacheCSS: 650
-      });
-
-      assert.ok(result.includes('.foo{border:none}'), 'Option should override env var');
-    } finally {
-      // Cleanup always runs, even if assertion fails
-      delete process.env.HMN_CACHE_CSS;
-    }
-  });
-
-  test('Very large cache sizes work', async () => {
-    const input = '<script>function largeTest() { return "large"; }</script>';
-
-    // Should handle large cache sizes without issues
-    const result = await minify(input, {
-      minifyJS: true,
-      cacheJS: 10000 // Very large size
-    });
-
-    assert.ok(result.includes('function largeTest(){'), 'JS should minify with large cache');
-  });
-
-  test('Zero cache size still minifies', async () => {
-    const input = '<style>.zero { margin: 0; }</style>';
-
-    const result = await minify(input, {
-      minifyCSS: true,
-      cacheCSS: 0 // Switches the cache off
-    });
-
-    assert.ok(result.includes('.zero{margin:0}'), 'CSS should minify even with `cacheCSS: 0`');
-  });
-
   // Sizes lock on the first `minify()` call for the life of the process, so any size but
   // the default has to be observed in a process that sets it before anything else runs
-  const cssStatsForFirstCall = (/** @type {number} */ size) => {
+  const firstCall = (/** @type {object} */ options, /** @type {Record<string, string>} */ env = {}) => {
     const urlMinifier = new URL('../src/htmlminifier.js', import.meta.url).href;
     const script = `
       import { minify, getCacheStats } from ${JSON.stringify(urlMinifier)};
-      const input = '<style>.probe { color: red; }</style>';
-      await minify(input, { minifyCSS: true, cacheCSS: ${size} });
-      await minify(input, { minifyCSS: true, cacheCSS: ${size} });
-      console.log(JSON.stringify(getCacheStats().css));
+      const options = { minifyCSS: true, minifyJS: true, ...${JSON.stringify(options)} };
+      const input = '<style>.probe { color: red; }</style><script>let probe = 1; console.log(probe);</script>';
+      const output = await minify(input, options);
+      await minify(input, options);
+      console.log(JSON.stringify({ output, stats: getCacheStats() }));
     `;
-    const { stdout, stderr, status } = spawnSync('node', ['--input-type=module', '--eval', script], { encoding: 'utf8' });
-    assert.strictEqual(status, 0, `Probe process failed: ${stderr}`);
+    const { stdout, stderr, status, error } = spawnSync(process.execPath, ['--input-type=module', '--eval', script], {
+      encoding: 'utf8',
+      env: { ...process.env, ...env },
+      timeout: 30000
+    });
+    assert.strictEqual(status, 0, `Probe process failed: ${error?.message ?? stderr}`);
     return JSON.parse(stdout);
   };
 
-  test('`cacheCSS: 0` switches the cache off', () => {
-    const stats = cssStatsForFirstCall(0);
+  test('Default sizes work', () => {
+    const { output, stats } = firstCall({});
 
-    assert.strictEqual(stats.limit, 0, 'Cache limit should be reported as zero');
-    assert.strictEqual(stats.gets, 2, 'Both calls should still perform a lookup');
-    assert.strictEqual(stats.hits, 0, 'The repeated call should miss rather than hit');
-    assert.strictEqual(stats.size, 0, 'Nothing should be stored');
+    assert.ok(output.includes('.probe{color:red}'), 'CSS should be minified');
+    assert.ok(output.includes('let probe=1;console.log(probe)'), 'JS should be minified');
+    for (const cache of ['css', 'js', 'svg']) {
+      assert.strictEqual(stats[cache].limit, 500, `${cache} cache limit should be the default`);
+    }
+  });
+
+  test('A custom CSS cache size works', () => {
+    const { stats } = firstCall({ cacheCSS: 750 });
+
+    assert.strictEqual(stats.css.limit, 750, 'CSS cache limit should be the configured size');
+    assert.strictEqual(stats.js.limit, 500, 'JS cache limit should stay at the default');
+  });
+
+  test('A custom JS cache size works', () => {
+    const { stats } = firstCall({ cacheJS: 250 });
+
+    assert.strictEqual(stats.js.limit, 250, 'JS cache limit should be the configured size');
+    assert.strictEqual(stats.css.limit, 500, 'CSS cache limit should stay at the default');
+  });
+
+  test('Both cache sizes work together', () => {
+    const { stats } = firstCall({ cacheCSS: 600, cacheJS: 400 });
+
+    assert.strictEqual(stats.css.limit, 600, 'CSS cache limit should be the configured size');
+    assert.strictEqual(stats.js.limit, 400, 'JS cache limit should be the configured size');
+  });
+
+  test('Environment variables set the cache size', () => {
+    const { stats } = firstCall({}, { HMN_CACHE_CSS: '900', HMN_CACHE_JS: '300' });
+
+    assert.strictEqual(stats.css.limit, 900, '`HMN_CACHE_CSS` should set the CSS cache limit');
+    assert.strictEqual(stats.js.limit, 300, '`HMN_CACHE_JS` should set the JS cache limit');
+  });
+
+  test('Option overrides environment variable', () => {
+    const { stats } = firstCall({ cacheCSS: 650 }, { HMN_CACHE_CSS: '100' });
+
+    assert.strictEqual(stats.css.limit, 650, 'Option should override env var');
+  });
+
+  test('Very large cache sizes work', () => {
+    const { output, stats } = firstCall({ cacheJS: 10000 });
+
+    assert.strictEqual(stats.js.limit, 10000, 'JS cache limit should be the configured size');
+    assert.ok(output.includes('let probe=1;console.log(probe)'), 'JS should minify with large cache');
+  });
+
+  test('`cacheCSS: 0` switches the cache off and still minifies', () => {
+    const { output, stats } = firstCall({ cacheCSS: 0 });
+
+    assert.ok(output.includes('.probe{color:red}'), 'CSS should minify even with `cacheCSS: 0`');
+    assert.strictEqual(stats.css.limit, 0, 'Cache limit should be reported as zero');
+    assert.strictEqual(stats.css.gets, 2, 'Both calls should still perform a lookup');
+    assert.strictEqual(stats.css.hits, 0, 'The repeated call should miss rather than hit');
+    assert.strictEqual(stats.css.size, 0, 'Nothing should be stored');
   });
 
   test('A negative cache size falls back to the default', () => {
-    const stats = cssStatsForFirstCall(-5);
+    const { stats } = firstCall({ cacheCSS: -5 });
 
-    assert.strictEqual(stats.limit, 500, 'Default cache limit should be reported');
-    assert.strictEqual(stats.hits, 1, 'The repeated call should hit, as it does by default');
+    assert.strictEqual(stats.css.limit, 500, 'Default cache limit should be reported');
+    assert.strictEqual(stats.css.hits, 1, 'The repeated call should hit, as it does by default');
   });
 
-  test('Negative environment variable returns undefined (uses default)', async () => {
-    const input = '<style>.test { color: red; }</style>';
+  test('Negative environment variable returns undefined (uses default)', () => {
+    const { stats } = firstCall({}, { HMN_CACHE_CSS: '-100' });
 
-    // Set negative env var—should be ignored
-    process.env.HMN_CACHE_CSS = '-100';
-    try {
-      const result = await minify(input, {
-        minifyCSS: true
-      });
-
-      // Should work with default cache size (check for selector and minified format)
-      assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is negative');
-      assert.ok(result.includes('color:'), 'Should contain color property');
-    } finally {
-      delete process.env.HMN_CACHE_CSS;
-    }
+    assert.strictEqual(stats.css.limit, 500, 'Default cache limit should be used when env var is negative');
   });
 
-  test('Infinity environment variable returns undefined (uses default)', async () => {
-    const input = '<style>.test { color: blue; }</style>';
+  test('Infinity environment variable returns undefined (uses default)', () => {
+    const { stats } = firstCall({}, { HMN_CACHE_CSS: 'Infinity' });
 
-    // Set `Infinity` env var—should be ignored
-    process.env.HMN_CACHE_CSS = 'Infinity';
-    try {
-      const result = await minify(input, {
-        minifyCSS: true
-      });
-
-      // Should work with default cache size (Lightning CSS converts blue to hex)
-      assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is Infinity');
-      assert.ok(result.includes('color:'), 'Should contain `color` property');
-    } finally {
-      delete process.env.HMN_CACHE_CSS;
-    }
+    assert.strictEqual(stats.css.limit, 500, 'Default cache limit should be used when env var is Infinity');
   });
 
-  test('Invalid string environment variable returns undefined (uses default)', async () => {
-    const input = '<style>.test { color: green; }</style>';
+  test('Invalid string environment variable returns undefined (uses default)', () => {
+    const { stats } = firstCall({}, { HMN_CACHE_CSS: 'not-a-number' });
 
-    // Set invalid string env var—should be ignored
-    process.env.HMN_CACHE_CSS = 'not-a-number';
-    try {
-      const result = await minify(input, {
-        minifyCSS: true
-      });
-
-      // Should work with default cache size (Lightning CSS converts green to hex)
-      assert.ok(result.includes('.test{'), 'Should minify CSS with default cache size when env var is invalid string');
-      assert.ok(result.includes('color:'), 'Should contain `color` property');
-    } finally {
-      delete process.env.HMN_CACHE_CSS;
-    }
+    assert.strictEqual(stats.css.limit, 500, 'Default cache limit should be used when env var is invalid string');
   });
 
   test('Large CSS inputs with identical first/last 50 chars are not confused in cache', async () => {

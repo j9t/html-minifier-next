@@ -176,23 +176,24 @@ describe('JS', () => {
 
   test('Uses SWC for script blocks', async () => {
     const input = '<script>function myFunction() { let x = 1; return x; }</script>';
+    const output = '<script>function myFunction(){return 1}</script>';
 
-    // SWC should minify the code (exact output may differ from Terser)
-    const result = await minify(input, { minifyJS: { engine: 'swc' } });
-    assert.ok(result.startsWith('<script>'), 'Should start with script tag');
-    assert.ok(result.endsWith('</script>'), 'Should end with script tag');
-    assert.ok(result.length < input.length, 'Should be minified (shorter)');
-    assert.ok(!result.includes('let x'), 'Variable should be optimized away');
+    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' } }), output);
+
+    // Both engines minify alike, so the parser’s error message is what tells them apart
+    // (Terser reports “Name expected” here)
+    await assert.rejects(
+      minify('<script>var = = =;</script>', { minifyJS: { engine: 'swc' }, continueOnMinifyError: false }),
+      { message: /Unexpected token `=`/ }
+    );
   });
 
   test('Uses Terser for inline handlers under SWC', async () => {
+    // SWC rejects a bare `return`, so the handler only minifies if Terser takes it
     const input = '<button onclick="return false;">Click</button>';
+    const output = '<button onclick="return!1">Click</button>';
 
-    // Even with SWC engine, inline handlers should use Terser
-    // This is because SWC doesn’t support bare return statements
-    const result = await minify(input, { minifyJS: { engine: 'swc' } });
-    assert.ok(result.includes('onclick'), '`onclick` attribute should be preserved');
-    assert.ok(result.includes('return'), 'Return statement should work (via Terser)');
+    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' }, continueOnMinifyError: false }), output);
   });
 
   test('Uses SWC for script blocks and Terser for inline handlers in one document', async () => {
@@ -241,20 +242,20 @@ describe('JS', () => {
   });
 
   test('Applies engine-specific options for SWC', async () => {
-    const input = '<script>function myFunction() { let unused = "test"; let x = 1; return x; }</script>';
+    const input = '<script>function myFunction() { console.log("test"); let x = 1; return x; }</script>';
 
     const result = await minify(input, {
       minifyJS: {
         engine: 'swc',
-        compress: true,
-        mangle: true
+        compress: {
+          drop_console: true
+        }
       }
     });
 
-    assert.ok(result.startsWith('<script>'), 'Should start with script tag');
-    assert.ok(result.length < input.length, 'Should be minified');
-    // SWC may or may not remove the unused variable depending on optimization level
-    // Just check that it’s shorter (minified)
+    assert.ok(!result.includes('console'), 'Console should be dropped');
+    assert.ok(result.includes('function myFunction()'), 'Function should remain');
+    assert.ok(result.includes('return'), '`return` statement should be present');
   });
 
   test('Reads the SWC engine name case-insensitively', async () => {
@@ -643,9 +644,10 @@ describe('JS', () => {
       );
     });
 
-    test('Minification errors propagate by default', async () => {
+    test('Minification errors propagate with `continueOnMinifyError: false`', async () => {
       await assert.rejects(
-        () => minify('<script>var = = =;</script>', { minifyJS: true, continueOnMinifyError: false })
+        () => minify('<script>var = = =;</script>', { minifyJS: true, continueOnMinifyError: false }),
+        { message: /Name expected/ }
       );
     });
 

@@ -91,14 +91,15 @@ describe('CSS', () => {
   });
 
   test('Applies custom options', async () => {
-    const input = '<style>.class1 { color: red; } .class2 { color: red; }</style>';
-    const result = await minify(input, {
-      minifyCSS: {}
-    });
+    const input = '<style>.a { &.b { color: red; } }</style>';
 
-    // Lightning CSS performs optimizations by default when minify is enabled
-    assert.ok(result.includes('color:red'), 'Should minify CSS');
-    assert.ok(result.length < input.length, 'Output should be shorter');
+    // Lightning CSS keeps nesting by default and lowers it for targets that predate it
+    // (versions are encoded as `major << 16`)
+    assert.strictEqual(await minify(input, { minifyCSS: true }), '<style>.a{&.b{color:red}}</style>');
+    assert.strictEqual(
+      await minify(input, { minifyCSS: { targets: { chrome: 80 << 16 } } }),
+      '<style>.a.b{color:red}</style>'
+    );
   });
 
   test('Minifies an inline `style` attribute', async () => {
@@ -431,12 +432,16 @@ describe('CSS', () => {
     });
 
     test('Leaves `style` and `media` attributes alone', async () => {
-      const input = '<p style="color:red" class="used"></p><link media="(min-width:0)" rel="stylesheet" href="a.css">';
+      // The style sheet is what turns removal on; without one, nothing would be exercised
+      const input = style('.used{color:red}.unused{color:red}') +
+        '<p style="color:red" class="used"></p><link media="(min-width:0)" rel="stylesheet" href="a.css">';
       const baseline = await minify(input, { minifyCSS: true });
       const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
+      const withoutSheet = html => html.replace(/<style>[\s\S]*?<\/style>/, '');
 
+      assert.ok(!styleOf(output).includes('.unused'), 'Unreferenced class should be removed');
       // Attributes carry declarations and media queries, never selectors
-      assert.strictEqual(output, baseline);
+      assert.strictEqual(withoutSheet(output), withoutSheet(baseline));
     });
 
     test('Does not leak one document’s result into another through the CSS cache', async () => {
