@@ -5874,8 +5874,8 @@ describe('HTML', () => {
       preventAttributesEscaping: true,
       decodeEntities: true
     });
-    // When both quote types are present, at least one must be escaped to ensure valid HTML
-    assert.ok(result.includes('&#34;') || result.includes('&#39;'), 'Should escape quotes when both types are present');
+    // Equal counts keep double quotes as the delimiter, so those are escaped
+    assert.strictEqual(result, '<div title="He said &#34;hello&#34; and she said \'hi\'">Text</div>');
 
     // The quote with fewer occurrences delimits—here, the single quote
     result = await minify('<p data-text="This has &#34;many&#34; &#34;double&#34; quotes and one &#39;single&#39;">Text</p>', {
@@ -6409,25 +6409,26 @@ describe('HTML', () => {
   });
 
   test('Prevents ReDoS in custom fragments processing', async () => {
-    // Test long sequences of whitespace that could trigger ReDoS
-    // If ReDoS occurs, the test runner’s timeout will catch it
-    const longWhitespace = ' '.repeat(10000);
+    // Long whitespace that a backtracking pattern would scan quadratically: milliseconds when
+    // linear, far past the bound otherwise (`node:test` has no default timeout to catch it)
+    const longWhitespace = ' '.repeat(100000);
     const phpFragments = [/<%[\s\S]*?%>/g, /<\?[\s\S]*?\?>/g];
+    const start = Date.now();
 
     // Long whitespace before custom fragment
     let result = await minify(`<div>${longWhitespace}<?php echo "test"; ?></div>`, {
       ignoreCustomFragments: phpFragments,
       collapseWhitespace: true
     });
-    assert.ok(result.includes('<?php echo "test"; ?>'));
+    assert.strictEqual(result, '<div> <?php echo "test"; ?></div>');
 
     // Multiple consecutive fragments with long whitespace
     result = await minify(`<div>${longWhitespace}<?php echo "test1"; ?>${longWhitespace}<?php echo "test2"; ?>${longWhitespace}</div>`, {
       ignoreCustomFragments: phpFragments,
       collapseWhitespace: true
     });
-    assert.ok(result.includes('<?php echo "test1"; ?>'));
-    assert.ok(result.includes('<?php echo "test2"; ?>'));
+    assert.strictEqual(result, '<div> <?php echo "test1"; ?> <?php echo "test2"; ?> </div>');
+    assert.ok(Date.now() - start < 5000, 'Whitespace around fragments should be processed in linear time');
   });
 
   test('Avoids ReDoS on a long unclosed end tag', async () => {
@@ -6446,7 +6447,7 @@ describe('HTML', () => {
 
     // The default path throws a parse error—but must do so promptly, not after an O(n²) scan
     start = Date.now();
-    await assert.rejects(minify(unclosed));
+    await assert.rejects(minify(unclosed), { message: /^Parse error at line 1, column 7/ });
     assert.ok(Date.now() - start < 5000, 'parse error should be raised in linear time');
 
     // Sanity: A well-formed long end tag is unaffected by the guard
@@ -7038,7 +7039,7 @@ describe('HTML', () => {
       keepClosingSlash: false,
       minifyCSS: true,
       minifyJS: true,
-      noNewlinesBeforeTagClose: true,
+      noNewlinesBeforeTagClose: false,
       preventAttributesEscaping: false,
       processScripts: ['text/html', 'application/ld+json'],
       removeAttributeQuotes: true,
@@ -7055,15 +7056,8 @@ describe('HTML', () => {
       useShortDoctype: true
     };
 
-    const result = await minify(input, benchmarkConfig);
-
-    // Should produce valid HTML, not corrupted output like:
-    // `&lt;divid="test"class="foo">content&lt;/div>`
-    assert.ok(!result.includes('&lt;'), 'Should not contain HTML entities for angle brackets');
-    assert.ok(!result.includes('&gt;'), 'Should not contain HTML entities for angle brackets');
-    assert.ok(result.startsWith('<div'), 'Should start with proper opening tag');
-    assert.ok(result.includes('id'), 'Should contain `id` attribute');
-    assert.ok(result.includes('class'), 'Should contain `class` attribute');
+    // Corrupted output looked like `&lt;divid="test"class="foo">content&lt;/div>`
+    assert.strictEqual(await minify(input, benchmarkConfig), '<div class=foo id=test>content</div>');
   });
 
   test('`sortAttributes` with complex attributes does not cause parse errors', async () => {
@@ -7078,13 +7072,11 @@ describe('HTML', () => {
       sortAttributes: true
     };
 
-    const result = await minify(input, benchmarkConfig);
-
-    // Should successfully minify without parse errors showing escaped quotes and double spaces
-    // Parse error would look like: `<div  id=\"personalization\"  data-snacks-3:custom=\"…`
-    assert.ok(!result.includes('\\"'), 'Should not contain escaped quotes');
-    assert.ok(!result.includes('  '), 'Should not contain double spaces');
-    assert.ok(result.includes('data-snacks-3:custom'), 'Should preserve custom attribute names');
+    // A parse error looked like `<div  id=\"personalization\"  data-snacks-3:custom=\"…`
+    assert.strictEqual(
+      await minify(input, benchmarkConfig),
+      '<div data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null"id="personalization">test</div>'
+    );
   });
 
   test('`sortAttributes` handles multiple script tags and different types', async () => {
@@ -7113,12 +7105,12 @@ describe('HTML', () => {
       minifyJS: true
     });
 
-    assert.ok(!result.includes('&lt;'), 'Should not contain HTML entity for `<`');
-    assert.ok(!result.includes('&gt;'), 'Should not contain HTML entity for `>`');
-    assert.ok(!result.includes('\\"'), 'Should not contain escaped quotes');
-    assert.ok(result.includes('<script'), 'Should contain `script` tags');
-    assert.ok(result.includes('"@type"'), 'Should preserve JSON-LD content');
-    assert.ok(result.includes('data-track'), 'Should preserve custom attributes');
+    assert.strictEqual(
+      result,
+      '<html><head><script type="application/ld+json">{"@context": "https://schema.org", "@type": "WebSite", "name": "Example"}</script>' +
+      '<script>console.log("test")</script></head>' +
+      '<body><div class="container" data-track="click" id="main"><h1 class="heading title">Test</h1></div></body></html>'
+    );
   });
 
   test('`sortAttributes` handles deeply nested complex structures', async () => {
@@ -7148,12 +7140,14 @@ describe('HTML', () => {
       processScripts: ['text/html', 'application/ld+json']
     });
 
-    assert.ok(!result.includes('&lt;'), 'Should not corrupt angle brackets');
-    assert.ok(!result.includes('\\"'), 'Should not escape quotes');
-    assert.ok(!result.includes('  '), 'Should not have double spaces');
-    assert.ok(result.includes('data-snacks:plugin'), 'Should preserve namespaced attributes');
-    assert.ok(result.includes('article-container'), 'Should preserve classes');
-    assert.ok(result.includes('data-article-id'), 'Should preserve data attributes');
+    assert.strictEqual(
+      result,
+      '<section class=content-wrapper><div class=article-container data-article-id=123 data-category=news id=article-123>' +
+      '<header class=article-header><h1 class=headline-text data-track=impression id=headline>Breaking News</h1>' +
+      '<div class=metadata data-published=2025-01-01><span class=author data-author-id=456>John Doe</span></div></header>' +
+      '<div class=article-body data-snacks:plugin=reader data-track=scroll>' +
+      '<p class="intro lead-paragraph">Content here with <a class="inline link"href=/link target=_blank>link</a>.</p></div></div></section>'
+    );
   });
 
   test('`sortAttributes` output can be re-parsed without errors', async () => {
@@ -7169,19 +7163,15 @@ describe('HTML', () => {
     };
 
     const result = await minify(input, benchmarkConfig);
+    assert.strictEqual(result, '<div class="bar foo"data-value="[test]"id="test">content</div>');
 
-    // Try to parse the result—should not throw
-    await assert.doesNotReject(
-      async () => { await minify(result, {}); },
-      'Minified output should be parseable HTML'
-    );
-
-    assert.ok(result.match(/<div[^>]*>.*<\/div>/), 'Should have valid `div` structure');
+    // Parsing the output again reads every attribute back, with the spaces restored
+    assert.strictEqual(await minify(result), '<div class="bar foo" data-value="[test]" id="test">content</div>');
   });
 
   test('`sortAttributes` works with `preventAttributesEscaping` and `sortClassNames`', async () => {
     // All three sorting/escaping options together
-    const input = '<div class="bar foo" id="test" data-value=\'{"key": "value"}\' data-config="[1,2,3]">content</div>';
+    const input = '<div class="foo bar" id="test" data-value=\'{"key": "value"}\' data-config="[1,2,3]">content</div>';
 
     const result = await minify(input, {
       sortAttributes: true,
@@ -7190,14 +7180,8 @@ describe('HTML', () => {
       processScripts: ['text/html', 'application/ld+json']
     });
 
-    assert.ok(result.includes('class'), 'Should contain `class` attribute');
-    assert.ok(result.includes('id'), 'Should contain `id` attribute');
-    assert.ok(result.includes('data-value'), 'Should contain `data-value` attribute');
-    assert.ok(result.includes('data-config'), 'Should contain `data-config` attribute');
-    assert.ok(result.includes('{"key": "value"}'), 'Should preserve JSON in attribute');
-    assert.ok(result.includes('[1,2,3]'), 'Should preserve arrays in attribute');
-    assert.ok(!result.includes('\\"'), 'Should not escape quotes with `preventAttributesEscaping`');
-    assert.ok(!result.includes('&lt;'), 'Should not contain HTML entities');
+    // The JSON keeps its single-quote delimiter rather than having its double quotes escaped
+    assert.strictEqual(result, '<div class="bar foo" data-config="[1,2,3]" data-value=\'{"key": "value"}\' id="test">content</div>');
   });
 
   // Check if FAZ.html exists and conditionally skip test if not available
@@ -7229,7 +7213,7 @@ describe('HTML', () => {
       keepClosingSlash: false,
       minifyCSS: true,
       minifyJS: true,
-      noNewlinesBeforeTagClose: true,
+      noNewlinesBeforeTagClose: false,
       preventAttributesEscaping: true,
       processScripts: ['text/html', 'application/ld+json'],
       removeAttributeQuotes: true,
@@ -7382,7 +7366,7 @@ describe('HTML', () => {
 
   test('`customAttrSurround` with non-array value degrades gracefully', async () => {
     // A non-array value is treated as empty (no custom surrounds) and should not throw
-    await assert.doesNotReject(minify('<div foo="bar"></div>', { customAttrSurround: /foo/ }));
+    assert.strictEqual(await minify('<div foo="bar"></div>', { customAttrSurround: /foo/ }), '<div foo="bar"></div>');
   });
 
   test('Handles complex template patterns with `customAttrSurround`', async () => {
@@ -7573,7 +7557,7 @@ describe('HTML', () => {
       keepClosingSlash: false,
       minifyCSS: true,
       minifyJS: true,
-      noNewlinesBeforeTagClose: true,
+      noNewlinesBeforeTagClose: false,
       preventAttributesEscaping: false,
       removeAttributeQuotes: true,
       removeComments: true,

@@ -111,10 +111,8 @@ describe('CSS', () => {
 
   test('Preserves important comments', async () => {
     const input = '<style>/*! Important license */ body { color: red; }</style>';
-    const result = await minify(input, { minifyCSS: true });
-
-    // Lightning CSS preserves `/*!` comments by default
-    assert.ok(result.includes('Important license'), 'Important comment should be preserved');
+    // Lightning CSS preserves `/*!` comments by default, followed by a line break
+    assert.strictEqual(await minify(input, { minifyCSS: true }), '<style>/*! Important license */\nbody{color:red}</style>');
   });
 
   test('Works with `collapseWhitespace`', async () => {

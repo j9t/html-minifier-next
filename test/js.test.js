@@ -70,11 +70,11 @@ describe('JS', () => {
   });
 
   test('Keeps names in event attributes with mangle disabled', async () => {
-    const input = '<button onclick="let myVar = 42; alert(myVar);">Click</button>';
-    const result = await minify(input, { minifyJS: { mangle: false } });
+    // A parameter is local, so it is mangled by default
+    const input = '<button onclick="function show(myVar) { alert(myVar); } show(42);">Click</button>';
 
-    assert.ok(result.includes('myVar'), 'Variable names should not be mangled');
-    assert.ok(result.includes('alert'), 'Function call should be preserved');
+    assert.strictEqual(await minify(input, { minifyJS: true }), '<button onclick="function show(o){alert(o)}show(42)">Click</button>');
+    assert.strictEqual(await minify(input, { minifyJS: { mangle: false } }), '<button onclick="function show(myVar){alert(myVar)}show(42)">Click</button>');
   });
 
   test('Decodes entity references in event handler attributes before minification', async () => {
@@ -202,16 +202,19 @@ describe('JS', () => {
       <button onclick="let result = calculate(); alert(result); return false;">Test</button>
     `;
 
-    // Script block uses SWC, inline handler uses Terser
-    const result = await minify(input, {
-      minifyJS: { engine: 'swc' },
-      collapseWhitespace: true
-    });
+    const options = { minifyJS: { engine: 'swc' }, collapseWhitespace: true, continueOnMinifyError: false };
 
-    assert.ok(result.includes('<script>'), '`script` element should be present');
-    assert.ok(result.includes('onclick='), '`onclick` attribute should be present');
-    assert.ok(result.includes('return'), 'Inline return statement should work');
-    assert.ok(result.length < input.length, 'Should be minified overall');
+    // SWC rejects the handler’s bare `return`, so a minified handler means Terser took it
+    assert.strictEqual(
+      await minify(input, options),
+      '<script>function calculate(){return 30}</script><button onclick="let result=calculate();return alert(result),!1">Test</button>'
+    );
+
+    // Terser would report “Name expected,” so this shows SWC took the script block
+    await assert.rejects(
+      minify('<script>var = = =;</script><button onclick="return false;">Test</button>', options),
+      { message: /Unexpected token `=`/ }
+    );
   });
 
   test('Invalid engine throws error', async () => {
