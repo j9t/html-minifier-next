@@ -357,6 +357,13 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  *  Default: `false`
  *
+ * @prop {boolean} [minifyJSON]
+ *  When true, removes whitespace from the content of JSON `<script>` types
+ *  (e.g., `application/ld+json`, `importmap`, `speculationrules`), leaving
+ *  values as written. Malformed JSON is left as is.
+ *
+ *  Default: `false`
+ *
  * @prop {boolean | string | {site?: string} | ((text: string) => Promise<string> | string)} [minifyURLs]
  *  When true, enables URL rewriting/minification. If an object is provided,
  *  the `site` property sets the base URL for computing relative paths.
@@ -2615,7 +2622,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const foreign = Boolean(options.insideForeignContent);
       textForeign = foreign;
       const holdsSource = !foreign || Boolean(source);
-      const needsProcessScript = holdsSource && specialContentElements.has(currentTag) && (options.processScripts || hasJsonScriptType(currentAttrs));
+      const needsProcessScript = holdsSource && specialContentElements.has(currentTag) && (options.processScripts || (options.minifyJSON && hasJsonScriptType(currentAttrs)));
       const needsMinifyJS = holdsSource && options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(
         a => a.name.toLowerCase() === 'type' && (a.value ?? '').trim().toLowerCase() === 'module'

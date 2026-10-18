@@ -679,7 +679,7 @@ describe('SVG and MathML', () => {
       '<svg><script type=text/x-template>&lt;p title=a>&amplt;&lt;/p></script></svg>'
     );
     assert.strictEqual(
-      await minify('<svg><script type="application/json">{ "a": "&amp;" }</script></svg>'),
+      await minify('<svg><script type="application/json">{ "a": "&amp;" }</script></svg>', { minifyJSON: true }),
       '<svg><script type="application/json">{"a":"&"}</script></svg>'
     );
   });

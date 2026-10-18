@@ -124,6 +124,10 @@ const optionDefinitions = {
     description: 'Minify JavaScript in `script` elements and event attributes (uses Terser or SWC; pass `{"engine": "swc"}` for SWC)',
     type: 'jsonObject'
   },
+  minifyJSON: {
+    description: 'Minify JSON in `script` elements (e.g., `application/ld+json`, `importmap`, etc.) by removing whitespace',
+    type: 'boolean'
+  },
   minifySVG: {
     description: 'Minify SVG elements (uses SVGO)',
     type: 'jsonObject'

@@ -134,9 +134,9 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 
 | Option (config/CLI) | Description | Default |
 | --- | --- | --- |
-| `cacheCSS`<br>`--cache-css` | Set CSS minification cache size; higher values improve performance for batch processing | `500` |
-| `cacheJS`<br>`--cache-js` | Set JavaScript minification cache size; higher values improve performance for batch processing | `500` |
-| `cacheSVG`<br>`--cache-svg` | Set SVG minification cache size; higher values improve performance for batch processing | `500` |
+| `cacheCSS`<br>`--cache-css` | [Set CSS minification cache size](#css-javascript-and-svg-cache-configuration); higher values improve performance for batch processing | `500` |
+| `cacheJS`<br>`--cache-js` | [Set JavaScript minification cache size](#css-javascript-and-svg-cache-configuration); higher values improve performance for batch processing | `500` |
+| `cacheSVG`<br>`--cache-svg` | [Set SVG minification cache size](#css-javascript-and-svg-cache-configuration); higher values improve performance for batch processing | `500` |
 | `caseSensitive`<br>`--case-sensitive` | Keep element and attribute names as written (e.g., for framework components like `<MyButton>`) | `false` |
 | `collapseAttributeWhitespace`<br>`--collapse-attribute-whitespace` | Trim and collapse whitespace characters within attribute values | `false` |
 | `collapseBooleanAttributes`<br>`--collapse-boolean-attributes` | [Omit attribute values from boolean attributes](https://perfectionkills.com/experimenting-with-html-minifier/#collapse_boolean_attributes) | `false` |
@@ -160,9 +160,10 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `maxInputLength`<br>`--max-input-length` | Maximum input length to prevent ReDoS attacks (disabled by default) | `undefined` |
 | `maxLineLength`<br>`--max-line-length` | Specify a maximum line length; output will be split by newlines in tags only (between attributes or before a tag’s `>`), where they can’t change the page, so lines may run longer | `undefined` |
 | `mergeScripts`<br>`--merge-scripts` | Merge consecutive inline `script` elements into one (only merges compatible scripts with same `type`, matching `async`/`defer`/`nomodule`/`nonce`) | `false` |
-| `minifyCSS`<br>`--minify-css` | Minify CSS in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
-| `minifyJS`<br>`--minify-js` | Minify JavaScript in `script` elements and event attributes (uses [Terser](https://terser.org/) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
-| `minifySVG`<br>`--minify-svg` | Minify SVG elements (uses [SVGO](https://svgo.dev/)) | `false` (could be `true`, `Object`) |
+| `minifyCSS`<br>`--minify-css` | [Minify CSS](#css-minification) in `style` elements and attributes (uses [Lightning CSS](https://lightningcss.dev/)) | `false` (could be `true`, `Object`, `Function(text, type)`) |
+| `minifyJS`<br>`--minify-js` | [Minify JavaScript](#javascript-minification) in `script` elements and event attributes (uses [Terser](https://terser.org/) or [SWC](https://swc.rs/)) | `false` (could be `true`, `Object`, `Function(text, inline)`) |
+| `minifyJSON`<br>`--minify-json` | [Minify JSON](#json-minification) in `script` elements (e.g., `application/ld+json`, `importmap`, etc.) by removing whitespace | `false` |
+| `minifySVG`<br>`--minify-svg` | [Minify SVG](#svg-minification) elements (uses [SVGO](https://svgo.dev/)) | `false` (could be `true`, `Object`) |
 | `minifyURLs`<br>`--minify-urls` | Minify URLs in various attributes | `false` (could be `true`, `String`, `Object`, `Function(text)`) |
 | `noNewlinesBeforeTagClose`<br>`--no-newlines-before-tag-close` | Never split a line in a tag that closes an element—use with `maxLineLength` | `false` |
 | `partialMarkup`<br>`--partial-markup` | Treat input as a partial HTML fragment, preserving stray end tags (closing tags without opening tags) and preventing auto-closing of unclosed tags at end of input | `false` |
@@ -458,6 +459,12 @@ const result = await minify(html, {
 });
 ```
 
+### JSON minification
+
+`minifyJSON` minifies JSON script types—`application/json`, `application/ld+json`, `application/manifest+json`, `application/vnd.geo+json`, `application/problem+json`, `application/merge-patch+json`, `application/json-patch+json`, `importmap`, and `speculationrules`. It removes whitespace between tokens and unneeded escapes in strings, escaping `<`, and leaves values as written (e.g., large numbers and duplicate keys). Malformed JSON is preserved by default (with `continueOnMinifyError: true`).
+
+Note: The `processScripts` option is only for script types containing HTML templates (e.g., `text/ng-template`, `text/x-handlebars-template`), not for JSON.
+
 ### SVG minification
 
 When `minifySVG` is set to `true`, HTML Minifier Next uses [SVGO](https://svgo.dev/) to optimize inline SVG elements. Complete `<svg>` subtrees are extracted and processed as a block, enabling deep structural optimization:
@@ -677,12 +684,6 @@ If you have chunks of markup you would like preserved, you can wrap them with `<
 ### Line breaks
 
 HTML reads CRLF and CR line breaks as line feeds, so HMN writes them so, too. Markup within `<!-- htmlmin:ignore -->` and custom fragments, with the whitespace padding them, stay as written. A carriage return written as a character reference (e.g., `&#13;`) stays one under `decodeEntities`.
-
-### Minifying JSON content
-
-JSON script types are minified automatically without configuration, including `application/json`, `application/ld+json`, `application/manifest+json`, `application/vnd.geo+json`, `application/problem+json`, `application/merge-patch+json`, `application/json-patch+json`, `importmap`, and `speculationrules`. Malformed JSON is preserved by default (with `continueOnMinifyError: true`).
-
-Note: The `processScripts` option is only for script types containing HTML templates (e.g., `text/ng-template`, `text/x-handlebars-template`), not for JSON.
 
 ### Preserving SVG and MathML elements
 

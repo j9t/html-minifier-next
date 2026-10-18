@@ -4,10 +4,19 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [9.0.0] - 2026-10-18
+
+### Fixed
+
+* Fixed JSON minification changing values, as it serialized the parsed JSON: Large numbers lost precision (e.g., `12345678901234567890` became `12345678901234567000`), out-of-range numbers became `null`, `-0` became `0`, and duplicate keys were dropped; it now only removes whitespace between tokens and shortens escapes in strings
+
+### Added
+
+* Added `minifyJSON` (`--minify-json`), which minifies JSON script types (e.g., `application/ld+json`, `importmap`, `speculationrules`); included by the `comprehensive` preset
 
 ### Changed
 
+* **BREAKING:** JSON is no longer minified by default (also not by the `conservative` preset); use `minifyJSON` (or the `comprehensive` preset)
 * Improved `collapseAttributeWhitespace` performance
 
 ## [8.11.0] - 2026-10-17

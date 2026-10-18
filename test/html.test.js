@@ -5295,12 +5295,12 @@ describe('HTML', () => {
 
     // JSON detection should use normalized value (case-insensitive)
     input = '<script type="Application/LD+JSON">{"foo": "bar"}</script>';
-    result = await minify(input, { collapseWhitespace: true });
+    result = await minify(input, { collapseWhitespace: true, minifyJSON: true });
     assert.strictEqual(result, '<script type="Application/LD+JSON">{"foo":"bar"}</script>', 'JSON detection should be case-insensitive');
 
     // JSON detection should strip parameters
     input = '<script type="application/json; charset=utf-8">{"foo": "bar"}</script>';
-    result = await minify(input, { collapseWhitespace: true });
+    result = await minify(input, { collapseWhitespace: true, minifyJSON: true });
     assert.ok(result.includes('{"foo":"bar"}'), 'JSON detection should strip parameters');
 
     // `<script type>` with no value: `rawValue` is undefined, should not match `processScripts`

@@ -3,6 +3,7 @@
  */
 
 import {
+  RE_ESCAPE_LT,
   jsonScriptTypes
 } from './constants.js';
 import { isExecutableScript } from './attributes.js';
@@ -48,14 +49,21 @@ function unwrapCSS(text, type) {
 
 // Script processing
 
-// Minify JSON script content, keeping `<` escaped
+// Strings (matched first, so their whitespace stays) or whitespace between tokens
+const RE_JSON_STRING_OR_WHITESPACE = /"(?:[^"\\]|\\[\s\S])*"|[\t\n\r ]+/g;
+
+// Minify JSON script content, keeping `<` escaped—only strings are re-serialized (to shorten
+// escapes), as serializing the whole parsed value would change others (e.g., large numbers)
 /**
  * @param {string} text
  * @param {{continueOnMinifyError?: boolean, log?: Function}} options
  */
 function minifyJson(text, options) {
   try {
-    return JSON.stringify(JSON.parse(text)).replace(/</g, '\\u003C');
+    JSON.parse(text);
+    return text.replace(RE_JSON_STRING_OR_WHITESPACE, token =>
+      token[0] === '"' ? JSON.stringify(JSON.parse(token)).replace(RE_ESCAPE_LT, '\\u003C') : ''
+    );
   }
   catch (err) {
     if (!options.continueOnMinifyError) {
@@ -92,7 +100,7 @@ async function processScript(text, options, currentAttrs, minifyHTML) {
       const rawValue = attr.value;
       const normalizedValue = trimWhitespace((rawValue || '').split(/;/, 2)[0] ?? '').toLowerCase();
       if (jsonScriptTypes.has(normalizedValue)) {
-        return minifyJson(text, options);
+        return options.minifyJSON ? minifyJson(text, options) : text;
       }
       if (options.processScripts && rawValue && options.processScripts.indexOf(rawValue) > -1) {
         return await minifyHTML(text, options);
