@@ -747,7 +747,12 @@ describe('CSS and JS', () => {
       ['{"a": 1e400, "b": -0, "c": 1.50}', '{"a":1e400,"b":-0,"c":1.50}'],
       ['{"k": 1, "k": 2}', '{"k":1,"k":2}'],
       ['{"s": "a  b\\n\\t c", "e": "\\u00e9\\/"}', '{"s":"a  b\\n\\t c","e":"é/"}'],
-      ['{"q": "say \\"hi\\"  there", "r": "\\\\"  }', '{"q":"say \\"hi\\"  there","r":"\\\\"}']
+      ['{"q": "say \\"hi\\"  there", "r": "\\\\"  }', '{"q":"say \\"hi\\"  there","r":"\\\\"}'],
+      ['{"u": "\\ud800", "v": "\\uD83D\\uDE00"}', '{"u":"\\ud800","v":"😀"}'],
+      ['[ "", " ", "\\"", "a\\\\" , "\\\\\\"" ]', '[""," ","\\"","a\\\\","\\\\\\""]'],
+      ['\n  42 \n', '42'],
+      ['"  top level  "', '"  top level  "'],
+      ['{ "a" : [ 1 , { "b" : null } ] , "c" : true }', '{"a":[1,{"b":null}],"c":true}']
     ];
     for (const [json, minified] of values) {
       const input = `<script type="application/json">${json}</script>`;
@@ -756,9 +761,16 @@ describe('CSS and JS', () => {
   });
 
   test('Escapes `<` in minified JSON', async () => {
-    const input = '<script type="application/json">{"html": "<\\/p>",  "lt": 1}</script>';
-    const output = '<script type="application/json">{"html":"\\u003C/p>","lt":1}</script>';
-    assert.strictEqual(await minify(input, { minifyJSON: true }), output);
+    const values = [
+      // With and without other escapes in the same string
+      ['{"html": "<\\/p>",  "lt": 1}', '{"html":"\\u003C/p>","lt":1}'],
+      ['{"a": "x<y<z",  "b": "<"}', '{"a":"x\\u003Cy\\u003Cz","b":"\\u003C"}'],
+      ['["\\"<", "<\\\\"]', '["\\"\\u003C","\\u003C\\\\"]']
+    ];
+    for (const [json, minified] of values) {
+      const input = `<script type="application/json">${json}</script>`;
+      assert.strictEqual(await minify(input, { minifyJSON: true }), `<script type="application/json">${minified}</script>`);
+    }
   });
 
   test('Applies presets', async () => {
