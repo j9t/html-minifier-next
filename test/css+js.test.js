@@ -735,6 +735,17 @@ describe('CSS and JS', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, processScripts: ['application/ld+json'] }), input);
   });
 
+  test('Leaves JSON types on `style` elements alone', async () => {
+    const input = '<style type="application/json">{ "a": 1 }</style>';
+    assert.strictEqual(await minify(input, { minifyJSON: true }), input);
+    assert.strictEqual(await minify(input, { minifyJSON: true, processScripts: ['text/x-template'] }), input);
+    // `processScripts` still applies to `style` elements
+    assert.strictEqual(
+      await minify('<style type="text/x-template"><p> a </p></style>', { collapseWhitespace: true, minifyJSON: true, processScripts: ['text/x-template'] }),
+      '<style type="text/x-template"><p>a</p></style>'
+    );
+  });
+
   test('Minifies JSON with `minifyJSON` alone', async () => {
     const input = '<script type="application/ld+json">{\n  "foo": "bar"\n}</script>';
     const output = '<script type="application/ld+json">{"foo":"bar"}</script>';

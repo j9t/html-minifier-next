@@ -2622,7 +2622,7 @@ async function minifyHTML(value, options, partialMarkup) {
       const foreign = Boolean(options.insideForeignContent);
       textForeign = foreign;
       const holdsSource = !foreign || Boolean(source);
-      const needsProcessScript = holdsSource && specialContentElements.has(currentTag) && (options.processScripts || (options.minifyJSON && hasJsonScriptType(currentAttrs)));
+      const needsProcessScript = holdsSource && specialContentElements.has(currentTag) && (options.processScripts || (options.minifyJSON && currentTag === 'script' && hasJsonScriptType(currentAttrs)));
       const needsMinifyJS = holdsSource && options.minifyJS !== identity && isExecutableScript(currentTag, currentAttrs);
       const isModuleScript = needsMinifyJS && currentAttrs.some(
         a => a.name.toLowerCase() === 'type' && (a.value ?? '').trim().toLowerCase() === 'module'
@@ -2651,7 +2651,7 @@ async function minifyHTML(value, options, partialMarkup) {
         }
         text = charsCollapse(text);
         if (needsProcessScript) {
-          text = await processScript(text, options, currentAttrs, minifyHTML);
+          text = await processScript(text, options, currentTag, currentAttrs, minifyHTML);
         }
         if (needsMinifyJS) {
           const prewarmed = jsPrewarmed?.get((isModuleScript ? 'm|' : '|') + text);

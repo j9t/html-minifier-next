@@ -134,16 +134,17 @@ function hasJsonScriptType(attrs) {
 /**
  * @param {string} text
  * @param {ProcessedOptions} options
+ * @param {string} tag
  * @param {Array<{name: string, value?: string | undefined}>} currentAttrs
  * @param {Function} minifyHTML
  */
-async function processScript(text, options, currentAttrs, minifyHTML) {
+async function processScript(text, options, tag, currentAttrs, minifyHTML) {
   for (const attr of currentAttrs) {
     const attrName = attr.name.toLowerCase();
     if (attrName === 'type') {
       const rawValue = attr.value;
       const normalizedValue = trimWhitespace((rawValue || '').split(/;/, 2)[0] ?? '').toLowerCase();
-      if (jsonScriptTypes.has(normalizedValue)) {
+      if (tag === 'script' && jsonScriptTypes.has(normalizedValue)) {
         return options.minifyJSON ? minifyJson(text, options) : text;
       }
       if (options.processScripts && rawValue && options.processScripts.indexOf(rawValue) > -1) {
