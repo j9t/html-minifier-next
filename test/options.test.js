@@ -47,7 +47,7 @@ describe('Options', () => {
   });
 
   // `removeUnusedCSS`, whose prerequisite can be set and still unusable, is
-  // covered in css+js.test.js
+  // covered in css.test.js
   describe('Option dependencies', () => {
     test('Every entry names options that exist', () => {
       for (const { option, requires } of optionDependencies) {
@@ -181,5 +181,135 @@ describe('Options', () => {
 
       assert.strictEqual(await options.minifyJS(script, false), script, 'Content the engine chokes on should pass through as before');
     });
+  });
+
+  test('Applies presets', async () => {
+    const { getPreset } = await import('../src/presets.js');
+
+    // With conservative preset
+    let input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n    <script type="application/ld+json">\n{\n  "name": "Test",\n  "url": "https://example.com/page"\n}\n    </script>\n  </head>\n</html>';
+    const conservativeResult = await minify(input, getPreset('conservative'));
+    // Conservative preset should: remove comments, use short doctype, leave JSON as is
+    assert.ok(!conservativeResult.includes('<!-- Comment -->'), 'Conservative: Should remove comments');
+    assert.ok(conservativeResult.includes('<!doctype html>'), 'Conservative: Should use short doctype');
+    assert.ok(conservativeResult.includes('{\n  "name": "Test",\n  "url": "https://example.com/page"\n}'), 'Conservative: Should leave JSON as is');
+
+    // With comprehensive preset
+    input = '<script type="importmap">\n{\n  "imports": {\n    "vue": "https://cdn.example.com/vue.js"\n  }\n}\n</script>';
+    const comprehensiveResult = await minify(input, getPreset('comprehensive'));
+    // Comprehensive preset should: minify JSON, collapse whitespace, remove quotes from
+    // attributes where possible
+    assert.ok(comprehensiveResult.includes('{"imports":{"vue":"https://cdn.example.com/vue.js"}}'), 'Comprehensive: Should minify JSON');
+    assert.ok(comprehensiveResult.includes('type=importmap'), 'Comprehensive: Should remove attribute quotes');
+
+    // JSON minification is opt-in
+    input = '<script type="application/json">{\n  "test": "value"\n}</script>';
+    const noOptionsResult = await minify(input, {});
+    assert.strictEqual(noOptionsResult, input, 'No options: Should leave JSON as is');
+
+    // Preset as option key (should work the same as spreading `getPreset`)
+    input = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n<html>\n  <head>\n    <!-- Comment -->\n  </head>\n</html>';
+    const presetOptionResult = await minify(input, { preset: 'conservative' });
+    const spreadPresetResult = await minify(input, getPreset('conservative'));
+    assert.strictEqual(presetOptionResult, spreadPresetResult, 'Using preset option should produce same result as spreading getPreset()');
+    assert.ok(!presetOptionResult.includes('<!-- Comment -->'), 'Preset option: Should apply preset settings');
+
+    // Preset with overrides (user options should override preset)
+    input = '<!DOCTYPE html>\n<html>\n  <head>\n    <!-- Comment -->\n  </head>\n</html>';
+    const presetWithOverride = await minify(input, { preset: 'conservative', removeComments: false });
+    assert.ok(presetWithOverride.includes('<!-- Comment -->'), 'User option should override preset setting');
+
+    // Unknown preset emits warning (once per preset name per process)
+    const originalWarn = console.warn;
+    let warnMessage = '';
+    let warnCount = 0;
+    console.warn = (msg) => { warnMessage = msg; warnCount++; };
+    try {
+      input = '<p>Test</p>';
+      await minify(input, { preset: 'nonexistent' });
+      assert.ok(warnMessage.includes('Unknown preset “nonexistent”'), 'Should warn about unknown preset');
+      assert.ok(warnMessage.includes('conservative, comprehensive'), 'Should list available presets');
+
+      await minify(input, { preset: 'nonexistent' });
+      assert.strictEqual(warnCount, 1, 'Should not repeat the warning for the same preset');
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  describe('Object-valued options handed a string', () => {
+    // `'false'` must not switch minification on: Any non-empty string is truthy, and these options
+    // read a non-object as `{}`
+    const cases = [
+      ['minifyCSS', '<style>.a { color : red }</style>'],
+      ['minifyJS', '<script>var x  =  1</script>'],
+      ['minifySVG', '<svg><circle cx="1.00"/></svg>']
+    ];
+
+    for (const [key, input] of cases) {
+      test(`\`${key}\` refuses a string rather than reading it as “on”`, async () => {
+        const logs = [];
+        const output = await minify(input, { [key]: 'false', log: message => logs.push(String(message)) });
+
+        assert.strictEqual(output, input, `\`${key}: "false"\` must not enable minification`);
+        assert.ok(
+          logs.some(message => message.includes(key) && message.includes('string')),
+          `The rejected value should be reported (got ${JSON.stringify(logs)})`
+        );
+      });
+    }
+
+    test('`minifyURLs` still takes a string, which names the site', async () => {
+      // The one object-valued option where a string carries meaning, so it is
+      // deliberately left out of the check above
+      const input = '<a href="https://example.com/x/y.html">y</a>';
+
+      assert.strictEqual(
+        await minify(input, { minifyURLs: 'https://example.com/x/' }),
+        '<a href="y.html">y</a>'
+      );
+    });
+  });
+
+  // Combined tests
+  test('Applies `minifyJS` and `minifyCSS` together', async () => {
+    const input = `
+      <style>body { color: red; }</style>
+      <script>function test() { console.log("test"); }</script>
+    `;
+    const result = await minify(input, {
+      minifyJS: { compress: { drop_console: true } },
+      minifyCSS: true,
+      collapseWhitespace: true
+    });
+
+    assert.ok(result.includes('body{color:red}'), 'CSS should be minified');
+    assert.ok(!result.includes('console.log'), 'Console should be dropped');
+    assert.ok(result.includes('function test(){}'), 'Empty function after console removal');
+  });
+
+  test('`canMinifyCSS` and `canMinifyJS` work together, and with `collapseWhitespace`', async () => {
+    const input = `
+      <style>
+        .a { color: red; }
+      </style>
+      <style>
+        .b { color: blue; }
+      </style>
+      <script>
+        let x = 1;
+      </script>
+      <script>
+        let y = 2;
+      </script>
+    `;
+    const result = await minify(input, {
+      minifyCSS: true,
+      minifyJS: true,
+      collapseWhitespace: true,
+      canMinifyCSS: text => text.includes('.a'),
+      canMinifyJS: text => text.includes('x = 1')
+    });
+    assert.strictEqual(result, '<style>.a{color:red}</style><style>.b { color: blue; }</style><script>let x=1</script><script>let y = 2;</script>');
   });
 });

@@ -679,7 +679,7 @@ describe('SVG and MathML', () => {
       '<svg><script type=text/x-template>&lt;p title=a>&amplt;&lt;/p></script></svg>'
     );
     assert.strictEqual(
-      await minify('<svg><script type="application/json">{ "a": "&amp;" }</script></svg>'),
+      await minify('<svg><script type="application/json">{ "a": "&amp;" }</script></svg>', { minifyJSON: true }),
       '<svg><script type="application/json">{"a":"&"}</script></svg>'
     );
   });
@@ -867,8 +867,7 @@ describe('SVG and MathML', () => {
 
   test('Handles nested SVG elements', async () => {
     const result = await minify('<div><svg><svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg></svg></div>', { minifySVG: true, collapseWhitespace: true });
-    assert.ok(result.startsWith('<div>'), 'Wrapper `div` preserved');
-    assert.ok(result.includes('<svg'), 'SVG output present');
+    assert.strictEqual(result, '<div><svg><svg viewBox="0 0 10 10"><path d="M0 0h10v10H0z"/></svg></svg></div>');
   });
 
   test('CSS in SVG is minified', async () => {
@@ -1181,9 +1180,8 @@ describe('SVG and MathML', () => {
 
   test('Optimizes SVG inside `template`', async () => {
     const result = await minify('<template><svg><rect width="10" height="10" fill="red"/></svg></template>', { minifySVG: true, collapseWhitespace: true });
-    assert.ok(result.includes('<template>'), '`template` wrapper preserved');
-    assert.ok(result.includes('<svg>'), 'SVG inside `template` is optimized');
-    assert.ok(result.includes('fill="red"'), '`fill` attribute preserved');
+    // SVGO turns the `rect` into a `path`
+    assert.strictEqual(result, '<template><svg><path fill="red" d="M0 0h10v10H0z"/></svg></template>');
   });
 
   test('`continueOnMinifyError: false` throws on SVGO error', async () => {

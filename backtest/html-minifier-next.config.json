@@ -31,6 +31,7 @@
   "minifyJS": {
     "engine": "swc"
   },
+  "minifyJSON": true,
   "minifySVG": true,
   "minifyURLs": true,
   "noNewlinesBeforeTagClose": false,

@@ -3,6 +3,7 @@
  */
 
 import {
+  RE_ESCAPE_LT,
   jsonScriptTypes
 } from './constants.js';
 import { isExecutableScript } from './attributes.js';
@@ -48,14 +49,65 @@ function unwrapCSS(text, type) {
 
 // Script processing
 
-// Minify JSON script content, keeping `<` escaped
+/** @param {number} code */
+function isJsonWhitespace(code) {
+  return code === 32 || code === 10 || code === 13 || code === 9;
+}
+
+// Remove whitespace between tokens of valid JSON in one pass, copying strings as written
+// unless they hold escapes (re-serialized to shorten them) or `<` (escaped)
+/** @param {string} text */
+function stripJsonWhitespace(text) {
+  const length = text.length;
+  let out = '';
+  let start = 0;
+  let i = 0;
+  while (i < length) {
+    const code = text.charCodeAt(i);
+    if (code === 34) { // `"`
+      let end = i + 1;
+      let hasEscape = false;
+      let hasLt = false;
+      for (;;) {
+        const c = text.charCodeAt(end);
+        if (c === 34) break;
+        if (c === 92) { // `\`
+          hasEscape = true;
+          end += 2;
+          continue;
+        }
+        if (c === 60) hasLt = true; // `<`
+        end++;
+      }
+      if (hasEscape || hasLt) {
+        let string = text.slice(i, end + 1);
+        if (hasEscape) string = JSON.stringify(JSON.parse(string));
+        out += text.slice(start, i) + string.replace(RE_ESCAPE_LT, '\\u003C');
+        start = end + 1;
+      }
+      i = end + 1;
+    } else if (isJsonWhitespace(code)) {
+      out += text.slice(start, i);
+      do i++;
+      while (i < length && isJsonWhitespace(text.charCodeAt(i)));
+      start = i;
+    } else {
+      i++;
+    }
+  }
+  return out + text.slice(start);
+}
+
+// Minify JSON script content, keeping `<` escaped—parsing only validates,
+// as serializing the parsed value would change some values (e.g., large numbers)
 /**
  * @param {string} text
  * @param {{continueOnMinifyError?: boolean, log?: Function}} options
  */
 function minifyJson(text, options) {
   try {
-    return JSON.stringify(JSON.parse(text)).replace(/</g, '\\u003C');
+    JSON.parse(text);
+    return stripJsonWhitespace(text);
   }
   catch (err) {
     if (!options.continueOnMinifyError) {
@@ -82,17 +134,18 @@ function hasJsonScriptType(attrs) {
 /**
  * @param {string} text
  * @param {ProcessedOptions} options
+ * @param {string} tag
  * @param {Array<{name: string, value?: string | undefined}>} currentAttrs
  * @param {Function} minifyHTML
  */
-async function processScript(text, options, currentAttrs, minifyHTML) {
+async function processScript(text, options, tag, currentAttrs, minifyHTML) {
   for (const attr of currentAttrs) {
     const attrName = attr.name.toLowerCase();
     if (attrName === 'type') {
       const rawValue = attr.value;
       const normalizedValue = trimWhitespace((rawValue || '').split(/;/, 2)[0] ?? '').toLowerCase();
-      if (jsonScriptTypes.has(normalizedValue)) {
-        return minifyJson(text, options);
+      if (tag === 'script' && jsonScriptTypes.has(normalizedValue)) {
+        return options.minifyJSON ? minifyJson(text, options) : text;
       }
       if (options.processScripts && rawValue && options.processScripts.indexOf(rawValue) > -1) {
         return await minifyHTML(text, options);

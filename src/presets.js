@@ -26,6 +26,7 @@ export const presets = {
     mergeScripts: true,
     minifyCSS: true,
     minifyJS: true,
+    minifyJSON: true,
     minifySVG: true,
     minifyURLs: true,
     removeAttributeQuotes: true,

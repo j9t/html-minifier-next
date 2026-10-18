@@ -103,6 +103,10 @@ const demoConfig = {
     checked: true,
     helpText: 'Minify JavaScript in <code>script</code> elements and event attributes (uses Terser)'
   },
+  minifyJSON: {
+    label: 'Minify JSON',
+    checked: true
+  },
   minifySVG: {
     label: 'Minify SVG',
     checked: false,

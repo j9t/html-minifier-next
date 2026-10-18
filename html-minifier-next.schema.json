@@ -195,6 +195,10 @@
         "object"
       ]
     },
+    "minifyJSON": {
+      "description": "Minify JSON in `script` elements (e.g., `application/ld+json`, `importmap`, etc.) by removing whitespace",
+      "type": "boolean"
+    },
     "minifySVG": {
       "description": "Minify SVG elements (uses SVGO)",
       "type": [
