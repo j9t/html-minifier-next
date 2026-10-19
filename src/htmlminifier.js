@@ -1002,6 +1002,9 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     const attrOrderCache = new LRU(500);
 
     options.sortAttributes = function (/** @type {string} */ tag, /** @type {HTMLAttribute[]} */ attrs) {
+      if (attrs.length < 2) {
+        return;
+      }
       // Called with the name as written, as any `sortAttributes` function is
       const sorter = attrSorters[resolveName(tag)];
       if (sorter) {

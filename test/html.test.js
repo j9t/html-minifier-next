@@ -6153,6 +6153,26 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { sortClassNames: true }), input);
   });
 
+  test('Sorts class names by frequency, then in locale order, through nested lists', async () => {
+    let input, output;
+
+    // Locale order, not code-point order (`B` < `a`)
+    input = '<a class="B a"></a>';
+    output = '<a class="a B"></a>';
+    assert.strictEqual(await minify(input, { sortClassNames: true }), output);
+
+    // Ties nested under a more frequent class are broken in locale order, too
+    input = '<a class="x B a"></a><b class="x B a"></b><i class="y x"></i>';
+    output = '<a class="x a B"></a><b class="x a B"></b><i class="x y"></i>';
+    assert.strictEqual(await minify(input, { sortClassNames: true }), output);
+
+    // Repeated lists count once per occurrence; `c` gets no top-level rank, as all of its
+    // occurrences are covered under `a` and `b`, so `d e c` is ordered within `d`’s list
+    input = '<a class="c b a"></a><a class="c b a"></a><a class="c b a"></a><b class="a d"></b><i class="d c e"></i><s class="e d b"></s>';
+    output = '<a class="a b c"></a><a class="a b c"></a><a class="a b c"></a><b class="a d"></b><i class="d e c"></i><s class="b d e"></s>';
+    assert.strictEqual(await minify(input, { sortClassNames: true }), output);
+  });
+
   test('Collapses attribute whitespace', async () => {
     let input, output;
 
