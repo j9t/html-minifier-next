@@ -4,8 +4,19 @@ class Sorter {
     // token list sorts in one pass instead of one scan per known key
     /** @type {Map<string, number>} */
     this.rank = new Map();
-    /** @type {Map<string, Sorter>} */
+    /** @type {Map<string, Sorter | (() => Sorter)>} */
     this.sorterMap = new Map();
+  }
+
+  /** @param {string} token */
+  child(token) {
+    let child = this.sorterMap.get(token);
+    // Nested sorters are built on first use, as most are never reached
+    if (typeof child === 'function') {
+      child = child();
+      this.sorterMap.set(token, child);
+    }
+    return child;
   }
 
   /**
@@ -48,70 +59,96 @@ class Sorter {
       tokens[writeIdx++] = other;
     }
 
-    return this.sorterMap.get(best)?.sort(tokens, fromIndex + matchCount) ?? tokens;
+    return this.child(best)?.sort(tokens, fromIndex + matchCount) ?? tokens;
   }
 }
 
+const compareLocale = new Intl.Collator().compare;
+
 class TokenChain {
   constructor() {
-    /** @type {Map<string, {arrays: string[][], processed: number}>} */
+    // Identical token lists are kept once, with how often they occurred
+    /** @type {Map<string, {lists: Map<string, {tokens: string[], weight: number}>, count: number, processed: number}>} */
     this.map = new Map();
   }
 
-  /** @param {string[]} tokens */
-  add(tokens) {
-    tokens.forEach((token) => {
+  /**
+   * @param {string[]} tokens
+   * @param {number} [weight]
+   */
+  add(tokens, weight = 1) {
+    // Tokens hold no whitespace, so a space-joined key is unique
+    const key = tokens.join(' ');
+    for (const token of tokens) {
       let entry = this.map.get(token);
       if (!entry) {
-        entry = { arrays: [], processed: 0 };
+        entry = { lists: new Map(), count: 0, processed: 0 };
         this.map.set(token, entry);
       }
-      entry.arrays.push(tokens);
-    });
+      const list = entry.lists.get(key);
+      if (list) {
+        list.weight += weight;
+      } else {
+        entry.lists.set(key, { tokens, weight });
+      }
+      entry.count += weight;
+    }
   }
 
-  createSorter() {
+  /** @param {Map<string, number>} [localeRanks] */
+  createSorter(localeRanks) {
     const sorter = new Sorter();
+
+    // Rank all tokens in locale order once, so nested chains break ties on numbers;
+    // tokens the collator deems equal share a rank and keep the stable sort’s order
+    if (!localeRanks) {
+      localeRanks = new Map();
+      const tokens = Array.from(this.map.keys()).sort(compareLocale);
+      let rank = 0;
+      for (let i = 0; i < tokens.length; i++) {
+        const token = /** @type {string} */ (tokens[i]);
+        if (i && compareLocale(/** @type {string} */ (tokens[i - 1]), token) !== 0) {
+          rank++;
+        }
+        localeRanks.set(token, rank);
+      }
+    }
+    const ranks = localeRanks;
 
     // Sort tokens by usage frequency (descending), then alphabetically
     const entries = Array.from(this.map.entries()).sort((a, b) => {
-      const m = a[1].arrays.length;
-      const n = b[1].arrays.length;
-      const lengthDiff = n - m;
-      if (lengthDiff !== 0) return lengthDiff;
-      return a[0].localeCompare(b[0]);
+      const countDiff = b[1].count - a[1].count;
+      if (countDiff !== 0) return countDiff;
+      return /** @type {number} */ (ranks.get(a[0])) - /** @type {number} */ (ranks.get(b[0]));
     });
 
-    entries.forEach(([token, data]) => {
-      if (data.processed < data.arrays.length) {
-        const chain = new TokenChain();
-
-        data.arrays.forEach((tokens) => {
-          // Build new array without the current token instead of splicing
-          /** @type {string[]} */
-          const filtered = [];
+    for (const [token, data] of entries) {
+      if (data.processed < data.count) {
+        const lists = data.lists;
+        for (const { tokens, weight } of lists.values()) {
           for (const t of tokens) {
             if (t !== token) {
-              filtered.push(t);
+              const tData = this.map.get(t);
+              if (tData) {
+                tData.processed += weight;
+              }
             }
           }
-
-          filtered.forEach((t) => {
-            const tData = this.map.get(t);
-            if (tData) {
-              tData.processed++;
-            }
-          });
-
-          if (filtered.length > 0) {
-            chain.add(filtered);
-          }
-        });
+        }
 
         sorter.rank.set(token, sorter.rank.size);
-        sorter.sorterMap.set(token, chain.createSorter());
+        sorter.sorterMap.set(token, () => {
+          const chain = new TokenChain();
+          for (const { tokens, weight } of lists.values()) {
+            const filtered = tokens.filter(t => t !== token);
+            if (filtered.length > 0) {
+              chain.add(filtered, weight);
+            }
+          }
+          return chain.createSorter(ranks);
+        });
       }
-    });
+    }
 
     return sorter;
   }
