@@ -549,7 +549,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
       const engineOptions = { ...config };
       delete engineOptions.engine;
 
-      // Terser options (needed for inline JS and when engine is `terser`)
+      // Terser options (when engine is `terser`)
       const terserOptions = engine === 'terser' ? engineOptions : {};
       terserOptions.parse = {
         ...terserOptions.parse,
@@ -582,18 +582,16 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return text;
         }
 
-        // Inline JS always goes to Terser, for bare returns; script blocks go to the chosen engine
-        const useEngine = inline ? 'terser' : engine;
         let jsKey;
         const isCacheable = code.length <= MAX_CACHE_ENTRY_SIZE;
 
         try {
-          const optsSig = useEngine === 'terser' ? terserSig : swcSig;
+          const optsSig = engine === 'terser' ? terserSig : swcSig;
 
           if (isCacheable) {
             // For large inputs, hash the full content to avoid storing huge strings as Map keys
             jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
-              + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + useEngine + '|' + optsSig;
+              + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + engine + '|' + optsSig;
 
             const cached = /** @type {string | Promise<string> | undefined} */ (jsCache.get(jsKey));
             if (cached !== undefined) {
@@ -602,7 +600,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           }
 
           const inFlight = (async () => {
-            if (useEngine === 'terser') {
+            if (engine === 'terser') {
               // Create a copy to avoid mutating shared `terserOptions` (race condition)
               const terserCallOptions = {
                 ...terserOptions,
@@ -615,8 +613,24 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
               const terser = await loadTerser();
               const result = await terser(code, terserCallOptions);
               return result.code.replace(RE_TRAILING_SEMICOLON, '');
-            } else if (useEngine === 'swc') {
+            } else if (engine === 'swc') {
               const swc = await loadSwc();
+              if (inline) {
+                // `swc.minify()` rejects bare returns, which `transform()` can parse;
+                // no .swcrc may apply, and `esnext` keeps the syntax as written
+                const result = await swc.transform(code, {
+                  swcrc: false,
+                  configFile: false,
+                  isModule: false,
+                  minify: true,
+                  jsc: {
+                    parser: { syntax: 'ecmascript', allowReturnOutsideFunction: true },
+                    target: 'esnext',
+                    minify: { compress: true, mangle: true, ...swcOptions }
+                  }
+                });
+                return result.code.replace(RE_TRAILING_SEMICOLON, '');
+              }
               // `swc.minify()` takes compress and mangle directly as options
               const result = await swc.minify(code, {
                 compress: true,
@@ -626,7 +640,7 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
               });
               return result.code.replace(RE_TRAILING_SEMICOLON, '');
             }
-            throw new Error(`Unknown JS minifier engine: ${useEngine}`);
+            throw new Error(`Unknown JS minifier engine: ${engine}`);
           })();
 
           if (jsKey !== undefined) jsCache.set(jsKey, inFlight);

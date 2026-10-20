@@ -348,8 +348,6 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *  When true, enables JS minification for `<script>` contents and
  *  event handler attributes. If an object is provided, it can include:
  *  - `engine`: The minifier to use (`terser` or `swc`). Default: `terser`.
- *    Note: Inline event handlers (e.g., `onclick="…"`) always use Terser
- *    regardless of engine setting, as SWC doesn’t support bare return statements.
  *  - Engine-specific options (e.g., Terser options if `engine: 'terser'`,
  *    SWC options if `engine: 'swc'`).
  *  If a function is provided, it will be used to perform

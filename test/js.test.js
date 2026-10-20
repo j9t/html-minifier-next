@@ -188,33 +188,45 @@ describe('JS', () => {
     );
   });
 
-  test('Uses Terser for inline handlers under SWC', async () => {
-    // SWC rejects a bare `return`, so the handler only minifies if Terser takes it
-    const input = '<button onclick="return false;">Click</button>';
-    const output = '<button onclick="return!1">Click</button>';
+  test('Uses SWC for inline handlers', async () => {
+    const options = { minifyJS: { engine: 'swc' }, continueOnMinifyError: false };
 
-    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' }, continueOnMinifyError: false }), output);
+    assert.strictEqual(
+      await minify('<button onclick="event.preventDefault(); return false;">Click</button>', options),
+      '<button onclick="return event.preventDefault(),!1">Click</button>'
+    );
+
+    // Terser would report “Name expected,” so this shows SWC took the handler
+    await assert.rejects(
+      minify('<button onclick="var = = =; return false;">Test</button>', options),
+      { message: /Unexpected token `=`/ }
+    );
   });
 
-  test('Uses SWC for script blocks and Terser for inline handlers in one document', async () => {
+  test('Uses SWC for script blocks and inline handlers in one document', async () => {
     const input = `
       <script>function calculate() { let x = 10; let y = 20; return x + y; }</script>
       <button onclick="let result = calculate(); alert(result); return false;">Test</button>
     `;
 
-    const options = { minifyJS: { engine: 'swc' }, collapseWhitespace: true, continueOnMinifyError: false };
-
-    // SWC rejects the handler’s bare `return`, so a minified handler means Terser took it
     assert.strictEqual(
-      await minify(input, options),
+      await minify(input, { minifyJS: { engine: 'swc' }, collapseWhitespace: true, continueOnMinifyError: false }),
       '<script>function calculate(){return 30}</script><button onclick="let result=calculate();return alert(result),!1">Test</button>'
     );
+  });
 
-    // Terser would report “Name expected,” so this shows SWC took the script block
-    await assert.rejects(
-      minify('<script>var = = =;</script><button onclick="return false;">Test</button>', options),
-      { message: /Unexpected token `=`/ }
-    );
+  test('Keeps a directive prologue in inline handlers under SWC', async () => {
+    const input = '<button onclick="\'use strict\'; return this.value;">Test</button>';
+    const output = '<button onclick=\'"use strict";return this.value\'>Test</button>';
+
+    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc' }, continueOnMinifyError: false }), output);
+  });
+
+  test('Applies SWC options to inline handlers', async () => {
+    const input = '<button onclick="console.log(1); return false;">Test</button>';
+    const output = '<button onclick="return!1">Test</button>';
+
+    assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc', compress: { drop_console: true } }, continueOnMinifyError: false }), output);
   });
 
   test('Invalid engine throws error', async () => {

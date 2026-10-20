@@ -388,7 +388,7 @@ Values that cannot be honored—a `safelist` that isn’t an array, an entry tha
 
 When `minifyJS` is set to `true`, HTML Minifier Next uses [Terser](https://terser.org/) by default to minify JavaScript in `<script>` elements and event attributes.
 
-You can choose between different JS minifiers using the `engine` field:
+You can choose between different JS minifiers—for `script` elements and event attributes alike—using the `engine` field:
 
 ```js
 const result = await minify(html, {
@@ -411,8 +411,6 @@ The engine also decides how work is scheduled: SWC minifies a document’s scrip
 ```shell
 npm i -D @swc/core
 ```
-
-**Important:** Inline event handlers (e.g., `onclick="return false"`) always use Terser regardless of the `engine` setting, as SWC doesn’t support bare return statements. This is handled automatically—you don’t need to do anything special.
 
 You can pass engine-specific configuration options:
 
