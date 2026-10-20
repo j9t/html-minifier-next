@@ -264,15 +264,16 @@ function collectUsedSymbols(html, includeScripts, decode, elements) {
   if (includeScripts) {
     // Script contents are raw text, so character references stay literal
     // except in SVG and MathML, where they are resolved; as the namespace
-    // isn’t tracked here, both readings count. An unclosed `script` runs
-    // to the end of the document, as it does in a browser.
+    // isn’t tracked here, both readings count where they differ. An unclosed
+    // `script` runs to the end of the document, as it does in a browser.
     skipCursor = 0;
     for (const element of findRawTextElements(haystack, 'script')) {
       if (isSkipped(element.start)) {
         continue;
       }
       const body = html.slice(element.bodyStart, element.bodyEnd);
-      for (const text of (decode && body.indexOf('&') !== -1) ? [body, decode(body)] : [body]) {
+      const decoded = (decode && body.indexOf('&') !== -1) ? decode(body) : body;
+      for (const text of decoded === body ? [body] : [body, decoded]) {
         addIdentifiers(text, elements);
         stringLiteralPattern.lastIndex = 0;
         let literal;
@@ -388,8 +389,9 @@ function collectUsage(html, includeScripts, decode) {
   return {
     usedSymbols,
     usedElements,
-    // The CSS cache outlives a document, so its keys tell element sets apart
-    usedElementsKey: String(hashContent([...usedElements].sort().join(' ')))
+    // The CSS cache outlives a document, so its keys tell element sets apart. The set
+    // is in document order, so the same elements in another order only miss the cache.
+    usedElementsKey: String(hashContent([...usedElements].join(' ')))
   };
 }
 

@@ -767,9 +767,42 @@ describe('CSS', () => {
       assert.strictEqual(styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: { scripts: false } })), '');
     });
 
+    test('Compares element names from inline scripts case-insensitively', async () => {
+      const options = { minifyCSS: true, removeUnusedCSS: true };
+      const script = '<script>document.body.append(document.createElement("DIALOG"))</script>';
+
+      assert.strictEqual(styleOf(await minify(style('dialog{color:red}') + '<p></p>' + script, options)), 'dialog{color:red}');
+      assert.strictEqual(styleOf(await minify(style('Dialog{color:red}') + '<p></p>' + script, options)), 'Dialog{color:red}');
+    });
+
+    test('Keeps parser-supplied table elements when an inline script names a table', async () => {
+      const input = style('tbody{color:red}tr{color:red}colgroup{color:red}') +
+        '<p></p><script>const t = document.createElement("TABLE"), c = document.createElement("col")</script>';
+      const output = styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: true }));
+
+      assert.strictEqual(output, 'tbody,tr,colgroup{color:red}');
+    });
+
+    test('Keeps selectors for elements named in foreign scripts as HTML reads them', async () => {
+      const input = style('dialog{color:red}') + '<p></p><svg><script>document.createElement("di&#97;log")</script></svg>';
+      assert.strictEqual(styleOf(await minify(input, { minifyCSS: true, removeUnusedCSS: true })), 'dialog{color:red}');
+    });
+
+    test('Does not leak one document’s script-named elements into another through the CSS cache', async () => {
+      const sheet = style('p{color:red}dialog{color:red}');
+      const options = { minifyCSS: true, removeUnusedCSS: true };
+
+      assert.strictEqual(styleOf(await minify(sheet + '<p></p><script>x("dialog")</script>', options)), 'p,dialog{color:red}');
+      assert.strictEqual(styleOf(await minify(sheet + '<p></p><script>x("other")</script>', options)), 'p{color:red}');
+      assert.strictEqual(styleOf(await minify(sheet + '<p></p><script>x("dialog")</script>', options)), 'p,dialog{color:red}');
+    });
+
     test('Does not count an element as evidence for a class of the same name, or vice versa', async () => {
       const output = styleOf(await minify(style('.header{color:red}header{color:blue}') + '<header></header>', { minifyCSS: true, removeUnusedCSS: true }));
       assert.strictEqual(output, 'header{color:#00f}');
+
+      const reverse = styleOf(await minify(style('.footer{color:red}footer{color:blue}') + '<p class="footer"></p>', { minifyCSS: true, removeUnusedCSS: true }));
+      assert.strictEqual(reverse, '.footer{color:red}');
     });
 
     test('Leaves selector lists in `@scope` style sheets alone', async () => {
