@@ -189,7 +189,7 @@ const optionDefinitions = {
     type: 'boolean'
   },
   removeRedundantAttributes: {
-    description: 'Remove attributes when value matches default',
+    description: 'Remove attributes when value matches default (as well as `rel` keywords and `meta` elements without effect)',
     type: 'boolean'
   },
   removeTagWhitespace: {

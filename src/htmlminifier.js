@@ -55,9 +55,11 @@ import {
   isIgnoredComment,
   isExecutableScript,
   isStyleElement,
+  isMetaWithoutEffect,
   normalizeAttr,
   buildAttr,
-  deduplicateAttributes
+  deduplicateAttributes,
+  replaceContentTypePragma
 } from './lib/attributes.js';
 
 import {
@@ -501,7 +503,8 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  * @prop {boolean} [removeRedundantAttributes]
  *  Remove attributes that are redundant because they match the element’s
- *  default values (for example `<button type="submit">`).
+ *  default values (for example `<button type="submit">`), along with `meta`
+ *  elements and `rel` keywords that have no effect.
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_redundant_attributes
  *
  *  Default: `false`
@@ -2321,6 +2324,15 @@ async function minifyHTML(value, options, partialMarkup) {
       tag = nameTag(tag);
       // HTML names are written as in the source under `caseSensitive`, foreign ones as named anyway
       const tagOut = namesAsWritten && nameTag === lowercase ? tagSource : tag;
+      if (tag === 'meta' && options.removeRedundantAttributes) {
+        deduplicateAttributes(attrs, Boolean(options.caseSensitive));
+        // As if not written
+        if (isMetaWithoutEffect(attrs, markers)) {
+          removed = true;
+          return undefined;
+        }
+        replaceContentTypePragma(attrs, markers);
+      }
       currentTag = tag;
       charsPrevTag = tag;
       if (!inlineTextSet.has(tag)) {

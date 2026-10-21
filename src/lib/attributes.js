@@ -13,6 +13,8 @@ import {
   RE_WS_CHAR,
   generalDefaults,
   tagDefaults,
+  metaHttpEquivNoEffect,
+  metaNamesNoEffect,
   targetSelfElements,
   tagDefaultsSVG,
   svgElementsInheritingByReference,
@@ -204,6 +206,16 @@ function isTargetSelfRedundant(attrValue, options) {
 }
 
 /**
+ * Whether `xml:lang` repeats `lang`, which it must match exactly, as XHTML reads it first
+ * @param {string} attrValue
+ * @param {HTMLAttribute[]} attrs
+ */
+function isXMLLangRedundant(attrValue, attrs) {
+  const lang = attrs.find(attr => attr.name.toLowerCase() === 'lang');
+  return lang !== undefined && (lang.value ?? '').toLowerCase() === attrValue.toLowerCase();
+}
+
+/**
  * @param {string} tag - In lowercase
  * @param {string} attrName - In lowercase
  * @param {string} attrValue
@@ -256,6 +268,9 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs, options) {
   if (attrName === 'target' && targetSelfElements.has(tag)) {
     return isTargetSelfRedundant(attrValue, options);
   }
+  if (attrName === 'xml:lang') {
+    return isXMLLangRedundant(attrValue, attrs);
+  }
 
   // Fast path: Check if this element–attribute combination can possibly be redundant before
   // normalizing the value; own properties only, so `constructor` has no default
@@ -288,6 +303,9 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs, options) {
   }
   if (tag === 'a' && attrName === 'name' && attributesInclude(attrs, 'id')) {
     return true;
+  }
+  if (tag === 'ol' && attrName === 'start' && attributesInclude(attrs, 'reversed')) {
+    return false;
   }
 
   return attrValue === generalDefault || attrValue === tagDefault;
@@ -493,6 +511,107 @@ function isContentSecurityPolicy(tag, attrs) {
     }
   }
   return false;
+}
+
+/**
+ * Whether a `meta` element has no effect in any current browser, holding no more than the
+ * `http-equiv` or `name` that says so, and `content`
+ * @param {HTMLAttribute[]} attrs - Deduplicated
+ * @param {string[]} markers - What custom fragment and `htmlmin:ignore` placeholders hold
+ */
+function isMetaWithoutEffect(attrs, markers) {
+  let hasKey = false;
+  for (const attr of attrs) {
+    const name = attr.name.toLowerCase();
+    const value = attr.value ?? '';
+    if (markers.some(marker => value.indexOf(marker) !== -1)) {
+      return false;
+    }
+    if (name === 'http-equiv' || name === 'name') {
+      if (!(name === 'name' ? metaNamesNoEffect : metaHttpEquivNoEffect).has(value.toLowerCase())) {
+        return false;
+      }
+      hasKey = true;
+    } else if (name !== 'content') {
+      return false;
+    }
+  }
+  return hasKey;
+}
+
+/**
+ * The charset a `content` value declares, as browsers extract it, if any
+ * https://html.spec.whatwg.org/multipage/urls-and-fetching.html#algorithm-for-extracting-a-character-encoding-from-a-meta-element
+ * @param {string} value
+ * @returns {string | undefined}
+ */
+function extractCharset(value) {
+  const re = /charset[\t\n\f\r ]*(=)?[\t\n\f\r ]*/gi;
+  let match;
+  while ((match = re.exec(value))) {
+    if (!match[1]) {
+      continue;
+    }
+    const start = re.lastIndex;
+    const quote = value.charAt(start);
+    if (quote === '"' || quote === "'") {
+      const end = value.indexOf(quote, start + 1);
+      return end === -1 ? undefined : value.slice(start + 1, end);
+    }
+    return value.slice(start).split(/[\t\n\f\r ;]/, 1)[0];
+  }
+  return undefined;
+}
+
+/**
+ * Replace a `meta` element’s `http-equiv=Content-Type` and `content` with the `charset` they
+ * declare, which browsers read the same
+ * @param {HTMLAttribute[]} attrs - Deduplicated; changed in place
+ * @param {string[]} markers - What custom fragment and `htmlmin:ignore` placeholders hold
+ */
+function replaceContentTypePragma(attrs, markers) {
+  if (attrs.length !== 2) {
+    return;
+  }
+  const httpEquiv = attrs.find(attr => attr.name.toLowerCase() === 'http-equiv');
+  const content = attrs.find(attr => attr.name.toLowerCase() === 'content');
+  if (!httpEquiv || !content || (httpEquiv.value ?? '').toLowerCase() !== 'content-type') {
+    return;
+  }
+  const value = content.value ?? '';
+  const charset = markers.some(marker => value.indexOf(marker) !== -1) ? undefined : extractCharset(value);
+  if (charset && trimWhitespace(charset)) {
+    attrs.splice(0, 2, { ...content, name: 'charset', value: charset });
+  }
+}
+
+/**
+ * A `rel` value without repeated keywords, nor ones others imply
+ * @param {string} tag - In lowercase
+ * @param {string} attrValue
+ */
+function cleanRelKeywords(tag, attrValue) {
+  const keywords = trimWhitespace(attrValue).split(RE_ATTR_WS_COLLAPSE);
+  const seen = new Set();
+  for (const keyword of keywords) {
+    seen.add(keyword.toLowerCase());
+  }
+  // Only Internet Explorer needed `shortcut`; `noreferrer` implies `noopener`
+  const implied = tag === 'link' && seen.has('icon')
+    ? 'shortcut'
+    : (tag === 'a' || tag === 'area' || tag === 'form') && seen.has('noreferrer') ? 'noopener' : '';
+  if (seen.size === keywords.length && !seen.has(implied)) {
+    return attrValue;
+  }
+  seen.clear();
+  return keywords.filter(keyword => {
+    const keywordLower = keyword.toLowerCase();
+    if (keywordLower === implied || seen.has(keywordLower)) {
+      return false;
+    }
+    seen.add(keywordLower);
+    return true;
+  }).join(' ');
 }
 
 /**
@@ -725,6 +844,10 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
       return Promise.all(processed).then(results => results.join(', '));
     }
     return processed.join(', ');
+  }
+
+  if (attrName === 'rel' && options.removeRedundantAttributes && !options.insideForeignContent) {
+    return cleanRelKeywords(tag, attrValue);
   }
 
   if (attrName === 'content' && isMetaViewport(tag, attrs)) {
@@ -1099,6 +1222,7 @@ export {
   isSrcset,
   isMetaViewport,
   isContentSecurityPolicy,
+  isMetaWithoutEffect,
   canDeleteEmptyAttribute,
   hasAttrName,
 
@@ -1106,5 +1230,6 @@ export {
   cleanAttributeValue,
   normalizeAttr,
   buildAttr,
-  deduplicateAttributes
+  deduplicateAttributes,
+  replaceContentTypePragma
 };
