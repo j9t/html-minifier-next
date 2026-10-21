@@ -524,7 +524,7 @@ function isMetaWithoutEffect(attrs, markers) {
   for (const attr of attrs) {
     const name = attr.name.toLowerCase();
     const value = attr.value ?? '';
-    if (markers.some(marker => value.indexOf(marker) !== -1)) {
+    if (attr.customOpen || attr.customClose || markers.some(marker => value.indexOf(marker) !== -1)) {
       return false;
     }
     if (name === 'http-equiv' || name === 'name') {
@@ -570,7 +570,7 @@ function extractCharset(value) {
  * @param {string[]} markers - What custom fragment and `htmlmin:ignore` placeholders hold
  */
 function replaceContentTypePragma(attrs, markers) {
-  if (attrs.length !== 2) {
+  if (attrs.length !== 2 || attrs.some(attr => attr.customOpen || attr.customClose)) {
     return;
   }
   const httpEquiv = attrs.find(attr => attr.name.toLowerCase() === 'http-equiv');
@@ -579,7 +579,8 @@ function replaceContentTypePragma(attrs, markers) {
     return;
   }
   const value = content.value ?? '';
-  const charset = markers.some(marker => value.indexOf(marker) !== -1) ? undefined : extractCharset(value);
+  // Character references are left to the attribute, which browsers decode before extracting
+  const charset = value.indexOf('&') !== -1 || markers.some(marker => value.indexOf(marker) !== -1) ? undefined : extractCharset(value);
   if (charset && trimWhitespace(charset)) {
     attrs.splice(0, 2, { ...content, name: 'charset', value: charset });
   }
@@ -596,7 +597,8 @@ function cleanRelKeywords(tag, attrValue) {
   for (const keyword of keywords) {
     seen.add(keyword.toLowerCase());
   }
-  // Only Internet Explorer needed `shortcut`; `noreferrer` implies `noopener`
+  // Only Internet Explorer needed `shortcut`; `noreferrer` implies `noopener` (as does
+  // `target=_blank`, but only since Chrome 88, Firefox 79, and Safari 12.1 [TBC])
   const implied = tag === 'link' && seen.has('icon')
     ? 'shortcut'
     : (tag === 'a' || tag === 'area' || tag === 'form') && seen.has('noreferrer') ? 'noopener' : '';
@@ -847,7 +849,8 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
   }
 
   if (attrName === 'rel' && options.removeRedundantAttributes && !options.insideForeignContent) {
-    return cleanRelKeywords(tag, attrValue);
+    // Which keywords a template renders, the value doesn’t show
+    return markers.some(marker => attrValue.indexOf(marker) !== -1) ? attrValue : cleanRelKeywords(tag, attrValue);
   }
 
   if (attrName === 'content' && isMetaViewport(tag, attrs)) {

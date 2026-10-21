@@ -1571,6 +1571,9 @@ describe('HTML', () => {
     // Unchanged where nothing repeats or is implied
     let input = '<a href=/ rel=noopener>a</a><link rel=shortcut href=/><link rel="noopener noreferrer" href=/><a href=/ rel=" nofollow  ugc ">a</a>';
     assert.strictEqual(await minify(input, options), input);
+    // A template may render any keyword it holds or not
+    input = '<a href=/ rel="<% if (a) { %>noreferrer<% } %> noopener">a</a><a href=/ rel="<% if (a) { %>nofollow<% } %> nofollow">a</a>';
+    assert.strictEqual(await minify(input, options), input);
     input = '<svg><a href=/ rel="noopener noreferrer">a</a></svg>';
     assert.strictEqual(await minify(input, options), input);
     input = '<link rel="shortcut icon" href=favicon.ico>';
@@ -1610,6 +1613,8 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<svg><meta name=HandheldFriendly content=true></svg>', options), '<svg></svg>');
     input = '<meta http-equiv=X-UA-Compatible content="<% edge %>">';
     assert.strictEqual(await minify(input, options), input);
+    input = '<meta {{#if a}}name=HandheldFriendly{{/if}} content=true>';
+    assert.strictEqual(await minify(input, { ...options, customAttrSurround: [[/\{\{#if\s+\w+\}\}/, /\{\{\/if\}\}/]] }), '<meta {{#if a}}name=HandheldFriendly {{/if}}content=true>');
 
     // As if not written
     input = '<html>\n<head>\n\t<meta http-equiv=X-UA-Compatible content="IE=edge">\n\t<title>a</title>\n</head>\n</html>';
@@ -1631,6 +1636,11 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, options), input);
     input = '<meta http-equiv=Content-Type content="text/html; charset=utf-8" id=a>';
     assert.strictEqual(await minify(input, options), input);
+    // Read decoded, which the value as written doesn’t show
+    input = '<meta http-equiv=Content-Type content="text/html; charset=&quot;utf-8&quot;"><meta http-equiv=Content-Type content="text/html; charset=utf-8&#59;x">';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<meta {{#if a}}http-equiv=Content-Type{{/if}} content="text/html; charset=utf-8">';
+    assert.strictEqual(await minify(input, { ...options, customAttrSurround: [[/\{\{#if\s+\w+\}\}/, /\{\{\/if\}\}/]] }), '<meta {{#if a}}http-equiv=Content-Type {{/if}}content="text/html; charset=utf-8">');
     input = '<meta http-equiv=Content-Type content="text/html; charset=utf-8">';
     assert.strictEqual(await minify(input), input);
   });
