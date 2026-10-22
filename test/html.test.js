@@ -1555,9 +1555,8 @@ describe('HTML', () => {
 
   test('Removes redundant attributes: `xml:lang`', async () => {
     const options = { removeRedundantAttributes: true };
-    assert.strictEqual(await minify('<html lang=en xml:lang=en><p lang=de xml:lang=DE>a</p></html>', options), '<html lang=en><p lang=de>a</p></html>');
-    // XHTML reads `xml:lang` over `lang`
-    const input = '<html xml:lang=en><p lang=de xml:lang=en>a</p><p lang=de xml:lang=" de ">b</p></html>';
+    assert.strictEqual(await minify('<html lang=en xml:lang=en><p lang=de xml:lang=en>a</p><p xml:lang=fr>b</p></html>', options), '<html lang=en><p lang=de>a</p><p>b</p></html>');
+    const input = '<svg><text xml:lang=en>a</text></svg>';
     assert.strictEqual(await minify(input, options), input);
     assert.strictEqual(await minify('<html lang=en xml:lang=en>', { removeRedundantAttributes: false }), '<html lang=en xml:lang=en>');
   });

@@ -206,16 +206,6 @@ function isTargetSelfRedundant(attrValue, options) {
 }
 
 /**
- * Whether `xml:lang` repeats `lang`, which it must match exactly, as XHTML reads it first
- * @param {string} attrValue
- * @param {HTMLAttribute[]} attrs
- */
-function isXMLLangRedundant(attrValue, attrs) {
-  const lang = attrs.find(attr => attr.name.toLowerCase() === 'lang');
-  return lang !== undefined && (lang.value ?? '').toLowerCase() === attrValue.toLowerCase();
-}
-
-/**
  * @param {string} tag - In lowercase
  * @param {string} attrName - In lowercase
  * @param {string} attrValue
@@ -268,8 +258,9 @@ function isAttributeRedundant(tag, attrName, attrValue, attrs, options) {
   if (attrName === 'target' && targetSelfElements.has(tag)) {
     return isTargetSelfRedundant(attrValue, options);
   }
+  // Without effect in HTML (unlike in foreign content, where it’s in the XML namespace)
   if (attrName === 'xml:lang') {
-    return isXMLLangRedundant(attrValue, attrs);
+    return true;
   }
 
   // Fast path: Check if this element–attribute combination can possibly be redundant before
