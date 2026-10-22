@@ -503,8 +503,9 @@ import { toFragment, replaceCustomFragments } from './lib/fragments.js';
  *
  * @prop {boolean} [removeRedundantAttributes]
  *  Remove attributes that are redundant because they match the element’s
- *  default values (for example `<button type="submit">`), along with `meta`
- *  elements and `rel` keywords that have no effect.
+ *  default values (for example `<button type="submit">`) or have no effect
+ *  (for example `xml:lang`), along with `meta` elements and `rel` keywords
+ *  that have no effect.
  *  See also: https://perfectionkills.com/experimenting-with-html-minifier/#remove_redundant_attributes
  *
  *  Default: `false`
