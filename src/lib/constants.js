@@ -114,6 +114,7 @@ const tagDefaults = {
     method: 'get'
   },
   html: { dir: 'ltr' },
+  iframe: { scrolling: 'auto' },
   img: { decoding: 'auto' },
   input: {
     colorspace: 'limited-srgb',
@@ -129,7 +130,11 @@ const tagDefaults = {
     max: '1',
     min: '0'
   },
-  ol: { type: '1' },
+  // Not `start` on reversed lists, which count down from their number of items
+  ol: {
+    start: '1',
+    type: '1'
+  },
   progress: { max: '1' },
   source: { media: 'all' },
   style: { media: 'all' },
@@ -157,6 +162,10 @@ const integrationPointsForeign = {
   svg: new Set(['desc', 'title']),
   math: new Set(['mi', 'mn', 'mo', 'ms', 'mtext'])
 };
+
+// `meta` element `http-equiv` and `name` values no current browser acts on, in lowercase
+const metaHttpEquivNoEffect = new Set(['cleartype', 'content-script-type', 'content-style-type', 'imagetoolbar', 'msthemecompatible', 'page-enter', 'page-exit', 'pics-label', 'site-enter', 'site-exit', 'window-target', 'x-ua-compatible']);
+const metaNamesNoEffect = new Set(['handheldfriendly', 'ie_rm_off', 'mobileoptimized', 'mssmarttagspreventparsing']);
 
 // Elements whose `target` defaults to `_self` where no `base` element sets another
 const targetSelfElements = new Set(['a', 'area', 'form']);
@@ -446,6 +455,8 @@ export {
   // Default values
   generalDefaults,
   tagDefaults,
+  metaHttpEquivNoEffect,
+  metaNamesNoEffect,
   targetSelfElements,
   integrationPointsForeign,
   tagDefaultsSVG,

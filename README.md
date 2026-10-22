@@ -178,7 +178,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `removeEmptyElements`<br>`--remove-empty-elements` | [Remove all elements with empty contents](#removing-empty-elements) | `false` |
 | `removeEmptyElementsExcept`<br>`--remove-empty-elements-except` | Array of elements to preserve—use with `removeEmptyElements`; accepts simple tag names (e.g., `["td"]`) or HTML-like markup with attributes (e.g., `["<i class='test'>"]`); supports double quotes, single quotes, and unquoted attribute values | `[]` |
 | `removeOptionalTags`<br>`--remove-optional-tags` | [Remove optional tags](https://perfectionkills.com/experimenting-with-html-minifier/#remove_optional_tags) | `false` |
-| `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) | `false` |
+| `removeRedundantAttributes`<br>`--remove-redundant-attributes` | [Remove attributes when value matches default](https://meiert.com/blog/optional-html/#toc-attribute-values) or has no effect (as well as `rel` keywords and `meta` elements without effect) | `false` |
 | `removeTagWhitespace`<br>`--remove-tag-whitespace` | Remove space between attributes whenever possible; **note that this will result in invalid HTML** | `false` |
 | `removeUnusedCSS`<br>`--remove-unused-css` | [Remove CSS from `style` elements](#unused-css-removal) that name an element, class, or ID the document doesn’t reference—use with `minifyCSS`, and `safelist` for names only external scripts use | `false` (could be `true`, `{ safelist, scripts }`) |
 | `selfCloseForeignElements`<br>`--self-close-foreign-elements` | Self-close empty SVG and MathML elements (e.g., `<path d="…"></path>` → `<path d="…"/>`) | `false` |
@@ -675,9 +675,9 @@ npx html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whites
 
 If you have chunks of markup you would like preserved, you can wrap them with `<!-- htmlmin:ignore -->`.
 
-### Line breaks
+### XHTML
 
-HTML reads CRLF and CR line breaks as line feeds, so HMN writes them so, too. Markup within `<!-- htmlmin:ignore -->` and custom fragments, with the whitespace padding them, stay as written. A carriage return written as a character reference (e.g., `&#13;`) stays one under `decodeEntities`.
+HMN is primarily an HTML minifier. To process XHTML (`application/xhtml+xml`), keep those options off whose output XML can’t parse (e.g., `removeOptionalTags`, `removeAttributeQuotes`, and `collapseBooleanAttributes`) as well as `removeRedundantAttributes` (as the option removes `xml:lang` attributes as well as `xmlns` from `html`).
 
 ### Preserving SVG and MathML elements
 
@@ -704,6 +704,10 @@ To validate complete HTML markup, use [the W3C validator](https://validator.w3.o
 Where browsers parse markup differently by document mode, HMN follows the doctype [as the HTML parser does](https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode): Under a doctype that sets quirks mode, like HTML 3.2 or HTML 4.01 Transitional without a system identifier, a `table` doesn’t close an open `p`, while under the HTML doctype and legacy doctypes that set no-quirks or limited-quirks mode, like XHTML 1.0 Strict or HTML 4.01 Strict, it does.
 
 Only the first doctype counts, and only after nothing but comments and whitespace, as browsers ignore any other. Without such a doctype, the mode is unknown: The markup may be a fragment of a document in either mode, or a complete document, which renders in quirks mode—and text before the doctype, like template code (e.g., `<?php … ?>`), may render to nothing or to text that makes browsers ignore the doctype. HMN then keeps what either mode needs where the two differ—a `</p>` before a `table`, or after a `table` inside a `p`. `useShortDoctype` replaces the doctype with the HTML one, so where the doctype counts, markup is then read as no-quirks, which is how browsers will parse the output.
+
+### Line breaks
+
+HTML reads CRLF and CR line breaks as line feeds, so HMN writes them so, too. Markup within `<!-- htmlmin:ignore -->` and custom fragments, with the whitespace padding them, stay as written. A carriage return written as a character reference (e.g., `&#13;`) stays one under `decodeEntities`.
 
 ### Minifying server-side templates
 

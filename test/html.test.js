@@ -1546,6 +1546,102 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<meter min=0 max=1 value=.5></meter><meter min=1 max=2 value=1.5></meter><progress max=1 value=.5></progress>', options), '<meter value=.5></meter><meter min=1 max=2 value=1.5></meter><progress value=.5></progress>');
     assert.strictEqual(await minify('<form autocomplete=on></form><form autocomplete=off></form>', options), '<form></form><form autocomplete=off></form>');
     assert.strictEqual(await minify('<ol type=1></ol><ol type=a></ol><ol type=I></ol>', options), '<ol></ol><ol type=a></ol><ol type=I></ol>');
+    // Reversed, a list starts from the number of its items
+    assert.strictEqual(await minify('<ol start=1></ol><ol start=" 1 "></ol><ol start=2></ol><ol reversed start=1></ol>', options), '<ol></ol><ol></ol><ol start=2></ol><ol reversed start=1></ol>');
+    assert.strictEqual(await minify('<iframe scrolling=auto></iframe><iframe scrolling=no></iframe>', options), '<iframe></iframe><iframe scrolling=no></iframe>');
+    // Sizes set as attributes keep a flex or grid item from stretching
+    assert.strictEqual(await minify('<iframe width=300 height=150></iframe>', options), '<iframe width=300 height=150></iframe>');
+  });
+
+  test('Removes redundant attributes: `xml:lang`', async () => {
+    const options = { removeRedundantAttributes: true };
+    assert.strictEqual(await minify('<html lang=en xml:lang=en><p lang=de xml:lang=en>a</p><p xml:lang=fr>b</p></html>', options), '<html lang=en><p lang=de>a</p><p>b</p></html>');
+    const input = '<svg><text xml:lang=en>a</text></svg>';
+    assert.strictEqual(await minify(input, options), input);
+    assert.strictEqual(await minify('<html lang=en xml:lang=en>', { removeRedundantAttributes: false }), '<html lang=en xml:lang=en>');
+  });
+
+  test('Removes redundant attributes: `rel` keywords', async () => {
+    const options = { removeRedundantAttributes: true };
+    assert.strictEqual(await minify('<link rel="shortcut icon" href=favicon.ico><link rel="icon SHORTCUT" href=favicon.ico>', options), '<link rel="icon" href=favicon.ico><link rel="icon" href=favicon.ico>');
+    // `noreferrer` implies `noopener`
+    assert.strictEqual(await minify('<a href=/ rel="noopener noreferrer">a</a><area href=/ rel="noreferrer noopener"><form rel="noopener noreferrer"></form>', options), '<a href=/ rel="noreferrer">a</a><area href=/ rel="noreferrer"><form rel="noreferrer"></form>');
+    assert.strictEqual(await minify('<a href=/ rel="nofollow  nofollow\tNOFOLLOW">a</a>', options), '<a href=/ rel="nofollow">a</a>');
+    // Unchanged where nothing repeats or is implied
+    let input = '<a href=/ rel=noopener>a</a><link rel=shortcut href=/><link rel="noopener noreferrer" href=/><a href=/ rel=" nofollow  ugc ">a</a>';
+    assert.strictEqual(await minify(input, options), input);
+    // A template may render any keyword it holds or not
+    input = '<a href=/ rel="<% if (a) { %>noreferrer<% } %> noopener">a</a><a href=/ rel="<% if (a) { %>nofollow<% } %> nofollow">a</a>';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<svg><a href=/ rel="noopener noreferrer">a</a></svg>';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<link rel="shortcut icon" href=favicon.ico>';
+    assert.strictEqual(await minify(input), input);
+  });
+
+  test('Removes `meta` elements without effect', async () => {
+    const options = { removeRedundantAttributes: true };
+    let input = '<meta charset=utf-8>' +
+      '<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">' +
+      '<meta http-equiv=imagetoolbar content=no>' +
+      '<meta http-equiv=cleartype content=on>' +
+      '<meta http-equiv=MSThemeCompatible content=no>' +
+      '<meta http-equiv=Content-Style-Type content=text/css>' +
+      '<meta http-equiv=Content-Script-Type content=text/javascript>' +
+      '<meta http-equiv=Page-Enter content="revealTrans(Duration=1,Transition=23)">' +
+      '<meta http-equiv=Page-Exit content="blendTrans(Duration=1)">' +
+      '<meta http-equiv=Site-Enter content="blendTrans(Duration=1)">' +
+      '<meta http-equiv=Site-Exit content="blendTrans(Duration=1)">' +
+      '<meta http-equiv=Window-target content=_top>' +
+      '<meta http-equiv=PICS-Label content=\'(PICS-1.1 "https://example.com")\'>' +
+      '<meta name=HandheldFriendly content=true>' +
+      '<meta name=MobileOptimized content=320>' +
+      '<meta name=MSSmartTagsPreventParsing content=true>' +
+      '<meta name=IE_RM_OFF content=true>' +
+      '<meta name=MobileOptimized>' +
+      '<title>a</title>';
+    assert.strictEqual(await minify(input, options), '<meta charset=utf-8><title>a</title>');
+    assert.strictEqual(await minify(input), input);
+
+    // Other attributes may be what scripts or styles look for, or carry microdata
+    input = '<meta http-equiv=X-UA-Compatible content="IE=edge" id=a><meta name=HandheldFriendly content=true itemprop=b>';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<meta http-equiv=Set-Cookie content="a=b"><meta http-equiv=refresh content=5><meta name=viewport content="width=device-width">';
+    assert.strictEqual(await minify(input, options), input);
+    // Out of SVG, as HTML reads it
+    assert.strictEqual(await minify('<svg><meta name=HandheldFriendly content=true></svg>', options), '<svg></svg>');
+    input = '<meta http-equiv=X-UA-Compatible content="<% edge %>">';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<meta {{#if a}}name=HandheldFriendly{{/if}} content=true>';
+    assert.strictEqual(await minify(input, { ...options, customAttrSurround: [[/\{\{#if\s+\w+\}\}/, /\{\{\/if\}\}/]] }), '<meta {{#if a}}name=HandheldFriendly {{/if}}content=true>');
+
+    // As if not written
+    input = '<html>\n<head>\n\t<meta http-equiv=X-UA-Compatible content="IE=edge">\n\t<title>a</title>\n</head>\n</html>';
+    assert.strictEqual(await minify(input, options), '<html>\n<head>\n\t<title>a</title>\n</head>\n</html>');
+    assert.strictEqual(await minify(input, { ...options, collapseWhitespace: true }), '<html><head><title>a</title></head></html>');
+    assert.strictEqual(await minify(input, { ...options, collapseWhitespace: true, removeOptionalTags: true }), '<title>a</title>');
+    input = '<head><meta name=MobileOptimized content=320></head><body><p>a</p></body>';
+    assert.strictEqual(await minify(input, { ...options, removeOptionalTags: true }), '<p>a');
+  });
+
+  test('Replaces `http-equiv=Content-Type` with `charset`', async () => {
+    const options = { removeRedundantAttributes: true };
+    assert.strictEqual(await minify('<meta http-equiv="Content-Type" content="text/html; charset=utf-8">', options), '<meta charset="utf-8">');
+    assert.strictEqual(await minify('<meta content=\'text/html;charset="ISO-8859-1"\' HTTP-EQUIV=content-type>', options), '<meta charset=\'ISO-8859-1\'>');
+    assert.strictEqual(await minify('<meta http-equiv=Content-Type content="text/html; CHARSET = windows-1252; x=y">', { ...options, removeAttributeQuotes: true }), '<meta charset=windows-1252>');
+
+    // Without a charset to extract, or with more to keep
+    let input = '<meta http-equiv=Content-Type content=text/html><meta http-equiv=Content-Type content="text/html; charset=\'utf-8">';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<meta http-equiv=Content-Type content="text/html; charset=utf-8" id=a>';
+    assert.strictEqual(await minify(input, options), input);
+    // Read decoded, which the value as written doesn’t show
+    input = '<meta http-equiv=Content-Type content="text/html; charset=&quot;utf-8&quot;"><meta http-equiv=Content-Type content="text/html; charset=utf-8&#59;x">';
+    assert.strictEqual(await minify(input, options), input);
+    input = '<meta {{#if a}}http-equiv=Content-Type{{/if}} content="text/html; charset=utf-8">';
+    assert.strictEqual(await minify(input, { ...options, customAttrSurround: [[/\{\{#if\s+\w+\}\}/, /\{\{\/if\}\}/]] }), '<meta {{#if a}}http-equiv=Content-Type {{/if}}content="text/html; charset=utf-8">');
+    input = '<meta http-equiv=Content-Type content="text/html; charset=utf-8">';
+    assert.strictEqual(await minify(input), input);
   });
 
   test('Removes redundant attributes: `<… = "javascript: …" …>`', async () => {
@@ -7515,13 +7611,8 @@ describe('HTML', () => {
       ['<pre>\n\n\ntest</pre>', '<pre>\n\n\ntest</pre>'],
       /* single line-break preceding <pre> is redundant, assuming <pre> is block element
       ['<pre>test</pre>', '<pre>\ntest</pre>'], */
-      // Closing slash and optional attribute quotes removed by minifier, but not by PHPTAL
-      // Attribute ordering differences between minifier and PHPTAL
-      // Redundant inter-attribute spacing removed by minifier, but not by PHPTAL
-      ['<meta content="text/plain;charset=UTF-8"http-equiv=Content-Type>', '<meta http-equiv=\'Content-Type\' content=\'text/plain;charset=UTF-8\'/>'],
-      /* Minifier does not optimize `<meta/>`
-      ['<meta charset=utf-8>',
-        '<meta http-equiv=\'Content-Type\' content=\'text/plain;charset=UTF-8\'/>'], */
+      // `http-equiv=Content-Type` replaced by `charset` by minifier, but not by PHPTAL
+      ['<meta charset=UTF-8>', '<meta http-equiv=\'Content-Type\' content=\'text/plain;charset=UTF-8\'/>'],
       /* Minifier does not optimize `<script/>`
       [
         '<script></script><style></style>',
