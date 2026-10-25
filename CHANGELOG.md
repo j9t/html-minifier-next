@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [9.1.0] - 2026-10-25
 
+### Fixed
+
+* Fixed a quoted attribute value longer than about 20 KB keeping repeated closing quotes (e.g., `href="…""`), which shorter values drop
+
 ### Changed
 
 * Extended `removeRedundantAttributes` to remove additional attributes, `rel` keywords that repeat or that others imply, and `meta` elements without effect in current browsers

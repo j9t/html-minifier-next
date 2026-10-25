@@ -800,9 +800,12 @@ export class HTMLParser {
       if (quoteChar !== '"' && quoteChar !== "'") return null;
       const closeQuote = fullHtml.indexOf(quoteChar, valueStart + 1);
       if (closeQuote === -1) return null;
+      // Repeated closing quotes belong to the attribute, as in the attribute pattern
+      let attrEnd = closeQuote + 1;
+      while (fullHtml[attrEnd] === quoteChar) attrEnd++;
       /** @type {Array<string | undefined>} */
       const attr = [];
-      attr[0] = fullHtml.substring(attrPos, closeQuote + 1);
+      attr[0] = fullHtml.substring(attrPos, attrEnd);
       attr[baseIndex] = nameMatch[1];
       attr[baseIndex + 1] = '='; // `customAssign` falls back to `=` for huge attributes
       // Double-quoted values go to `baseIndex + 2`, single-quoted ones to `+ 3`
