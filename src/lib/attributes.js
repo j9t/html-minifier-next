@@ -1200,28 +1200,12 @@ function buildAttr(normalized, hasUnarySlash, options, isLast, uidAttr) {
 export {
   // Validators
   isIgnoredComment,
-  isEventAttribute,
-  canRemoveAttributeQuotes,
-  attributesInclude,
-  isAttributeRedundant,
-  isScriptTypeAttribute,
-  keepScriptTypeAttribute,
   isExecutableScript,
-  isStyleLinkTypeAttribute,
   isStyleElement,
-  isUriTypeAttribute,
-  isNumberTypeAttribute,
-  isLinkType,
-  isMediaQuery,
-  isSrcset,
-  isMetaViewport,
-  isContentSecurityPolicy,
   isMetaWithoutEffect,
-  canDeleteEmptyAttribute,
   hasAttrName,
 
   // Cleaners
-  cleanAttributeValue,
   normalizeAttr,
   buildAttr,
   deduplicateAttributes,

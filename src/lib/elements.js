@@ -273,7 +273,6 @@ export {
 
   // Element removal
   canRemoveElement,
-  parseElementSpec,
   parseRemoveEmptyElementsExcept,
   shouldPreserveEmptyElement
 };

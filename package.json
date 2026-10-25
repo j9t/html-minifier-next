@@ -15,12 +15,12 @@
   "description": "Highly effective, super-configurable, well-tested web page minifier (enhanced successor to HTML Minifier)",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@swc/core": "^1.16.18",
+    "@swc/core": "^1.16.20",
     "@types/node": "^26.6.5",
     "eslint": "^10.13.0",
     "globals": "^17.13.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4"
+    "vite": "^8.3.5"
   },
   "engines": {
     "node": ">=22.13"
@@ -94,5 +94,5 @@
   },
   "type": "module",
   "types": "dist/types/htmlminifier.d.ts",
-  "version": "9.0.1"
+  "version": "9.1.0"
 }

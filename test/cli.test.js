@@ -1063,6 +1063,25 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.strictEqual(existsFixture('tmp/verbose-dir/default.html'), true);
   });
 
+  test('Reports sizes in the same format for STDIN, file lists, and directories', async () => {
+    const input = '<p>  test  </p>';
+    const verboseStdin = (await spawnCli(['--verbose', '--collapse-whitespace'], { input })).stderr.toString();
+    const dryStdin = (await spawnCli(['--dry', '--collapse-whitespace'], { input })).stderr.toString();
+    await fs.promises.mkdir(path.resolve(dirSandbox(), 'tmp/list'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(dirSandbox(), 'tmp/list/a.html'), input);
+    await fs.promises.writeFile(path.resolve(dirSandbox(), 'tmp/list/b.html'), input);
+    const verboseList = (await spawnCli(['tmp/list/a.html', 'tmp/list/b.html', '--verbose', '--collapse-whitespace', '-o', 'tmp/list-out.html'])).stderr.toString();
+    const dryList = (await spawnCli(['tmp/list/a.html', 'tmp/list/b.html', '--dry', '--collapse-whitespace'])).stderr.toString();
+    const verboseDir = (await spawnCli(['--input-dir=tmp/list', '--output-dir=tmp/list-dir', '--verbose', '--collapse-whitespace'])).stderr.toString();
+
+    assert.ok(verboseStdin.includes('  ✓ STDIN: 15 → 11 bytes (-4, 26.7%)'));
+    assert.ok(dryStdin.includes('[DRY RUN] Would minify: STDIN → STDOUT\n  Original: 15 bytes\n  Minified: 11 bytes\n  Saved: -4 bytes (26.7%)'));
+    assert.ok(verboseList.includes('  ✓ tmp/list/a.html, tmp/list/b.html: 30 → 22 bytes (-8, 26.7%)'));
+    assert.ok(dryList.includes('[DRY RUN] Would minify: tmp/list/a.html, tmp/list/b.html → STDOUT\n  Original: 30 bytes\n  Minified: 22 bytes\n  Saved: -8 bytes (26.7%)'));
+    assert.ok(verboseDir.includes(`  ✓ ${path.join('tmp', 'list', 'a.html')}: 15 → 11 bytes (-4, 26.7%)`));
+    assert.ok(verboseDir.includes('Total: 30 → 22 bytes (-8, 26.7%)'));
+  });
+
   test('Shows processing info in verbose mode with STDIN', async () => {
     const input = '<p>  test  </p>';
     const { stdout, stderr, status } = await spawnCli(['--verbose', '--collapse-whitespace', '-o', 'tmp/verbose-stdin.html'], {
@@ -1260,7 +1279,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(result.stderr.includes('CLI options:'));
     assert.ok(result.stderr.includes(path.join('tmp', 'test1.html')));
     assert.ok(result.stderr.includes(path.join('tmp', 'test2.html')));
-    assert.ok(!result.stderr.includes('Processing: ['));
+    assert.ok(!result.stderr.includes('Processing '));
     assert.strictEqual(result.stdout, '');
   });
 
@@ -1281,11 +1300,35 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(result.stderr.includes('[DRY RUN]'));
     assert.ok(result.stderr.includes(path.join('tmp', 'test1.html')));
     assert.ok(result.stderr.includes(path.join('tmp', 'test2.html')));
-    assert.ok(!result.stderr.includes('Processing: ['));
+    assert.ok(!result.stderr.includes('Processing '));
     assert.strictEqual(result.stdout, '');
 
     // Dry run should not create output files
     assert.strictEqual(existsFixture('tmp-out'), false);
+  });
+
+  test('Shows the progress indicator with the file total in a TTY', async () => {
+    await fs.promises.mkdir(path.resolve(dirSandbox(), 'tmp/sub1/sub2'), { recursive: true });
+    await fs.promises.writeFile(path.resolve(dirSandbox(), 'tmp/test1.html'), '<html><body><h1>Test 1</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(dirSandbox(), 'tmp/sub1/test2.html'), '<html><body><h1>Test 2</h1></body></html>');
+    await fs.promises.writeFile(path.resolve(dirSandbox(), 'tmp/sub1/sub2/test3.html'), '<html><body><h1>Test 3</h1></body></html>');
+
+    // STDERR is a pipe here, so the CLI is told it is a terminal
+    const { stderr, status } = await spawnAsync('node', [
+      '--import', 'data:text/javascript,process.stderr.isTTY=true',
+      cliPath,
+      '--input-dir=tmp',
+      '--output-dir=tmp-out',
+      '--collapse-whitespace'
+    ]);
+    const stderrStr = stderr.toString();
+
+    assert.strictEqual(status, 0);
+    assert.ok(stderrStr.includes('Processing 1/3 (33.3%)'));
+    assert.ok(stderrStr.includes('Processing 3/3 (100.0%)'));
+    assert.ok(stderrStr.includes('Processed 3 files.'));
+    // The total is known before the first file is done
+    assert.ok(!/Processing \d+ files…/.test(stderrStr));
   });
 
   test('Processes multiple subdirectories for progress counting', async () => {
@@ -1997,6 +2040,26 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
   // Half the cores decides the default pool, so a machine this narrow has no pool to
   // form and nothing for the test below to observe
   const hasCoresForPool = os.availableParallelism() >= 4;
+
+  (hasCoresForPool ? test : test.skip)('`--zero` goes wide on a run large enough for a pool', async () => {
+    const dir = buildInputDir('zero-pool', 128);
+    // `--zero` takes no `--verbose` to report the pool, so starting a worker is reported instead
+    const preload = 'data:text/javascript,' + encodeURIComponent(
+      'import wt from "node:worker_threads"; import { syncBuiltinESMExports } from "node:module";' +
+      'const { Worker } = wt; wt.Worker = class extends Worker { constructor(...args) { super(...args); process.stderr.write("[worker started]\\n"); } };' +
+      'syncBuiltinESMExports();'
+    );
+
+    const { stderr, status } = await spawnAsync('node', ['--import', preload, cliPath, '--zero'], { cwd: dir, input: 'y\n' });
+    const stderrStr = stderr.toString();
+
+    assert.strictEqual(status, 0, stderrStr);
+    assert.ok(stderrStr.includes('[worker started]'), 'Without the pool this would test the in-process path again');
+    assert.ok(stderrStr.includes('Processed 128 files.'));
+    for (const file of fs.readdirSync(dir)) {
+      assert.ok(!fs.readFileSync(path.join(dir, file), 'utf8').includes('  '), `${file} should be minified`);
+    }
+  });
 
   (hasCoresForPool ? test : test.skip)('A small run carrying enough to share out goes wide', async () => {
     const byteSizes = [1.2 * MB, 1.2 * MB, 1.2 * MB];

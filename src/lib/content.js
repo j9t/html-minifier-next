@@ -231,7 +231,6 @@ export {
   unwrapCSS,
 
   // Scripts
-  minifyJson,
   hasJsonScriptType,
   extractScriptBodies,
   processScript

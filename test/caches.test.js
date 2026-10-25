@@ -126,19 +126,19 @@ describe('Caches', () => {
     assert.strictEqual(stats.css.hits, 1, 'The repeated call should hit, as it does by default');
   });
 
-  test('Negative environment variable returns undefined (uses default)', () => {
+  test('A negative environment variable falls back to the default size', () => {
     const { stats } = firstCall({}, { HMN_CACHE_CSS: '-100' });
 
     assert.strictEqual(stats.css.limit, 500, 'Default cache limit should be used when env var is negative');
   });
 
-  test('Infinity environment variable returns undefined (uses default)', () => {
+  test('An infinite environment variable falls back to the default size', () => {
     const { stats } = firstCall({}, { HMN_CACHE_CSS: 'Infinity' });
 
     assert.strictEqual(stats.css.limit, 500, 'Default cache limit should be used when env var is Infinity');
   });
 
-  test('Invalid string environment variable returns undefined (uses default)', () => {
+  test('A non-numeric environment variable falls back to the default size', () => {
     const { stats } = firstCall({}, { HMN_CACHE_CSS: 'not-a-number' });
 
     assert.strictEqual(stats.css.limit, 500, 'Default cache limit should be used when env var is invalid string');
@@ -207,6 +207,36 @@ describe('Caches', () => {
     assert.strictEqual(after.hits - before.hits, 1, 'Only the second, identical call should hit the cache');
     assert.ok(after.size >= 1, 'Cache should hold at least the entry just inserted');
     assert.strictEqual(after.limit, 500, 'Default cache limit should be reported');
+  });
+
+  test('Concurrent calls with the same input share one minification', async () => {
+    const input = '<script>let concurrentProbe = 1; console.log(concurrentProbe);</script>';
+
+    const before = getCacheStats().js;
+    const [first, second] = await Promise.all([
+      minify(input, { minifyJS: true }),
+      minify(input, { minifyJS: true })
+    ]);
+    const after = getCacheStats().js;
+
+    assert.strictEqual(first, second);
+    assert.strictEqual(after.gets - before.gets, 2);
+    assert.strictEqual(after.hits - before.hits, 1, 'The second call should find the first one’s minification in flight');
+  });
+
+  test('A failed minification is not cached', async () => {
+    const input = '<script>let failedProbe = ;</script>';
+    const options = { minifyJS: true, continueOnMinifyError: true, log: () => {} };
+
+    const before = getCacheStats().js;
+    const first = await minify(input, options);
+    const second = await minify(input, options);
+    const after = getCacheStats().js;
+
+    assert.strictEqual(first, input);
+    assert.strictEqual(second, input);
+    assert.strictEqual(after.gets - before.gets, 2);
+    assert.strictEqual(after.hits - before.hits, 0, 'The second call should minify again rather than hit');
   });
 
   test('`getCacheStats()` leaves untouched caches unchanged', async () => {

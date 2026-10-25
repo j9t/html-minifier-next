@@ -7921,6 +7921,18 @@ describe('HTML', () => {
       );
     }
 
+    // Repeated closing quotes go with the attribute, as they do within the window
+    for (const length of [10, 19995, 40000]) {
+      const value = 'a'.repeat(length);
+      for (const quote of ['"', '\'']) {
+        assert.strictEqual(
+          await minify(`${padding}<a href=${quote}${value}${quote}${quote} id="q">t</a>`, { continueOnParseError: true }),
+          `${padding}<a href=${quote}${value}${quote} id="q">t</a>`,
+          `length ${length}, quote ${quote}`
+        );
+      }
+    }
+
     // Where parse errors are tolerated, an unquoted value takes in `=` past the window, too
     const lenient = `${'a'.repeat(20000)}=b`;
     assert.strictEqual(

@@ -59,6 +59,19 @@ const pkg = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url
 const EXTENSIONS_DEFAULT = ['html', 'htm', 'shtml', 'shtm'];
 const EXTENSIONS_NON_HTML = new Set(['css', 'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx', 'svg']);
 
+const CONCURRENCY_IN_PROCESS = Math.max(1, Math.min(os.cpus().length || 4, 8));
+
+// A run with many files earns back each worker’s isolate/JIT startup cost. A smaller
+// run can do so too when it carries enough bytes to share out, which a file count
+// alone cannot see.
+const FILES_PER_RUN_MIN = 128;
+const PARALLEL_BYTES_MIN = 2 * 1024 * 1024;
+// Each worker warms up its own JIT, so the useful count tops out well short of the cores
+const WORKERS_MAX = 6;
+
+/** @type {WeakMap<string[], Promise<number[]>>} */
+const fileSizesByList = new WeakMap();
+
 const MARK_ERROR = process.stderr.isTTY ? '\x1b[31m' : '';
 const MARK_SUCCESS = process.stderr.isTTY ? '\x1b[32m' : '';
 const MARK_WARNING = process.stderr.isTTY ? '\x1b[33m' : '';
@@ -337,12 +350,6 @@ program.option('-c --config-file <file>', 'Use a configuration file (defaults to
 program.version(pkg.version, '-V, --version', 'Output the version number');
 program.helpOption('-h, --help', 'Display help for command');
 
-/**
- * Progress state shared between the file walk and the indicator; `total` stays
- * `null` until the background count finishes
- * @typedef {{current: number, total: number | null}} Progress
- */
-
 (async () => {
   /** @type {string} */
   let content;
@@ -411,35 +418,8 @@ program.helpOption('-h, --help', 'Display help for command');
       programOptions.preset = 'comprehensive';
 
       const inputDirResolved = await fs.promises.realpath(cwd).catch(() => cwd);
-      const extensions = EXTENSIONS_DEFAULT;
-      const ignorePatterns = ['node_modules'];
-
-      const showProgress = process.stderr.isTTY;
-      /** @type {Progress | null} */
-      let progress = null;
-      if (showProgress) {
-        progress = { current: 0, total: null };
-      }
-
-      const allFiles = await collectFiles(cwd, extensions, undefined, ignorePatterns, inputDirResolved);
-      const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
-
-      if (progress) {
-        progress.total = allFiles.length;
-      }
-
-      await runWithConcurrency(allFiles, concurrency, async (file) => {
-        await processFile(file, file, false, false);
-        if (progress) {
-          progress.current++;
-          updateProgress(progress.current, progress.total);
-        }
-      });
-
-      if (progress) {
-        clearProgress();
-      }
-      console.error(`${MARK_SUCCESS}Processed ${allFiles.length.toLocaleString()} file${allFiles.length === 1 ? '' : 's'}.${MARK_RESET}`);
+      const stats = await processDirectory(cwd, cwd, EXTENSIONS_DEFAULT, false, false, undefined, Boolean(process.stderr.isTTY), ['node_modules'], inputDirResolved);
+      reportProcessed(stats.length);
 
       process.exit(0);
     }
@@ -558,16 +538,60 @@ program.helpOption('-h, --help', 'Display help for command');
     return { originalSize, minifiedSize, saved, sign, percentage };
   }
 
-  // A run with many files earns back each worker’s isolate/JIT startup cost. A smaller
-  // run can do so too when it carries enough bytes to share out, which a file count
-  // alone cannot see.
-  const FILES_PER_RUN_MIN = 128;
-  const PARALLEL_BYTES_MIN = 2 * 1024 * 1024;
-  // Each worker warms up its own JIT, so the useful count tops out well short of the cores
-  const WORKERS_MAX = 6;
+  /** @param {ReturnType<typeof calculateSizeStats>} stats */
+  function formatSizeStats(stats) {
+    return `${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`;
+  }
 
-  /** @type {WeakMap<string[], Promise<number[]>>} */
-  const fileSizesByList = new WeakMap();
+  /**
+   * @param {string} label
+   * @param {ReturnType<typeof calculateSizeStats>} stats
+   */
+  function reportFileStats(label, stats) {
+    console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${label}: ${formatSizeStats(stats)}`);
+  }
+
+  /** @param {number} count */
+  function reportProcessed(count) {
+    console.error(`${MARK_SUCCESS}Processed ${count.toLocaleString()} file${count === 1 ? '' : 's'}.${MARK_RESET}`);
+  }
+
+  /**
+   * Reports a single-output run and writes its result to `--output` or STDOUT; a dry
+   * run reports only
+   * @param {string} inputSource
+   * @param {string} original
+   * @param {string} minified
+   */
+  async function reportAndWrite(inputSource, original, minified) {
+    const stats = calculateStats(original, minified);
+
+    if (programOptions.dry) {
+      console.error(`[DRY RUN] Would minify: ${inputSource} → ${programOptions.output || 'STDOUT'}`);
+      console.error(`  Original: ${stats.originalSize.toLocaleString()} bytes`);
+      console.error(`  Minified: ${stats.minifiedSize.toLocaleString()} bytes`);
+      console.error(`  Saved: ${stats.sign}${Math.abs(stats.saved).toLocaleString()} bytes (${stats.percentage}%)`);
+      await printCacheStats();
+      return;
+    }
+
+    if (programOptions.verbose) {
+      reportFileStats(inputSource, stats);
+      await printCacheStats();
+    }
+
+    if (programOptions.output) {
+      try {
+        await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
+        await writeFileAtomic(programOptions.output, minified);
+      } catch (err) {
+        fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
+      }
+      return;
+    }
+
+    process.stdout.write(minified);
+  }
 
   /**
    * Byte size per file, read once per list whichever step asks first; a failed stat counts
@@ -702,16 +726,14 @@ program.helpOption('-h, --help', 'Display help for command');
     const stats = calculateStats(data, minified);
 
     if (isDryRun || isVerbose) {
-      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+      reportFileStats(path.relative(process.cwd(), inputFile), stats);
     }
 
-    if (isDryRun) {
-      return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
+    if (!isDryRun) {
+      await writeFileAtomic(outputFile, minified).catch(err => {
+        fatal('Cannot write ' + outputFile + '\n' + errorMessage(err));
+      });
     }
-
-    await writeFileAtomic(outputFile, minified).catch(err => {
-      fatal('Cannot write ' + outputFile + '\n' + err.message);
-    });
 
     return { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
   }
@@ -777,62 +799,14 @@ program.helpOption('-h, --help', 'Display help for command');
   }
 
   /**
-   * @param {string} dir
-   * @param {string[]} extensions
-   * @param {string | undefined} skipRootAbs
-   * @param {string[]} ignorePatterns
-   * @param {string} baseDir
-   * @returns {Promise<number>}
-   */
-  async function countFiles(dir, extensions, skipRootAbs, ignorePatterns, baseDir) {
-    let count = 0;
-
-    const files = await fs.promises.readdir(dir).catch(() => []);
-
-    for (const file of files) {
-      const filePath = path.join(dir, file);
-
-      // Skip anything inside the output root
-      if (skipRootAbs) {
-        const real = await fs.promises.realpath(filePath).catch(() => undefined);
-        if (real && (real === skipRootAbs || real.startsWith(skipRootAbs + path.sep))) {
-          continue;
-        }
-      }
-
-      const lst = await fs.promises.lstat(filePath).catch(() => null);
-      if (!lst || lst.isSymbolicLink()) {
-        continue;
-      }
-
-      if (lst.isDirectory()) {
-        if (shouldIgnoreDirectory(filePath, ignorePatterns, baseDir)) {
-          continue;
-        }
-        count += await countFiles(filePath, extensions, skipRootAbs, ignorePatterns, baseDir);
-      } else if (shouldProcessFile(file, extensions)) {
-        count++;
-      }
-    }
-
-    return count;
-  }
-
-  /**
    * @param {number} current
-   * @param {number | null} total
+   * @param {number} total
    */
   function updateProgress(current, total) {
     // Clear the line first, then write simple progress
     process.stderr.write(`\r\x1b[K`);
-    if (total) {
-      const ratio = Math.min(current / total, 1);
-      const percentage = (ratio * 100).toFixed(1);
-      process.stderr.write(`Processing ${current.toLocaleString()}/${total.toLocaleString()} (${percentage}%)`);
-    } else {
-      // Indeterminate progress—no total known yet
-      process.stderr.write(`Processing ${current.toLocaleString()} files…`);
-    }
+    const percentage = ((current / total) * 100).toFixed(1);
+    process.stderr.write(`Processing ${current.toLocaleString()}/${total.toLocaleString()} (${percentage}%)`);
   }
 
   function clearProgress() {
@@ -907,25 +881,15 @@ program.helpOption('-h, --help', 'Display help for command');
   /**
    * @param {string} inputDir
    * @param {string} outputDir
-   * @param {string | string[]} extensions
-   * @param {boolean} [isDryRun]
-   * @param {boolean} [isVerbose]
-   * @param {string} [skipRootAbs]
-   * @param {Progress | null} [progress]
-   * @param {string[]} [ignorePatterns]
-   * @param {string | null} [baseDir]
+   * @param {string[]} extensions
+   * @param {boolean} isDryRun
+   * @param {boolean} isVerbose
+   * @param {string | undefined} skipRootAbs
+   * @param {boolean} showProgress
+   * @param {string[]} ignorePatterns
+   * @param {string} baseDir
    */
-  async function processDirectory(inputDir, outputDir, extensions, isDryRun = false, isVerbose = false, skipRootAbs, progress = null, ignorePatterns = [], baseDir = null) {
-    // If first call provided a string, normalize once; otherwise assume pre-parsed array
-    if (typeof extensions === 'string') {
-      extensions = parseFileExtensions(extensions);
-    }
-
-    // Set `baseDir` on first call
-    if (baseDir === null) {
-      baseDir = inputDir;
-    }
-
+  async function processDirectory(inputDir, outputDir, extensions, isDryRun, isVerbose, skipRootAbs, showProgress, ignorePatterns, baseDir) {
     // Collect all files first for bounded parallel processing
     const list = await collectFiles(inputDir, extensions, skipRootAbs, ignorePatterns, baseDir);
     const allStats = new Array(list.length);
@@ -940,11 +904,9 @@ program.helpOption('-h, --help', 'Display help for command');
       return outFile;
     };
 
+    let done = 0;
     const advanceProgress = () => {
-      if (progress) {
-        progress.current++;
-        updateProgress(progress.current, progress.total);
-      }
+      if (showProgress) updateProgress(++done, list.length);
     };
 
     const pool = await createPool(list);
@@ -967,7 +929,7 @@ program.helpOption('-h, --help', 'Display help for command');
             });
           const stats = calculateSizeStats(sizes.originalSize, sizes.minifiedSize);
           if (isDryRun || isVerbose) {
-            console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${path.relative(process.cwd(), inputFile)}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
+            reportFileStats(path.relative(process.cwd(), inputFile), stats);
           }
           allStats[idx] = { originalSize: stats.originalSize, minifiedSize: stats.minifiedSize, saved: stats.saved };
           advanceProgress();
@@ -975,16 +937,14 @@ program.helpOption('-h, --help', 'Display help for command');
       } finally {
         await pool.close();
       }
-      return allStats.filter(Boolean);
+    } else {
+      await runWithConcurrency(list, CONCURRENCY_IN_PROCESS, async (inputFile, idx) => {
+        const outFile = await prepareOutDir(inputFile);
+        allStats[idx] = await processFile(inputFile, outFile, isDryRun, isVerbose);
+        advanceProgress();
+      });
     }
-
-    const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
-    await runWithConcurrency(list, concurrency, async (inputFile, idx) => {
-      const outFile = await prepareOutDir(inputFile);
-      const stats = await processFile(inputFile, outFile, isDryRun, isVerbose);
-      allStats[idx] = stats;
-      advanceProgress();
-    });
+    if (showProgress) clearProgress();
     return allStats.filter(Boolean);
   }
 
@@ -1004,37 +964,7 @@ program.helpOption('-h, --help', 'Display help for command');
       fatal('Minification error:\n' + errorMessage(err));
     }
 
-    const stats = calculateStats(content, minified);
-
-    if (programOptions.dry) {
-      const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
-      const outputDest = programOptions.output || 'STDOUT';
-
-      console.error(`[DRY RUN] Would minify: ${inputSource} → ${outputDest}`);
-      console.error(`  Original: ${stats.originalSize.toLocaleString()} bytes`);
-      console.error(`  Minified: ${stats.minifiedSize.toLocaleString()} bytes`);
-      console.error(`  Saved: ${stats.sign}${Math.abs(stats.saved).toLocaleString()} bytes (${stats.percentage}%)`);
-      await printCacheStats();
-      return;
-    }
-
-    if (programOptions.verbose) {
-      const inputSource = program.args.length > 0 ? program.args.join(', ') : 'STDIN';
-      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
-      await printCacheStats();
-    }
-
-    if (programOptions.output) {
-      try {
-        await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
-        await writeFileAtomic(programOptions.output, minified);
-      } catch (err) {
-        fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
-      }
-      return;
-    }
-
-    process.stdout.write(minified);
+    await reportAndWrite(program.args.length > 0 ? program.args.join(', ') : 'STDIN', content, minified);
   };
 
   const { inputDir, outputDir, fileExt, ignoreDir } = programOptions;
@@ -1054,8 +984,8 @@ program.helpOption('-h, --help', 'Display help for command');
       fatal('You need to specify where to write the output files with the option `--output-dir`');
     }
 
+    const extList = Array.isArray(resolvedFileExt) ? resolvedFileExt : parseFileExtensions(String(resolvedFileExt || ''));
     {
-      const extList = Array.isArray(resolvedFileExt) ? resolvedFileExt : parseFileExtensions(String(resolvedFileExt || ''));
       const isWildcard = extList.includes('*');
       const nonHtmlExts = isWildcard ? [] : extList.filter(e => EXTENSIONS_NON_HTML.has(e));
       if (isWildcard || nonHtmlExts.length > 0) {
@@ -1090,10 +1020,7 @@ program.helpOption('-h, --help', 'Display help for command');
         console.error(`[DRY RUN] Would process directory: ${inputDir} → ${outputDir}`);
       }
 
-      const showProgress = process.stderr.isTTY && !isVerbose;
-      /** @type {Progress | null} */
-      let progress = null;
-
+      const showProgress = Boolean(process.stderr.isTTY) && !isVerbose;
       const ignorePatterns = parseIgnorePatterns(resolvedIgnoreDir);
 
       try {
@@ -1108,38 +1035,17 @@ program.helpOption('-h, --help', 'Display help for command');
       // Resolve base directory for consistent path comparisons
       const inputDirResolved = inputReal || inputDir;
 
+      const stats = await processDirectory(inputDir, outputDir, extList, Boolean(programOptions.dry), Boolean(isVerbose), skipRootAbs, showProgress, ignorePatterns, inputDirResolved);
+
       if (showProgress) {
-        // Start with indeterminate progress, count in background
-        progress = {current: 0, total: null};
-
-        // `countFiles` sets `progress.total` once it resolves (safe, as JavaScript is
-        // single-threaded); until then, `updateProgress` reads `null` and shows no total
-        const extensions = typeof resolvedFileExt === 'string' ? parseFileExtensions(resolvedFileExt) : resolvedFileExt;
-        countFiles(inputDir, extensions, skipRootAbs, ignorePatterns, inputDirResolved).then(total => {
-          if (progress) {
-            progress.total = total;
-          }
-        }).catch(() => {
-          // Ignore count errors, just keep showing indeterminate progress
-        });
+        reportProcessed(stats.length);
       }
 
-      const stats = await processDirectory(inputDir, outputDir, resolvedFileExt, programOptions.dry, isVerbose, skipRootAbs, progress, ignorePatterns, inputDirResolved);
-
-      if (progress) {
-        clearProgress();
-        console.error(`${MARK_SUCCESS}Processed ${progress.current.toLocaleString()} file${progress.current === 1 ? '' : 's'}.${MARK_RESET}`);
-      }
-
-      if (isVerbose && stats && stats.length > 0) {
+      if (isVerbose && stats.length > 0) {
         const totalOriginal = stats.reduce((sum, s) => sum + s.originalSize, 0);
         const totalMinified = stats.reduce((sum, s) => sum + s.minifiedSize, 0);
-        const totalSaved = totalOriginal - totalMinified;
-        const sign = totalSaved >= 0 ? '-' : '+';
-        const totalPercentage = totalOriginal ? ((Math.abs(totalSaved) / totalOriginal) * 100).toFixed(1) : '0.0';
-
         console.error('---');
-        console.error(`Total: ${totalOriginal.toLocaleString()} → ${totalMinified.toLocaleString()} bytes (${sign}${Math.abs(totalSaved).toLocaleString()}, ${totalPercentage}%)`);
+        console.error(`Total: ${formatSizeStats(calculateSizeStats(totalOriginal, totalMinified))}`);
       }
 
       if (isVerbose) {
@@ -1160,13 +1066,12 @@ program.helpOption('-h, --help', 'Display help for command');
       }
     }
 
-    const concurrency = Math.max(1, Math.min(os.cpus().length || 4, 8));
     const inputs = capturedFiles.slice();
 
     const originals = new Array(inputs.length);
     const outputs = new Array(inputs.length);
 
-    await runWithConcurrency(inputs, concurrency, async (file, idx) => {
+    await runWithConcurrency(inputs, CONCURRENCY_IN_PROCESS, async (file, idx) => {
       const data = await fs.promises.readFile(file, 'utf8').catch(err => fatal('Cannot read ' + file + '\n' + errorMessage(err)));
       const minify = await getMinify();
       let out;
@@ -1179,38 +1084,7 @@ program.helpOption('-h, --help', 'Display help for command');
       outputs[idx] = out;
     });
 
-    const originalCombined = originals.join('');
-    const minifiedCombined = outputs.join('');
-
-    const stats = calculateStats(originalCombined, minifiedCombined);
-
-    if (programOptions.dry) {
-      const inputSource = capturedFiles.join(', ');
-      const outputDest = programOptions.output || 'STDOUT';
-      console.error(`[DRY RUN] Would minify: ${inputSource} → ${outputDest}`);
-      console.error(`  Original: ${stats.originalSize.toLocaleString()} bytes`);
-      console.error(`  Minified: ${stats.minifiedSize.toLocaleString()} bytes`);
-      console.error(`  Saved: ${stats.sign}${Math.abs(stats.saved).toLocaleString()} bytes (${stats.percentage}%)`);
-      await printCacheStats();
-      process.exit(0);
-    }
-
-    if (programOptions.verbose) {
-      const inputSource = capturedFiles.join(', ');
-      console.error(`  ${MARK_SUCCESS}✓${MARK_RESET} ${inputSource}: ${stats.originalSize.toLocaleString()} → ${stats.minifiedSize.toLocaleString()} bytes (${stats.sign}${Math.abs(stats.saved).toLocaleString()}, ${stats.percentage}%)`);
-      await printCacheStats();
-    }
-
-    if (programOptions.output) {
-      try {
-        await fs.promises.mkdir(path.dirname(programOptions.output), { recursive: true });
-        await writeFileAtomic(programOptions.output, minifiedCombined);
-      } catch (err) {
-        fatal('Cannot write ' + programOptions.output + '\n' + errorMessage(err));
-      }
-    } else {
-      process.stdout.write(minifiedCombined);
-    }
+    await reportAndWrite(capturedFiles.join(', '), originals.join(''), outputs.join(''));
     process.exit(0);
   } else { // Minifying input coming from STDIN
     content = '';

@@ -2884,35 +2884,15 @@ function initCaches(options) {
   if (!cssMinifyCache) {
     const defaultSize = 500;
 
-    // Parses an env var size (0 allowed); undefined when absent, invalid, or negative
-    const parseEnvCacheSize = (/** @type {string | undefined} */ envVar) => {
-      if (envVar === undefined) return undefined;
-      const parsed = Number(envVar);
-      if (Number.isNaN(parsed) || !Number.isFinite(parsed) || parsed < 0) {
-        return undefined;
-      }
-      return parsed;
+    // Precedence: Options > env > default; non-finite and negative sizes fall back to the default
+    const cacheSize = (/** @type {number | undefined} */ option, /** @type {string | undefined} */ envVar) => {
+      const size = option !== undefined ? option : (envVar !== undefined ? Number(envVar) : defaultSize);
+      return Number.isFinite(size) && size >= 0 ? Math.floor(size) : defaultSize;
     };
 
-    // Non-finite and negative sizes fall back to `defaultSize`, as they do for the
-    // environment variables above
-    const sanitizeSize = (/** @type {number} */ size) => Number.isFinite(size) && size >= 0 ? Math.floor(size) : defaultSize;
-
-    // Precedence: Options > env > default
-    const cssSize = options.cacheCSS !== undefined ? options.cacheCSS
-                 : (parseEnvCacheSize(process.env.HMN_CACHE_CSS) ?? defaultSize);
-    const jsSize = options.cacheJS !== undefined ? options.cacheJS
-                 : (parseEnvCacheSize(process.env.HMN_CACHE_JS) ?? defaultSize);
-    const svgSize = options.cacheSVG !== undefined ? options.cacheSVG
-                 : (parseEnvCacheSize(process.env.HMN_CACHE_SVG) ?? defaultSize);
-
-    const cssFinalSize = sanitizeSize(cssSize);
-    const jsFinalSize = sanitizeSize(jsSize);
-    const svgFinalSize = sanitizeSize(svgSize);
-
-    cssMinifyCache = new LRU(cssFinalSize);
-    jsMinifyCache = new LRU(jsFinalSize);
-    svgMinifyCache = new LRU(svgFinalSize);
+    cssMinifyCache = new LRU(cacheSize(options.cacheCSS, process.env.HMN_CACHE_CSS));
+    jsMinifyCache = new LRU(cacheSize(options.cacheJS, process.env.HMN_CACHE_JS));
+    svgMinifyCache = new LRU(cacheSize(options.cacheSVG, process.env.HMN_CACHE_SVG));
   }
 
   return { cssMinifyCache, jsMinifyCache, svgMinifyCache };

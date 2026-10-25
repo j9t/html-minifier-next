@@ -87,6 +87,21 @@ describe('Demo', () => {
       assert.deepStrictEqual(options.processScripts, ['text/html', 'text/ng-template']);
       assert.strictEqual('removeComments' in options, false);
     });
+
+    test('Splits each list and pattern-list option as its definition types it', () => {
+      const options = getOptions([
+        textOption('inlineCustomElements', 'x-a, x-b'),
+        textOption('removeEmptyElementsExcept', 'td'),
+        textOption('customAttrAssign', '/\\$=/ /:=/'),
+        textOption('ignoreCustomComments', '/^!/'),
+        textOption('customEventAttributes', '/^on/ /^x-on:/')
+      ]);
+      assert.deepStrictEqual(options.inlineCustomElements, ['x-a', 'x-b']);
+      assert.deepStrictEqual(options.removeEmptyElementsExcept, ['td']);
+      assert.deepStrictEqual(options.customAttrAssign.map(re => re.source), ['\\$=', ':=']);
+      assert.deepStrictEqual(options.ignoreCustomComments.map(re => re.source), ['^!']);
+      assert.deepStrictEqual(options.customEventAttributes.map(re => re.source), ['^on', '^x-on:']);
+    });
   });
 
   describe('`encodeState`/`decodeState`', () => {
