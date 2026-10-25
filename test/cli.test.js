@@ -2041,6 +2041,26 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
   // form and nothing for the test below to observe
   const hasCoresForPool = os.availableParallelism() >= 4;
 
+  (hasCoresForPool ? test : test.skip)('`--zero` goes wide on a run large enough for a pool', async () => {
+    const dir = buildInputDir('zero-pool', 128);
+    // `--zero` takes no `--verbose` to report the pool, so starting a worker is reported instead
+    const preload = 'data:text/javascript,' + encodeURIComponent(
+      'import wt from "node:worker_threads"; import { syncBuiltinESMExports } from "node:module";' +
+      'const { Worker } = wt; wt.Worker = class extends Worker { constructor(...args) { super(...args); process.stderr.write("[worker started]\\n"); } };' +
+      'syncBuiltinESMExports();'
+    );
+
+    const { stderr, status } = await spawnAsync('node', ['--import', preload, cliPath, '--zero'], { cwd: dir, input: 'y\n' });
+    const stderrStr = stderr.toString();
+
+    assert.strictEqual(status, 0, stderrStr);
+    assert.ok(stderrStr.includes('[worker started]'), 'Without the pool this would test the in-process path again');
+    assert.ok(stderrStr.includes('Processed 128 files.'));
+    for (const file of fs.readdirSync(dir)) {
+      assert.ok(!fs.readFileSync(path.join(dir, file), 'utf8').includes('  '), `${file} should be minified`);
+    }
+  });
+
   (hasCoresForPool ? test : test.skip)('A small run carrying enough to share out goes wide', async () => {
     const byteSizes = [1.2 * MB, 1.2 * MB, 1.2 * MB];
     buildSizedDir('par-bytes-in', byteSizes);
