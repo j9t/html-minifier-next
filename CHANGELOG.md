@@ -4,11 +4,14 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [9.1.0] - 2026-10-25
 
 ### Changed
 
 * Extended `removeRedundantAttributes` to remove additional attributes, `rel` keywords that repeat or that others imply, and `meta` elements without effect in current browsers
+* Improved CLI progress to show the file total from the start, walking the input directory once instead of twice
+* Changed `--zero` to use worker threads for large folders, as `--input-dir`/`--output-dir` does
+* Refactored internals to remove duplicated and dead code
 
 ## [9.0.1] - 2026-10-20
 

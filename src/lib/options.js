@@ -219,6 +219,42 @@ function declinesMinify(options, name, ...args) {
   }
 }
 
+// Cache key for minifier output: the content, hashed where too large for a `Map` key, then
+// what else the output depends on; `undefined` where the content is too large to cache
+/**
+ * @param {string} content
+ * @param {string} suffix
+ */
+function minifyCacheKey(content, suffix) {
+  if (content.length > MAX_CACHE_ENTRY_SIZE) return undefined;
+  return (content.length > 2048 ? hashContent(content) : content) + '|' + suffix;
+}
+
+// Runs `compute` once per key: Concurrent callers share the in-flight promise, which the
+// result replaces once settled; a failure leaves no entry behind
+/**
+ * @template T
+ * @param {LRU} cache
+ * @param {string | undefined} key
+ * @param {() => Promise<T>} compute
+ * @returns {Promise<T>}
+ */
+async function cachedMinify(cache, key, compute) {
+  if (key === undefined) return compute();
+  const cached = /** @type {T | Promise<T> | undefined} */ (cache.get(key));
+  if (cached !== undefined) return cached;
+  const inFlight = compute();
+  cache.set(key, inFlight);
+  try {
+    const resolved = await inFlight;
+    cache.set(key, resolved);
+    return resolved;
+  } catch (err) {
+    cache.delete(key);
+    throw err;
+  }
+}
+
 /** @param {unknown} err - Error raised while minifying */
 function isMissingDependency(err) {
   return Boolean(err) && /** @type {any} */ (err).code === MISSING_DEPENDENCY;
@@ -449,27 +485,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           elements: pruneSelectors ? context?.usedElementsKey : undefined,
           safelist: pruneSelectors ? unusedCSSConfig?.safelist : undefined
         });
-        const isCacheable = inputCSS.length <= MAX_CACHE_ENTRY_SIZE;
-        const cssKey = isCacheable
-          ? (inputCSS.length > 2048
-            ? (hashContent(inputCSS) + '|' + type + '|' + cssSig)
-            : (inputCSS + '|' + type + '|' + cssSig))
-          : undefined;
+        const cssKey = minifyCacheKey(inputCSS, type + '|' + cssSig);
 
         try {
-          if (cssKey !== undefined) {
-            const cached = /** @type {CSSResult | Promise<CSSResult> | undefined} */ (cssCache.get(cssKey));
-            if (cached !== undefined) {
-              // Support both resolved values and in-flight promises
-              const settled = await cached;
-              report(settled.warnings);
-              return settled.css;
-            }
-          }
-
-          // In-flight promise caching: Prevent duplicate concurrent minifications
-          // of the same CSS content (same pattern as JS minification)
-          const inFlight = (async () => {
+          const resolved = await cachedMinify(cssCache, cssKey, async () => {
             const transformCSS = await cssLoader();
             // `Buffer.from()` is required—the Lightning CSS API expects a `Uint8Array`
             const result = transformCSS({
@@ -511,16 +530,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
             const looksLikeTemplate = (text.includes('<') || text.includes('>')) && !isCDATA;
 
             const css = (text.trim() && !outputCSS.trim() && (looksLikeTemplate || hasUID)) ? text : outputCSS;
-            return { css, warnings };
-          })();
-
-          if (cssKey !== undefined) cssCache.set(cssKey, inFlight);
-          const resolved = await inFlight;
-          if (cssKey !== undefined) cssCache.set(cssKey, resolved);
+            return /** @type {CSSResult} */ ({ css, warnings });
+          });
           report(resolved.warnings);
           return resolved.css;
         } catch (err) {
-          if (cssKey !== undefined) cssCache.delete(cssKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }
@@ -582,24 +596,11 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           return text;
         }
 
-        let jsKey;
-        const isCacheable = code.length <= MAX_CACHE_ENTRY_SIZE;
+        const optsSig = engine === 'terser' ? terserSig : swcSig;
+        const jsKey = minifyCacheKey(code, (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + engine + '|' + optsSig);
 
         try {
-          const optsSig = engine === 'terser' ? terserSig : swcSig;
-
-          if (isCacheable) {
-            // For large inputs, hash the full content to avoid storing huge strings as Map keys
-            jsKey = (code.length > 2048 ? (hashContent(code) + '|') : (code + '|'))
-              + (inline ? '1' : '0') + '|' + (isModule ? 'm' : '') + '|' + engine + '|' + optsSig;
-
-            const cached = /** @type {string | Promise<string> | undefined} */ (jsCache.get(jsKey));
-            if (cached !== undefined) {
-              return await cached;
-            }
-          }
-
-          const inFlight = (async () => {
+          return await cachedMinify(jsCache, jsKey, async () => {
             if (engine === 'terser') {
               // Create a copy to avoid mutating shared `terserOptions` (race condition)
               const terserCallOptions = {
@@ -641,14 +642,8 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
               return result.code.replace(RE_TRAILING_SEMICOLON, '');
             }
             throw new Error(`Unknown JS minifier engine: ${engine}`);
-          })();
-
-          if (jsKey !== undefined) jsCache.set(jsKey, inFlight);
-          const resolved = await inFlight;
-          if (jsKey !== undefined) jsCache.set(jsKey, resolved);
-          return resolved;
+          });
         } catch (err) {
-          if (jsKey !== undefined) jsCache.delete(jsKey);
           if (!options.continueOnMinifyError || isMissingDependency(err)) {
             throw err;
           }
@@ -750,22 +745,10 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
           ? '<svg xmlns:xlink="' + namespaceXLink + '"' + svgContent.slice(4)
           : svgContent;
 
-        const isCacheable = svgContent.length <= MAX_CACHE_ENTRY_SIZE;
-        const svgKey = isCacheable
-          ? (svgContent.length > 2048
-            ? (hashContent(svgContent) + '|' + svgSig)
-            : (svgContent + '|' + svgSig)) + (collapseEmpty ? '|c' : '') + (removeNamespaces ? '|n' : '')
-          : undefined;
+        const svgKey = minifyCacheKey(svgContent, svgSig + (collapseEmpty ? '|c' : '') + (removeNamespaces ? '|n' : ''));
 
         try {
-          if (svgKey !== undefined) {
-            const cached = /** @type {string | Promise<string> | undefined} */ (svgCache.get(svgKey));
-            if (cached !== undefined) {
-              return await cached;
-            }
-          }
-
-          const inFlight = (async () => {
+          return await cachedMinify(svgCache, svgKey, async () => {
             const optimize = await loadSvgo();
             const result = optimize(svgInput, removeNamespaces
               ? { ...svgoOptions, plugins: [...svgoOptions.plugins, pluginNamespacesHTML] }
@@ -781,15 +764,9 @@ const processOptions = (inputOptions, { getLightningCSS, getTerser, getSwc, getS
                 data = data.slice(0, at) + data.slice(at + XLINK_DECLARATION_SVGO.length);
               }
             }
-            return collapseEmpty ? data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : data;
-          })();
-
-          if (svgKey !== undefined) svgCache.set(svgKey, inFlight);
-          const resolved = await inFlight;
-          if (svgKey !== undefined) svgCache.set(svgKey, resolved);
-          return resolved;
+            return /** @type {string} */ (collapseEmpty ? data.replace(RE_SVGO_EMPTY_ATTRIBUTE, ' $1') : data);
+          });
         } catch (err) {
-          if (svgKey !== undefined) svgCache.delete(svgKey);
           if (!options.continueOnMinifyError) {
             throw err;
           }

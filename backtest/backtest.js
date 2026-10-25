@@ -242,7 +242,7 @@ function getOptions(fileName, options) {
   return result;
 }
 
-async function minify(hash, options) {
+async function minify(options) {
   try {
     const minifyFn = await loadModule();
     process.send('ready');
@@ -645,7 +645,7 @@ if (isMain && (process.argv.length > 2 || !process.send)) {
         git('checkout', hash, '--', 'package.json', function () {
           readConfigFromGit(hash, 0, function (data) {
             try {
-              minify(hash, JSON.parse(data));
+              minify(JSON.parse(data));
             } catch (err) {
               console.error(`Invalid JSON in config for ${hash}: ${err.message}`);
               process.disconnect();

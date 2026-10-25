@@ -1,4 +1,5 @@
 import { describeQuantifierRisk, parseRegExp } from '../../src/lib/utils.js';
+import { optionDefinitions } from '../../src/lib/option-definitions.js';
 
 // Turn the demo’s option controls into the options object the minifier takes,
 // kept apart from the page so that it can be read without one
@@ -25,11 +26,13 @@ export const getOptions = (options) => {
       value = option.value;
     }
 
-    if (option.id === 'processScripts' || option.id === 'removeEmptyElementsExcept' || option.id === 'inlineCustomElements') {
+    const type = typeof value === 'string' ? optionDefinitions[option.id]?.type : undefined;
+
+    if (type === 'jsonArray') {
       value = value.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
     }
 
-    if (option.id === 'customAttrCollapse') {
+    if (type === 'regexp') {
       try {
         value = parseRegExp(value);
       } catch (err) {
@@ -38,7 +41,7 @@ export const getOptions = (options) => {
       }
     }
 
-    if (option.id === 'ignoreCustomComments' || option.id === 'customAttrAssign' || option.id === 'ignoreCustomFragments') {
+    if (type === 'regexpArray') {
       // Split by whitespace and convert each pattern to RegExp, `/…/flags` included
       const patterns = value.split(/\s+/).filter(p => p.trim());
       value = patterns.map(pattern => {

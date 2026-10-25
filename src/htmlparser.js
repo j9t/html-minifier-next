@@ -62,6 +62,8 @@ const singleAttrValues = [
 const singleAttrValueLenientUnquoted = /([^ \t\n\f\r"'>]+)/.source;
 // The characters the lenient pattern takes in beyond the strict one, each a parse error
 const RE_UNQUOTED_VALUE_ERROR = /[<=`]/;
+// An attribute name and `=`, for reading a quoted value too long for the attribute pattern
+const RE_ATTR_NAME_ASSIGN = /^\s*([^\s"'<>/=]+)\s*=\s*/;
 // The rest of an unquoted value, strict and lenient, as one character class read in a single
 // pass from where the attribute window cut the value short
 const RE_UNQUOTED_VALUE_REST = new RegExp(/** @type {string} */ (singleAttrValues[2]).slice(1, -2) + '*', 'y');
@@ -299,6 +301,8 @@ export class HTMLParser {
     let lastTagLower = '';
     const attribute = getAttrRegexForHandler(handler);
     const attributeY = getAttrRegexStickyForHandler(handler);
+    // Index of the attribute name in a match, after each `customAttrSurround` pattern’s captures
+    const baseIndex = 1 + (handler.customAttrSurround ? handler.customAttrSurround.length * NCP : 0);
     /** @type {string | undefined} */
     let prevTag;
     /** @type {string | undefined} */
@@ -787,12 +791,28 @@ export class HTMLParser {
       parseEndTag('', '');
     }
 
+    // A quoted attribute read from the full input, where the attribute pattern’s window cuts it off
+    function readLongQuotedAttr(/** @type {number} */ attrPos, /** @type {string} */ searchStr) {
+      const nameMatch = searchStr.match(RE_ATTR_NAME_ASSIGN);
+      if (!nameMatch) return null;
+      const valueStart = attrPos + nameMatch[0].length;
+      const quoteChar = fullHtml[valueStart];
+      if (quoteChar !== '"' && quoteChar !== "'") return null;
+      const closeQuote = fullHtml.indexOf(quoteChar, valueStart + 1);
+      if (closeQuote === -1) return null;
+      /** @type {Array<string | undefined>} */
+      const attr = [];
+      attr[0] = fullHtml.substring(attrPos, closeQuote + 1);
+      attr[baseIndex] = nameMatch[1];
+      attr[baseIndex + 1] = '='; // `customAssign` falls back to `=` for huge attributes
+      // Double-quoted values go to `baseIndex + 2`, single-quoted ones to `+ 3`
+      attr[quoteChar === '"' ? baseIndex + 2 : baseIndex + 3] = fullHtml.substring(valueStart + 1, closeQuote);
+      return attr;
+    }
+
     // Minimal attribute info (name/value pairs) from raw matches, for whitespace collapsing
     function extractAttrInfo(/** @type {Array<Array<string | undefined>>} */ rawAttrs) {
       if (!rawAttrs || !rawAttrs.length) return [];
-
-      const numCustomParts = handler.customAttrSurround ? handler.customAttrSurround.length * NCP : 0;
-      const baseIndex = 1 + numCustomParts;
 
       return /** @type {HTMLAttribute[]} */ (rawAttrs.map((/** @type {Array<string | undefined>} */ args) => {
         const name = args[baseIndex];
@@ -899,10 +919,6 @@ export class HTMLParser {
           // If input was limited and there’s a match, check if the value might be truncated
           if (attr) {
             const attrEnd = attr[0].length;
-            const numCustomParts = handler.customAttrSurround
-              ? handler.customAttrSurround.length * NCP
-              : 0;
-            const baseIndex = 1 + numCustomParts;
             const unquotedValue = attr[baseIndex + 4];
             if (unquotedValue !== undefined && attrEnd === searchStr.length) {
               // An unquoted value running into the window’s end is read on past it
@@ -914,31 +930,7 @@ export class HTMLParser {
             } else if (attrEnd > MAX_ATTR_PARSE_LENGTH - 100) {
               // If the match ends near the limit, a quoted value might be truncated,
               // so extract the attribute manually
-              const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
-              if (manualMatch) {
-                const quoteChar = searchStr[manualMatch[0].length];
-                if (quoteChar === '"' || quoteChar === "'") {
-                  const closeQuote = searchStr.indexOf(quoteChar, manualMatch[0].length + 1);
-                  if (closeQuote !== -1) {
-                    const fullAttrLen = closeQuote + 1;
-
-                    attr = [];
-                    attr[0] = searchStr.substring(0, fullAttrLen);
-                    attr[baseIndex] = manualMatch[1]; // Attribute name
-                    attr[baseIndex + 1] = '='; // `customAssign` (falls back to "=" for huge attributes)
-                    const value = searchStr.substring(manualMatch[0].length + 1, closeQuote);
-                    if (quoteChar === '"') {
-                      attr[baseIndex + 2] = value; // Double-quoted value
-                    } else {
-                      attr[baseIndex + 3] = value; // Single-quoted value
-                    }
-                    currentPos += fullAttrLen;
-                    consumed += fullAttrLen;
-                    match.attrs.push(attr);
-                    continue;
-                  }
-                }
-              }
+              attr = readLongQuotedAttr(currentPos, searchStr) ?? attr;
             } else if (attr[baseIndex + 1] === undefined) {
               // If attr has no value assign but `=` follows in `fullHtml`,
               // the value would be cut off—reset to trigger manual extraction below
@@ -952,36 +944,7 @@ export class HTMLParser {
           if (!attr) {
             // If input was limited and there’s no match, a quoted value may exceed
             // `MAX_ATTR_PARSE_LENGTH`, so try manual extraction
-            const manualMatch = searchStr.match(/^\s*([^\s"'<>/=]+)\s*=\s*/);
-            if (manualMatch) {
-              const quoteChar = searchStr[manualMatch[0].length];
-              if (quoteChar === '"' || quoteChar === "'") {
-                // Search in the full HTML (not limited substring) for closing quote
-                const closeQuote = fullHtml.indexOf(quoteChar, currentPos + manualMatch[0].length + 1);
-                if (closeQuote !== -1) {
-                  const fullAttrLen = closeQuote - currentPos + 1;
-                  const numCustomParts = handler.customAttrSurround
-                    ? handler.customAttrSurround.length * NCP
-                    : 0;
-                  const baseIndex = 1 + numCustomParts;
-
-                  attr = [];
-                  attr[0] = fullHtml.substring(currentPos, closeQuote + 1);
-                  attr[baseIndex] = manualMatch[1]; // Attribute name
-                  attr[baseIndex + 1] = '='; // `customAssign`
-                  const value = fullHtml.substring(currentPos + manualMatch[0].length + 1, closeQuote);
-                  if (quoteChar === '"') {
-                    attr[baseIndex + 2] = value; // Double-quoted value
-                  } else {
-                    attr[baseIndex + 3] = value; // Single-quoted value
-                  }
-                  currentPos += fullAttrLen;
-                  consumed += fullAttrLen;
-                  match.attrs.push(attr);
-                  continue;
-                }
-              }
-            }
+            attr = readLongQuotedAttr(currentPos, searchStr);
           }
         }
 
@@ -1024,13 +987,13 @@ export class HTMLParser {
       return -1;
     }
 
-    function parseEndTagAt(/** @type {number} */ stackIndex) {
+    function parseEndTagAt(/** @type {number} */ stackIndex, autoGenerated = true) {
       // Close all open elements up to `stackIndex` (mirrors `parseEndTag`’s core branch);
       // `end` handlers are synchronous—invoked without awaiting, as in `parseEndTag`
       for (let i = stack.length - 1; i >= stackIndex; i--) {
         const entry = /** @type {NonNullable<(typeof stack)[number]>} */ (stack[i]);
         if (handler.end) {
-          handler.end(entry.tag, entry.attrs, true);
+          handler.end(entry.tag, entry.attrs, autoGenerated);
         }
       }
       stack.length = stackIndex;
@@ -1242,23 +1205,14 @@ export class HTMLParser {
     // Closes the foreign elements open down to the nearest HTML element or
     // integration point, writing their end tags so that an SVG stays well-formed
     // for SVGO (none of them is an HTML `p`, so none can hold a table). This
-    // repeats the closing loop of `parseEndTag`, as sharing it costs that
-    // hot function about 1%.
+    // doesn’t share the closing loop of `parseEndTag`, as that costs the hot
+    // function about 1%.
     function closeForeignContent() {
       let stackIndex = stack.length;
       while (stackIndex && namespaceInside(stack[stackIndex - 1])) {
         stackIndex--;
       }
-      for (let i = stack.length - 1; i >= stackIndex; i--) {
-        if (handler.end) {
-          const entry = stack[i];
-          handler.end(entry?.tag, entry?.attrs, false, '', false);
-        }
-      }
-      stack.length = stackIndex;
-      stackVersion++;
-      lastTag = stackIndex ? (stack[stackIndex - 1]?.tag ?? '') : '';
-      lastTagLower = stackIndex ? (stack[stackIndex - 1]?.lowerTag ?? '') : '';
+      parseEndTagAt(stackIndex, false);
     }
 
     function parseEndTag(/** @type {string} */ tag, /** @type {string} */ tagName) {
