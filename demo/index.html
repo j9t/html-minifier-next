@@ -10,7 +10,7 @@
 		<h1>HTML Minifier Next <span id="minifier-version"></span></h1>
 		<main x-data="minifier" x-cloak>
 			<div class="workspace">
-				<textarea rows="10" cols="40" id="input" x-ref="input" x-model="input" x-show="!inputMarked" @blur="showInputView()" aria-label="Markup to minify"></textarea>
+				<textarea rows="10" cols="40" id="input" x-ref="input" x-model="input" x-show="!inputMarked" @focus="editingInput = true" @blur="showInputView()" aria-label="Markup to minify"></textarea>
 				<pre id="input-view" x-ref="inputView" role="region" aria-label="Markup to minify, invisible characters marked; select to edit" tabindex="0" x-show="inputMarked" x-html="annotatedInput" @pointerdown="_pointerOnInputView = true" @focus="_pointerOnInputView || editInput()" @click="editInput($event)" @blur="_pointerOnInputView = false"></pre>
 				<div class="alt">
 					<button type="button" @click="minify()">Minify</button>
