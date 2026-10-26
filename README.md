@@ -256,6 +256,8 @@ Where the modifiers disagree, the preserving one wins—`conservativeCollapse` a
 
 Regardless of these options, whitespace at the start and end of the output goes, and so do lines that a removed comment or tag leaves with nothing but whitespace (blank lines of the source stay). Whitespace stays, however, where it’s kept verbatim (in `pre` or `textarea`, or in `pre`, `textarea`, or `script` content left open at the end), next to custom fragments where their handling keeps it (see `trimCustomFragments`), at either end of partial markup (cf. `partialMarkup`), and where `conservativeCollapse` or `preserveLineBreaks` keep it.
 
+Note: `preserveLineBreaks` keeps line breaks, not indentation. HTML Minifier Next doesn’t format: To keep the source formatting, leave `collapseWhitespace` off (as in the first row of the table above). Line breaks and indentation then stay as written, while other options still apply.
+
 ### Sorting attributes and style classes
 
 `sortAttributes` and `sortClassNames` reorder attributes and class names by frequency, so that repeated markup looks more alike. This doesn’t change the plain-text size of the output, only how well it compresses: `sortAttributes` makes Gzip and Brotli output slightly smaller on average, though not on every page (see [“Optimizing for compression”](#optimizing-for-compression)); `sortClassNames` doesn’t help, and alongside `sortAttributes` cancels most of its gain with Brotli.
