@@ -181,7 +181,8 @@ describe('Demo', () => {
     test('Marked text reads back as the original, so that offsets in the view match the input’s', () => {
       const str = '<p title="a\u00A0b">x &amp;\u00AD y\u200B\u0007</p>\n\u{1D54F}';
       const text = annotateInvisibles(str)
-        .replace(/<[^>]+>/g, '')
+        .replace(/<span class="invisible(?: zero-width)?" title="[^"]+"(?: data-marker="[^"]+")?>/g, '')
+        .replace(/<\/span>/g, '')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
         .replace(/&amp;/g, '&');
