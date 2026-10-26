@@ -56,7 +56,7 @@ const RE_INVISIBLE = new RegExp(`[${CONTROLS}${classOf(SPACES.keys())}${classOf(
 
 /**
  * Wrap every invisible character in a span that names it, keeping the character itself so
- * that the marked-up text still copies as what it is
+ * that offsets in the marked-up text match those in the original
  *
  * @param {unknown} str
  * @returns {string}
@@ -71,6 +71,8 @@ export const annotateInvisibles = (str) => {
     }
 
     const [name, marker] = ZERO_WIDTH.get(char) ?? ['CONTROL CHARACTER', codePoint(char)];
-    return `<span class="invisible zero-width" title="${codePoint(char)} ${name}" data-marker="${marker}">${char}</span>`;
+    // HTML parsing drops `U+0000`, so a zero-width space holds its place to keep offsets in view
+    const content = char === '\u0000' ? '\u200B' : char;
+    return `<span class="invisible zero-width" title="${codePoint(char)} ${name}" data-marker="${marker}">${content}</span>`;
   });
 };

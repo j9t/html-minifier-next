@@ -235,6 +235,23 @@ const loadStateFromUrl = () => {
   return decodeState(hash);
 };
 
+// Where a selection in a marked view starts and ends in its text, which is the text it marks
+const selectionIn = (view) => {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || !view.contains(selection.anchorNode) || !view.contains(selection.focusNode)) return null;
+
+  const offsetOf = (node, offset) => {
+    const range = document.createRange();
+    range.selectNodeContents(view);
+    range.setEnd(node, offset);
+    return range.toString().length;
+  };
+
+  const anchor = offsetOf(selection.anchorNode, selection.anchorOffset);
+  const focus = offsetOf(selection.focusNode, selection.focusOffset);
+  return [Math.min(anchor, focus), Math.max(anchor, focus), anchor > focus ? 'backward' : 'forward'];
+};
+
 const updateUrlWithState = (input, options, showInvisibles) => {
   const encoded = encodeState({ input, options, defaultOptions, showInvisibles });
   const url = `${window.location.origin}${window.location.pathname}#${encoded}`;
@@ -252,6 +269,8 @@ const minifierData = () => ({
   input: '',
   output: '',
   showInvisibles: false,
+  editingInput: false,
+  _pointerOnInputView: false,
   copied: '',
   stats: {
     result: '',
@@ -261,9 +280,46 @@ const minifierData = () => ({
   _shareTimeout: null,
   _copiedTimeout: null,
 
-  // Output with every invisible character marked, for the “Show invisibles” view
+  // Input and output with every invisible character marked, for the “Show invisibles” view
+  get annotatedInput() {
+    return annotateInvisibles(this.input);
+  },
+
   get annotatedOutput() {
     return annotateInvisibles(this.output);
+  },
+
+  // The marked input stands in for the textarea except while it is edited or empty
+  get inputMarked() {
+    return this.showInvisibles && !this.editingInput && this.input !== '';
+  },
+
+  // Swap the marked input for the textarea, keeping size, scroll position, and a clicked caret
+  editInput(event) {
+    const { input: textarea, inputView: view } = this.$refs;
+    const selection = event?.type === 'click' ? selectionIn(view) : null;
+    const { scrollTop } = view;
+
+    textarea.style.height = view.style.height;
+    this.editingInput = true;
+
+    this.$nextTick(() => {
+      textarea.focus();
+      if (selection) textarea.setSelectionRange(...selection);
+      textarea.scrollTop = scrollTop;
+    });
+  },
+
+  showInputView() {
+    const { input: textarea, inputView: view } = this.$refs;
+    const { scrollTop } = textarea;
+
+    view.style.height = textarea.style.height;
+    this.editingInput = false;
+
+    this.$nextTick(() => {
+      view.scrollTop = scrollTop;
+    });
   },
 
   init() {
@@ -400,6 +456,15 @@ const minifierData = () => ({
         this._shareTimeout = null;
       }, 8000);
     }
+  },
+
+  // Copy a selection in a marked view as the text it marks, which browsers would alter
+  copyFromView(event, text) {
+    const selection = selectionIn(event.currentTarget);
+    if (!selection) return;
+
+    event.preventDefault();
+    event.clipboardData.setData('text/plain', text.slice(selection[0], selection[1]));
   },
 
   // Copy the minified markup itself, which the “Show invisibles” view marks up to show

@@ -174,8 +174,26 @@ describe('Demo', () => {
       );
     });
 
+    test('A null character, which HTML parsing drops, keeps its place as a zero-width space', () => {
+      assert.strictEqual(
+        annotateInvisibles('a\u0000b'),
+        'a<span class="invisible zero-width" title="U+0000 CONTROL CHARACTER" data-marker="U+0000">\u200B</span>b'
+      );
+    });
+
     test('Characters outside the BMP pass through whole', () => {
       assert.strictEqual(annotateInvisibles('\u{1D54F}'), '\u{1D54F}');
+    });
+
+    test('Marked text reads back as the original, so that offsets in the view match the input’s', () => {
+      const str = '<p title="a\u00A0b">x &amp;\u00AD y\u200B\u0007</p>\n\u{1D54F}';
+      const text = annotateInvisibles(str)
+        .replace(/<span class="invisible(?: zero-width)?" title="[^"]+"(?: data-marker="[^"]+")?>/g, '')
+        .replace(/<\/span>/g, '')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&');
+      assert.strictEqual(text, str);
     });
 
     test('Anything but a string is taken as empty', () => {
