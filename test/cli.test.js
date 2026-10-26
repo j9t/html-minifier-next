@@ -1245,6 +1245,13 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.strictEqual(result.stderr, '');
   });
 
+  test('Ends `--help` with the project link', async () => {
+    const result = await execCliWithStderr(['--help']);
+
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.stdout.endsWith('HTML Minifier Next documentation: https://meiert.com/hmn'));
+  });
+
   test('Does not show the progress indicator in a non-TTY environment', async () => {
     await fs.promises.mkdir(path.resolve(dirSandbox(), 'tmp'), { recursive: true });
     await fs.promises.writeFile(path.resolve(dirSandbox(), 'tmp/test1.html'), '<html><body><h1>Test</h1></body></html>');

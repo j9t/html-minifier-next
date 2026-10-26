@@ -212,7 +212,7 @@ program.option('-i --input <file>', 'Specify input file (alternative to position
 program.option('-o --output <file>', 'Specify output file (reads from `--input` file argument or STDIN; outputs to STDOUT if not specified)');
 program.option('-v --verbose', 'Show detailed processing information (active options, worker thread count, file statistics, and minifier warnings)');
 program.option('-d --dry', 'Dry run: Process and report statistics without writing output');
-program.addHelpText('after', '\nBoolean options support a `--no-<flag>` form to disable them, overriding a preset or config file (e.g., `--preset=comprehensive --no-collapse-whitespace`).');
+program.addHelpText('after', '\nBoolean options support a `--no-<flag>` form to disable them, overriding a preset or config file (e.g., `--preset=comprehensive --no-collapse-whitespace`).\n\nHTML Minifier Next documentation: https://meiert.com/hmn');
 
 // Lazy import wrapper for HMN
 /** @type {Promise<typeof import('./src/htmlminifier.js').minify> | undefined} */
