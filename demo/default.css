@@ -72,6 +72,7 @@ button {
 }
 
 textarea + p,
+#input-view,
 #output-view {
 	margin-top: 0;
 }
@@ -138,6 +139,7 @@ code {
 }
 
 #input,
+#input-view,
 #output,
 #output-view {
 	/* Set explicitly, as form controls take neither the page’s font nor its box model */
@@ -155,6 +157,7 @@ code {
 	width: 100%;
 }
 
+#input-view,
 #output-view {
 	overflow: auto;
 	overflow-wrap: anywhere;
