@@ -174,6 +174,13 @@ describe('Demo', () => {
       );
     });
 
+    test('A null character, which HTML parsing drops, keeps its place as a zero-width space', () => {
+      assert.strictEqual(
+        annotateInvisibles('a\u0000b'),
+        'a<span class="invisible zero-width" title="U+0000 CONTROL CHARACTER" data-marker="U+0000">\u200B</span>b'
+      );
+    });
+
     test('Characters outside the BMP pass through whole', () => {
       assert.strictEqual(annotateInvisibles('\u{1D54F}'), '\u{1D54F}');
     });

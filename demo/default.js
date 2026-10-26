@@ -458,6 +458,15 @@ const minifierData = () => ({
     }
   },
 
+  // Copy a selection in a marked view as the text it marks, which browsers would alter
+  copyFromView(event, text) {
+    const selection = selectionIn(event.currentTarget);
+    if (!selection) return;
+
+    event.preventDefault();
+    event.clipboardData.setData('text/plain', text.slice(selection[0], selection[1]));
+  },
+
   // Copy the minified markup itself, which the “Show invisibles” view marks up to show
   async copyOutput() {
     if (!this.output) return;
