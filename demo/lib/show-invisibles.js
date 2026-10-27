@@ -68,6 +68,8 @@ const RE_INVISIBLE = /((?<![^\n\r\u2028\u2029])[\t ]+)| {2,}|(?![ \n\r\p{Variati
 
 const RE_CONTROL = /\p{Cc}/u;
 
+const PLACEHELD = new Set(['\u0000', '\u2066', '\u2067', '\u2068', '\u2069']);
+
 /**
  * Wrap every invisible character in a span that names it, keeping the character itself so
  * that offsets in the marked-up text match those in the original
@@ -92,8 +94,9 @@ export const annotateInvisibles = (str) => {
 
     const [name, marker] = ZERO_WIDTH.get(char) ??
       [RE_CONTROL.test(char) ? 'CONTROL CHARACTER' : 'INVISIBLE CHARACTER', codePoint(char)];
-    // HTML parsing drops `U+0000`, so a zero-width space holds its place to keep offsets in view
-    const content = char === '\u0000' ? '\u200B' : char;
+    // HTML parsing drops `U+0000`, and bidi isolates would pair with those of the view,
+    // so a zero-width space holds their place to keep offsets in view
+    const content = PLACEHELD.has(char) ? '\u200B' : char;
     return `<span class="invisible zero-width" title="${codePoint(char)} ${name}" data-marker="${marker}">${content}</span>`;
   });
 };

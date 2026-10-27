@@ -171,9 +171,9 @@ describe('Demo', () => {
 
     test('Indentation after a line or paragraph separator is not marked', () => {
       assert.strictEqual(
-        annotateInvisibles('a   b \t  c'),
-        'a<span class="invisible zero-width" title="U+2028 LINE SEPARATOR" data-marker="LS"> </span>  b' +
-        '<span class="invisible zero-width" title="U+2029 PARAGRAPH SEPARATOR" data-marker="PS"> </span>\t  c'
+        annotateInvisibles('a\u2028  b\u2029\t  c'),
+        'a<span class="invisible zero-width" title="U+2028 LINE SEPARATOR" data-marker="LS">\u2028</span>  b' +
+        '<span class="invisible zero-width" title="U+2029 PARAGRAPH SEPARATOR" data-marker="PS">\u2029</span>\t  c'
       );
     });
 
@@ -215,6 +215,14 @@ describe('Demo', () => {
       assert.strictEqual(
         annotateInvisibles('a\u202Eb'),
         'a<span class="invisible zero-width" title="U+202E RIGHT-TO-LEFT OVERRIDE" data-marker="RLO">\u202E</span>b'
+      );
+    });
+
+    test('A bidi isolate control keeps its place as a zero-width space, so as not to pair with the view’s isolates', () => {
+      assert.strictEqual(
+        annotateInvisibles('a\u2067b\u2069c'),
+        'a<span class="invisible zero-width" title="U+2067 RIGHT-TO-LEFT ISOLATE" data-marker="RLI">\u200B</span>b' +
+        '<span class="invisible zero-width" title="U+2069 POP DIRECTIONAL ISOLATE" data-marker="PDI">\u200B</span>c'
       );
     });
 
