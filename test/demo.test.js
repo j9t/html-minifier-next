@@ -143,8 +143,17 @@ describe('Demo', () => {
       assert.strictEqual(annotateInvisibles('<p>a & b</p>'), '&lt;p&gt;a &amp; b&lt;/p&gt;');
     });
 
-    test('Ordinary spaces, tabs, and line breaks stay as they are', () => {
-      assert.strictEqual(annotateInvisibles('a \tb\nc'), 'a \tb\nc');
+    test('Single spaces, tabs, and line breaks stay as they are', () => {
+      assert.strictEqual(annotateInvisibles('a b \tc\nd'), 'a b \tc\nd');
+    });
+
+    test('A run of spaces within a line is marked space by space, so that it can be counted', () => {
+      const space = '<span class="invisible space" title="U+0020 SPACE"> </span>';
+      assert.strictEqual(annotateInvisibles('a  b   '), `a${space.repeat(2)}b${space.repeat(3)}`);
+    });
+
+    test('Indentation, a run that opens a line, is not marked', () => {
+      assert.strictEqual(annotateInvisibles('  a\n    b\n\t  c'), '  a\n    b\n\t  c');
     });
 
     test('A no-break space is marked, keeping the character itself', () => {
@@ -186,9 +195,9 @@ describe('Demo', () => {
     });
 
     test('Marked text reads back as the original, so that offsets in the view match the input’s', () => {
-      const str = '<p title="a\u00A0b">x &amp;\u00AD y\u200B\u0007</p>\n\u{1D54F}';
+      const str = '<p title="a\u00A0b">x &amp;\u00AD y\u200B\u0007  \u202F</p>\n  \u{1D54F}';
       const text = annotateInvisibles(str)
-        .replace(/<span class="invisible(?: zero-width)?" title="[^"]+"(?: data-marker="[^"]+")?>/g, '')
+        .replace(/<span class="invisible(?: [a-z-]+)?" title="[^"]+"(?: data-marker="[^"]+")?>/g, '')
         .replace(/<\/span>/g, '')
         .replace(/&lt;/g, '<')
         .replace(/&gt;/g, '>')
