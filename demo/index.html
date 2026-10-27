@@ -20,7 +20,7 @@
 				<div class="form-group">
 					<input type="checkbox" id="show-invisibles" x-model="showInvisibles">
 					<label for="show-invisibles">Show <i>invisibles</i></label>
-					<span class="quiet">Mark no-break spaces, soft hyphens, and other characters that input and output do not show</span>
+					<span class="quiet">Mark runs of spaces (“·”), no-break spaces, soft hyphens, and other characters that input and output do not show</span>
 				</div>
 				<textarea rows="10" cols="40" id="output" readonly x-model="output" x-show="!showInvisibles" aria-label="Minified markup"></textarea>
 				<pre id="output-view" role="region" aria-label="Minified markup, invisible characters marked" tabindex="0" x-show="showInvisibles" x-html="annotatedOutput" @copy="copyFromView($event, output)"></pre>

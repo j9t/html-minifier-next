@@ -79,7 +79,7 @@ textarea + p,
 
 i,
 .invisible {
-	background: #ff0;
+	background: #ffc000;
 }
 
 i {
@@ -121,6 +121,22 @@ code {
 
 .invisible {
 	border-radius: 2px;
+}
+
+.invisible.space {
+	background: none;
+	position: relative;
+}
+
+/* Laid over the character, so as not to add width or be copied */
+.invisible.space::after {
+	color: #888;
+	content: '·';
+	content: '·' / '';
+	inset: 0;
+	pointer-events: none;
+	position: absolute;
+	text-align: center;
 }
 
 .invisible.zero-width::after {
