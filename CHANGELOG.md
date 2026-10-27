@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Changed
 
 * Added project reference to CLI `--help` output
-* Extended the web demo’s “Show invisibles” view to mark runs of spaces within a line, with a higher-contrast highlight
+* Extended the web demo’s “Show invisibles” view to mark runs of spaces and tabs within a line, bidi controls, and other Unicode whitespace and default-ignorable characters, with a higher-contrast highlight
 
 ## [9.1.0] - 2026-10-25
 

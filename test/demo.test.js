@@ -143,8 +143,15 @@ describe('Demo', () => {
       assert.strictEqual(annotateInvisibles('<p>a & b</p>'), '&lt;p&gt;a &amp; b&lt;/p&gt;');
     });
 
-    test('Single spaces, tabs, and line breaks stay as they are', () => {
-      assert.strictEqual(annotateInvisibles('a b \tc\nd'), 'a b \tc\nd');
+    test('Single spaces and line breaks stay as they are', () => {
+      assert.strictEqual(annotateInvisibles('a b c\nd\r\ne'), 'a b c\nd\r\ne');
+    });
+
+    test('A tab within a line is marked, so that it can be told from spaces', () => {
+      assert.strictEqual(
+        annotateInvisibles('a\tb'),
+        'a<span class="invisible" title="U+0009 CHARACTER TABULATION">\t</span>b'
+      );
     });
 
     test('A run of spaces within a line is marked space by space, so that it can be counted', () => {
@@ -154,7 +161,8 @@ describe('Demo', () => {
 
     test('A run of spaces after a tab within a line is marked', () => {
       const space = '<span class="invisible space" title="U+0020 SPACE"> </span>';
-      assert.strictEqual(annotateInvisibles('a\t  b'), `a\t${space.repeat(2)}b`);
+      const tab = '<span class="invisible" title="U+0009 CHARACTER TABULATION">\t</span>';
+      assert.strictEqual(annotateInvisibles('a\t  b'), `a${tab}${space.repeat(2)}b`);
     });
 
     test('Indentation, a run that opens a line, is not marked', () => {
@@ -203,12 +211,37 @@ describe('Demo', () => {
       );
     });
 
+    test('A bidi control is marked by name', () => {
+      assert.strictEqual(
+        annotateInvisibles('a\u202Eb'),
+        'a<span class="invisible zero-width" title="U+202E RIGHT-TO-LEFT OVERRIDE" data-marker="RLO">\u202E</span>b'
+      );
+    });
+
+    test('An unnamed default-ignorable character falls back to its code point', () => {
+      assert.strictEqual(
+        annotateInvisibles('\u3164'),
+        '<span class="invisible zero-width" title="U+3164 INVISIBLE CHARACTER" data-marker="U+3164">\u3164</span>'
+      );
+    });
+
+    test('An invisible character outside the BMP is marked whole', () => {
+      assert.strictEqual(
+        annotateInvisibles('\u{E0041}'),
+        '<span class="invisible zero-width" title="U+E0041 INVISIBLE CHARACTER" data-marker="U+E0041">\u{E0041}</span>'
+      );
+    });
+
+    test('Variation selectors, as in emoji, are not marked', () => {
+      assert.strictEqual(annotateInvisibles('\u2764\uFE0F \u845B\u{E0100}'), '\u2764\uFE0F \u845B\u{E0100}');
+    });
+
     test('Characters outside the BMP pass through whole', () => {
       assert.strictEqual(annotateInvisibles('\u{1D54F}'), '\u{1D54F}');
     });
 
     test('Marked text reads back as the original, so that offsets in the view match the input’s', () => {
-      const str = '<p title="a\u00A0b">x &amp;\u00AD y\u200B\u0007  \u202F</p>\n  \u{1D54F}';
+      const str = '<p title="a\u00A0b">x\t&amp;\u00AD y\u200B\u0007  \u202F\u202E\u{E0041}</p>\n  \u{1D54F}';
       const text = annotateInvisibles(str)
         .replace(/<span class="invisible(?: [a-z-]+)?" title="[^"]+"(?: data-marker="[^"]+")?>/g, '')
         .replace(/<\/span>/g, '')

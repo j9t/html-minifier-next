@@ -119,6 +119,12 @@ code {
 	color: #f00;
 }
 
+/* Isolated so that bidi controls reorder neither the text around them nor their markers */
+.invisible,
+.invisible.zero-width::after {
+	unicode-bidi: isolate;
+}
+
 .invisible {
 	border-radius: 2px;
 }
@@ -184,6 +190,10 @@ code {
 
 	main {
 		grid-template-columns: 3fr 2fr;
+	}
+
+	.quiet span {
+		display: none;
 	}
 
 }
