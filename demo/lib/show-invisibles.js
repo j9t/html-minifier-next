@@ -55,7 +55,8 @@ const codePoint = (char) => `U+${(char.codePointAt(0) ?? 0).toString(16).toUpper
 /** @param {Iterable<string>} chars */
 const classOf = (chars) => [...chars].map(char => `\\u${(char.codePointAt(0) ?? 0).toString(16).padStart(4, '0')}`).join('');
 
-const RE_INVISIBLE = new RegExp(`(?<=[^\\n\\t ]) {2,}|[${CONTROLS}${classOf(SPACES.keys())}${classOf(ZERO_WIDTH.keys())}]`, 'g');
+// Indentation is matched first so that the runs of spaces left are those within a line
+const RE_INVISIBLE = new RegExp(`((?<![^\\n\\r\\u2028\\u2029])[\\t ]+)| {2,}|[${CONTROLS}${classOf(SPACES.keys())}${classOf(ZERO_WIDTH.keys())}]`, 'g');
 
 /**
  * Wrap every invisible character in a span that names it, keeping the character itself so
@@ -67,7 +68,9 @@ const RE_INVISIBLE = new RegExp(`(?<=[^\\n\\t ]) {2,}|[${CONTROLS}${classOf(SPAC
 export const annotateInvisibles = (str) => {
   if (typeof str !== 'string') return '';
 
-  return escapeHtml(str).replace(RE_INVISIBLE, (char) => {
+  return escapeHtml(str).replace(RE_INVISIBLE, (char, indentation) => {
+    if (indentation) return char;
+
     if (char[0] === ' ') {
       return '<span class="invisible space" title="U+0020 SPACE"> </span>'.repeat(char.length);
     }

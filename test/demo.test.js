@@ -152,8 +152,21 @@ describe('Demo', () => {
       assert.strictEqual(annotateInvisibles('a  b   '), `a${space.repeat(2)}b${space.repeat(3)}`);
     });
 
+    test('A run of spaces after a tab within a line is marked', () => {
+      const space = '<span class="invisible space" title="U+0020 SPACE"> </span>';
+      assert.strictEqual(annotateInvisibles('a\t  b'), `a\t${space.repeat(2)}b`);
+    });
+
     test('Indentation, a run that opens a line, is not marked', () => {
-      assert.strictEqual(annotateInvisibles('  a\n    b\n\t  c'), '  a\n    b\n\t  c');
+      assert.strictEqual(annotateInvisibles('  a\n    b\n\t  c\r  d'), '  a\n    b\n\t  c\r  d');
+    });
+
+    test('Indentation after a line or paragraph separator is not marked', () => {
+      assert.strictEqual(
+        annotateInvisibles('a   b \t  c'),
+        'a<span class="invisible zero-width" title="U+2028 LINE SEPARATOR" data-marker="LS"> </span>  b' +
+        '<span class="invisible zero-width" title="U+2029 PARAGRAPH SEPARATOR" data-marker="PS"> </span>\t  c'
+      );
     });
 
     test('A no-break space is marked, keeping the character itself', () => {
