@@ -2479,6 +2479,23 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: ['<span hidden>'] }), output);
   });
 
+  test('Warns about `removeEmptyElementsExcept` values it cannot use, and skips them', async () => {
+    const input = '<div>x<td></td><span></span></div>';
+    let logs;
+    const log = message => String(message).startsWith('Warning') && logs.push(String(message));
+
+    logs = [];
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: 'td', log }), '<div>x</div>');
+    assert.deepStrictEqual(logs, ['Warning: `removeEmptyElementsExcept` option must be an array, received: string']);
+
+    logs = [];
+    assert.strictEqual(await minify(input, { removeEmptyElements: true, removeEmptyElementsExcept: [42, '<>', 'td'], log }), '<div>x<td></td></div>');
+    assert.deepStrictEqual(logs, [
+      'Warning: `removeEmptyElementsExcept` specification must be a string, received: number',
+      'Warning: Unable to parse `removeEmptyElementsExcept` specification: “<>”'
+    ]);
+  });
+
   test('Collapses boolean attributes', async () => {
     let input, output;
 
@@ -2983,6 +3000,11 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), input);
 
     output = '<table><tbody></table>';
+    assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
+
+    // A `tbody` start tag closes an open `tfoot`, as in tables from when `tfoot` came first
+    input = '<table><tfoot><tr><td>foo</td></tr></tfoot><tbody><tr><td>bar</td></tr></tbody></table>';
+    output = '<table><tfoot><tr><td>foo<tbody><tr><td>bar</table>';
     assert.strictEqual(await minify(input, { removeOptionalTags: true }), output);
   });
 
@@ -4871,6 +4893,19 @@ describe('HTML', () => {
       assert.strictEqual(await minify(input, { collapseWhitespace: true }), input.replace(/<!-- htmlmin:ignore -->/g, ''));
     }
     assert.strictEqual(await minify('<p>\n<script></script>\nb</p>', { collapseWhitespace: true, conservativeCollapse: true }), '<p> <script></script> b</p>');
+
+    // The same with `maxLineLength`, which writes each attribute as an entry of its own
+    for (const input of ['<div class="a"><link rel="x"> b</div>', '<p class="a"><meta name="x" content="y"> b</p>', '<div><link rel="x" href="y"> b</div>']) {
+      assert.strictEqual(await minify(input, { collapseWhitespace: true, maxLineLength: 1000 }), input.replace('> b<', '>b<'));
+    }
+    assert.strictEqual(await minify('<p><img src="a" alt="b"> <link rel="x"> c</p>', { collapseWhitespace: true, maxLineLength: 1000 }), '<p><img src="a" alt="b"><link rel="x"> c</p>');
+
+    // At the end of the document, nothing follows that would render pending whitespace
+    assert.strictEqual(await minify('a <link rel="x">', { collapseWhitespace: true }), 'a<link rel="x">');
+    assert.strictEqual(await minify('a <script></script>', { collapseWhitespace: true }), 'a<script></script>');
+    assert.strictEqual(await minify('a <link rel="x">', { collapseWhitespace: true, conservativeCollapse: true }), 'a <link rel="x">');
+    // Also after an SVG block that SVGO rewrites, which shortens what came before
+    assert.strictEqual(await minify('<svg><rect width="1"/><rect width="2"/></svg>a <link rel="x">', { collapseWhitespace: true, minifySVG: true }), '<svg><rect width="1"/><rect width="2"/></svg>a<link rel="x">');
   });
 
   test('Keeps elements that don’t close `p` inside it', async () => {
@@ -5657,6 +5692,10 @@ describe('HTML', () => {
     input = '<meta name="viewport" content="width=device-width, initial-scale=1.0001, maximum-scale=3.140000">';
     output = '<meta name="viewport" content="width=device-width,initial-scale=1.0001,maximum-scale=3.14">';
     assert.strictEqual(await minify(input), output);
+
+    // Only on `meta`, as `content` on other elements (e.g., RDFa) means something else
+    input = '<span name="viewport" content="width=device-width, initial-scale=1.0"></span>';
+    assert.strictEqual(await minify(input), input);
   });
 
   test('Handles `noscript`', async () => {
@@ -6244,6 +6283,14 @@ describe('HTML', () => {
     output = '<span class="{{sprite}}"></span>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/{{.*?}}/], removeAttributeQuotes: true, sortClassNames: true }), output);
 
+    // A fragment sorted away from the start stays apart from the class before it, with or
+    // without `collapseWhitespace`, so it can’t render into that class
+    for (const options of [{}, { collapseWhitespace: true }]) {
+      assert.strictEqual(await minify('<p class="{{x}} b a"></p>', { ...options, ignoreCustomFragments: [/{{.*?}}/], sortClassNames: true }), '<p class="a {{x}} b"></p>');
+      assert.strictEqual(await minify('<p class="{{x}}z b a"></p>', { ...options, ignoreCustomFragments: [/{{.*?}}/], sortClassNames: true }), '<p class="a b {{x}}z"></p>');
+      assert.strictEqual(await minify('<p class="{{x}}  b a"></p>', { ...options, ignoreCustomFragments: [/{{.*?}}/], sortClassNames: true }), options.collapseWhitespace ? '<p class="a {{x}} b"></p>' : '<p class="a {{x}}  b"></p>');
+    }
+
     input = '<div class></div>';
     assert.strictEqual(await minify(input, { sortClassNames: false }), input);
     assert.strictEqual(await minify(input, { sortClassNames: true }), input);
@@ -6266,6 +6313,11 @@ describe('HTML', () => {
     // occurrences are covered under `a` and `b`, so `d e c` is ordered within `d`’s list
     input = '<a class="c b a"></a><a class="c b a"></a><a class="c b a"></a><b class="a d"></b><i class="d c e"></i><s class="e d b"></s>';
     output = '<a class="a b c"></a><a class="a b c"></a><a class="a b c"></a><b class="a d"></b><i class="d e c"></i><s class="b d e"></s>';
+    assert.strictEqual(await minify(input, { sortClassNames: true }), output);
+
+    // A class name that looks like a comment counts like any other
+    input = '<p class="z <!--c-->"></p><p class="<!--c--> y"></p><p class="y z <!--c-->"></p>';
+    output = '<p class="<!--c--> z"></p><p class="<!--c--> y"></p><p class="<!--c--> y z"></p>';
     assert.strictEqual(await minify(input, { sortClassNames: true }), output);
   });
 
@@ -6521,6 +6573,10 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), output);
 
     input = '<meta http-equiv="content-security-policy" content="default-src \'self\'; img-src https://*;">';
+    assert.strictEqual(await minify(input), input);
+
+    // Only on `meta`
+    input = '<span http-equiv="content-security-policy" content="default-src \'self\';\n\timg-src https://*;"></span>';
     assert.strictEqual(await minify(input), input);
   });
 

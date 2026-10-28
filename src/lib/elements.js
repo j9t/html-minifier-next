@@ -159,10 +159,6 @@ function canRemoveElement(tag, attrs) {
  * @returns {{tag: string, attrs: Object.<string, string|undefined>|null}|null} Parsed spec or null if invalid
  */
 function parseElementSpec(str, options) {
-  if (typeof str !== 'string') {
-    return null;
-  }
-
   const trimmed = str.trim();
   if (!trimmed) {
     return null;
@@ -210,21 +206,15 @@ function parseElementSpec(str, options) {
  * @returns {Array<{tag: string, attrs: Object.<string, string|undefined>|null}>} Array of parsed element specs
  */
 function parseRemoveEmptyElementsExcept(input, options) {
-  if (!Array.isArray(input)) {
-    return [];
-  }
-
   return /** @type {Array<{tag: string, attrs: {[x: string]: string | undefined} | null}>} */ (input.map(item => {
     if (typeof item === 'string') {
       const spec = parseElementSpec(item, options);
-      if (!spec && options.log) {
+      if (!spec) {
         options.log('Warning: Unable to parse `removeEmptyElementsExcept` specification: “' + item + '”');
       }
       return spec;
     }
-    if (options.log) {
-      options.log('Warning: `removeEmptyElementsExcept` specification must be a string, received: ' + typeof item);
-    }
+    options.log('Warning: `removeEmptyElementsExcept` specification must be a string, received: ' + typeof item);
     return null;
   }).filter(Boolean));
 }

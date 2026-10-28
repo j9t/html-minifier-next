@@ -102,7 +102,7 @@ function stripJsonWhitespace(text) {
 // as serializing the parsed value would change some values (e.g., large numbers)
 /**
  * @param {string} text
- * @param {{continueOnMinifyError?: boolean, log?: Function}} options
+ * @param {{continueOnMinifyError?: boolean, log: Function}} options
  */
 function minifyJson(text, options) {
   try {
@@ -113,7 +113,7 @@ function minifyJson(text, options) {
     if (!options.continueOnMinifyError) {
       throw err;
     }
-    options.log && options.log(err);
+    options.log(err);
     return text;
   }
 }
