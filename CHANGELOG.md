@@ -4,12 +4,18 @@ As of version 2.0.0, all notable changes to HTML Minifier Next (HMN) are documen
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [9.1.1] - 2026-10-28
+
+### Fixed
+
+* Fixed `sortClassNames` joining a custom fragment that starts a class list to the class sorted before it when `collapseWhitespace` is off (e.g., `class="{{x}} b a"` → `class="a{{x}} b"`, now `class="a {{x}} b"`)
+* Fixed `sortClassNames` leaving class names that look like comments (e.g., `<!--x-->`) out of its frequency count, which sorted them last
 
 ### Changed
 
 * Added project reference to CLI `--help` output
 * Extended the web demo’s “Show invisibles” view to mark runs of spaces and tabs within a line, bidi controls, and other Unicode whitespace and default-ignorable characters, with a higher-contrast highlight
+* Refactored internals to remove dead code
 
 ## [9.1.0] - 2026-10-25
 

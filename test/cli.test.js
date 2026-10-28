@@ -328,6 +328,34 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(cliMinifiedHTML.includes('<web-component>X</web-component><web-component>Y</web-component>'));
   });
 
+  test('Handles regular expression arrays (`ignore-custom-comments`, `ignore-custom-fragments`)', async () => {
+    const input = '<!-- Keep me --><!-- drop me --><p>  {{ a   b }}  </p>';
+
+    const minifyOptions = {
+      collapseWhitespace: true,
+      ignoreCustomComments: [/^ keep/i],
+      ignoreCustomFragments: [/{{.*?}}/],
+      removeComments: true
+    };
+
+    const cliArguments = [
+      '--collapse-whitespace',
+      '--ignore-custom-comments=["/^ keep/i"]',
+      '--ignore-custom-fragments=["{{.*?}}"]',
+      '--remove-comments'
+    ];
+
+    const { stdout, stderr, status } = await spawnCli(cliArguments, { input });
+    assert.strictEqual(status, 0, stderr.toString());
+    const cliMinifiedHTML = stdout.toString();
+    assert.strictEqual(cliMinifiedHTML, await minify(input, minifyOptions));
+
+    // Both lists took effect: The matching comment and the fragment’s inner whitespace stay
+    assert.ok(cliMinifiedHTML.includes('<!-- Keep me -->'));
+    assert.ok(!cliMinifiedHTML.includes('drop me'));
+    assert.ok(cliMinifiedHTML.includes('{{ a   b }}'));
+  });
+
   test('Processes files with a single extension', async () => {
     const cliArguments = [
       '--input-dir=./',

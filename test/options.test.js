@@ -125,22 +125,6 @@ describe('Options', () => {
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { preset: 'comprehensive' }), []);
     });
 
-    test('A minifier asked for but not loadable counts as absent', async () => {
-      // `minifyCSS` settles to a no-op when Lightning CSS cannot be loaded, and unused-CSS
-      // removal rides along with it—so the dependency is unmet even though the user set it
-      const logs = [];
-      const options = processOptions(
-        { minifyCSS: true, removeUnusedCSS: true, log: message => logs.push(String(message)) },
-        { getLightningCSS: undefined, cssMinifyCache: undefined }
-      );
-
-      assert.strictEqual(options.removeUnusedCSS, null, 'Removal should be switched off, not left to run without a minifier');
-      assert.ok(
-        logs.some(message => message.includes('`removeUnusedCSS`') && message.includes('`minifyCSS`')),
-        'Silently doing nothing would be the surprise, so it should warn'
-      );
-    });
-
     test('Cache sizes never warn—they configure a cache rather than transform markup', async () => {
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { cacheCSS: 300, cacheJS: 300, cacheSVG: 300 }), []);
     });

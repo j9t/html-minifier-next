@@ -852,10 +852,9 @@ function mergeConsecutiveScripts(html, hasMathML = false) {
  * @param {string} value
  * @param {ProcessedOptions} options
  * @param {string} uidIgnore
- * @param {string} uidAttr
  * @param {string[]} ignoredMarkupChunks
  */
-async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupChunks) {
+async function createSortFns(value, options, uidIgnore, ignoredMarkupChunks) {
   const attrChains = options.sortAttributes && typeof options.sortAttributes !== 'function' && Object.create(null);
   const classChain = options.sortClassNames && typeof options.sortClassNames !== 'function' && new TokenChain();
   const resolveName = options.name;
@@ -864,18 +863,6 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
     return attrs.map(function (attr) {
       return resolveName(attr.name);
     });
-  }
-
-  function shouldSkipUID(/** @type {string} */ token, /** @type {string} */ uid) {
-    return !uid || token.indexOf(uid) === -1;
-  }
-
-  function shouldKeepToken(/** @type {string} */ token) {
-    // Comments are UID placeholders from `htmlmin:ignore` and `ignoreCustomFragments`
-    if (token.startsWith('<!--') && token.endsWith('-->')) {
-      return false;
-    }
-    return shouldSkipUID(token, uidIgnore) && shouldSkipUID(token, uidAttr);
   }
 
   const whitespaceSplitPatternScan = /[ \t\n\f\r]+/;
@@ -894,12 +881,11 @@ async function createSortFns(value, options, uidIgnore, uidAttr, ignoredMarkupCh
           if (!attrChains[tagKey]) {
             attrChains[tagKey] = new TokenChain();
           }
-          const attrNamesList = attrNames(attrs).filter(shouldKeepToken);
-          attrChains[tagKey].add(attrNamesList);
+          attrChains[tagKey].add(attrNames(attrs));
         }
         for (const attr of attrs) {
           if (classChain && attr.value && resolveName(attr.name) === 'class') {
-            const classes = trimWhitespace(attr.value).split(whitespaceSplitPatternScan).filter(shouldKeepToken);
+            const classes = trimWhitespace(attr.value).split(whitespaceSplitPatternScan);
             classChain.add(classes);
           } else if (options.processScripts && attr.name.toLowerCase() === 'type') {
             currentTag = tag;
@@ -1205,12 +1191,10 @@ async function minifyHTML(value, options, partialMarkup) {
   /** @type {Array<{tag: string, attrs: {[x: string]: string | undefined} | null}>} */
   let removeEmptyElementsExcept;
   if (options.removeEmptyElementsExcept && !Array.isArray(options.removeEmptyElementsExcept)) {
-    if (options.log) {
-      options.log('Warning: `removeEmptyElementsExcept` option must be an array, received: ' + typeof options.removeEmptyElementsExcept);
-    }
+    options.log('Warning: `removeEmptyElementsExcept` option must be an array, received: ' + typeof options.removeEmptyElementsExcept);
     removeEmptyElementsExcept = [];
   } else {
-    removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept || [], options) || [];
+    removeEmptyElementsExcept = parseRemoveEmptyElementsExcept(options.removeEmptyElementsExcept || [], options);
   }
 
   // Temporarily replace ignored chunks with comments, so whatever they hold needn’t be parsed
@@ -1251,7 +1235,7 @@ async function minifyHTML(value, options, partialMarkup) {
   // markers, so frequency analysis can reach ignored content via UID tokens
   if ((options.sortAttributes && typeof options.sortAttributes !== 'function') ||
       (options.sortClassNames && typeof options.sortClassNames !== 'function')) {
-    await createSortFns(value, options, uidIgnore ?? '', uidAttr ?? '', ignoredMarkupChunks);
+    await createSortFns(value, options, uidIgnore ?? '', ignoredMarkupChunks);
   }
 
   const customFragments = (options.ignoreCustomFragments || []).map(toFragment);
@@ -2769,7 +2753,9 @@ async function minifyHTML(value, options, partialMarkup) {
           return match;
         }
         if (!options.collapseWhitespace) {
-          return chunks[0];
+          // The fragment took the whitespace around it along, so other whitespace here was
+          // written by the minifier (e.g., by sorting) and is needed where the fragment has none
+          return (chunks[1] ? '' : prefix.replace(RE_TABS, '')) + chunks[0] + (chunks[2] ? '' : suffix.replace(RE_TABS, ''));
         }
         const leading = chunks[1] ?? '';
         const trailing = chunks[2] ?? '';
@@ -2879,9 +2865,12 @@ function joinResultSegments(results, resultTags, markers, options, restoreCustom
  *   even if different `cacheCSS`/`cacheJS`/`cacheSVG` options are provided
  * - Invalid values (NaN, Infinity, negative) fall back to the default size (500)
  */
-/** @param {MinifierOptions} options */
+/**
+ * @param {MinifierOptions} options
+ * @returns {{cssMinifyCache: LRU, jsMinifyCache: LRU, svgMinifyCache: LRU}}
+ */
 function initCaches(options) {
-  if (!cssMinifyCache) {
+  if (!cssMinifyCache || !jsMinifyCache || !svgMinifyCache) {
     const defaultSize = 500;
 
     // Precedence: Options > env > default; non-finite and negative sizes fall back to the default
@@ -3027,9 +3016,9 @@ export const minify = async function (value, options) {
       getTerser,
       getSwc,
       getSvgo,
-      cssMinifyCache: caches.cssMinifyCache ?? undefined,
-      jsMinifyCache: caches.jsMinifyCache ?? undefined,
-      svgMinifyCache: caches.svgMinifyCache ?? undefined
+      cssMinifyCache: caches.cssMinifyCache,
+      jsMinifyCache: caches.jsMinifyCache,
+      svgMinifyCache: caches.svgMinifyCache
     });
     if (canMemoize) {
       const snapshot = snapshotValue(inputOptions, { budget: SNAPSHOT_MAX_NODES });

@@ -695,7 +695,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
         if (isThenable(result)) {
           return result.then(reEncode, (/** @type {Error} */ err) => {
             if (!options.continueOnMinifyError) throw err;
-            options.log && options.log(err);
+            options.log(err);
             return attrValue;
           });
         }
@@ -706,7 +706,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     if (isThenable(result)) {
       return result.catch((/** @type {Error} */ err) => {
         if (!options.continueOnMinifyError) throw err;
-        options.log && options.log(err);
+        options.log(err);
         return attrValue;
       });
     }
@@ -738,7 +738,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
         .then((/** @type {unknown} */ out) => typeof out === 'string' ? out : attrValue)
         .catch((/** @type {Error} */ err) => {
           if (!options.continueOnMinifyError) throw err;
-          options.log && options.log(err);
+          options.log(err);
           return attrValue;
         });
     }
@@ -766,7 +766,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
           })
           .catch((/** @type {Error} */ err) => {
             if (!options.continueOnMinifyError) throw err;
-            options.log && options.log(err);
+            options.log(err);
             return originalAttrValue;
           });
       }
@@ -827,7 +827,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
           .then((/** @type {unknown} */ result) => (typeof result === 'string' ? result : url) + descriptor)
           .catch((/** @type {Error} */ err) => {
             if (!options.continueOnMinifyError) throw err;
-            options.log && options.log(err);
+            options.log(err);
             return url + descriptor;
           });
       }
@@ -877,7 +877,7 @@ function cleanAttributeValue(tag, attrName, attrValue, options, attrs, minifyHTM
     if (isThenable(cssResult)) {
       return cssResult.catch((/** @type {Error} */ err) => {
         if (!options.continueOnMinifyError) throw err;
-        options.log && options.log(err);
+        options.log(err);
         return originalAttrValue;
       });
     }
@@ -933,7 +933,7 @@ async function minifySrcdoc(attrValue, options, minifyHTMLSelf) {
     return wasEncoded ? (await getEscapeAttribute())(minified) : minified;
   } catch (err) {
     if (!options.continueOnMinifyError) throw err;
-    options.log && options.log(/** @type {Error} */ (err));
+    options.log(/** @type {Error} */ (err));
     return attrValue;
   }
 }
