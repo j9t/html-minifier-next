@@ -6,5 +6,4 @@ backtest/results.json
 demo/build/
 dist/
 node_modules/
-tmp/
 .DS_Store

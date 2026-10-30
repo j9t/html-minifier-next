@@ -30,8 +30,6 @@ export default [
   {
     ignores: ['demo/**'],
     languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
       globals: globals.node
     }
   },
