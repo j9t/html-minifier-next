@@ -269,8 +269,9 @@ describe('Utils', () => {
       assert.strictEqual(describeQuantifierRisk(/[\q{ab}]*a*/v) !== null, false);
       // Without `v` a `[` inside a class is a member, and the first `]` closes it
       assert.strictEqual(hasRiskyQuantifiers('[[a]*a*'), true);
-      // Nesting past the bound is declined rather than recursed into
-      const deep = new RegExp('['.repeat(3000) + 'a' + ']'.repeat(3000) + '*a*', 'v');
+      // Nesting past the bound (50) is declined rather than recursed into;
+      // deeper nesting can overflow the engine’s own parser before the bound is reached
+      const deep = new RegExp('['.repeat(100) + 'a' + ']'.repeat(100) + '*a*', 'v');
       assert.strictEqual(describeQuantifierRisk(deep), null);
     });
 
