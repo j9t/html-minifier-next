@@ -41,18 +41,18 @@ describe('Benchmark', () => {
       });
     });
 
-    test('`--iterations` falls back to the default when not a number, and to 1 when lower', () => {
+    test('Falls back to the default `--iterations` when not a number, and to 1 when lower', () => {
       assert.strictEqual(parseArgs(['--iterations=many']).iterations, DEFAULT_ITERATIONS);
       assert.strictEqual(parseArgs(['--iterations=0']).iterations, 1);
     });
 
-    test('`--preset` takes the place of the options file', () => {
+    test('Lets `--preset` take the place of the options file', () => {
       const args = parseArgs(['--preset=comprehensive']);
       assert.strictEqual(args.preset, 'comprehensive');
       assert.strictEqual(args.config, null);
     });
 
-    test('`--preset` and `--config` together are rejected', () => {
+    test('Rejects `--preset` and `--config` together', () => {
       assert.throws(() => parseArgs(['--preset=comprehensive', '--config=other.json']), /either `--config` or `--preset`/);
     });
   });
@@ -63,14 +63,14 @@ describe('Benchmark', () => {
       assert.strictEqual(resolvePreset(options), options);
     });
 
-    test('The preset goes under the other options, and its name is dropped', () => {
+    test('Puts the preset under the other options, dropping its name', () => {
       assert.deepStrictEqual(
         resolvePreset({ preset: 'comprehensive', minifyJS: false }),
         { ...getPreset('comprehensive'), minifyJS: false }
       );
     });
 
-    test('An unknown preset is rejected, naming the available ones', () => {
+    test('Rejects an unknown preset, naming the available ones', () => {
       assert.throws(
         () => resolvePreset({ preset: 'unknown' }),
         { message: `Unknown preset “unknown”; available presets: ${getPresetNames().join(', ')}` }
@@ -81,24 +81,24 @@ describe('Benchmark', () => {
   describe('`optionsForSite`', () => {
     const site = 'https://example.com/';
 
-    test('An enabled `minifyURLs` gets the site', () => {
+    test('Gives an enabled `minifyURLs` the site', () => {
       assert.deepStrictEqual(optionsForSite({ minifyURLs: true }, site).minifyURLs, { site });
     });
 
-    test('A `minifyURLs` object keeps its settings and gets the site', () => {
+    test('Keeps the settings of a `minifyURLs` object and gives it the site', () => {
       assert.deepStrictEqual(optionsForSite({ minifyURLs: { output: 'rootRelative' } }, site).minifyURLs, { output: 'rootRelative', site });
     });
 
-    test('A disabled `minifyURLs` stays disabled', () => {
+    test('Keeps a disabled `minifyURLs` disabled', () => {
       assert.strictEqual(optionsForSite({ minifyURLs: false }, site).minifyURLs, false);
       assert.ok(!('minifyURLs' in optionsForSite({}, site)));
     });
 
-    test('A `minifyURLs` from a preset gets the site', () => {
+    test('Gives a `minifyURLs` from a preset the site', () => {
       assert.deepStrictEqual(optionsForSite(resolvePreset({ preset: 'comprehensive' }), site).minifyURLs, { site });
     });
 
-    test('The shared options are not changed', () => {
+    test('Does not change the shared options', () => {
       const options = { minifyURLs: true };
       optionsForSite(options, site);
       assert.deepStrictEqual(options, { minifyURLs: true });
@@ -115,16 +115,16 @@ describe('Benchmark', () => {
   });
 
   describe('`baselineMismatches`', () => {
-    test('A baseline saved with the same settings matches', () => {
+    test('Matches a baseline saved with the same settings', () => {
       const args = parseArgs([]);
       assert.deepStrictEqual(baselineMismatches({ core: false, cold: false, iterations: DEFAULT_ITERATIONS, config: DEFAULT_CONFIG, preset: null }, args), []);
     });
 
-    test('A baseline predating `cold` and `preset` matches default settings', () => {
+    test('Matches a baseline predating `cold` and `preset` to default settings', () => {
       assert.deepStrictEqual(baselineMismatches({ core: false, iterations: DEFAULT_ITERATIONS, config: DEFAULT_CONFIG }, parseArgs([])), []);
     });
 
-    test('Switching from the options file to a preset is reported', () => {
+    test('Reports switching from the options file to a preset', () => {
       const baseline = { core: false, cold: false, iterations: DEFAULT_ITERATIONS, config: DEFAULT_CONFIG };
       assert.deepStrictEqual(baselineMismatches(baseline, parseArgs(['--preset=comprehensive'])), [
         `config ${DEFAULT_CONFIG} → none`,
@@ -132,7 +132,7 @@ describe('Benchmark', () => {
       ]);
     });
 
-    test('Differing modes and iterations are reported', () => {
+    test('Reports differing modes and iterations', () => {
       const baseline = { core: true, cold: false, iterations: 15, config: DEFAULT_CONFIG };
       assert.deepStrictEqual(baselineMismatches(baseline, parseArgs(['--cold'])), [
         'core true → false',
@@ -143,11 +143,11 @@ describe('Benchmark', () => {
   });
 
   describe('`baselineMetric`', () => {
-    test('A baseline naming its metric is taken at its word', () => {
+    test('Takes a baseline naming its metric at its word', () => {
       assert.strictEqual(baselineMetric({ metric: 'median' }), 'median');
     });
 
-    test('A baseline predating the marker counts as fastest only if every file has a spread', () => {
+    test('Counts a baseline predating the marker as fastest only if every file has a spread', () => {
       assert.strictEqual(baselineMetric({ files: { a: { spread: 1 }, b: { spread: null } } }), 'fastest');
       assert.strictEqual(baselineMetric({ files: { a: { spread: 1 }, b: {} } }), 'median');
       assert.strictEqual(baselineMetric({ files: {} }), 'median');
@@ -155,7 +155,7 @@ describe('Benchmark', () => {
   });
 
   describe('Formatting', () => {
-    test('`formatDelta` shows two decimals, and nothing without a baseline value', () => {
+    test('Shows two decimals in `formatDelta`, and nothing without a baseline value', () => {
       assert.strictEqual(formatDelta(100, null), '');
       assert.strictEqual(formatDelta(100, 0), '');
       assert.strictEqual(formatDelta(100, 100), ' (±0%)');
@@ -163,7 +163,7 @@ describe('Benchmark', () => {
       assert.strictEqual(formatDelta(9995, 10000), ' (-0.05%)');
     });
 
-    test('`formatTimeDelta` marks a delta within the noise band as such', () => {
+    test('Marks a delta within the noise band as such in `formatTimeDelta`', () => {
       assert.strictEqual(formatTimeDelta(105, 100, 10), ' (~+5.0%, within noise)');
       assert.strictEqual(formatTimeDelta(95, 100, 10), ' (~-5.0%, within noise)');
       assert.strictEqual(formatTimeDelta(80, 100, 10), ' (-20.0%)');
@@ -173,7 +173,7 @@ describe('Benchmark', () => {
   });
 
   describe('Statistics', () => {
-    test('`fastest` and `median` pick the right iteration without reordering the input', () => {
+    test('Picks the right iteration as `fastest` and `median` without reordering the input', () => {
       const values = [4, 1, 3, 2];
       assert.strictEqual(fastest(values), 1);
       assert.strictEqual(median(values), 2.5);
@@ -181,16 +181,16 @@ describe('Benchmark', () => {
       assert.deepStrictEqual(values, [4, 1, 3, 2]);
     });
 
-    test('`reproducibility` compares the fastest iteration of each half', () => {
+    test('Compares the fastest iteration of each half for `reproducibility`', () => {
       assert.strictEqual(reproducibility([10, 20, 12, 30]), 20);
       assert.strictEqual(reproducibility([0, 5, 0, 5]), 0);
     });
 
-    test('`reproducibility` reports nothing for a single iteration', () => {
+    test('Reports no `reproducibility` for a single iteration', () => {
       assert.strictEqual(reproducibility([10]), null);
     });
 
-    test('One slow outlier inflates `spread` but not `reproducibility`', () => {
+    test('Lets one slow outlier inflate `spread` but not `reproducibility`', () => {
       const values = [10, 10, 100, 10];
       assert.strictEqual(reproducibility(values), 0);
       assert.strictEqual(spread(values), 900);
@@ -281,7 +281,7 @@ describe('Benchmark', () => {
       assert.ok(findLine(logs, `Noise: ${noise.total.toFixed(1)}% on the total`));
     });
 
-    test('`--save` writes a baseline with the run’s settings and per-file results', async (t) => {
+    test('Writes a baseline with `--save` that holds the run’s settings and per-file results', async (t) => {
       const { files } = await run(t, ['--save', '--iterations=2']);
       const baseline = await readBaseline();
       assert.strictEqual(baseline.metric, 'fastest');

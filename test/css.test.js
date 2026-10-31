@@ -420,7 +420,7 @@ describe('CSS', () => {
       assert.ok(!styleOf(output).includes('.drop'), 'Unsafelisted symbol should still be removed');
     });
 
-    test('Never removes `@keyframes` or `@counter-style` a class name collides with', async () => {
+    test('Does not remove `@keyframes` or `@counter-style` a class name collides with', async () => {
       const input = style('@keyframes spin{from{opacity:0}}.spin{animation:spin 1s}' +
         '@counter-style tick{system:cyclic}.tick{list-style:tick}') + '<p></p>';
       const output = await minify(input, { minifyCSS: true, removeUnusedCSS: true });
@@ -879,7 +879,7 @@ describe('CSS', () => {
   });
 
   describe('`canMinifyCSS`', () => {
-    test('A `false` return leaves the CSS unminified', async () => {
+    test('Leaves the CSS unminified on a `false` return', async () => {
       const input = '<style>body { color: red; font-size: 12px; }</style>';
       assert.strictEqual(await minify(input, { minifyCSS: true, canMinifyCSS: () => false }), input);
       assert.strictEqual(
@@ -888,7 +888,7 @@ describe('CSS', () => {
       );
     });
 
-    test('The hook receives the CSS and its type', async () => {
+    test('Passes the CSS and its type to the hook', async () => {
       const received = [];
       const input = '<style>body { color: red; }</style><p style="margin: 0;"></p><link rel="stylesheet" href="a.css" media="screen and (min-width: 100px)">';
       await minify(input, {
@@ -914,7 +914,7 @@ describe('CSS', () => {
       assert.strictEqual(result, '<style>.keep{color:red}</style><style>.skip { color: blue; }</style>');
     });
 
-    test('Attributes are exempted by type', async () => {
+    test('Exempts attributes by type', async () => {
       const input = '<div style="color: red; font-size: 12px;"></div><link rel="stylesheet" href="a.css" media="screen and (min-width: 100px)"><style>body { color: blue; }</style>';
       const result = await minify(input, {
         minifyCSS: true,
@@ -923,7 +923,7 @@ describe('CSS', () => {
       assert.strictEqual(result, '<div style="color:red;font-size:12px"></div><link rel="stylesheet" href="a.css" media="screen and (min-width: 100px)"><style>body { color: blue; }</style>');
     });
 
-    test('Exempted CSS keeps its URLs and unused rules', async () => {
+    test('Keeps the URLs and unused rules of exempted CSS', async () => {
       const input = '<style>.a { background: url(https://example.com/x/a.png); } .unused { color: red; }</style><div class="a" style="background: url(https://example.com/x/b.png)"></div>';
       const options = { minifyCSS: true, minifyURLs: 'https://example.com/x/', removeUnusedCSS: true };
       assert.strictEqual(
@@ -933,7 +933,7 @@ describe('CSS', () => {
       assert.strictEqual(await minify(input, { ...options, canMinifyCSS: () => false }), input);
     });
 
-    test('The hook is not called when `minifyCSS` is a function', async () => {
+    test('Does not call the hook when `minifyCSS` is a function', async () => {
       let calls = 0;
       const logs = [];
       const input = '<style>body { color: red; }</style>';
@@ -950,7 +950,7 @@ describe('CSS', () => {
       assert.ok(logs.some(message => message.includes('canMinifyCSS') && message.includes('function of your own')));
     });
 
-    test('Setting the hook without `minifyCSS` is reported', async () => {
+    test('Reports setting the hook without `minifyCSS`', async () => {
       const logs = [];
       await minify('<style>body { color: red; }</style>', {
         canMinifyCSS: () => true,
@@ -959,7 +959,7 @@ describe('CSS', () => {
       assert.ok(logs.some(message => message.includes('canMinifyCSS') && message.includes('minifyCSS')));
     });
 
-    test('A hook that throws leaves the CSS unminified, or rejects without `continueOnMinifyError`', async () => {
+    test('Leaves the CSS unminified when the hook throws, or rejects without `continueOnMinifyError`', async () => {
       const input = '<style>body { color: red; }</style>';
       const canMinifyCSS = () => { throw new Error('Hook failure'); };
       const logs = [];
@@ -974,7 +974,7 @@ describe('CSS', () => {
       await assert.rejects(minify(input, { minifyCSS: true, continueOnMinifyError: false, canMinifyCSS }), /Hook failure/);
     });
 
-    test('A hook that returns a promise is an error, whether it resolves or rejects', async () => {
+    test('Treats a hook that returns a promise as an error, whether it resolves or rejects', async () => {
       const input = '<style>body { color: red; }</style>';
       for (const canMinifyCSS of [async () => false, () => Promise.reject(new Error('Hook failure'))]) {
         const logs = [];

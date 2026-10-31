@@ -6,7 +6,7 @@ import { minify, getPreset } from '../src/htmlminifier.js';
 import { trimWhitespace, collapseWhitespaceAll, collapseWhitespace } from '../src/lib/whitespace.js';
 
 describe('HTML', () => {
-  test('`minify` exists', () => {
+  test('Exports `minify`', () => {
     assert.ok(minify);
   });
 
@@ -2636,14 +2636,14 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<img src="a"/>x'), '<img src="a">x');
   });
 
-  test('`keepClosingSlash` reads a slash on a start tag as closing the element', async () => {
+  test('Reads a slash on a start tag as closing the element with `keepClosingSlash`', async () => {
     assert.strictEqual(await minify('<div/>x</div>y', { keepClosingSlash: true }), '<div/>xy');
     assert.strictEqual(await minify('<title/>a</title>b', { keepClosingSlash: true }), '<title/>ab');
     // Templates that write their components as self-closing keep both slash and nesting
     assert.strictEqual(await minify('<Foo/><Bar/>', { keepClosingSlash: true, caseSensitive: true }), '<Foo/><Bar/>');
   });
 
-  test('A unary element holds no text for the options that read element content', async () => {
+  test('Treats a unary element as holding no text for the options that read element content', async () => {
     // Under `keepClosingSlash` the element closes at the slash, so what
     // follows belongs to the document
     assert.strictEqual(await minify('<script/>var a = 1;', { keepClosingSlash: true, minifyJS: true }), '<script/>var a = 1;');
@@ -3099,7 +3099,7 @@ describe('HTML', () => {
   });
 
   // https://github.com/kangax/html-minifier/issues/888
-  test('`ul` and `ol` are treated as phrasing content', async () => {
+  test('Treats `ul` and `ol` as phrasing content', async () => {
     let input, output;
 
     input = '<p>a<ul><li>item</li></ul>';
@@ -3147,7 +3147,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('foo <!-- c -->\n<div>x</div>', { collapseWhitespace: true, removeComments: true }), 'foo<div>x</div>');
   });
 
-  test('Removal leaves no whitespace-only line behind', async () => {
+  test('Leaves no whitespace-only line behind on removal', async () => {
     const options = { removeComments: true, removeOptionalTags: true };
 
     // Removed comments
@@ -3385,7 +3385,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { removeOptionalTags: true, ignoreCustomFragments: [/\{\{[\s\S]*?\}\}/] }), output);
   });
 
-  test('Custom fragment patterns keep their flags', async () => {
+  test('Keeps the flags of custom fragment patterns', async () => {
     const input = '<p>  {A%  x  %a}  </p>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, ignoreCustomFragments: [/\{a%[\s\S]*?%a\}/i] }), '<p> {A%  x  %a} </p>');
     // Without the flag the pattern does not match, so the fragment is text like any other
@@ -3397,7 +3397,7 @@ describe('HTML', () => {
     const trim = { collapseWhitespace: true, trimCustomFragments: true };
     const django = { ignoreCustomFragments: [/\{%[\s\S]*?%\}/, /\{\{[\s\S]*?\}\}/] };
 
-    test('Tags keep the spacing of their source', async () => {
+    test('Keeps the spacing of tags from their source', async () => {
       const inputs = [
         '<div <?= $attrs ?>>x</div>',
         '<div <?= $a ?> class="a" <?= $b ?>>x</div>',
@@ -3422,7 +3422,7 @@ describe('HTML', () => {
       }
     });
 
-    test('Tags keep attributes next to fragments intact', async () => {
+    test('Keeps attributes of tags next to fragments intact', async () => {
       let input = '<div class="a"<?= $x ?>>x</div>';
       assert.strictEqual(await minify(input, { ...trim, removeAttributeQuotes: true }), input);
 
@@ -3471,7 +3471,7 @@ describe('HTML', () => {
       assert.strictEqual(await minify('<img <?= $a ?> />', { ...trim, keepClosingSlash: true }), '<img <?= $a ?> />');
     });
 
-    test('Text keeps whitespace that separates content', async () => {
+    test('Keeps whitespace in text that separates content', async () => {
       const inputs = [
         '<p>Hello <?= $name ?> !</p>',
         '<p><b>Hi</b> <?= $name ?> <i>x</i></p>',
@@ -3494,7 +3494,7 @@ describe('HTML', () => {
 
     });
 
-    test('Text loses whitespace where the minifier removes it anyway', async () => {
+    test('Drops whitespace in text where the minifier removes it anyway', async () => {
       const cases = [
         ['<ul>\n  <?php foreach ($a as $b): ?>\n  <li>x</li>\n  <?php endforeach; ?>\n</ul>', '<ul><?php foreach ($a as $b): ?><li>x</li><?php endforeach; ?></ul>'],
         ['<?php include "h.php"; ?>\n<div>x</div>\n<?php include "f.php"; ?>', '<?php include "h.php"; ?><div>x</div><?php include "f.php"; ?>'],
@@ -3517,7 +3517,7 @@ describe('HTML', () => {
       assert.strictEqual(await minify('<p>x</p>\n<?= $a ?>\n<p>y</p>', { ...trim, preserveLineBreaks: true }), '<p>x</p>\n<?= $a ?>\n<p>y</p>');
     });
 
-    test('Attribute values keep whitespace that separates content', async () => {
+    test('Keeps whitespace in attribute values that separates content', async () => {
       const inputs = [
         '<p class="a <?= $c ?> b">x</p>',
         '<p class="<?= $c ?> <?= $d ?>">x</p>',
@@ -3534,7 +3534,7 @@ describe('HTML', () => {
       assert.strictEqual(await minify('<p class=" <?= $c ?> ">x</p>', trim), '<p class="<?= $c ?>">x</p>');
     });
 
-    test('CSS and JavaScript keep whitespace next to fragments', async () => {
+    test('Keeps whitespace in CSS and JavaScript next to fragments', async () => {
       const options = { ...trim, minifyCSS: true, minifyJS: true };
       const cases = [
         ['<script>function f() { return <?= $x ?> }</script>', 'return <?= $x ?>'],
@@ -3558,7 +3558,7 @@ describe('HTML', () => {
     });
   });
 
-  test('Custom fragments that are never closed stay cheap', async () => {
+  test('Stays cheap on custom fragments that are never closed', async () => {
     // Running the patterns as a regex costs O(n²) here, seconds at this size
     const input = '<p>' + '<% '.repeat(200000) + '</p>';
     const start = Date.now();
@@ -3617,7 +3617,7 @@ describe('HTML', () => {
     assert.strictEqual(logged.filter(message => String(message).includes('compounds quantifiers')).length, 1);
   });
 
-  test('Frequency analysis reads fragments with their own flags', async () => {
+  test('Reads fragments with their own flags in frequency analysis', async () => {
     // The scan blanks fragments out so the markup around them parses. `q` is the
     // frequent attribute, but only in tags carrying an uppercase fragment, which
     // are read at all only where the matcher honors the pattern's `i`
@@ -3632,7 +3632,7 @@ describe('HTML', () => {
     assert.ok(output.endsWith('<x q="2" p="1"></x>'), `Expected \`q\` to sort first, got ${JSON.stringify(output.slice(-30))}`);
   });
 
-  test('`customAttrSurround` and `customAttrAssign` keep their flags', async () => {
+  test('Keeps the flags of `customAttrSurround` and `customAttrAssign`', async () => {
     // The parser merges these into one attribute pattern, which carries no flags
     // of its own, so each pattern's `i` has to survive the merge
     const surround = (/** @type {string} */ flags) => ({
@@ -3650,7 +3650,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div flagX="v">y</div>', { customAttrAssign: [/x=/i] }), '<div flagx="v">y</div>');
   });
 
-  test('`customAttrSurround` and `customAttrAssign` refuse flags that cannot survive the merge', async () => {
+  test('Refuses `customAttrSurround` and `customAttrAssign` flags that cannot survive the merge', async () => {
     const assign = (/** @type {string} */ source, /** @type {string} */ flags) =>
       minify('<div flagX="v">y</div>', { customAttrAssign: [new RegExp(source, flags)] });
 
@@ -5260,7 +5260,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(once, options), once);
   });
 
-  test('`trimWhitespace` trims whitespace but not no-break spaces', () => {
+  test('Trims whitespace but not no-break spaces with `trimWhitespace`', () => {
     assert.strictEqual(trimWhitespace(' \t\n\r\f a b \f\r\n\t '), 'a b');
     assert.strictEqual(trimWhitespace(' \t\n\r\f'), '');
     assert.strictEqual(trimWhitespace(''), '');
@@ -5273,7 +5273,7 @@ describe('HTML', () => {
     assert.strictEqual(trimWhitespace('a b'), 'a b');
   });
 
-  test('`collapseWhitespaceAll` collapses whitespace runs', () => {
+  test('Collapses whitespace runs with `collapseWhitespaceAll`', () => {
     assert.strictEqual(collapseWhitespaceAll('a  \n\r\f b   c'), 'a b c');
     assert.strictEqual(collapseWhitespaceAll(''), '');
 
@@ -5292,7 +5292,7 @@ describe('HTML', () => {
     assert.strictEqual(collapseWhitespaceAll('abc'), 'abc');
   });
 
-  test('`collapseWhitespace` trims and collapses as its options say', () => {
+  test('Trims and collapses as the options of `collapseWhitespace` say', () => {
     const plain = {};
     const conservative = { conservativeCollapse: true };
     const lineBreaks = { preserveLineBreaks: true };
@@ -5331,7 +5331,7 @@ describe('HTML', () => {
   // The whitespace set is exactly `[ \n\r\t\f\xA0]`; anything else is content, and the
   // fast paths that decide “is there whitespace here at all” must agree with that on
   // strings of every length, short ones included
-  test('Whitespace detection covers exactly the whitespace set', () => {
+  test('Covers exactly the whitespace set in whitespace detection', () => {
     // A vertical tab and the Unicode spaces are content, however long the text
     for (const character of ['\v', '\u2003', '\u3000', '\uFEFF']) {
       const short = 'a' + character + 'b';
@@ -5356,7 +5356,7 @@ describe('HTML', () => {
     assert.strictEqual(collapseWhitespace(' \xA0', {}, true, true, false), '\xA0');
   });
 
-  test('`collapseWhitespaceAll` leaves text with nothing to collapse untouched', () => {
+  test('Leaves text with nothing to collapse untouched with `collapseWhitespaceAll`', () => {
     // Single spaces, no tab, no no-break space: The text comes back untouched
     for (const text of ['a b', 'a b c', 'a b '.repeat(200), ' ', 'a']) {
       assert.strictEqual(collapseWhitespaceAll(text), text);
@@ -5801,7 +5801,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<p>xyzxyzxyz</p><p>xyzxyzxyz</p>', options), '<p>xyzxyzxyz</p><p\n>xyzxyzxyz</p>');
   });
 
-  test('Max line length only breaks lines in tags', async () => {
+  test('Only breaks lines in tags with a max line length', async () => {
     // Walks the wrapped and the unwrapped output side by side: Each line break has to stand
     // in a tag, in place of a space or right before the `>`
     const assertBreaksInTags = (/** @type {string} */ wrapped, /** @type {string} */ flat, /** @type {string} */ message) => {
@@ -5954,7 +5954,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), output);
   });
 
-  test('`preventAttributesEscaping`: Chooses a safe quote when the decoded value contains double quotes', async () => {
+  test('Chooses a safe quote with `preventAttributesEscaping` when the decoded value contains double quotes', async () => {
     // When `decodeEntities` is used with `preventAttributesEscaping`, the minifier should
     // choose a safe quote character (opposite of what’s in the value) to avoid invalid HTML
     const entityInput = '<a data-rid-relay="{&quot;299&quot;: &quot;itsct&quot;}">Example</a>';
@@ -5976,7 +5976,7 @@ describe('HTML', () => {
       'Should add quotes to non-last unquoted attributes with removeTagWhitespace to prevent ambiguity');
   });
 
-  test('`preventAttributesEscaping` with `quoteCharacter`: Handles quote conflicts safely', async () => {
+  test('Handles quote conflicts safely with `preventAttributesEscaping` and `quoteCharacter`', async () => {
     // When `quoteCharacter` is set but conflicts with attribute value content,
     // the minifier should switch to the opposite quote type to avoid invalid HTML
 
@@ -5999,7 +5999,7 @@ describe('HTML', () => {
       'Should use preferred quoteCharacter when there is no conflict');
   });
 
-  test('`preventAttributesEscaping`: Both quote types present forces escaping', async () => {
+  test('Forces escaping with `preventAttributesEscaping` when both quote types are present', async () => {
     // When an attribute value contains both single and double quotes,
     // `preventAttributesEscaping` is ignored to ensure valid HTML output.
     // The quote type with fewer occurrences is chosen and the other is escaped.
@@ -6212,7 +6212,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { sortAttributes: true }), input);
   });
 
-  test('A self-closed `<script>` holds no text for the sorting scan', async () => {
+  test('Treats a self-closed `<script>` as holding no text for the sorting scan', async () => {
     // The scan pass reads what a `text/html` script holds as markup; a self-closed one holds
     // nothing, so the raw text that follows must not be counted into the frequency chains
     const options = { keepClosingSlash: true, processScripts: ['text/html'], sortClassNames: true, sortAttributes: true };
@@ -6501,7 +6501,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, decodeEntities: true }), output);
   });
 
-  test('`decodeEntities` keeps carriage returns encoded, which HTML reads as line feeds when raw', async () => {
+  test('Keeps carriage returns encoded with `decodeEntities`, which HTML reads as line feeds when raw', async () => {
     const options = { decodeEntities: true };
     assert.strictEqual(await minify('<p title="a&#13;b">x&#13;y</p>', options), '<p title="a&#13;b">x&#13;y</p>');
     assert.strictEqual(await minify('<pre>a&#xD;b&#x0d;c</pre>', options), '<pre>a&#13;b&#13;c</pre>');
@@ -6758,7 +6758,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, removeEmptyElements: true }), '<iframe srcdoc=""></iframe>');
   });
 
-  test('Malformed `srcdoc` does not abort the document', async () => {
+  test('Does not abort the document on malformed `srcdoc`', async () => {
     const input = '<p>before</p><iframe srcdoc=\'<p title="a"b">oops</p>\'></iframe><p>after</p>';
 
     // With `continueOnMinifyError` (the default), the value passes through unminified
@@ -6814,7 +6814,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input), expected);
   });
 
-  test('`tbody` auto-closes open `tfoot`', async () => {
+  test('Auto-closes an open `tfoot` at `tbody`', async () => {
     // Per the HTML spec (“in table body” insertion mode), a `<tbody>` start tag
     // must close any currently open `tfoot` (or `thead`) in the same table
     const input = '<table><tfoot><tr><td>Footer</td></tr><tbody><tr><td>Body</td></tr></tbody></table>';
@@ -6825,7 +6825,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { includeAutoGeneratedTags: false }), input);
   });
 
-  test('`tr` and `td` auto-close the open row and cell', async () => {
+  test('Auto-closes the open row and cell at `tr` and `td`', async () => {
     let input;
 
     // Per the HTML spec (“in row” and “in cell” insertion modes), a `<tr>` start tag closes
@@ -6862,7 +6862,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(output, { removeOptionalTags: true, includeAutoGeneratedTags: true }), output);
   });
 
-  test('Synthetic `colgroup` auto-closes before non-`col` element', async () => {
+  test('Auto-closes a synthetic `colgroup` before a non-`col` element', async () => {
     // When bare `<col>` appears without explicit `<colgroup>`, the parser inserts
     // a synthetic one; it must be closed before the next non-`col` element
     let input = '<table><col><tbody><tr><td>x</td></tr></tbody></table>';
@@ -7174,7 +7174,7 @@ describe('HTML', () => {
       'partialMarkup and removeOptionalTags work independently (optional </p> is removed)');
   });
 
-  test('`sortAttributes` with `processScripts` does not corrupt HTML', async () => {
+  test('Does not corrupt HTML with `sortAttributes` and `processScripts`', async () => {
     const input = '<div id="test" class="foo">content</div>';
     const expected = '<div class="foo" id="test">content</div>'; // Attributes sorted, no corruption
 
@@ -7188,7 +7188,7 @@ describe('HTML', () => {
     assert.ok(!result.includes('\\'), 'Should not contain escaped quotes');
   });
 
-  test('`sortAttributes` with benchmark config does not corrupt HTML', async () => {
+  test('Does not corrupt HTML with `sortAttributes` and the benchmark config', async () => {
     const input = '<div id="test" class="foo">content</div>';
 
     // Benchmark config that triggers the corruption
@@ -7232,7 +7232,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, benchmarkConfig), '<div class=foo id=test>content</div>');
   });
 
-  test('`sortAttributes` with complex attributes does not cause parse errors', async () => {
+  test('Does not cause parse errors with `sortAttributes` and complex attributes', async () => {
     // Real-world example from FAZ.html that triggers parse errors
     const input = '<div id="personalization" data-snacks-3:custom="_plugins [full-bleed], _tracking.inview = null">test</div>';
 
@@ -7251,7 +7251,7 @@ describe('HTML', () => {
     );
   });
 
-  test('`sortAttributes` handles multiple script tags and different types', async () => {
+  test('Handles multiple script tags and different types with `sortAttributes`', async () => {
     // With multiple script types including JSON-LD which is in `processScripts`
     const input = `
       <html>
@@ -7285,7 +7285,7 @@ describe('HTML', () => {
     );
   });
 
-  test('`sortAttributes` handles deeply nested complex structures', async () => {
+  test('Handles deeply nested complex structures with `sortAttributes`', async () => {
     // With realistic nested HTML structure similar to FAZ
     const input = `
       <section class="content-wrapper">
@@ -7322,7 +7322,7 @@ describe('HTML', () => {
     );
   });
 
-  test('`sortAttributes` output can be re-parsed without errors', async () => {
+  test('Produces `sortAttributes` output that can be re-parsed without errors', async () => {
     // Critical test: Ensure output is valid parseable HTML
     const input = '<div id="test" class="foo bar" data-value="[test]">content</div>';
 
@@ -7341,7 +7341,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify(result), '<div class="bar foo" data-value="[test]" id="test">content</div>');
   });
 
-  test('`sortAttributes` works with `preventAttributesEscaping` and `sortClassNames`', async () => {
+  test('Combines `sortAttributes` with `preventAttributesEscaping` and `sortClassNames`', async () => {
     // All three sorting/escaping options together
     const input = '<div class="foo bar" id="test" data-value=\'{"key": "value"}\' data-config="[1,2,3]">content</div>';
 
@@ -7536,7 +7536,7 @@ describe('HTML', () => {
     assert.strictEqual(result2, '<div [class=test]>content</div>');
   });
 
-  test('`customAttrSurround` with non-array value degrades gracefully', async () => {
+  test('Degrades gracefully with a non-array `customAttrSurround` value', async () => {
     // A non-array value is treated as empty (no custom surrounds) and should not throw
     assert.strictEqual(await minify('<div foo="bar"></div>', { customAttrSurround: /foo/ }), '<div foo="bar"></div>');
   });
@@ -7746,7 +7746,7 @@ describe('HTML', () => {
     assert.ok(result.includes('{"289":"itsct"}'), 'Should preserve JSON data in attribute');
   });
 
-  test('Omitting a tag next to `pre` whitespace leaves it verbatim', async () => {
+  test('Leaves `pre` whitespace verbatim when omitting a tag next to it', async () => {
     // Whitespace in `pre`, in `textarea`, or wherever `canTrimWhitespace` says so is never
     // collapsed, so a tag omitted next to it must not take any of it along
     const options = { removeOptionalTags: true, collapseWhitespace: true, preserveLineBreaks: true };
@@ -7778,7 +7778,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div><p>a </p>  <p>b</p></div>', aggressive), '<div><p>a<p>b</div>');
   });
 
-  test('`textarea` and `title` hold text, not markup', async () => {
+  test('Treats `textarea` and `title` content as text, not markup', async () => {
     // Both are escapable raw text elements: A `<` inside them never starts a tag, so no
     // option may treat their content as elements
     // https://html.spec.whatwg.org/multipage/syntax.html#raw-text-elements
@@ -7883,7 +7883,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<title>a'), '<title>a');
   });
 
-  test('End tags that are never complete stay cheap', async () => {
+  test('Stays cheap on end tags that are never complete', async () => {
     // Scanning for the end tag with a regex lazy enough to skip the content rescans the rest
     // of the input at every near match, which costs minutes at this size
     for (const tag of ['textarea', 'script']) {
@@ -7925,7 +7925,7 @@ describe('HTML', () => {
     }
   });
 
-  test('An end tag ends at the `>` outside its attribute values', async () => {
+  test('Ends an end tag at the `>` outside its attribute values', async () => {
     // An end tag could carry attributes, and a quoted value there can hold `>`, which does
     // not end the tag it stands in
     // https://html.spec.whatwg.org/multipage/parsing.html#attribute-value-(double-quoted)-state
@@ -7948,7 +7948,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<textarea>a</textarea foo="a<b>c">d'), '<textarea>a</textarea>c">d');
   });
 
-  test('An attribute reaching past the parser’s window is read whole', async () => {
+  test('Reads an attribute reaching past the parser’s window whole', async () => {
     // The parser reads attributes through a 20 KB window, so that a value no closing quote
     // can end cannot take the whole document down with it; an attribute reaching past that
     // window is read past it, which must make no difference to what comes out
@@ -7997,7 +7997,7 @@ describe('HTML', () => {
     );
   });
 
-  test('A start tag that ends a paragraph ends it, whatever the element', async () => {
+  test('Ends a paragraph at a start tag that ends it, whatever the element', async () => {
     // The spec names these alongside `div` and `ul`, and each closes an open `p` the same
     // way; leaving one out kept the paragraph open across it, which put the end tag
     // `includeAutoGeneratedTags` writes behind the element that had long closed it
@@ -8015,7 +8015,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<div><p>a<table>b</table></div>', { includeAutoGeneratedTags: true }), '<div><p>a<table>b</table></div>');
   });
 
-  test('`iframe` and `xmp` hold text, not markup', async () => {
+  test('Treats `iframe` and `xmp` content as text, not markup', async () => {
     // The parser reads these as raw text as well, so a `<` inside them never starts a tag
     // https://html.spec.whatwg.org/multipage/parsing.html#generic-raw-text-element-parsing-algorithm
 
@@ -8066,7 +8066,7 @@ describe('HTML', () => {
     assert.strictEqual(await minify('<noframes>a&amp;b</noframes>', { decodeEntities: true }), '<noframes>a&b</noframes>');
   });
 
-  test('`plaintext` holds text to the end of the document', async () => {
+  test('Treats `plaintext` content as text to the end of the document', async () => {
     // Everything that follows the start tag is text, `</plaintext>` and all, and no end tag
     // ends the element
 
@@ -8203,7 +8203,7 @@ describe('HTML', () => {
     assert.strictEqual(withOverride, input);
   });
 
-  test('Minifying twice changes nothing', async () => {
+  test('Changes nothing when minifying twice', async () => {
     // Whatever a run produces must be a fixed point: Feeding the output back in has to
     // return it unchanged. Tag omission and whitespace collapsing decide together what
     // survives, and each can relocate or drop the other’s whitespace.
@@ -8240,7 +8240,7 @@ describe('HTML', () => {
     }
   });
 
-  test('Minifying twice changes nothing, in generated combinations, too', async () => {
+  test('Changes nothing when minifying twice, in generated combinations, too', async () => {
     // The documents above are written by hand, so they reach the adjacencies someone thought
     // of. Building the input from fragments instead reaches the ones no one writes down, like
     // a paragraph left open across a `<pre>` or whitespace behind a `textarea`.

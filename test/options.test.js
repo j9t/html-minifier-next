@@ -23,23 +23,23 @@ const warningsFor = async (input, options) => {
 
 describe('Options', () => {
   describe('Definitions and schema', () => {
-    test('Checked-in schema is in sync with the option definitions (regenerate via `npm run build:schema`)', () => {
+    test('Keeps the checked-in schema in sync with the option definitions (regenerate via `npm run build:schema`)', () => {
       assert.deepStrictEqual(schemaOnDisk, buildConfigSchema());
     });
 
-    test('Schema covers every option definition', () => {
+    test('Covers every option definition in the schema', () => {
       for (const key of Object.keys(optionDefinitions)) {
         assert.ok(key in schemaOnDisk.properties, `Missing schema property for option \`${key}\``);
       }
     });
 
-    test('Every schema property has a type or enum (catches option types missing from the generator)', () => {
+    test('Gives every schema property a type or enum (catches option types missing from the generator)', () => {
       for (const [key, property] of Object.entries(schemaOnDisk.properties)) {
         assert.ok(property.type || property.enum, `Missing type mapping for schema property \`${key}\``);
       }
     });
 
-    test('Every schema property has a description', () => {
+    test('Gives every schema property a description', () => {
       for (const [key, property] of Object.entries(schemaOnDisk.properties)) {
         assert.ok(typeof property.description === 'string' && property.description.length, `Missing description for schema property \`${key}\``);
       }
@@ -49,14 +49,14 @@ describe('Options', () => {
   // `removeUnusedCSS`, whose prerequisite can be set and still unusable, is
   // covered in css.test.js
   describe('Option dependencies', () => {
-    test('Every entry names options that exist', () => {
+    test('Names only existing options in every entry', () => {
       for (const { option, requires } of optionDependencies) {
         assert.ok(Object.hasOwn(optionDefinitions, option) || optionKeysExtra.has(option), `\`${option}\` is not an option`);
         assert.ok(Object.hasOwn(optionDefinitions, requires), `\`${requires}\`, needed by \`${option}\`, is not an option`);
       }
     });
 
-    test('The README table lists the same dependencies, and no others', () => {
+    test('Lists the same dependencies in the README table, and no others', () => {
       // Found by its header row rather than by heading text, and stopped at the blank
       // line that ends it, so that neither a renamed heading nor a later table interferes
       const table = readme.split(/^\| Option \| Needs \|\n\| --- \| --- \|\n/m)[1]?.split('\n\n')[0] ?? '';
@@ -71,7 +71,7 @@ describe('Options', () => {
       }
     });
 
-    test('An option that needs another one says so when it is missing', async () => {
+    test('Says so when an option that needs another one is missing it', async () => {
       const cases = [
         ['collapseInlineTagWhitespace', { collapseInlineTagWhitespace: true }, 'collapseWhitespace', '--collapse-whitespace'],
         ['collapseNoBreakSpaces', { collapseNoBreakSpaces: true }, 'collapseWhitespace', '--collapse-whitespace'],
@@ -96,7 +96,7 @@ describe('Options', () => {
       }
     });
 
-    test('An option paired with the one it needs stays quiet', async () => {
+    test('Stays quiet for an option paired with the one it needs', async () => {
       const cases = [
         { collapseInlineTagWhitespace: true, collapseWhitespace: true },
         { collapseNoBreakSpaces: true, collapseWhitespace: true },
@@ -114,18 +114,18 @@ describe('Options', () => {
       }
     });
 
-    test('An option left off, or handed an empty array, asks for nothing', async () => {
+    test('Asks for nothing for an option left off, or handed an empty array', async () => {
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { conservativeCollapse: false }), []);
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { inlineCustomElements: [] }), []);
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { maxLineLength: 0, noNewlinesBeforeTagClose: false }), []);
     });
 
-    test('A preset that pairs the options itself stays quiet', async () => {
+    test('Stays quiet for a preset that pairs the options itself', async () => {
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { preset: 'conservative' }), []);
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { preset: 'comprehensive' }), []);
     });
 
-    test('Cache sizes never warn—they configure a cache rather than transform markup', async () => {
+    test('Does not warn about cache sizes—they configure a cache rather than transform markup', async () => {
       assert.deepStrictEqual(await warningsFor('<p>x</p>', { cacheCSS: 300, cacheJS: 300, cacheSVG: 300 }), []);
     });
   });
@@ -137,7 +137,7 @@ describe('Options', () => {
       throw err;
     };
 
-    test('An engine that is not installed is reported, however errors are handled', async () => {
+    test('Reports an engine that is not installed, however errors are handled', async () => {
       for (const continueOnMinifyError of [true, false]) {
         const options = processOptions(
           { minifyJS: { engine: 'swc' }, continueOnMinifyError },
@@ -152,7 +152,7 @@ describe('Options', () => {
       }
     });
 
-    test('A minification error is still tolerated', async () => {
+    test('Still tolerates a minification error', async () => {
       const script = 'var a = 1;';
       const options = processOptions(
         { minifyJS: { engine: 'swc' }, continueOnMinifyError: true },
@@ -231,7 +231,7 @@ describe('Options', () => {
     ];
 
     for (const [key, input] of cases) {
-      test(`\`${key}\` refuses a string rather than reading it as “on”`, async () => {
+      test(`Refuses a string for \`${key}\` rather than reading it as “on”`, async () => {
         const logs = [];
         const output = await minify(input, { [key]: 'false', log: message => logs.push(String(message)) });
 
@@ -243,7 +243,7 @@ describe('Options', () => {
       });
     }
 
-    test('`minifyURLs` still takes a string, which names the site', async () => {
+    test('Still takes a string for `minifyURLs`, which names the site', async () => {
       // The one object-valued option where a string carries meaning, so it is
       // deliberately left out of the check above
       const input = '<a href="https://example.com/x/y.html">y</a>';
@@ -272,7 +272,7 @@ describe('Options', () => {
     assert.ok(result.includes('function test(){}'), 'Empty function after console removal');
   });
 
-  test('`canMinifyCSS` and `canMinifyJS` work together, and with `collapseWhitespace`', async () => {
+  test('Combines `canMinifyCSS` and `canMinifyJS`, and both with `collapseWhitespace`', async () => {
     const input = `
       <style>
         .a { color: red; }

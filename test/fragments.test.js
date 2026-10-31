@@ -105,7 +105,7 @@ describe('Fragments', () => {
       }
     });
 
-    test('Whitespace and adjacent fragments join the match', () => {
+    test('Joins whitespace and adjacent fragments to the match', () => {
       const fragments = prepare([/<%[\s\S]*?%>/]);
       assert.strictEqual(replaceCustomFragments('a   <%x%><%y%>   b', fragments, marker), 'a["   <%x%><%y%>   "]b');
       // However long the run, since nothing caps it
@@ -116,24 +116,24 @@ describe('Fragments', () => {
       assert.strictEqual(replaceCustomFragments('<%x%> <%y%>', fragments, marker), '["<%x%> "]["<%y%>"]');
     });
 
-    test('A negated-class body cannot cross the characters it excludes', () => {
+    test('Keeps a negated-class body from crossing the characters it excludes', () => {
       const fragments = prepare([/\{\{[^}]*?\}\}/]);
       assert.strictEqual(replaceCustomFragments('{{a}b}} {{c}}', fragments, marker), '{{a}b}}[" {{c}}"]');
       assert.strictEqual(replaceCustomFragments('{{}a}}', fragments, marker), '{{}a}}');
     });
 
-    test('Input without a fragment comes back untouched', () => {
+    test('Returns input without a fragment untouched', () => {
       const input = '<p>' + '<% '.repeat(50) + '</p>';
       assert.strictEqual(replaceCustomFragments(input, prepare([/<%[\s\S]*?%>/]), marker), input);
     });
 
-    test('A pattern keeps its own flags', () => {
+    test('Keeps a pattern’s own flags', () => {
       // The whitespace before the match joins it, as it would for any other fragment
       assert.strictEqual(replaceCustomFragments('<%x%> <A%x%a>', prepare([/<a%[\s\S]*?%a>/i]), marker), '<%x%>[" <A%x%a>"]');
       assert.strictEqual(replaceCustomFragments('<%x%> <A%x%a>', prepare([/<a%[\s\S]*?%a>/]), marker), '<%x%> <A%x%a>');
     });
 
-    test('A pattern run as a regex gives up where its closing literal is nowhere ahead', () => {
+    test('Gives up on a pattern run as a regex where its closing literal is nowhere ahead', () => {
       assert.strictEqual(toFragment(/<\?(?:php[\t\n\r ]|=|\$|xml(?:-stylesheet)?(?![\w-])|\s)[\s\S]*?\?>/i).close, '?>');
       assert.strictEqual(toFragment(/a|<%[\s\S]*?%>/).close, null, 'A match of `a` ends anywhere');
       assert.strictEqual(toFragment(/(<%|\{\{)[\s\S]*?%>/).close, '%>');
@@ -147,7 +147,7 @@ describe('Fragments', () => {
       assert.ok(Date.now() - start < 200, 'should fail in linear time');
     });
 
-    test('A pattern that matches nothing cannot stall the scan', () => {
+    test('Does not let a pattern that matches nothing stall the scan', () => {
       // `String.replace` spreads an empty match over every position; skipping it is saner
       assert.strictEqual(replaceCustomFragments('abc', prepare([/x*/]), marker), 'abc');
       assert.strictEqual(replaceCustomFragments('abxc', prepare([/x*/]), marker), 'ab["x"]c');

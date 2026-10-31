@@ -1543,7 +1543,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(!stdout.toString().includes('<!-- comment -->'));
   });
 
-  test('Verbose mode prints cache stats, omitting caches that were never touched', async () => {
+  test('Prints cache stats in verbose mode, omitting caches that were never touched', async () => {
     // Duplicate `<style>` block to trigger a CSS cache hit; single `<script>` to keep JS at a miss;
     // no `<svg>`/`minifySVG`, so the SVG cache must be omitted entirely
     const input = '<style>body{color:red}</style><style>body{color:red}</style><script>let a=1;</script>';
@@ -1560,7 +1560,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.ok(stdout.toString().length > 0);
   });
 
-  test('Dry run prints cache stats', async () => {
+  test('Prints cache stats in a dry run', async () => {
     const input = '<style>body{color:blue}</style>';
     const { stderr, status } = await spawnCli(['--minify-css', '--dry'], {
       input
@@ -1910,7 +1910,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
   });
 
   // Boolean flag negation tests
-  test('`--no-X` overrides a boolean option enabled by a preset', async () => {
+  test('Lets `--no-X` override a boolean option enabled by a preset', async () => {
     const input = '<p>  hello  world</p>';
 
     const { stdout: withPreset, status: presetStatus } = await spawnCli(['--preset=comprehensive'], {
@@ -1930,7 +1930,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.notStrictEqual(withPreset.toString().trim(), withNegation.toString().trim());
   });
 
-  test('`--no-X` has no effect when the option is already disabled', async () => {
+  test('Leaves an already disabled option unaffected by `--no-X`', async () => {
     const input = '<p>  hello  </p>';
 
     const { stdout: plain, status: plainStatus } = await spawnCli([], {
@@ -1946,7 +1946,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.strictEqual(plain.toString().trim(), withNegation.toString().trim());
   });
 
-  test('`--continue-on-minify-error` is recognized as the positive form of the flag', async () => {
+  test('Recognizes `--continue-on-minify-error` as the positive form of the flag', async () => {
     const input = '<p>test</p>';
     const { stdout, status } = await spawnCli(['--continue-on-minify-error'], {
       input
@@ -1955,7 +1955,7 @@ describe('CLI', { concurrency: os.availableParallelism() }, () => {
     assert.strictEqual(stdout.toString().trim(), '<p>test</p>');
   });
 
-  test('`--no-newlines-before-tag-close` is applied and matches the JS API', async () => {
+  test('Applies `--no-newlines-before-tag-close`, matching the JS API', async () => {
     const input = '<a title="x"href=" ">foo</a>';
     const expected = await minify(input, { maxLineLength: 25, noNewlinesBeforeTagClose: true });
 
@@ -2014,13 +2014,13 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
 
   const OPTIONS_MINIFY = ['--collapse-whitespace', '--remove-comments', '--minify-css', '--minify-js', '--minify-svg'];
 
-  test('Files are handed to the pool largest first, ties in discovery order', async () => {
+  test('Hands files to the pool largest first, ties in discovery order', async () => {
     const { orderLargestFirst } = await import('../src/lib/file-pool.js');
     assert.deepStrictEqual(orderLargestFirst(['a', 'b', 'c', 'd', 'e'], [10, 300, 0, 300, 20]), ['b', 'd', 'e', 'a', 'c']);
     assert.deepStrictEqual(orderLargestFirst([], []), []);
   });
 
-  test('A worker names the step it failed at', async () => {
+  test('Names the step a worker failed at', async () => {
     const { createFilePool } = await import('../src/lib/file-pool.js');
     const dir = path.resolve(dirSandbox(), 'tmp', 'par-stage');
     fs.mkdirSync(dir, { recursive: true });
@@ -2047,7 +2047,7 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
     }
   });
 
-  test('Parallel output is byte-identical to sequential output', async () => {
+  test('Produces parallel output byte-identical to sequential output', async () => {
     buildInputDir('par-in', 40);
 
     await execCli(['--input-dir=./tmp/par-in', '--output-dir=./tmp/par-seq', '--workers=1', ...OPTIONS_MINIFY]);
@@ -2060,7 +2060,7 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
     assert.deepStrictEqual(parallel, sequential);
   });
 
-  test('A run too small to repay a worker still produces the same output', async () => {
+  test('Still produces the same output for a run too small to repay a worker', async () => {
     buildInputDir('par-small-in', 2);
 
     await execCli(['--input-dir=./tmp/par-small-in', '--output-dir=./tmp/par-small-a', '--workers=1', ...OPTIONS_MINIFY]);
@@ -2115,7 +2115,7 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
     );
   });
 
-  test('A run whose bytes sit in one file stays in-process', async () => {
+  test('Stays in-process for a run whose bytes sit in one file', async () => {
     // The one large file cannot be split, so the pool would have only the crumbs
     // around it to work on while paying for every worker it started
     buildSizedDir('par-skew-in', [3 * MB, 1024, 1024, 1024]);
@@ -2128,7 +2128,7 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
     assert.match(stderr, /Worker threads: none/);
   });
 
-  test('A small run of small files stays in-process', async () => {
+  test('Stays in-process for a small run of small files', async () => {
     buildInputDir('par-light-in', 4);
 
     const { stderr, exitCode } = await execCliCapture([
@@ -2139,7 +2139,7 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
     assert.match(stderr, /Worker threads: none/);
   });
 
-  test('A single file stays in-process even when workers are asked for', async () => {
+  test('Stays in-process for a single file even when workers are asked for', async () => {
     const dir = buildInputDir('par-single-in', 1);
     assert.strictEqual(fs.readdirSync(dir).length, 1);
 
@@ -2152,14 +2152,14 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
     assert.strictEqual(fs.readdirSync(path.resolve(dirSandbox(), 'tmp/par-single-out')).length, 1);
   });
 
-  test('`--workers=0` is read as “no workers” rather than as no work', async () => {
+  test('Reads `--workers=0` as “no workers” rather than as no work', async () => {
     buildInputDir('par-zero-in', 6);
     await execCli(['--input-dir=./tmp/par-zero-in', '--output-dir=./tmp/par-zero-out', '--workers=0', ...OPTIONS_MINIFY]);
 
     assert.strictEqual(fs.readdirSync(path.resolve(dirSandbox(), 'tmp/par-zero-out')).length, 6);
   });
 
-  test('A file the minifier rejects is named, and the run does not hang', async () => {
+  test('Names a file the minifier rejects, without hanging the run', async () => {
     const dir = buildInputDir('par-bad-in', 8);
     fs.writeFileSync(path.join(dir, 'broken.html'), '<script>var = = =;</script>');
 
@@ -2196,7 +2196,7 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
     assert.strictEqual(strictParallel.exitCode, strictSequential.exitCode);
   });
 
-  test('A warning from a worker is worded as it is in this process', async () => {
+  test('Words a warning from a worker as it is in this process', async () => {
     const dir = buildInputDir('par-warn-in', 8);
     fs.writeFileSync(path.join(dir, 'broken.html'), '<p>x</p><script>var = = =;</script>');
 
@@ -2219,7 +2219,7 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
     assert.match(parallel[0] ?? '', /\(.*broken\.html\)$/);
   });
 
-  test('An invalid worker count is rejected', async () => {
+  test('Rejects an invalid worker count', async () => {
     await assert.rejects(
       execCli(['--input-dir=./tmp', '--output-dir=./tmp/par-invalid', '--workers=abc']),
       /Invalid number for `--workers: "abc"`/
@@ -2231,7 +2231,7 @@ describe('Parallel multi-file processing', { concurrency: Math.max(1, Math.floor
 describe('Output file integrity', () => {
   // An abrupt exit (a native crash, an OOM kill) gives no chance to clean up, so
   // content has to land somewhere else first and be moved into place in one step
-  test('Output content is never written to the destination path directly', async () => {
+  test('Does not write output content to the destination path directly', async () => {
     const dirBase = path.resolve(dirSandbox(), 'tmp-atomic');
     const dirInput = path.resolve(dirBase, 'in');
     const dirOutput = path.resolve(dirBase, 'out');
@@ -2269,7 +2269,7 @@ describe('Output file integrity', () => {
     assert.deepStrictEqual(direct, [], `Written straight to the destination: ${direct.join(', ')}`);
   });
 
-  test('An existing output file keeps its permissions', { skip: process.platform === 'win32' && 'POSIX file modes' }, async () => {
+  test('Keeps the permissions of an existing output file', { skip: process.platform === 'win32' && 'POSIX file modes' }, async () => {
     const dirInput = path.resolve(dirSandbox(), 'tmp-atomic/in3');
     const dirOutput = path.resolve(dirSandbox(), 'tmp-atomic/out3');
     await fs.promises.mkdir(dirInput, { recursive: true });
@@ -2299,7 +2299,7 @@ describe('Output file integrity', () => {
     }
   });
 
-  test('No temporary files survive a successful run', async () => {
+  test('Leaves no temporary files after a successful run', async () => {
     const dirInput = path.resolve(dirSandbox(), 'tmp-atomic/in2');
     const dirOutput = path.resolve(dirSandbox(), 'tmp-atomic/out2');
     await fs.promises.mkdir(dirInput, { recursive: true });
@@ -2310,7 +2310,7 @@ describe('Output file integrity', () => {
     assert.deepStrictEqual(await fs.promises.readdir(dirOutput), ['a.html']);
   });
 
-  test('A symlinked output file is written through rather than replaced', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
+  test('Writes through a symlinked output file rather than replacing it', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
     const dirInput = path.resolve(dirSandbox(), 'tmp-atomic/in4');
     const dirOutput = path.resolve(dirSandbox(), 'tmp-atomic/out4');
     const dirTarget = path.resolve(dirSandbox(), 'tmp-atomic/target4');
@@ -2332,7 +2332,7 @@ describe('Output file integrity', () => {
     assert.deepStrictEqual(await fs.promises.readdir(dirTarget), ['a.html'], 'No temporary file should be left next to the file linked to');
   });
 
-  test('A run on worker threads writes output the same way', { skip: process.platform === 'win32' && 'Symlinks and POSIX file modes' }, async () => {
+  test('Writes output the same way in a run on worker threads', { skip: process.platform === 'win32' && 'Symlinks and POSIX file modes' }, async () => {
     const dirInput = path.resolve(dirSandbox(), 'tmp-atomic/in5');
     const dirOutput = path.resolve(dirSandbox(), 'tmp-atomic/out5');
     const dirTarget = path.resolve(dirSandbox(), 'tmp-atomic/target5');
@@ -2367,7 +2367,7 @@ describe('Output file integrity', () => {
     assert.deepStrictEqual((await fs.promises.readdir(dirOutput)).sort(), ['a.html', 'b.html'], 'No temporary file should be left');
   });
 
-  test('A dangling symlinked output file is written through, in-process and on worker threads', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
+  test('Writes through a dangling symlinked output file, in-process and on worker threads', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
     for (const [flow, flags] of [['in-process', []], ['workers', ['--workers', '2', '--verbose']]]) {
       const dirBase = path.resolve(dirSandbox(), `tmp-atomic/dangling-${flow.replace(' ', '-')}`);
       const dirInput = path.resolve(dirBase, 'in');
@@ -2408,7 +2408,7 @@ describe('Output file integrity', () => {
     }
   };
 
-  test('Temporary files are created exclusively, under names that cannot be predicted', async () => {
+  test('Creates temporary files exclusively, under names that cannot be predicted', async () => {
     const { writeFileAtomic } = await import('../src/lib/file-write.js');
     const dirOutput = path.resolve(dirSandbox(), 'tmp-atomic/out6');
     await fs.promises.mkdir(dirOutput, { recursive: true });
@@ -2430,7 +2430,7 @@ describe('Output file integrity', () => {
     assert.ok(opened.every(({ file }) => !path.basename(file).includes(`.${process.pid}.`)), 'A name built from the process ID can be predicted');
   });
 
-  test('A temporary path that is already taken is retried, and what holds it is left alone', async () => {
+  test('Retries a temporary path that is already taken, leaving what holds it alone', async () => {
     const { writeFileAtomic } = await import('../src/lib/file-write.js');
     const dirOutput = path.resolve(dirSandbox(), 'tmp-atomic/out7');
     await fs.promises.mkdir(dirOutput, { recursive: true });
@@ -2451,7 +2451,7 @@ describe('Output file integrity', () => {
     assert.deepStrictEqual((await fs.promises.readdir(dirOutput)).sort(), ['a.html', path.basename(fileTaken)].sort(), 'No temporary file of ours should be left');
   });
 
-  test('A temporary file that could not be created is not cleaned up', async () => {
+  test('Does not clean up a temporary file that could not be created', async () => {
     const { writeFileAtomic } = await import('../src/lib/file-write.js');
     const dirOutput = path.resolve(dirSandbox(), 'tmp-atomic/out8');
     await fs.promises.mkdir(dirOutput, { recursive: true });
@@ -2466,7 +2466,7 @@ describe('Output file integrity', () => {
     assert.strictEqual(await fs.promises.readFile(fileTaken, 'utf8'), 'Not ours', 'Only a file this write created may be removed');
   });
 
-  test('A symlink loop is refused rather than replaced', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
+  test('Refuses a symlink loop rather than replacing it', { skip: process.platform === 'win32' && 'Symlinks need elevated rights' }, async () => {
     const { writeFileAtomic } = await import('../src/lib/file-write.js');
     const dirOutput = path.resolve(dirSandbox(), 'tmp-atomic/out9');
     await fs.promises.mkdir(dirOutput, { recursive: true });

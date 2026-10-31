@@ -183,7 +183,7 @@ describe('SVG and MathML', () => {
     assert.ok(mixed.includes('<br>'), 'HTML `br` should not have self-closing slash');
   });
 
-  test('A slash on a start tag closes the element in foreign content', async () => {
+  test('Closes the element on a slash on a start tag in foreign content', async () => {
     assert.strictEqual(await minify('<svg><rect/><circle/></svg>'), '<svg><rect/><circle/></svg>');
     assert.strictEqual(await minify('<math><mspace/>a</math>'), '<math><mspace/>a</math>');
 
@@ -205,7 +205,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('A unary foreign element leaves the context it opened', async () => {
+  test('Leaves the context a unary foreign element opened', async () => {
     // `<svg/>` has no end tag to fall back to HTML on, so the start tag has to do it
     assert.strictEqual(await minify('<svg/><br/>x'), '<svg/><br>x');
     assert.strictEqual(await minify('<math/><br/>x'), '<math/><br>x');
@@ -223,7 +223,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify('<svg><svg/></svg><br/>x', { minifySVG: true }), '<svg><svg/></svg><br>x');
   });
 
-  test('A self-closed integration point keeps the slash of the namespace it sits in', async () => {
+  test('Keeps the slash of the namespace a self-closed integration point sits in', async () => {
     // `foreignObject` is an SVG element, however HTML what it holds is
     assert.strictEqual(
       await minify('<svg><foreignObject/><rect width="10" height="10"/></svg>'),
@@ -236,7 +236,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify('<svg><foreignObject/></svg><br/>x'), '<svg><foreignObject/></svg><br>x');
   });
 
-  test('`keepClosingSlash` reaches the HTML an integration point holds', async () => {
+  test('Extends `keepClosingSlash` to the HTML an integration point holds', async () => {
     // The parser reads the slash as closing the element wherever the option is on, so the
     // output has to keep it there too—otherwise `a` and `b` end up inside the `div`
     assert.strictEqual(
@@ -259,7 +259,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('HTML inside `foreignObject` is written as XML wherever SVGO reads it', async () => {
+  test('Writes HTML inside `foreignObject` as XML wherever SVGO reads it', async () => {
     /** @type {string[]} */
     const messages = [];
     const log = (/** @type {unknown} */ message) => messages.push(String(/** @type {Error} */ (message)?.message ?? message));
@@ -383,7 +383,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('Attribute values keep their quotes wherever SVGO reads them', async () => {
+  test('Keeps the quotes of attribute values wherever SVGO reads them', async () => {
     // An unquoted value is valid HTML the source may well be written in, and invalid XML
     assert.strictEqual(
       await minify('<svg><rect width="10" height="10"/><foreignObject><p class=a>x</p></foreignObject></svg>', { minifySVG: true }),
@@ -870,7 +870,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(result, '<div><svg><svg viewBox="0 0 10 10"><path d="M0 0h10v10H0z"/></svg></svg></div>');
   });
 
-  test('CSS in SVG is minified', async () => {
+  test('Minifies CSS in SVG', async () => {
     const input = '<svg><style> .icon { fill : blue } .button { color : red } </style><path class="icon" style="fill : red ; stroke-width : 2px" d="M0 0h10v10z"/></svg>';
 
     // Through `minifyCSS`, with or without SVGO
@@ -910,7 +910,7 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('<use href="#c"/>'), '`use` and its reference should be preserved');
   });
 
-  test('IDs stay unique across the SVGs of a document', async () => {
+  test('Keeps IDs unique across the SVGs of a document', async () => {
     // Inline SVGs share the document’s IDs, so renaming each SVG’s IDs from `a` makes them collide
     const result = await minify(
       '<svg><defs><linearGradient id="red"><stop stop-color="red"/></linearGradient></defs><rect width="10" height="10" fill="url(#red)"/></svg>' +
@@ -921,7 +921,7 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('id="round"') && result.includes('url(#round)'), result);
   });
 
-  test('IDs referenced from outside the SVG are kept', async () => {
+  test('Keeps IDs referenced from outside the SVG', async () => {
     const cases = [
       ['<style>#mark{fill:red}</style><svg><path id="mark" d="M0 0h10v10z"/></svg>', 'id="mark"'],
       ['<svg><g id="section"><path d="M0 0h10v10z"/></g></svg><a href="#section">Jump</a>', 'id="section"'],
@@ -934,7 +934,7 @@ describe('SVG and MathML', () => {
     }
   });
 
-  test('Hidden SVGs keep the sprites and definitions other SVGs use', async () => {
+  test('Keeps the sprites and definitions in hidden SVGs that other SVGs use', async () => {
     const symbol = '<symbol id="s" viewBox="0 0 10 10"><path d="M0 0h10v10z"/></symbol>';
     const cases = [
       `<svg style="display:none">${symbol}</svg><svg><use href="#s"/></svg>`,
@@ -950,12 +950,12 @@ describe('SVG and MathML', () => {
     }
   });
 
-  test('`role` attributes are kept', async () => {
+  test('Keeps `role` attributes', async () => {
     const result = await minify('<svg role="img" aria-label="Logo"><path d="M0 0h10v10z"/></svg>', { minifySVG: true });
     assert.ok(result.includes('role="img"'), result);
   });
 
-  test('`style` rules in an SVG are kept for the rest of the page', async () => {
+  test('Keeps `style` rules in an SVG for the rest of the page', async () => {
     // A `style` element inside an SVG applies to the whole document
     const result = await minify('<svg><style>.button{color:red}.icon{fill:blue}</style><path class="icon" d="M0 0h10v10z"/></svg><svg><path class="icon" d="M0 0h10v10z"/></svg><button class="button">OK</button>', { minifySVG: true });
     assert.ok(result.includes('.button{'), result);
@@ -963,19 +963,19 @@ describe('SVG and MathML', () => {
     assert.strictEqual(result.match(/class="icon"/g)?.length, 2, result);
   });
 
-  test('SVGO options without `plugins` keep the plugins safe for inline SVG', async () => {
+  test('Keeps the plugins safe for inline SVG with SVGO options without `plugins`', async () => {
     const result = await minify('<svg><defs><linearGradient id="red"><stop stop-color="red"/></linearGradient></defs><path fill="url(#red)" d="M0.123 0.123h10v10z"/></svg>', { minifySVG: { floatPrecision: 1 } });
     assert.ok(result.includes('id="red"'), result);
     assert.ok(result.includes('M.1'), '`floatPrecision` should apply');
   });
 
-  test('SVGO `plugins` are passed as given', async () => {
+  test('Passes SVGO `plugins` as given', async () => {
     // Setting `plugins` opts back into SVGO’s full defaults
     const result = await minify('<svg><defs><linearGradient id="red"><stop stop-color="red"/></linearGradient></defs><path fill="url(#red)" d="M0 0h10v10z"/></svg>', { minifySVG: { plugins: ['preset-default'] } });
     assert.ok(result.includes('id="a"'), result);
   });
 
-  test('Names are written the way HTML reads them wherever SVGO reads them', async () => {
+  test('Writes names the way HTML reads them wherever SVGO reads them', async () => {
     // HTML reads names in any case and gives SVG’s mixed-case ones their case (`viewbox` is
     // `viewBox`); XML reads names as written, where SVGO would drop `viewbox` as unknown
     const options = { minifySVG: true, continueOnMinifyError: false };
@@ -1007,7 +1007,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('The end tag of an `svg` or `math` element matches its start tag', async () => {
+  test('Matches the end tag of an `svg` or `math` element to its start tag', async () => {
     assert.strictEqual(await minify('<SVG><RECT/></SVG>'), '<SVG><RECT/></SVG>');
     assert.strictEqual(await minify('<MATH><MI>x</MI></MATH>'), '<MATH><MI>x</MI></MATH>');
   });
@@ -1023,7 +1023,7 @@ describe('SVG and MathML', () => {
     assert.ok(withEntities.includes('A &amp; B'), 'Entities inside `foreignObject` should be preserved');
   });
 
-  test('`caseSensitive` is respected for HTML inside `foreignObject` and `annotation-xml`', async () => {
+  test('Respects `caseSensitive` for HTML inside `foreignObject` and `annotation-xml`', async () => {
     // With `caseSensitive`, the HTML context’s name function is preserved across
     // the namespace transition, so mixed-case names inside `foreignObject` keep their case
     assert.strictEqual(
@@ -1050,7 +1050,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('HTML inside `foreignObject` is optimized with `minifySVG`', async () => {
+  test('Optimizes HTML inside `foreignObject` with `minifySVG`', async () => {
     // Whitespace collapse inside `foreignObject`
     assert.strictEqual(
       await minify('<svg><foreignObject width="100" height="100">   <div>   Hello   World   </div>   </foreignObject></svg>', { minifySVG: true, collapseWhitespace: true }),
@@ -1110,7 +1110,7 @@ describe('SVG and MathML', () => {
     );
   });
 
-  test('HTML-only options are disabled inside SVG for XML compatibility', async () => {
+  test('Disables HTML-only options inside SVG for XML compatibility', async () => {
     // `decodeEntities` keeps `&` encoded inside SVG (bare `&` is invalid XML)
     assert.strictEqual(
       await minify('<svg><text>A &amp; B</text></svg>', { minifySVG: true, decodeEntities: true, collapseWhitespace: true }),
@@ -1126,7 +1126,7 @@ describe('SVG and MathML', () => {
     assert.ok(!tagWhitespace.includes('width="100"height'), 'Whitespace between SVG attributes preserved');
   });
 
-  test('`removeAttributeQuotes` applies inside SVG when `minifySVG` is disabled', async () => {
+  test('Applies `removeAttributeQuotes` inside SVG when `minifySVG` is disabled', async () => {
     // When `minifySVG` is false, SVG is parsed by the HTML parser—not an XML parser—
     // so unquoted attributes are valid and `removeAttributeQuotes` should work normally
     const result = await minify('<svg viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>', { minifySVG: false, removeAttributeQuotes: true, collapseWhitespace: true });
@@ -1134,7 +1134,7 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('fill=red'), 'Simple string SVG attribute quotes removed when `minifySVG` is off');
   });
 
-  test('`removeAttributeQuotes` applies inside MathML', async () => {
+  test('Applies `removeAttributeQuotes` inside MathML', async () => {
     // MathML is never processed by SVGO, so `removeAttributeQuotes` is never restricted
     // inside MathML regardless of the `minifySVG` setting
     const result = await minify('<math display="block"><mi mathvariant="normal" id="x">x</mi></math>', { removeAttributeQuotes: true, collapseWhitespace: true });
@@ -1143,19 +1143,19 @@ describe('SVG and MathML', () => {
     assert.ok(result.includes('id=x'), 'MathML `id` attribute quotes removed');
   });
 
-  test('`decodeEntities` applies inside SVG when `minifySVG` is disabled', async () => {
+  test('Applies `decodeEntities` inside SVG when `minifySVG` is disabled', async () => {
     // When `minifySVG` is false, SVGO is not invoked, so bare `&` is not a problem
     const result = await minify('<svg><text>A &amp; B</text></svg>', { minifySVG: false, decodeEntities: true, collapseWhitespace: true });
     assert.ok(result.includes('A & B'), 'Entities decoded inside SVG when `minifySVG` is off');
   });
 
-  test('`decodeEntities` applies inside MathML', async () => {
+  test('Applies `decodeEntities` inside MathML', async () => {
     // MathML is never processed by SVGO, so `decodeEntities` is never restricted inside MathML
     const result = await minify('<math><mi>A &amp; B</mi></math>', { decodeEntities: true, collapseWhitespace: true });
     assert.ok(result.includes('A & B'), 'Entities decoded inside MathML');
   });
 
-  test('HTML-only options stay disabled inside foreignObject for XML validity', async () => {
+  test('Keeps HTML-only options disabled inside `foreignObject` for XML validity', async () => {
     // The entire SVG block must be valid XML for SVGO—including `foreignObject` content
 
     // `decodeEntities` stays disabled inside `foreignObject`
@@ -1184,7 +1184,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(result, '<template><svg><path fill="red" d="M0 0h10v10H0z"/></svg></template>');
   });
 
-  test('`continueOnMinifyError: false` throws on SVGO error', async () => {
+  test('Throws on an SVGO error with `continueOnMinifyError: false`', async () => {
     await assert.rejects(
       () => minify('<svg><text>a &amp; b</text><rect width="10" height="10"/></svg>', {
         minifySVG: { plugins: [failingSVGOPlugin] },
@@ -1203,7 +1203,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(result, '<svg><path fill="red" d="M0 0h10v10H0z"/></svg>');
   });
 
-  test('Cache produces consistent results', async () => {
+  test('Produces consistent results with the cache', async () => {
     const opts = { minifySVG: true, collapseWhitespace: true };
     const input = '<svg><circle cx="10" cy="10" r="5"/></svg>';
     const r1 = await minify(input, opts);
@@ -1217,7 +1217,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(result, await minify(input, { minifySVG: true }), 'SVG should minify the same with a custom cache size');
   });
 
-  test('SVGO options differing only in a plugin function do not share a cache entry', async () => {
+  test('Does not share a cache entry between SVGO options differing only in a plugin function', async () => {
     const input = '<svg viewBox="0 0 1 1"><title>T</title><rect width="1" height="1"/></svg>';
     // Same plugin name and source; only the closed-over element name differs
     const removing = (/** @type {string} */ name) => ({
@@ -1238,7 +1238,7 @@ describe('SVG and MathML', () => {
     assert.ok(resultRect.includes('<title>') && !resultRect.includes('<rect'), resultRect);
   });
 
-  test('Large SVG inputs with identical first/last 50 chars are not confused in cache', async () => {
+  test('Does not confuse large SVG inputs with identical first/last 50 chars in the cache', async () => {
     const first50 = '<svg xmlns="http://www.w3.org/2000/svg" width="10"'; // exactly 50 chars
     const last50 = '<!-- ' + 'z'.repeat(35) + ' --></svg>'; // exactly 50 chars
     const filler = '<!-- ' + 'f'.repeat(1970) + ' -->'; // stripped by SVGO
@@ -1262,7 +1262,7 @@ describe('SVG and MathML', () => {
     assert.ok(result2.includes('#0f0') || result2.includes('lime'), 'Second result should contain the correct fill');
   });
 
-  test('SVG and MathML elements are not removed by `removeEmptyElements`', async () => {
+  test('Does not remove SVG and MathML elements with `removeEmptyElements`', async () => {
     // SVG elements define their content via attributes (like `d`, `cx`, `r`)
     // They should not be removed as "empty" even without text content
 
@@ -1517,7 +1517,7 @@ describe('SVG and MathML', () => {
     }
   });
 
-  test('`decodeEntities` reads raw text by namespace, not by name', async () => {
+  test('Reads raw text by namespace, not by name, with `decodeEntities`', async () => {
     // As an HTML element, `title` and `textarea` hold text that ends at their own end tag,
     // so only that one `<` needs escaping. In foreign content the same element holds markup,
     // and leaving the rest unescaped would turn text into elements
@@ -1560,7 +1560,7 @@ describe('SVG and MathML', () => {
     assert.strictEqual(await minify('<math><script>a&amp;lt;&lt;b</script></math>', options), '<math><script>a&amplt;&lt;b</script></math>');
   });
 
-  test('The namespace an element sits in stays cheap to read', async () => {
+  test('Stays cheap reading the namespace an element sits in', async () => {
     // Reading it off the stack costs as much as the stack is deep, for every element whose
     // content is text—which a deep document turns quadratic, minutes at this size
     const benign = '<div>a</div>'.repeat(46000);
@@ -1587,7 +1587,7 @@ describe('SVG and MathML', () => {
     assert.ok(!withSVGOff.includes('<path'), '`rect` should be preserved when `minifySVG` is overridden to false');
   });
 
-  test('Oversized SVG input (>1 MB) is minified normally but never cached', async () => {
+  test('Minifies oversized SVG input (>1 MB) normally but never caches it', async () => {
     const bigComment = '<!-- ' + 'x'.repeat(1024 * 1024) + ' -->';
     const input = `<svg><circle cx="10" cy="10" r="5"/>${bigComment}</svg>`;
 
@@ -1605,7 +1605,7 @@ describe('SVG and MathML', () => {
   describe('`canMinifySVG`', () => {
     const input = '<svg><rect width="100" height="100" fill="red"/></svg><svg><circle cx="50" cy="50" r="40" fill="blue"/></svg>';
 
-    test('A `false` return skips SVGO for that `svg` element', async () => {
+    test('Skips SVGO for that `svg` element on a `false` return', async () => {
       assert.strictEqual(await minify(input, { minifySVG: true, canMinifySVG: () => false }), input);
       assert.strictEqual(
         await minify(input, { minifySVG: true, canMinifySVG: text => text.includes('rect') }),
@@ -1613,7 +1613,7 @@ describe('SVG and MathML', () => {
       );
     });
 
-    test('The hook receives each `svg` element as the HTML pass wrote it', async () => {
+    test('Passes each `svg` element to the hook as the HTML pass wrote it', async () => {
       const received = [];
       const source = '<svg>\n  <!-- keep -->\n  <rect width="100"  height="100" />\n</svg>';
       const result = await minify(source, {
@@ -1629,7 +1629,7 @@ describe('SVG and MathML', () => {
       assert.strictEqual(result, received[0]);
     });
 
-    test('The hook receives nested `svg` elements only within the outermost one', async () => {
+    test('Passes nested `svg` elements to the hook only within the outermost one', async () => {
       const received = [];
       const source = '<svg><svg><rect width="100" height="100"/></svg></svg>';
       const result = await minify(source, {
@@ -1643,20 +1643,20 @@ describe('SVG and MathML', () => {
       assert.strictEqual(result, source);
     });
 
-    test('`htmlmin:ignore` keeps an `svg` element exactly as written', async () => {
+    test('Keeps an `svg` element exactly as written with `htmlmin:ignore`', async () => {
       const source = '<!-- htmlmin:ignore --><svg>\n  <!-- keep -->\n  <rect width="100"  height="100" />\n</svg><!-- htmlmin:ignore -->';
       const result = await minify(source, { minifySVG: true, collapseWhitespace: true, removeComments: true });
       assert.strictEqual(result, '<svg>\n  <!-- keep -->\n  <rect width="100"  height="100" />\n</svg>');
     });
 
-    test('CSS within an `svg` element is only kept by `canMinifySVG`', async () => {
+    test('Leaves CSS within an `svg` element as written only through `canMinifySVG`', async () => {
       const source = '<svg><style>.a { fill: red; }</style><rect class="a" width="10" height="10"/></svg>';
       const options = { minifySVG: true, minifyCSS: true, canMinifyCSS: () => false };
       assert.ok((await minify(source, options)).includes('<style>.a{fill:red}</style>'), 'SVGO should still minify the CSS');
       assert.strictEqual(await minify(source, { ...options, canMinifySVG: () => false }), source);
     });
 
-    test('The hook is not called when `minifySVG` is a function', async () => {
+    test('Does not call the hook when `minifySVG` is a function', async () => {
       let calls = 0;
       const logs = [];
       const result = await minify(input, {
@@ -1672,7 +1672,7 @@ describe('SVG and MathML', () => {
       assert.ok(logs.some(message => message.includes('canMinifySVG') && message.includes('function of your own')));
     });
 
-    test('Setting the hook without `minifySVG` is reported', async () => {
+    test('Reports setting the hook without `minifySVG`', async () => {
       const logs = [];
       await minify(input, {
         canMinifySVG: () => true,
@@ -1681,7 +1681,7 @@ describe('SVG and MathML', () => {
       assert.ok(logs.some(message => message.includes('canMinifySVG') && message.includes('minifySVG')));
     });
 
-    test('A hook that throws skips SVGO, or rejects without `continueOnMinifyError`', async () => {
+    test('Skips SVGO when the hook throws, or rejects without `continueOnMinifyError`', async () => {
       const canMinifySVG = () => { throw new Error('Hook failure'); };
       const logs = [];
       const result = await minify(input, {
@@ -1695,7 +1695,7 @@ describe('SVG and MathML', () => {
       await assert.rejects(minify(input, { minifySVG: true, continueOnMinifyError: false, canMinifySVG }), /Hook failure/);
     });
 
-    test('A hook that returns a promise is an error, whether it resolves or rejects', async () => {
+    test('Treats a hook that returns a promise as an error, whether it resolves or rejects', async () => {
       for (const canMinifySVG of [async () => false, () => Promise.reject(new Error('Hook failure'))]) {
         const logs = [];
         const result = await minify(input, {

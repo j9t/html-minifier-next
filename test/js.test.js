@@ -123,7 +123,7 @@ describe('JS', () => {
     assert.strictEqual(await minify(input, { minifyJS: true }), input);
   });
 
-  test('`type=module` enables module-specific optimizations', async () => {
+  test('Enables module-specific optimizations for `type=module`', async () => {
     let input, output;
 
     // Module-specific optimization: unused variable elimination (only safe in module scope)
@@ -229,7 +229,7 @@ describe('JS', () => {
     assert.strictEqual(await minify(input, { minifyJS: { engine: 'swc', compress: { drop_console: true } }, continueOnMinifyError: false }), output);
   });
 
-  test('Invalid engine throws error', async () => {
+  test('Throws an error for an invalid engine', async () => {
     const input = '<script>function test() { return 1; }</script>';
 
     await assert.rejects(
@@ -285,7 +285,7 @@ describe('JS', () => {
     assert.strictEqual(result2, result3, 'Case variations should produce same result');
   });
 
-  test('Non-string engine is rejected with the engine error', async () => {
+  test('Rejects a non-string engine with the engine error', async () => {
     const input = '<script>function test() { return 42; }</script>';
 
     for (const engine of [1, true, {}, ['swc']]) {
@@ -297,7 +297,7 @@ describe('JS', () => {
     }
   });
 
-  test('Engine that cannot be serialized is still rejected with the engine error', async () => {
+  test('Still rejects an engine that cannot be serialized with the engine error', async () => {
     const input = '<script>function test() { return 42; }</script>';
     const cyclic = {};
     cyclic.self = cyclic;
@@ -311,7 +311,7 @@ describe('JS', () => {
     }
   });
 
-  test('Unset engine falls back to Terser', async () => {
+  test('Falls back to Terser for an unset engine', async () => {
     const input = '<script>function test() { return 42; }</script>';
     const output = await minify(input, { minifyJS: { engine: 'terser' } });
 
@@ -392,18 +392,18 @@ describe('JS', () => {
   describe('Script body extraction', () => {
     const codesOf = (html) => extractScriptBodies(html).map(body => body.code);
 
-    test('Executable scripts are collected in document order', () => {
+    test('Collects executable scripts in document order', () => {
       assert.deepStrictEqual(
         codesOf('<script>var a = 1;</script><p>x</p><script>var b = 2;</script>'),
         ['var a = 1;', 'var b = 2;']
       );
     });
 
-    test('External and whitespace-only scripts are skipped', () => {
+    test('Skips external and whitespace-only scripts', () => {
       assert.deepStrictEqual(codesOf('<script src="a.js"></script><script>  \n </script>'), []);
     });
 
-    test('Data blocks are skipped, executable types are kept', () => {
+    test('Skips data blocks, keeping executable types', () => {
       const input = '<script type="application/json">{"a":1}</script>' +
         '<script type="application/ld+json">{"b":2}</script>' +
         '<script type="text/template"><p>x</p></script>' +
@@ -412,33 +412,33 @@ describe('JS', () => {
       assert.deepStrictEqual(codesOf(input), ['var a = 1;']);
     });
 
-    test('A module is recorded as one', () => {
+    test('Records a module as one', () => {
       assert.deepStrictEqual(
         extractScriptBodies('<script type="module">var a = 1;</script>'),
         [{ code: 'var a = 1;', isModule: true }]
       );
     });
 
-    test('The same body in both script modes stays two entries', () => {
+    test('Keeps the same body in both script modes as two entries', () => {
       assert.deepStrictEqual(
         extractScriptBodies('<script>var a = 1;</script><script type="module">var a = 1;</script>'),
         [{ code: 'var a = 1;', isModule: false }, { code: 'var a = 1;', isModule: true }]
       );
     });
 
-    test('A repeated body is dispatched once', () => {
+    test('Dispatches a repeated body once', () => {
       assert.deepStrictEqual(codesOf('<script>var a = 1;</script><script>var a = 1;</script>'), ['var a = 1;']);
     });
 
-    test('A `>` inside an attribute value does not end the tag', () => {
+    test('Does not end the tag at a `>` inside an attribute value', () => {
       assert.deepStrictEqual(codesOf('<script data-x="a>b">var a = 1;</script>'), ['var a = 1;']);
     });
 
-    test('Markup that looks like script content is left alone', () => {
+    test('Leaves markup that looks like script content alone', () => {
       assert.deepStrictEqual(codesOf('<p>var a = 1;</p><pre>&lt;script&gt;x&lt;/script&gt;</pre>'), []);
     });
 
-    test('Every collected body is what the minifier is asked to minify', async () => {
+    test('Collects exactly the bodies the minifier is asked to minify', async () => {
       const input = '<script>var a = 1;</script><script type="module">var b = 2;</script>' +
         '<script src="a.js"></script><script type="application/json">{"c":3}</script>';
       const asked = [];
@@ -454,21 +454,21 @@ describe('JS', () => {
       assert.deepStrictEqual(codesOf(input), asked);
     });
 
-    test('A closing tag carrying junk still ends the body', () => {
+    test('Still ends the body at a closing tag carrying junk', () => {
       assert.deepStrictEqual(codesOf('<script>var a = 1;</script foo bar>'), ['var a = 1;']);
     });
 
-    test('A tag whose name only starts with `script` does not end the body', () => {
+    test('Does not end the body at a tag whose name only starts with `script`', () => {
       const body = 'var a = 1; // </scriptx>\nvar b = 2;';
       assert.deepStrictEqual(codesOf('<script>' + body + '</script>'), [body]);
     });
 
-    test('An unclosed script is skipped', () => {
+    test('Skips an unclosed script', () => {
       assert.deepStrictEqual(codesOf('<script>var a = 1;'), []);
       assert.deepStrictEqual(codesOf('<script>var a = 1;</script'), []);
     });
 
-    test('Repeated `</script` does not degrade to a quadratic scan', () => {
+    test('Does not degrade to a quadratic scan on repeated `</script`', () => {
       const input = '<script>var a = 1;' + '</script'.repeat(20000);
       const start = performance.now();
 
@@ -476,7 +476,7 @@ describe('JS', () => {
       assert.ok(performance.now() - start < 500, 'Extraction should stay linear in the input length');
     });
 
-    test('Repeated `<script` does not degrade to a quadratic scan', () => {
+    test('Does not degrade to a quadratic scan on repeated `<script`', () => {
       const input = '<script '.repeat(20000);
       const start = performance.now();
 
@@ -486,7 +486,7 @@ describe('JS', () => {
   });
 
   describe('`canMinifyJS`', () => {
-    test('A `false` return leaves the JavaScript unminified', async () => {
+    test('Leaves the JavaScript unminified on a `false` return', async () => {
       const input = '<script>function test() { let x = 1; return x; }</script>';
       assert.strictEqual(await minify(input, { minifyJS: true, canMinifyJS: () => false }), input);
       assert.strictEqual(
@@ -495,7 +495,7 @@ describe('JS', () => {
       );
     });
 
-    test('The hook receives the JavaScript and whether it is inline', async () => {
+    test('Passes the JavaScript and whether it is inline to the hook', async () => {
       const received = [];
       const input = '<script>let a = 1;</script><script type="module">export const b = 2;</script><button onclick="let c = 3;">Click</button>';
       await minify(input, {
@@ -521,7 +521,7 @@ describe('JS', () => {
       assert.strictEqual(result, '<script>function keep(){return 1}</script><script>function skip() { return 2; }</script>');
     });
 
-    test('Event handlers are exempted by `inline`', async () => {
+    test('Exempts event handlers by `inline`', async () => {
       const input = '<script>let x = 1;</script><button onclick="let y = 2;">Click</button>';
       const result = await minify(input, {
         minifyJS: true,
@@ -530,7 +530,7 @@ describe('JS', () => {
       assert.strictEqual(result, '<script>let x=1</script><button onclick="let y = 2;">Click</button>');
     });
 
-    test('Exempted scripts are still merged under `mergeScripts`', async () => {
+    test('Still merges exempted scripts under `mergeScripts`', async () => {
       const input = '<script>function keep() { return 1; }</script><script>function skip() { return 2; }</script>';
       const result = await minify(input, {
         minifyJS: true,
@@ -541,7 +541,7 @@ describe('JS', () => {
     });
 
     // SWC dispatches scripts in parallel before the parse reaches them
-    test('The hook sees the same calls, and has the same effect, under either engine', async () => {
+    test('Makes the same hook calls, with the same effect, under either engine', async () => {
       const input = '<script> var a = 1; console.log(a); </script><script> var b = 2; console.log(b); </script><button onclick="var c = 3;">Go</button>';
       for (const engine of ['terser', 'swc']) {
         const received = [];
@@ -563,7 +563,7 @@ describe('JS', () => {
       }
     });
 
-    test('The hook is not called when `minifyJS` is a function', async () => {
+    test('Does not call the hook when `minifyJS` is a function', async () => {
       let calls = 0;
       const logs = [];
       const input = '<script>let x = 1;</script>';
@@ -580,7 +580,7 @@ describe('JS', () => {
       assert.ok(logs.some(message => message.includes('canMinifyJS') && message.includes('function of your own')));
     });
 
-    test('Setting the hook without `minifyJS` is reported', async () => {
+    test('Reports setting the hook without `minifyJS`', async () => {
       const logs = [];
       await minify('<script>let x = 1;</script>', {
         canMinifyJS: () => true,
@@ -589,7 +589,7 @@ describe('JS', () => {
       assert.ok(logs.some(message => message.includes('canMinifyJS') && message.includes('minifyJS')));
     });
 
-    test('A hook that throws leaves the JavaScript unminified, or rejects without `continueOnMinifyError`', async () => {
+    test('Leaves the JavaScript unminified when the hook throws, or rejects without `continueOnMinifyError`', async () => {
       const input = '<script>let x = 1;</script><button onclick="let y = 2;">Click</button>';
       const canMinifyJS = () => { throw new Error('Hook failure'); };
       const logs = [];
@@ -604,7 +604,7 @@ describe('JS', () => {
       await assert.rejects(minify(input, { minifyJS: true, continueOnMinifyError: false, canMinifyJS }), /Hook failure/);
     });
 
-    test('A hook that returns a promise is an error, whether it resolves or rejects', async () => {
+    test('Treats a hook that returns a promise as an error, whether it resolves or rejects', async () => {
       const input = '<script>let x = 1;</script><button onclick="let y = 2;">Click</button>';
       for (const canMinifyJS of [async () => false, () => Promise.reject(new Error('Hook failure'))]) {
         const logs = [];
@@ -621,7 +621,7 @@ describe('JS', () => {
   });
 
   describe('Deferred JS minification', () => {
-    test('Multiple scripts keep their results in document order', async () => {
+    test('Keeps the results of multiple scripts in document order', async () => {
       const input = '<script>var a = 1; console.log(a);</script>' +
         '<script>var b = 2; console.log(b);</script>' +
         '<script>var c = 3; console.log(c);</script>';
@@ -643,14 +643,14 @@ describe('JS', () => {
       assert.strictEqual(await minify(input, { minifyJS: true, mergeScripts: false }), output);
     });
 
-    test('Whitespace-only script is treated as empty', async () => {
+    test('Treats a whitespace-only script as empty', async () => {
       assert.strictEqual(
         await minify('<script>   </script>', { minifyJS: true, removeEmptyElements: true }),
         ''
       );
     });
 
-    test('Script that minifies away is still emitted', async () => {
+    test('Still emits a script that minifies away', async () => {
       // `removeEmptyElements` decides on the source text, so a comment-only script
       // survives as an empty element rather than being dropped
       assert.strictEqual(
@@ -659,14 +659,14 @@ describe('JS', () => {
       );
     });
 
-    test('Minification errors propagate with `continueOnMinifyError: false`', async () => {
+    test('Propagates minification errors with `continueOnMinifyError: false`', async () => {
       await assert.rejects(
         () => minify('<script>var = = =;</script>', { minifyJS: true, continueOnMinifyError: false }),
         { message: /Name expected/ }
       );
     });
 
-    test('Minification errors are swallowed with `continueOnMinifyError`', async () => {
+    test('Swallows minification errors with `continueOnMinifyError`', async () => {
       const logged = [];
       const result = await minify(
         '<script>var a = 1;</script><script>var = = =;</script>',
@@ -678,7 +678,7 @@ describe('JS', () => {
       assert.ok(logged.length > 0, 'Failure is reported through `log`');
     });
 
-    test('A user-supplied function sees each script exactly once', async () => {
+    test('Shows a user-supplied function each script exactly once', async () => {
       const seen = [];
       const input = '<script>var a = 1;</script><script>var b = 2;</script>';
 
@@ -693,7 +693,7 @@ describe('JS', () => {
       assert.deepStrictEqual(seen, ['var a = 1;', 'var b = 2;']);
     });
 
-    test('`processScripts` and the batched engine work together', async () => {
+    test('Combines `processScripts` with the batched engine', async () => {
       const scripts = '<script>var b = 1 ;</script><script>var c = 2 ;</script>';
       const options = { collapseWhitespace: true, minifyJS: { engine: 'swc' }, mergeScripts: false };
 
@@ -711,7 +711,7 @@ describe('JS', () => {
       );
     });
 
-    test('Deferred results survive whitespace collapsing around scripts', async () => {
+    test('Keeps deferred results through whitespace collapsing around scripts', async () => {
       const input = '<div>\n  <script>var a = 1; console.log(a);</script>\n  <p>text</p>\n</div>';
       const output = '<div><script>var a=1;console.log(a)</script><p>text</p></div>';
 

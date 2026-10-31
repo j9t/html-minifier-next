@@ -8,25 +8,25 @@ const hasRiskyQuantifiers = source => describeQuantifierRisk(source) !== null;
 
 describe('Utils', () => {
   describe('LRU', () => {
-    test('New cache reports all-zero stats', () => {
+    test('Reports all-zero stats for a new cache', () => {
       const cache = new LRU(3);
       assert.deepStrictEqual(cache.stats(), { gets: 0, hits: 0, size: 0, limit: 3 });
     });
 
-    test('`get()` on a missing key counts a get but not a hit', () => {
+    test('Counts a get but not a hit for `get()` on a missing key', () => {
       const cache = new LRU(3);
       assert.strictEqual(cache.get('missing'), undefined);
       assert.deepStrictEqual(cache.stats(), { gets: 1, hits: 0, size: 0, limit: 3 });
     });
 
-    test('`get()` on a present key counts both a get and a hit', () => {
+    test('Counts both a get and a hit for `get()` on a present key', () => {
       const cache = new LRU(3);
       cache.set('key', 'value');
       assert.strictEqual(cache.get('key'), 'value');
       assert.deepStrictEqual(cache.stats(), { gets: 1, hits: 1, size: 1, limit: 3 });
     });
 
-    test('Repeated lookups accumulate gets and hits independently', () => {
+    test('Accumulates gets and hits independently over repeated lookups', () => {
       const cache = new LRU(3);
       cache.set('a', 1);
 
@@ -40,14 +40,14 @@ describe('Utils', () => {
       assert.strictEqual(stats.hits, 2);
     });
 
-    test('`set()` does not affect gets/hits counters', () => {
+    test('Does not affect gets/hits counters with `set()`', () => {
       const cache = new LRU(3);
       cache.set('a', 1);
       cache.set('b', 2);
       assert.deepStrictEqual(cache.stats(), { gets: 0, hits: 0, size: 2, limit: 3 });
     });
 
-    test('`stats()` size reflects eviction once the limit is exceeded', () => {
+    test('Reflects eviction in the `stats()` size once the limit is exceeded', () => {
       const cache = new LRU(2);
       cache.set('a', 1);
       cache.set('b', 2);
@@ -62,7 +62,7 @@ describe('Utils', () => {
       assert.strictEqual(stats.hits, 1);
     });
 
-    test('`get()` promotes a key, changing which entry is evicted', () => {
+    test('Promotes a key with `get()`, changing which entry is evicted', () => {
       const cache = new LRU(2);
       cache.set('a', 1);
       cache.set('b', 2);
@@ -77,11 +77,11 @@ describe('Utils', () => {
 
   // Cache keys are built from it, so values that behave differently must not stringify alike
   describe('`stableStringify`', () => {
-    test('Key order does not matter', () => {
+    test('Ignores key order', () => {
       assert.strictEqual(stableStringify({ a: 1, b: [2, { c: 3, d: 4 }] }), stableStringify({ b: [2, { d: 4, c: 3 }], a: 1 }));
     });
 
-    test('Regular expressions are told apart by source and flags', () => {
+    test('Tells regular expressions apart by source and flags', () => {
       assert.strictEqual(stableStringify({ re: /a/g }), stableStringify({ re: /a/g }));
       assert.notStrictEqual(stableStringify({ re: /a/ }), stableStringify({ re: /b/ }));
       assert.notStrictEqual(stableStringify({ re: /a/ }), stableStringify({ re: /a/g }));
@@ -89,7 +89,7 @@ describe('Utils', () => {
       assert.notStrictEqual(stableStringify({ re: /a/ }), stableStringify({ re: '/a/' }));
     });
 
-    test('Functions are told apart by identity, not source', () => {
+    test('Tells functions apart by identity, not source', () => {
       const make = (/** @type {string} */ value) => () => value;
       const fn = make('a');
       assert.strictEqual(stableStringify({ fn }), stableStringify({ fn }));
@@ -98,7 +98,7 @@ describe('Utils', () => {
       assert.notStrictEqual(stableStringify({ fn }), stableStringify({}));
     });
 
-    test('Non-plain objects are told apart by identity', () => {
+    test('Tells non-plain objects apart by identity', () => {
       const map = new Map([['a', 1]]);
       assert.strictEqual(stableStringify({ map }), stableStringify({ map }));
       assert.notStrictEqual(stableStringify({ map }), stableStringify({ map: new Map([['b', 2]]) }));
@@ -108,24 +108,24 @@ describe('Utils', () => {
   });
 
   describe('`embedSource`', () => {
-    test('A pattern without flags is its own source', () => {
+    test('Returns a pattern without flags as its own source', () => {
       assert.strictEqual(embedSource(/\{\{#if\}\}/), '\\{\\{#if\\}\\}');
       assert.strictEqual(embedSource(/a.c/), 'a.c');
     });
 
-    test('`i` is written into the source, since the merged pattern cannot carry it', () => {
+    test('Writes `i` into the source, since the merged pattern cannot carry it', () => {
       assert.strictEqual(embedSource(/abc/i), '[aA][bB][cC]');
       assert.strictEqual(embedSource(/[a-z]/i), '[a-zA-Z]');
       assert.strictEqual(embedSource(/[^a-z0-9]/i), '[^a-zA-Z0-9]');
     });
 
-    test('`s` becomes the class it stands for', () => {
+    test('Turns `s` into the class it stands for', () => {
       assert.strictEqual(embedSource(/a.c/s), 'a[\\s\\S]c');
       // Only where `.` is the wildcard, not where it is a literal
       assert.strictEqual(embedSource(/a\.[.]c/s), 'a\\.[.]c');
     });
 
-    test('Syntax is left alone, and so is what cannot fold in place', () => {
+    test('Leaves syntax alone, and what cannot fold in place', () => {
       // Folding a group or property name would be a syntax error
       assert.strictEqual(embedSource(/(?<name>ab)/i), '(?<name>[aA][bB])');
       assert.strictEqual(embedSource(/\k<n>/i), '\\k<n>');
@@ -139,7 +139,7 @@ describe('Utils', () => {
       assert.strictEqual(embedSource(/[[ab]--[b]]/vi), '[[aAbB]--[bB]]');
     });
 
-    test('What `i` cannot reach is left alone, never widened', () => {
+    test('Leaves what `i` cannot reach alone, never widening it', () => {
       // Each of these would need the flag itself; the source keeps its own meaning.
       // Built with `RegExp` so they read as the fixtures they are, not as patterns
       // for scanners to flag.
@@ -149,7 +149,7 @@ describe('Utils', () => {
       assert.strictEqual(embedSource(/[\q{ab|cd}]/vi), '[\\q{ab|cd}]'); // `\q` holds strings, which fold as strings or not at all
     });
 
-    test('The rewrite never matches more than the pattern would', () => {
+    test('Does not rewrite a pattern to match more than it would', () => {
       const exact = [/abc/i, /[a-z]+/i, /[^a-z]/i, /a.c/s, /a.c/is, /<%[A-Z]+%>/i, /[a-z\d]/i, /(?:ab)+/i];
       const conservative = [
         new RegExp('(a)\\1', 'i'), new RegExp('[ü-ÿ]', 'i'), new RegExp('[*-[]', 'i'), new RegExp('\\x6a', 'i')
@@ -175,40 +175,40 @@ describe('Utils', () => {
   });
 
   describe('`describeQuantifierRisk`', () => {
-    test('A lazy scan up to a literal terminator is linear', () => {
+    test('Treats a lazy scan up to a literal terminator as linear', () => {
       // The shipped `ignoreCustomFragments` defaults
       assert.strictEqual(hasRiskyQuantifiers(/<%[\s\S]*?%>/.source), false);
       assert.strictEqual(hasRiskyQuantifiers(/<\?[\s\S]*?\?>/.source), false);
     });
 
-    test('Bounded quantifiers pass', () => {
+    test('Passes bounded quantifiers', () => {
       assert.strictEqual(hasRiskyQuantifiers(/\{\{[\s\S]{0,500}?\}\}/.source), false);
       assert.strictEqual(hasRiskyQuantifiers(/<!--[^-]{1,200}-->/.source), false);
     });
 
-    test('Alternation without an unlimited quantifier over it passes', () => {
+    test('Passes alternation without an unlimited quantifier over it', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(?:<%[\s\S]*?%>|<\?[\s\S]*?\?>)/.source), false);
     });
 
-    test('Unlimited quantifiers nested in a group are risky', () => {
+    test('Flags unlimited quantifiers nested in a group as risky', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(a+)+/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/\{\{([^}]+)+\}\}/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/(?:\s*\w*)*/.source), true);
     });
 
-    test('Unlimited quantifiers over an alternating group are risky', () => {
+    test('Flags unlimited quantifiers over an alternating group as risky', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(a|b)*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/<%(\s|\S)*?%>/.source), true);
       // The alternation counts however deeply it nests inside the repeated group
       assert.strictEqual(hasRiskyQuantifiers('(?:(?:a|aa))*b'), true);
     });
 
-    test('Variable quantifiers nested in an unbounded group are risky', () => {
+    test('Flags variable quantifiers nested in an unbounded group as risky', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(a?)+/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/\{\{(?:[^}]{1,3})+\}\}/.source), true);
     });
 
-    test('An exact count nested in an unbounded group passes', () => {
+    test('Passes an exact count nested in an unbounded group', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(?:a{4})+/.source), false);
       // `{n,n}` is the same count, spelled with a range
       assert.strictEqual(hasRiskyQuantifiers(/(?:a{2,2})+/.source), false);
@@ -217,12 +217,12 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(?:a{2,3})+/.source), true);
     });
 
-    test('The same atom repeated unboundedly twice in a row is risky', () => {
+    test('Flags the same atom repeated unboundedly twice in a row as risky', () => {
       assert.strictEqual(hasRiskyQuantifiers(/.*.*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/<!--[\s\S]*[\s\S]*-->/.source), true);
     });
 
-    test('Two unbounded repeats that can consume the same character are risky', () => {
+    test('Flags two unbounded repeats that can consume the same character as risky', () => {
       // Spelled differently, but `[a]` and `a` split a run of `a`s the same way
       assert.strictEqual(hasRiskyQuantifiers(/[a]*a*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/\w*\d*/.source), true);
@@ -239,14 +239,14 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/.*\n*/.source), false);
     });
 
-    test('An escape is read as what it stands for where it stands', () => {
+    test('Reads an escape as what it stands for where it stands', () => {
       // `\b` is a backspace inside a class, where outside one it is a boundary
       assert.strictEqual(hasRiskyQuantifiers('[\\b]*\\x08*'), true);
       // And a backspace is not the letter the escape is spelled with
       assert.strictEqual(hasRiskyQuantifiers('[\\b]*b*'), false);
     });
 
-    test('A pattern is judged the way its own flags make it match', () => {
+    test('Judges a pattern the way its own flags make it match', () => {
       // `s` and `S` fit into a source, and are written in before it is read
       assert.strictEqual(describeQuantifierRisk(/.*\n*/s) !== null, true);
       assert.strictEqual(describeQuantifierRisk(/.*\n*/) !== null, false);
@@ -259,7 +259,7 @@ describe('Utils', () => {
       assert.strictEqual(describeQuantifierRisk(/(?:a{4})+/i), null);
     });
 
-    test('A `v` class is read past the `]` that only closes a nested one', () => {
+    test('Reads a `v` class past the `]` that only closes a nested one', () => {
       // Under `v` a class nests, so `[[a][b]]` is one atom holding `a` and `b`
       assert.strictEqual(describeQuantifierRisk(/[[a][b]]*b*/v) !== null, true);
       assert.strictEqual(describeQuantifierRisk(/[[a][b]]*c*/v) !== null, false);
@@ -275,7 +275,7 @@ describe('Utils', () => {
       assert.strictEqual(describeQuantifierRisk(deep), null);
     });
 
-    test('A `v` class is read through subtraction and intersection', () => {
+    test('Reads a `v` class through subtraction and intersection', () => {
       assert.strictEqual(describeQuantifierRisk(/[[ab]--[b]]*a*/v) !== null, true);
       assert.strictEqual(describeQuantifierRisk(/[[ab]--[a]]*a*/v) !== null, false);
       assert.strictEqual(describeQuantifierRisk(/[[ab]&&[bc]]*b*/v) !== null, true);
@@ -302,7 +302,7 @@ describe('Utils', () => {
       assert.strictEqual(describeQuantifierRisk(nested) !== null, true);
     });
 
-    test('Repeats reach each other across atoms that can match empty', () => {
+    test('Lets repeats reach each other across atoms that can match empty', () => {
       // `b*` can match nothing, which leaves the two `a*` splitting the same run
       assert.strictEqual(hasRiskyQuantifiers(/a*b*a*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/\s*\w*\s*/.source), true);
@@ -318,7 +318,7 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/a*b*c*/.source), false);
     });
 
-    test('A group whose body can match empty does not separate repeats', () => {
+    test('Does not let a group whose body can match empty separate repeats', () => {
       // A quantifier inside the group, where the group itself carries none
       assert.strictEqual(hasRiskyQuantifiers(/a*(b*)a*/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/\s*(\w*)\s*/.source), true);
@@ -335,7 +335,7 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/a*(b|c)a*/.source), false);
     });
 
-    test('A group wrapping the atom does not hide the repetition', () => {
+    test('Does not let a group wrapping the atom hide the repetition', () => {
       // `^(?:a)*a*$` backtracks quadratically on `aaa…b`, the way `a*a*` does
       assert.strictEqual(hasRiskyQuantifiers(/^(?:a)*a*$/.source), true);
       assert.strictEqual(hasRiskyQuantifiers(/(a)*a*/.source), true);
@@ -348,7 +348,7 @@ describe('Utils', () => {
       assert.strictEqual(hasRiskyQuantifiers(/(?=a)a*/.source), false);
     });
 
-    test('Repeats reach each other across a group boundary', () => {
+    test('Lets repeats reach each other across a group boundary', () => {
       // A group is no wall: the repeat inside it and the one outside split the
       // same run, wherever the boundary falls between them
       assert.strictEqual(hasRiskyQuantifiers(/(a*)a*/.source), true);
@@ -399,12 +399,12 @@ describe('Utils', () => {
       assert.ok(Date.now() - start < 1000, 'Expected the analysis to bail out, not to walk every level');
     });
 
-    test('A repeated group repeating only within a bound passes', () => {
+    test('Passes a repeated group repeating only within a bound', () => {
       // The shape HMN itself composes from the fragment patterns
       assert.strictEqual(hasRiskyQuantifiers(/(?:<%[\s\S]*?%>|<\?[\s\S]*?\?>){1,200}/.source), false);
     });
 
-    test('The reason names what was found, not a shape nobody read', () => {
+    test('Names what was found in the reason, not a shape nobody read', () => {
       // A pattern refused for its size carries no quantifier to bound
       assert.match(String(describeQuantifierRisk('a'.repeat(10001))), /too long to analyze/);
       assert.match(String(describeQuantifierRisk('('.repeat(60) + 'a' + ')'.repeat(60))), /too deep to analyze/);
@@ -413,13 +413,13 @@ describe('Utils', () => {
       assert.strictEqual(describeQuantifierRisk(/<%[\s\S]*?%>/.source), null);
     });
 
-    test('Risk nested deeper in a group still surfaces', () => {
+    test('Still surfaces risk nested deeper in a group', () => {
       assert.strictEqual(hasRiskyQuantifiers(/<%(?:x(a+)+y)?%>/.source), true);
     });
   });
 
   describe('`isQuirksDoctype`', () => {
-    test('The HTML doctype and its legacy-compat form set no-quirks mode', () => {
+    test('Reads the HTML doctype and its legacy-compat form as no-quirks mode', () => {
       for (const doctype of [
         '<!doctype html>',
         '<!DOCTYPE HTML>',
@@ -432,7 +432,7 @@ describe('Utils', () => {
       }
     });
 
-    test('Strict legacy doctypes set no-quirks mode', () => {
+    test('Reads strict legacy doctypes as no-quirks mode', () => {
       for (const doctype of [
         '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
         '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">',
@@ -540,13 +540,13 @@ describe('Utils', () => {
       { code: 'ERR_MODULE_NOT_FOUND' }
     );
 
-    test('A package that is not installed is answered with the install command', () => {
+    test('Answers a package that is not installed with the install command', () => {
       const message = describeDependencyFailure('swc', '@swc/core', notFound('@swc/core'));
       assert.match(message, /requires @swc\/core to be installed/);
       assert.match(message, /npm install @swc\/core/);
     });
 
-    test('A package that is installed but fails to load names the failure instead', () => {
+    test('Names the failure for a package that is installed but fails to load', () => {
       // What a native package throws when npm skipped its platform binary, which no
       // reinstall of the package itself would change
       const message = describeDependencyFailure('swc', '@swc/core', new Error('Failed to load native binding'));
@@ -554,13 +554,13 @@ describe('Utils', () => {
       assert.doesNotMatch(message, /npm install/, 'Pointing at the install command would mislead');
     });
 
-    test('A missing dependency of the package is not read as the package itself', () => {
+    test('Does not read a missing dependency of the package as the package itself', () => {
       const message = describeDependencyFailure('swc', '@swc/core', notFound('@swc/counter'));
       assert.match(message, /could not load @swc\/core/);
       assert.doesNotMatch(message, /npm install/);
     });
 
-    test('A rejection that is not an error is still described', () => {
+    test('Still describes a rejection that is not an error', () => {
       assert.match(
         describeDependencyFailure('swc', '@swc/core', 'boom'),
         /could not load @swc\/core: boom/

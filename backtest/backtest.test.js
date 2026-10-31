@@ -10,15 +10,15 @@ import { formatChange, formatResults, historicalDeps, ordinal, parseRange } from
 
 describe('Backtest', () => {
   describe('`parseRange`', () => {
-    test('A count alone samples every commit', () => {
+    test('Samples every commit for a count alone', () => {
       assert.deepStrictEqual(parseRange('100'), { count: 100, step: 1 });
     });
 
-    test('A count and a step are read', () => {
+    test('Reads a count and a step', () => {
       assert.deepStrictEqual(parseRange('500/10'), { count: 500, step: 10 });
     });
 
-    test('Counts and steps that are not positive integers are rejected', () => {
+    test('Rejects counts and steps that are not positive integers', () => {
       for (const arg of ['0', '-5', 'all', '/2', '10abc', '1.5']) {
         assert.throws(() => parseRange(arg), /Invalid commit count/, arg);
       }
@@ -27,17 +27,17 @@ describe('Backtest', () => {
       }
     });
 
-    test('Leading zeros are still read as numbers', () => {
+    test('Still reads leading zeros as numbers', () => {
       assert.deepStrictEqual(parseRange('010/02'), { count: 10, step: 2 });
     });
 
-    test('More than one slash is rejected', () => {
+    test('Rejects more than one slash', () => {
       assert.throws(() => parseRange('1/2/3'), /Invalid format/);
     });
   });
 
   describe('`ordinal`', () => {
-    test('Suffixes follow English usage, including the teens', () => {
+    test('Follows English usage for suffixes, including the teens', () => {
       const cases = [[1, '1st'], [2, '2nd'], [3, '3rd'], [4, '4th'], [11, '11th'], [12, '12th'], [13, '13th'], [21, '21st'], [22, '22nd'], [23, '23rd'], [101, '101st'], [111, '111th']];
       for (const [n, expected] of cases) {
         assert.strictEqual(ordinal(n), expected);
@@ -46,7 +46,7 @@ describe('Backtest', () => {
   });
 
   describe('`formatChange`', () => {
-    test('Nothing is shown without an older value, or for a change that rounds to zero', () => {
+    test('Shows nothing without an older value, or for a change that rounds to zero', () => {
       assert.strictEqual(formatChange(100, undefined), '');
       assert.strictEqual(formatChange(100, 0), '');
       assert.strictEqual(formatChange(100, 100), '');
@@ -54,7 +54,7 @@ describe('Backtest', () => {
       assert.strictEqual(formatChange(99999, 100000), '');
     });
 
-    test('A change is shown with its sign and two decimals', () => {
+    test('Shows a change with its sign and two decimals', () => {
       assert.strictEqual(formatChange(101, 100), ' (+1.00%)');
       assert.strictEqual(formatChange(90, 100), ' (-10.00%)');
     });
@@ -80,7 +80,7 @@ describe('Backtest', () => {
     };
     const results = formatResults(table, ['Site A', 'Site B'], 2, new Date('2026-09-14T12:00:00Z'));
 
-    test('The summary names the run and the compression levels', () => {
+    test('Names the run and the compression levels in the summary', () => {
       assert.deepStrictEqual(results.summary, {
         commits: 3,
         step: 2,
@@ -90,7 +90,7 @@ describe('Backtest', () => {
       });
     });
 
-    test('Commits are listed newest first, each compared to the next older one', () => {
+    test('Lists commits newest first, each compared to the next older one', () => {
       assert.deepStrictEqual(results.sites['Site A'], {
         '2026-09-03 10:00 ccc3333': '990 (-1.00%) · Gzip 400 (-0.99%) · Brotli 303 (+1.00%) @ 10 ms (-16.67%)',
         '2026-09-02 10:00 bbb2222': '1,000 · Gzip 404 (+1.00%) · Brotli 300 @ 12 ms (+20.00%)',
@@ -103,7 +103,7 @@ describe('Backtest', () => {
       ]);
     });
 
-    test('A commit without a site’s result is skipped in the comparison', () => {
+    test('Skips a commit without a site’s result in the comparison', () => {
       assert.deepStrictEqual(results.sites['Site B'], {
         '2026-09-03 10:00 ccc3333': '1,900 (-5.00%) · Gzip 800 · Brotli 700 @ 20 ms',
         '2026-09-01 10:00 aaa1111': '2,000 · Gzip 800 · Brotli 700 @ 20 ms'

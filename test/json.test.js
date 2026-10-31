@@ -162,7 +162,7 @@ describe('JSON', () => {
     }
   });
 
-  test('JSON script content keeps `<` escaped', async () => {
+  test('Keeps `<` escaped in JSON script content', async () => {
     // A framework hydration payload: HTML held inside JSON, with `<` and `/`
     // escaped so the nested `</script>` cannot terminate the container
     const input = '<script type="application/json">{\n  "content": "\\u003Cscript\\u003Ealert(1)\\u003C\\u002Fscript\\u003E"\n}</script>';
@@ -176,7 +176,7 @@ describe('JSON', () => {
     assert.strictEqual(value.content, '<script>alert(1)</script>');
   });
 
-  test('JSON script content without markup is unaffected', async () => {
+  test('Leaves JSON script content without markup unaffected', async () => {
     const input = '<script type="application/ld+json">{\n  "@type": "Person",\n  "name": "Test"\n}</script>';
     const output = '<script type="application/ld+json">{"@type":"Person","name":"Test"}</script>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true, minifyJSON: true }), output);
