@@ -14,11 +14,16 @@ const RE_NBSP_TRAILING_STRIP = /[^\xA0]+$/;
 const RE_EVENT_ATTR_DEFAULT = /^on[a-z]{3,}$/;
 const RE_CAN_REMOVE_ATTR_QUOTES = /^[^ \t\n\f\r"'`=<>]+$/;
 const RE_TRAILING_SEMICOLON = /;$/;
-const RE_AMP_ENTITY = /&(#?[0-9a-zA-Z]+;)/g;
 // Line breaks HTML reads as line feeds when raw
 const RE_CR = /\r/g;
 const RE_LINE_BREAK_CR = /\r\n?/g;
-const RE_LEGACY_ENTITIES = /&((?:Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt)(?!;)|(?:#?[0-9a-zA-Z]+;))/g;
+// Named references HTML resolves without a semicolon
+const LEGACY_REFERENCE_NAMES = 'Iacute|aacute|uacute|plusmn|Otilde|otilde|agrave|Agrave|Yacute|yacute|Oslash|oslash|atilde|Atilde|brvbar|ccedil|Ccedil|Ograve|curren|divide|eacute|Eacute|ograve|Oacute|egrave|Egrave|Ugrave|frac12|frac14|frac34|ugrave|oacute|iacute|Ntilde|ntilde|Uacute|middot|igrave|Igrave|iquest|Aacute|cedil|laquo|micro|iexcl|Icirc|icirc|acirc|Ucirc|Ecirc|ocirc|Ocirc|ecirc|ucirc|Aring|aring|AElig|aelig|acute|pound|raquo|Acirc|times|THORN|szlig|thorn|COPY|auml|ordf|ordm|Uuml|macr|uuml|Auml|ouml|Ouml|para|nbsp|euml|quot|QUOT|Euml|yuml|cent|sect|copy|sup1|sup2|sup3|iuml|Iuml|ETH|shy|reg|not|yen|amp|AMP|REG|uml|eth|deg|gt|GT|LT|lt';
+// Ampersands text would read as starting a reference, for `&amp` to precede
+const RE_LEGACY_ENTITIES = new RegExp(`&((?:${LEGACY_REFERENCE_NAMES})(?!;)|[0-9a-zA-Z]+;|#[0-9]|#[xX][0-9a-fA-F])`, 'g');
+// Ampersands an attribute value would read as starting a reference (which a legacy name
+// followed by `=` or an alphanumeric does not)
+const RE_AMP_REFERENCE_ATTR = new RegExp(`&(?=(?:${LEGACY_REFERENCE_NAMES})(?![=0-9a-zA-Z])|[0-9a-zA-Z]+;|#[0-9]|#[xX][0-9a-fA-F])`, 'g');
 const RE_ESCAPE_LT = /</g;
 // A `base` element, also as character references may write it, or as a script may name it
 // (e.g., `createElement('base')`)
@@ -422,7 +427,7 @@ export {
   RE_EVENT_ATTR_DEFAULT,
   RE_CAN_REMOVE_ATTR_QUOTES,
   RE_TRAILING_SEMICOLON,
-  RE_AMP_ENTITY,
+  RE_AMP_REFERENCE_ATTR,
   RE_CR,
   RE_LINE_BREAK_CR,
   RE_LEGACY_ENTITIES,
