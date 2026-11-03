@@ -1,8 +1,8 @@
 {
   "author": "Jens Oliver Meiert",
   "bin": {
-    "html-minifier-next": "./cli.js",
-    "hmn": "./cli.js"
+    "html-minifier-next": "cli.js",
+    "hmn": "cli.js"
   },
   "bugs": "https://github.com/j9t/html-minifier-next/issues",
   "dependencies": {

@@ -77,7 +77,7 @@ function buildConfigSchema() {
 
 // Write the schema file when run as a script (not when imported by tests)
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  fs.writeFileSync(schemaPath, JSON.stringify(buildConfigSchema(), null, 2) + '\n');
+  fs.writeFileSync(schemaPath, JSON.stringify(buildConfigSchema(), null, 2));
   console.error(`Generated ${schemaPath}`);
 }
 
