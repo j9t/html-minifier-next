@@ -3568,10 +3568,9 @@ describe('HTML', () => {
   });
 
   test('Applies `strictCustomFragments`', async () => {
-    // Deliberately catastrophic shapes, built with `RegExp` so they read as the
-    // fixtures they are, not as patterns for scanners to flag
-    const catastrophicStrict = new RegExp('<%(?:x|xx)+%>');
-    const catastrophicWarn = new RegExp('<%(?:y|yy)+%>');
+    // Deliberately catastrophic shapes
+    const catastrophicStrict = /<%(?:x|xx)+%>/;
+    const catastrophicWarn = /<%(?:y|yy)+%>/;
 
     // A pattern that can backtrack catastrophically is refused outright
     await assert.rejects(
