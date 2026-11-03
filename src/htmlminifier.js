@@ -688,7 +688,22 @@ const RE_BLANKS_ONLY = /^[ \t\f]+$/;
 const RE_HTML_COMMENT_START = /^\s*<!--/;
 const RE_CLOSING_TAG_START = /^\s*<\/([a-zA-Z][\w:-]*)/;
 const RE_FIRST_HTML_TAG = /^\s*<([a-zA-Z][\w:-]*)/;
-const RE_LAST_HTML_TAG = /[\s\S]*<(\/?[a-zA-Z][\w:-]*)/;
+const RE_HTML_TAG_AT = /<(\/?[a-zA-Z][\w:-]*)/y;
+
+// Name of the last tag in `content` (prefixed with `/` for an end tag), scanned backward
+// from each `<`, as a greedy `[\s\S]*<…` regex backtracks quadratically on tagless content
+/**
+ * @param {string} content
+ * @returns {string | undefined}
+ */
+function findLastHtmlTag(content) {
+  for (let i = content.lastIndexOf('<'); i !== -1; i = i ? content.lastIndexOf('<', i - 1) : -1) {
+    RE_HTML_TAG_AT.lastIndex = i;
+    const match = RE_HTML_TAG_AT.exec(content);
+    if (match) return match[1];
+  }
+  return undefined;
+}
 
 
 // Probe for SVG/MathML elements—when the input has none (the common case),
@@ -1150,7 +1165,7 @@ async function minifyHTML(value, options, partialMarkup) {
   let textVerbatim = false;
   /** @type {string[]} */
   const ignoredMarkupChunks = [];
-  /** @type {Array<RegExpExecArray | null>} */
+  /** @type {Array<[string, string, string]>} */
   const ignoredCustomMarkupChunks = [];
   // Custom fragments whose surrounding whitespace is never trimmed: in tags, where it
   // separates attributes, and in CSS and JavaScript, where minifiers can’t judge it
@@ -1276,7 +1291,11 @@ async function minifyHTML(value, options, partialMarkup) {
       }
 
       const token = uidAttr + ignoredCustomMarkupChunks.length + uidAttr;
-      ignoredCustomMarkupChunks.push(/^(\s*)[\s\S]*?(\s*)$/.exec(match));
+      // Split off leading and trailing whitespace without a regex, which would
+      // backtrack quadratically over inner whitespace runs
+      const leading = match.length - match.trimStart().length;
+      const trailing = leading === match.length ? 0 : match.length - match.trimEnd().length;
+      ignoredCustomMarkupChunks.push([match, match.slice(0, leading), match.slice(match.length - trailing)]);
       return '\t' + token + '\t';
     };
 
@@ -1323,7 +1342,7 @@ async function minifyHTML(value, options, partialMarkup) {
     let joinsTag = false;
     let writeIndex = 0;
     // Padding of the previous attribute if that is a fragment without value
-    /** @type {RegExpExecArray | null | undefined} */
+    /** @type {[string, string, string] | null | undefined} */
     let prevChunks = null;
     for (const attr of attrs) {
       const uidMatch = pattern.exec(attr.name);
@@ -1792,9 +1811,8 @@ async function minifyHTML(value, options, partialMarkup) {
               const idx = +(match[1] ?? '');
               if (idx < ignoredMarkupChunks.length) {
                 const content = ignoredMarkupChunks[idx];
-                const lastTagMatch = content && RE_LAST_HTML_TAG.exec(content);
-                if (lastTagMatch) {
-                  const group = lastTagMatch[1] ?? '';
+                const group = content && findLastHtmlTag(content);
+                if (group) {
                   const isClose = group.charAt(0) === '/';
                   const tagName = resolveName(isClose ? group.slice(1) : group);
                   effectivePrevTag = isClose ? '/' + tagName : tagName;
