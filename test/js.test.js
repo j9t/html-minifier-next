@@ -91,6 +91,15 @@ describe('JS', () => {
     assert.ok(result.includes('onclick='), '`onclick` attribute should be preserved');
     assert.ok(result.includes('&&'), 'Decoded `&&` operator should be preserved');
     assert.ok(result.includes('b()'), 'Function call after `&amp;&amp;` should be preserved');
+
+    // A reference without a semicolon decodes as browsers decode it
+    input = '<p onclick="if(a &lt b)c()">x</p>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), '<p onclick="a<b&&c()">x</p>');
+  });
+
+  test('Keeps decoded ampersands in event handler attributes from forming character references', async () => {
+    const input = '<p onclick="x(&quot;&amp;copy b&quot;)">x</p>';
+    assert.strictEqual(await minify(input, { minifyJS: true }), '<p onclick=\'x("&amp;copy b")\'>x</p>');
   });
 
   test('Minifies the MIME types that trigger minification', async () => {

@@ -6501,6 +6501,32 @@ describe('HTML', () => {
     assert.strictEqual(await minify(input, { collapseWhitespace: true, decodeEntities: true }), output);
   });
 
+  test('Keeps decoded ampersands in attributes from forming character references with `decodeEntities`', async () => {
+    const options = { decodeEntities: true };
+
+    // References without a semicolon that browsers resolve in attributes stay escaped
+    assert.strictEqual(await minify('<p title="&amp;copy b">x</p>', options), '<p title="&amp;copy b">x</p>');
+    assert.strictEqual(await minify('<p title="&amp;amp">x</p>', options), '<p title="&amp;amp">x</p>');
+    assert.strictEqual(await minify('<p title="&amp;#169 &amp;#xA9">x</p>', options), '<p title="&amp;#169 &amp;#xA9">x</p>');
+    assert.strictEqual(await minify('<p title="&amp;copy;">x</p>', options), '<p title="&amp;copy;">x</p>');
+
+    // Ampersands that cannot start a reference in an attribute stay bare
+    assert.strictEqual(await minify('<a href="?a=1&amp;b=2&amp;copy=3&amp;copyright">x</a>', options), '<a href="?a=1&b=2&copy=3&copyright">x</a>');
+    assert.strictEqual(await minify('<p title="a &amp; b &amp;# &amp;#x">x</p>', options), '<p title="a & b &# &#x">x</p>');
+  });
+
+  test('Keeps decoded ampersands in text from forming numeric character references with `decodeEntities`', async () => {
+    const options = { decodeEntities: true };
+    assert.strictEqual(await minify('<p>&amp;#169 &amp;#xA9 &amp;#169;</p>', options), '<p>&amp#169 &amp#xA9 &amp#169;</p>');
+    assert.strictEqual(await minify('<p>&amp;# &amp;#x &amp;#xg</p>', options), '<p>&# &#x &#xg</p>');
+  });
+
+  test('Decodes references without a semicolon in attributes as browsers do with `decodeEntities`', async () => {
+    const options = { decodeEntities: true };
+    assert.strictEqual(await minify('<p title="&copy b &#169 c">x</p>', options), '<p title="© b © c">x</p>');
+    assert.strictEqual(await minify('<a href="?a&copy=1&copyb">x</a>', options), '<a href="?a&copy=1&copyb">x</a>');
+  });
+
   test('Keeps carriage returns encoded with `decodeEntities`, which HTML reads as line feeds when raw', async () => {
     const options = { decodeEntities: true };
     assert.strictEqual(await minify('<p title="a&#13;b">x&#13;y</p>', options), '<p title="a&#13;b">x&#13;y</p>');
@@ -6625,6 +6651,26 @@ describe('HTML', () => {
     // Sanity: A well-formed long end tag is unaffected by the guard
     const nested = '<x-' + longName + '>hi</x-' + longName + '>';
     assert.strictEqual(await minify(nested), nested);
+  });
+
+  test('Avoids ReDoS on a long tagless `htmlmin:ignore` block', async () => {
+    // Finding the block’s last tag (for whitespace collapsing before the next element) took a
+    // regex that backtracked quadratically over content without tags: ~3 s for 64,000 chars
+    const content = 'a'.repeat(300000);
+    const start = Date.now();
+    const result = await minify('<!-- htmlmin:ignore -->' + content + '<!-- htmlmin:ignore -->b<p>y</p>', { collapseWhitespace: true });
+    assert.ok(Date.now() - start < 5000, 'Ignored content should be scanned in linear time');
+    assert.strictEqual(result, content + 'b<p>y</p>');
+  });
+
+  test('Avoids ReDoS on long whitespace inside a custom fragment', async () => {
+    // Splitting a fragment’s leading and trailing whitespace off took a regex that backtracked
+    // quadratically over inner whitespace runs: ~3 s for 64,000 chars, with default options
+    const input = '<p><?php a' + ' '.repeat(300000) + 'a ?></p>';
+    const start = Date.now();
+    const result = await minify(input);
+    assert.ok(Date.now() - start < 5000, 'Fragment whitespace should be split in linear time');
+    assert.strictEqual(result, input);
   });
 
   test('Handles inline custom elements', async () => {
@@ -6783,6 +6829,11 @@ describe('HTML', () => {
     // `&lt;` in text round-trips instead of becoming a tag
     input = '<iframe srcdoc="&lt;p&gt;1 &amp;lt; 2&lt;/p&gt;"></iframe>';
     output = '<iframe srcdoc="<p>1 &amp;lt; 2</p>"></iframe>';
+    assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
+
+    // A no-break space round-trips as `&nbsp;`
+    input = '<iframe srcdoc="&lt;p&gt;a&amp;nbsp;b&nbsp;c&lt;/p&gt;"></iframe>';
+    output = '<iframe srcdoc="<p>a&amp;nbsp;b&nbsp;c</p>"></iframe>';
     assert.strictEqual(await minify(input, { collapseWhitespace: true }), output);
 
     // A value carrying both quote characters keeps its delimiters intact
