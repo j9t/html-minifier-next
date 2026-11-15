@@ -879,7 +879,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Changed
 
-[The following reads more complicated than it is. Consider going through [the brief upgrade guide](https://meiert.com/blog/html-minifier-next-5/).]
+[The following reads more complicated than it is. Consider going through [the brief upgrade guide](https://web.archive.org/web/20260626175248/https://meiert.com/blog/html-minifier-next-5/).]
 
 * **BREAKING:** Directory mode (`--input-dir`) now defaults to processing only `.html`, `.htm`, `.xhtml`, and `.shtml` files instead of all files
   - To process all files, use `--file-ext='*'`; to process specific extensions, use `--file-ext=html,php,twig` (replaces defaults)
