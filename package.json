@@ -6,7 +6,7 @@
   },
   "bugs": "https://github.com/j9t/html-minifier-next/issues",
   "dependencies": {
-    "commander": "^15.0.0",
+    "commander": "^15.1.0",
     "entities": "^9.0.0",
     "lightningcss": "^1.33.0",
     "svgo": "^4.1.0",
@@ -20,7 +20,7 @@
     "eslint": "^10.14.0",
     "globals": "^17.14.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.6"
+    "vite": "^8.3.8"
   },
   "engines": {
     "node": ">=22.13"
