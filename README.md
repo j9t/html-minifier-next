@@ -896,6 +896,6 @@ With many thanks to the previous authors of and contributors to HTML Minifier, e
 
 You might like some of my other work:
 
-* Optimization tools: [hihtml](https://github.com/j9t/hihtml) · [HTML Minifier](https://github.com/j9t/html-minifier) · [ObsoHTML](https://github.com/j9t/obsohtml) · [CSS Dedup](https://github.com/j9t/css-dedup) · [Image Guard](https://github.com/j9t/image-guard) · [Compressor.js Next](https://github.com/j9t/compressorjs-next) · [.htaccess Punk](https://github.com/j9t/htaccess-punk)
-* Defense tools: [IA Defensa](https://iadefensa.com/solutions/)
-* Resources for quality web development: [Articles](https://meiert.com/topics/development/) · [Books](https://meiert.com/topics/books/) (e.g., [_On Web Development_](https://meiert.com/blog/on-web-development-2/)) · [News](https://dxsrc.org/) · [Terminology](https://webglossary.info/)
+* Optimization tools: [hihtml](https://github.com/j9t/hihtml) · [HTML Minifier](https://github.com/j9t/html-minifier) · [CSS Dedup](https://github.com/j9t/css-dedup) · [Image Guard](https://github.com/j9t/image-guard) · [more](https://github.com/j9t?tab=repositories)
+* Defense tools: [AWAGAM TLD, Domain, and URL Blocker](https://iadefensa.com/solutions/awagam-chromium/) · [Middleman Alerter](https://iadefensa.com/solutions/middleman-alerter-chromium/) · [New Tab Traffic Randomizer](https://iadefensa.com/solutions/new-tab-traffic-randomizer-chromium/) · [Searcher](https://iadefensa.com/solutions/searcher-chromium/) · [more](https://iadefensa.com/solutions/)
+* Resources for quality web development: [Articles](https://meiert.com/topics/development/) · [Books](https://meiert.com/topics/books/) · [News](https://dxsrc.org/) · [Terminology](https://webglossary.info/)
