@@ -689,7 +689,7 @@ SVG and MathML elements are automatically recognized as foreign elements, and wh
 
 `removeRedundantAttributes` removes the namespace declarations HTML reads anyway (`xmlns` on `html`, `svg`, `math`, and other elements in the namespace it declares, and `xmlns:xlink` on SVG and MathML elements), along with SVG attributes set to their default values (e.g., `<feBlend mode="normal">`, `<stop offset="0">`; presentation attributes like `fill` are left alone, as they inherit). Without the declarations, SVG markup taken from the page via `outerHTML` (e.g., to save it as a file) is no standalone SVG; `XMLSerializer` adds them back.
 
-### Working with Invalid or Partial Markup
+### Working With Invalid or Partial Markup
 
 By default, HMN parses markup into a complete tree structure, then modifies it (removing anything that was specified for removal, ignoring anything that was specified to be ignored, etc.), then creates markup from that tree and returns it.
 
