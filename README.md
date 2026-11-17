@@ -26,7 +26,7 @@ For programmatic use, install as a development dependency:
 npm i -D html-minifier-next
 ```
 
-## General usage
+## General Usage
 
 ### CLI
 
@@ -47,7 +47,7 @@ Use `npx html-minifier-next --help` to check all available options:
 | `--verbose`, `-v` | Show detailed processing information (active options, worker thread count, file statistics, and minifier warnings) | `npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-whitespace` |
 | `--dry`, `-d` | Dry run: Process and report statistics without writing output | `npx html-minifier-next input.html --dry --collapse-whitespace` |
 
-### Configuration file
+### Configuration File
 
 You can use a configuration file to specify options. If an html-minifier-next.config.json file is present in the current working directory—only there; subfolders (including `--input-dir`) and parent folders are not searched—the CLI picks it up automatically, with a note on STDERR confirming this. An explicit `--config-file` takes precedence. (The standalone `--zero` mode is deliberately config-free and ignores default config files.) The file can be either in JSON format or a JavaScript module that exports the configuration object:
 
@@ -128,7 +128,7 @@ npx html-minifier-next --preset conservative --remove-empty-attributes input.htm
 
 **Priority order:** Presets are applied first, then config file options, then CLI flags. This allows you to start with a preset and customize as needed.
 
-## Options quick reference
+## Options Quick Reference
 
 Most of the options are disabled by default. Experiment and find what works best for you and your project.
 
@@ -190,7 +190,7 @@ Options can be used in config files (camelCase) or via CLI flags (kebab-case wit
 | `trimCustomFragments`<br>`--trim-custom-fragments` | Trim whitespace around custom fragments (`ignoreCustomFragments`) where it does not affect the output (see [“Minifying server-side templates”](#minifying-server-side-templates))—use with `collapseWhitespace` | `false` |
 | `useShortDoctype`<br>`--use-short-doctype` | [Replaces the doctype with the short HTML doctype](https://perfectionkills.com/experimenting-with-html-minifier/#use_short_doctype) | `false` |
 
-### API-only options
+### API-Only Options
 
 A few options take functions and are therefore only available programmatically, not via CLI flags or config files:
 
@@ -203,7 +203,7 @@ A few options take functions and are therefore only available programmatically, 
 | `canTrimWhitespace` | `Function(tag, attrs, defaultFn)` that determines whether whitespace inside an element may be trimmed; where not, it stays as written, as in `pre` | Built-in handling (protects `pre`, `textarea`, etc.) |
 | `log` | `Function(message)` called with warnings and errors, including minification errors (`continueOnMinifyError`) and parse errors (`continueOnParseError`); the CLI wires this up under `--verbose` and `--dry` | No-op (errors are silent) |
 
-### Options that rely on another option
+### Options That Rely on Another Option
 
 Some options modify what another option does, and do nothing when that other option is off. Setting one on its own is reported through [the `log` hook](#api-only-options) (and, in the CLI, on STDERR), once per message per run:
 
@@ -229,7 +229,7 @@ HTML Minifier Next: Ignoring `conservativeCollapse`—use with `collapseWhitespa
 
 Passing the option `false`, or an empty array, asks for nothing and is not reported. `cacheCSS`, `cacheJS`, and `cacheSVG` are not included because they size a cache rather than transform markup, and therefore don’t change output.
 
-### Combining whitespace options
+### Combining Whitespace Options
 
 `collapseInlineTagWhitespace`, `collapseNoBreakSpaces`, `conservativeCollapse`, and `preserveLineBreaks` are modifiers: They do nothing on their own, and only take effect when `collapseWhitespace` is enabled.
 
@@ -260,11 +260,11 @@ Regardless of these options, whitespace at the start and end of the output goes,
 
 Note: `preserveLineBreaks` keeps line breaks, not indentation. HTML Minifier Next doesn’t format: To keep the source formatting, leave `collapseWhitespace` off (as in the first row of the table above). Line breaks and indentation then stay as written, while other options still apply.
 
-### Sorting attributes and style classes
+### Sorting Attributes and Style Classes
 
 `sortAttributes` and `sortClassNames` reorder attributes and class names by frequency, so that repeated markup looks more alike. This doesn’t change the plain-text size of the output, only how well it compresses: `sortAttributes` makes Gzip and Brotli output slightly smaller on average, though not on every page (see [“Optimizing for compression”](#optimizing-for-compression)); `sortClassNames` doesn’t help, and alongside `sortAttributes` cancels most of its gain with Brotli.
 
-### Optimizing for compression
+### Optimizing for Compression
 
 Most HTML is served compressed, so the Gzip or Brotli size is often what counts—and it doesn’t always follow the raw size. Added to the `comprehensive` preset, these options changed output size as follows (average per page, relative to `comprehensive`):
 
@@ -288,7 +288,7 @@ npx html-minifier-next --preset comprehensive --sort-attributes --no-remove-attr
 
 These figures were measured in October 2026 with HMN 8.8.1 on 61 pages of the [backtest corpus](#regression-tests) (retrieved February and September 2026). They are indications, not guarantees, as they depend on the markup and will shift as HMN and the minifiers it bundles change. The [benchmark](#working-tree-benchmarks) reports Gzip and Brotli (quality 6) sizes to re-check them.
 
-### Removing empty elements
+### Removing Empty Elements
 
 `removeEmptyElements` removes elements without content—no text and no child elements (comments don’t count; whitespace does, unless `collapseWhitespace` removes it). It keeps:
 
@@ -302,7 +302,7 @@ Everything else goes, including elements that are empty on purpose: icons and ot
 
 Where the markup allows it, the option is effective: On a test corpus, it reduced output by 1.37% raw and 0.76% with Gzip on average (see [“Optimizing for compression”](#optimizing-for-compression)).
 
-### CSS minification
+### CSS Minification
 
 When `minifyCSS` is set to `true`, HTML Minifier Next uses [Lightning CSS](https://lightningcss.dev/) to minify CSS in `style` elements and attributes. Lightning CSS provides excellent minification by default.
 
@@ -346,7 +346,7 @@ const result = await minify(html, {
 });
 ```
 
-### Unused CSS removal
+### Unused CSS Removal
 
 `removeUnusedCSS` removes selectors from `style` elements that name an element, class, or ID the document doesn’t reference, as well as rules that are left without selectors. In `.used, .unused { … }`, only `.unused` goes. It needs to be used with `minifyCSS`, because the removal runs through Lightning CSS—passing `minifyCSS` a function of your own replaces that step, so the removal does not apply, either. Both cases are reported through [the `log` hook](#api-only-options). It doesn’t touch `style` or `media` attributes.
 
@@ -388,7 +388,7 @@ Names used by `@keyframes` and `@counter-style` rules are not removed, even when
 
 Values that cannot be honored—a `safelist` that isn’t an array, an entry that is neither a string nor a regular expression, a misspelled key—are reported through the `log` hook.
 
-### JavaScript minification
+### JavaScript Minification
 
 When `minifyJS` is set to `true`, HTML Minifier Next uses [Terser](https://terser.org/) by default to minify JavaScript in `<script>` elements and event attributes.
 
@@ -457,13 +457,13 @@ const result = await minify(html, {
 });
 ```
 
-### JSON minification
+### JSON Minification
 
 `minifyJSON` minifies JSON script types—`application/json`, `application/ld+json`, `application/manifest+json`, `application/vnd.geo+json`, `application/problem+json`, `application/merge-patch+json`, `application/json-patch+json`, `importmap`, and `speculationrules`. It removes whitespace between tokens and unneeded escapes in strings, escaping `<`, and leaves values as written (e.g., large numbers and duplicate keys). Malformed JSON is preserved by default (with `continueOnMinifyError: true`).
 
 Note: The `processScripts` option is only for script types containing HTML templates (e.g., `text/ng-template`, `text/x-handlebars-template`), not for JSON.
 
-### SVG minification
+### SVG Minification
 
 When `minifySVG` is set to `true`, HTML Minifier Next uses [SVGO](https://svgo.dev/) to optimize inline SVG elements. Complete `<svg>` subtrees are extracted and processed as a block, enabling deep structural optimization:
 
@@ -516,7 +516,7 @@ const result = await minify(html, {
 * SVG that uses `xlink:` attributes without declaring the XLink namespace, which HTML needs not, gets the declaration for SVGO, which reads XML, and loses it again after
 * For maximum compression, use `minifySVG` together with `collapseWhitespace` and other options
 
-### CSS, JavaScript, and SVG cache configuration
+### CSS, JavaScript, and SVG Cache Configuration
 
 HTML Minifier Next uses in-memory caches to improve performance when processing multiple files or repeated content. The cache sizes can be configured for optimal performance based on your use case:
 
@@ -598,7 +598,7 @@ A cache that was never exercised (e.g., `minifySVG` disabled, or `minify()` not 
 
 The CLI’s `--verbose` and `--dry` modes print the same information to STDERR at the end of a run, omitting caches that were never touched.
 
-## Minification comparison
+## Minification Comparison
 
 Please see [**the Minifier Benchmarks Project**](https://j9t.github.io/minifier-benchmarks/) for details on how HTML Minifier Next compares to other minifiers. (The benchmarks are currently maintained by the author of HTML Minifier Next. Contributions, including from other minifier authors, are welcome.)
 
@@ -673,9 +673,9 @@ npx html-minifier-next --input-dir=src --output-dir=dist --verbose --collapse-wh
 npx html-minifier-next --input-dir=src --output-dir=dist --dry --collapse-whitespace
 ```
 
-## Special cases
+## Special Cases
 
-### Ignoring chunks of markup
+### Ignoring Chunks of Markup
 
 If you have chunks of markup you would like preserved, you can wrap them with `<!-- htmlmin:ignore -->`.
 
@@ -683,13 +683,13 @@ If you have chunks of markup you would like preserved, you can wrap them with `<
 
 HMN is primarily an HTML minifier. To process XHTML (`application/xhtml+xml`), keep those options off whose output XML can’t parse (e.g., `removeOptionalTags`, `removeAttributeQuotes`, and `collapseBooleanAttributes`) as well as `removeRedundantAttributes` (as the option removes `xml:lang` attributes as well as `xmlns` from `html`).
 
-### Preserving SVG and MathML elements
+### Preserving SVG and MathML Elements
 
 SVG and MathML elements are automatically recognized as foreign elements, and when they are minified, both case-sensitivity and self-closing slashes are preserved, regardless of the minification settings used for the rest of the file. This ensures valid output for these namespaced elements. `selfCloseForeignElements` writes empty ones as self-closing, too (e.g., `<use href="#a"/>`), while HTML elements in them, as in `foreignObject`, keep their end tags.
 
 `removeRedundantAttributes` removes the namespace declarations HTML reads anyway (`xmlns` on `html`, `svg`, `math`, and other elements in the namespace it declares, and `xmlns:xlink` on SVG and MathML elements), along with SVG attributes set to their default values (e.g., `<feBlend mode="normal">`, `<stop offset="0">`; presentation attributes like `fill` are left alone, as they inherit). Without the declarations, SVG markup taken from the page via `outerHTML` (e.g., to save it as a file) is no standalone SVG; `XMLSerializer` adds them back.
 
-### Working with invalid or partial markup
+### Working with Invalid or Partial Markup
 
 By default, HMN parses markup into a complete tree structure, then modifies it (removing anything that was specified for removal, ignoring anything that was specified to be ignored, etc.), then creates markup from that tree and returns it.
 
@@ -703,17 +703,17 @@ Markup with [parse errors](https://html.spec.whatwg.org/multipage/parsing.html#p
 
 To validate complete HTML markup, use [the W3C validator](https://validator.w3.org/) or one of [several validator packages](https://meiert.com/blog/html-validator-packages/).
 
-### Doctypes and quirks mode
+### Doctypes and Quirks Mode
 
 Where browsers parse markup differently by document mode, HMN follows the doctype [as the HTML parser does](https://html.spec.whatwg.org/multipage/parsing.html#the-initial-insertion-mode): Under a doctype that sets quirks mode, like HTML 3.2 or HTML 4.01 Transitional without a system identifier, a `table` doesn’t close an open `p`, while under the HTML doctype and legacy doctypes that set no-quirks or limited-quirks mode, like XHTML 1.0 Strict or HTML 4.01 Strict, it does.
 
 Only the first doctype counts, and only after nothing but comments and whitespace, as browsers ignore any other. Without such a doctype, the mode is unknown: The markup may be a fragment of a document in either mode, or a complete document, which renders in quirks mode—and text before the doctype, like template code (e.g., `<?php … ?>`), may render to nothing or to text that makes browsers ignore the doctype. HMN then keeps what either mode needs where the two differ—a `</p>` before a `table`, or after a `table` inside a `p`. `useShortDoctype` replaces the doctype with the HTML one, so where the doctype counts, markup is then read as no-quirks, which is how browsers will parse the output.
 
-### Line breaks
+### Line Breaks
 
 HTML reads CRLF and CR line breaks as line feeds, so HMN writes them so, too. Markup within `<!-- htmlmin:ignore -->` and custom fragments, with the whitespace padding them, stay as written. A carriage return written as a character reference (e.g., `&#13;`) stays one under `decodeEntities`.
 
-### Minifying server-side templates
+### Minifying Server-Side Templates
 
 By default, `ignoreCustomFragments` preserves `<?php … ?>`, `<?= … ?>`, `<? … ?>`, and `<% … %>` blocks (as well as XML declarations), so PHP, ERB, JSP, and ASP templates can be minified as part of a build, with the markup, CSS, and JavaScript around those blocks being minified as usual. For includes and other partials, add `partialMarkup`.
 
@@ -721,7 +721,7 @@ Whitespace next to template blocks is collapsed but kept, as it may matter once 
 
 Where pages are rendered ahead of serving, as with static exports or full-page caches, you can also minify the rendered HTML instead, which makes this a non-issue.
 
-### Regex options and flags
+### Regex Options and Flags
 
 `customAttrAssign` and `customAttrSurround` patterns are merged into one attribute pattern which carries no flags of its own. `i` and `s` are written into each pattern’s source instead, so they survive the merge. `u`, `v`, and `m` cannot be, and none of them fails loudly when dropped: `u` and `v` only narrow what syntax is legal, so a source valid under either stays valid without it and quietly matches something else—a dropped `u` leaves `\p{L}` matching the literal text `p{L}`—while a dropped `m` leaves `^` and `$` matching at the ends of the input rather than of each line.
 
@@ -731,7 +731,7 @@ Patterns given as strings, in a configuration file or on the command line, may b
 
 ## Security
 
-### ReDoS protection
+### ReDoS Protection
 
 You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular expression to run against your documents. This is also where a regular expression denial of service (ReDoS) could originate:
 
@@ -747,7 +747,7 @@ You can use `ignoreCustomFragments` to hand HTML Minifier Next a regular express
 
 **Important:** A single unlimited quantifier is not one of those shapes: `[\s\S]*?` running up to a literal terminator matches in linear time, and it is how HMN’s defaults are written. Bounds are still worth adding where you know the maximum length of a fragment, since they cap how far a failing match can scan.
 
-#### Custom fragment examples
+#### Custom Fragment Examples
 
 **Safe patterns:**
 
@@ -786,7 +786,7 @@ ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 ignoreCustomFragments: [/\{\{[\s\S]{0,500}?\}\}/]
 ```
 
-##### Escaping patterns in different contexts
+##### Escaping Patterns in Different Contexts
 
 The escaping requirements for `ignoreCustomFragments` patterns differ depending on how you’re using HMN:
 
@@ -828,13 +828,13 @@ For CLI usage, using a config file is strongly recommended to avoid complex shel
 
 Note: This section assumes working with main dependencies installed (`npm i`).
 
-### Local server
+### Local Server
 
 ```shell
 npm run serve
 ```
 
-### Regression tests
+### Regression Tests
 
 ```shell
 cd backtest;
@@ -850,7 +850,7 @@ Parameters:
 * `COUNT`: Tests last `COUNT` commits (e.g., `npm run backtest 100`)
 * `COUNT/STEP`: Tests last `COUNT` commits, sampling every `STEP`th commit (e.g., `npm run backtest 500/10` tests 50 commits)
 
-### Working tree benchmarks
+### Working Tree Benchmarks
 
 Where the backtest walks Git history, the benchmark times the code as it is _right now_—useful for A/B testing a branch against a saved baseline:
 
